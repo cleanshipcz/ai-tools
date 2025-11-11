@@ -1,46 +1,43 @@
 {
   "folders": [
     {
-      "path": "."
-    }
+      "path": ".",
+    },
   ],
   "settings": {
     "files.associations": {
       "*.yml": "yaml",
-      "*.yaml": "yaml"
+      "*.yaml": "yaml",
     },
     "yaml.schemas": {
       "schemas/prompt.schema.json": "prompts/**/*.yml",
       "schemas/agent.schema.json": "agents/**/*.yml",
       "schemas/rulepack.schema.json": "rulepacks/**/*.yml",
       "schemas/skill.schema.json": "skills/**/*.yml",
-      "schemas/eval.schema.json": "evals/suites/**/*.yml"
+      "schemas/eval.schema.json": "evals/suites/**/*.yml",
     },
     "yaml.format.enable": true,
     "yaml.validate": true,
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "[yaml]": {
-      "editor.defaultFormatter": "redhat.vscode-yaml"
+      "editor.defaultFormatter": "redhat.vscode-yaml",
     },
     "[typescript]": {
-      "editor.defaultFormatter": "esbenp.prettier-vscode"
+      "editor.defaultFormatter": "esbenp.prettier-vscode",
     },
     "files.exclude": {
       "node_modules": true,
-      "dist": true
+      "dist": true,
     },
     "search.exclude": {
       "node_modules": true,
       "dist": true,
-      "adapters": true
+      "adapters": true,
     },
-    "typescript.tsdk": "node_modules/typescript/lib"
+    "typescript.tsdk": "node_modules/typescript/lib",
   },
   "extensions": {
-    "recommendations": [
-      "redhat.vscode-yaml",
-      "esbenp.prettier-vscode"
-    ]
-  }
+    "recommendations": ["redhat.vscode-yaml", "esbenp.prettier-vscode"],
+  },
 }

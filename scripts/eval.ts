@@ -100,7 +100,10 @@ class EvalRunner {
 
         if (entry.isDirectory()) {
           files.push(...(await this.findYamlFiles(fullPath)));
-        } else if (entry.isFile() && (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml'))) {
+        } else if (
+          entry.isFile() &&
+          (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml'))
+        ) {
           files.push(fullPath);
         }
       }

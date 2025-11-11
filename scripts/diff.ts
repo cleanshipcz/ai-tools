@@ -38,7 +38,9 @@ class DiffTool {
 
     const format = options.format || 'lines';
     const changes =
-      format === 'words' ? diffWords(beforeContent, afterContent) : diffLines(beforeContent, afterContent);
+      format === 'words'
+        ? diffWords(beforeContent, afterContent)
+        : diffLines(beforeContent, afterContent);
 
     let additions = 0;
     let deletions = 0;

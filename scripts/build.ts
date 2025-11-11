@@ -151,7 +151,10 @@ class Builder {
 
         if (entry.isDirectory()) {
           files.push(...(await this.findYamlFiles(fullPath)));
-        } else if (entry.isFile() && (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml'))) {
+        } else if (
+          entry.isFile() &&
+          (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml'))
+        ) {
           files.push(fullPath);
         }
       }
@@ -269,10 +272,7 @@ class Builder {
         outputs: prompt.outputs || { format: 'text' },
       };
 
-      await writeFile(
-        join(promptsDir, `${id}.json`),
-        JSON.stringify(claudePrompt, null, 2)
-      );
+      await writeFile(join(promptsDir, `${id}.json`), JSON.stringify(claudePrompt, null, 2));
     }
 
     console.log(chalk.gray(`    Generated ${this.skills.size} skills`));

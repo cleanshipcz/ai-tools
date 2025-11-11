@@ -60,7 +60,15 @@
           },
           "type": {
             "type": "string",
-            "enum": ["command", "regex", "json-schema", "llm-judge", "exact-match", "contains", "not-contains"],
+            "enum": [
+              "command",
+              "regex",
+              "json-schema",
+              "llm-judge",
+              "exact-match",
+              "contains",
+              "not-contains"
+            ],
             "description": "Type of check to perform"
           },
           "cmd": {

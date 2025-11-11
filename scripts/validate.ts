@@ -22,8 +22,16 @@ interface ManifestFile {
 // Security patterns to check for
 const SECURITY_PATTERNS = [
   { name: 'API Key', pattern: /\b[A-Za-z0-9_-]{32,}\b/, exclude: /example|sample|test/i },
-  { name: 'Password', pattern: /password\s*[:=]\s*['"][^'"]+['"]/, exclude: /\$\{|example|sample|placeholder/i },
-  { name: 'Secret', pattern: /secret\s*[:=]\s*['"][^'"]+['"]/, exclude: /\$\{|example|sample|placeholder/i },
+  {
+    name: 'Password',
+    pattern: /password\s*[:=]\s*['"][^'"]+['"]/,
+    exclude: /\$\{|example|sample|placeholder/i,
+  },
+  {
+    name: 'Secret',
+    pattern: /secret\s*[:=]\s*['"][^'"]+['"]/,
+    exclude: /\$\{|example|sample|placeholder/i,
+  },
   { name: 'Private Key', pattern: /-----BEGIN (RSA |DSA )?PRIVATE KEY-----/, exclude: null },
   { name: 'AWS Access Key', pattern: /AKIA[0-9A-Z]{16}/, exclude: null },
   { name: 'GitHub Token', pattern: /ghp_[a-zA-Z0-9]{36}/, exclude: null },
@@ -147,7 +155,10 @@ class Validator {
 
         if (entry.isDirectory()) {
           files.push(...(await this.findYamlFiles(fullPath)));
-        } else if (entry.isFile() && (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml'))) {
+        } else if (
+          entry.isFile() &&
+          (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml'))
+        ) {
           files.push(fullPath);
         }
       }
@@ -162,7 +173,9 @@ class Validator {
     for (const manifest of manifests) {
       const schema = schemas[manifest.type];
       if (!schema) {
-        this.errors.push(`${relative(rootDir, manifest.path)}: No schema found for type ${manifest.type}`);
+        this.errors.push(
+          `${relative(rootDir, manifest.path)}: No schema found for type ${manifest.type}`
+        );
         continue;
       }
 
@@ -186,9 +199,7 @@ class Validator {
 
       // Check kebab-case
       if (!KEBAB_CASE_PATTERN.test(id)) {
-        this.errors.push(
-          `${relative(rootDir, manifest.path)}: ID "${id}" must be in kebab-case`
-        );
+        this.errors.push(`${relative(rootDir, manifest.path)}: ID "${id}" must be in kebab-case`);
       }
 
       // Check uniqueness
