@@ -10,418 +10,432 @@ A comprehensive solution for managing AI agent prompts, rules, skills, and tool 
 
 ---
 
-## 🎯 What is This?
-
-Instead of maintaining separate configurations for each AI tool you use, define your agents, prompts, and rules **once** in version-controlled YAML files, then automatically generate tool-specific configs.
-
-```
-Write YAML → Validate → Build → Get configs for Windsurf, Claude, Cursor, etc.
-```
-
-## ✨ Features
-
-- 📝 **Single Source of Truth**: Define agents, prompts, and rules once in YAML
-- 🔄 **Multi-Tool Support**: Generate configs for Windsurf, Claude Code, Cursor, and more
-- 🛡️ **Type-Safe**: JSON Schema validation for all manifests
-- 🧩 **Composable**: Rulepacks extend and combine for maximum reuse
-- 📦 **Versioned**: Semantic versioning for all components
-- 🧪 **Evaluated**: Built-in eval framework with budget tracking
-- 🔒 **Secure**: Automatic checks for secrets and security issues
-- ⚡ **Automated**: Full CI/CD with GitHub Actions
-
-**What's Included:**
-
-- 21 validated manifests (6 rulepacks, 4 agents, 4 prompts, 5 skills)
-- 5 comprehensive JSON schemas
-- 5 build and automation scripts
-- Complete GitHub Actions workflow
-- Evaluation framework with test datasets
-- Red team security test cases
-- Full documentation and examples
-
 ## Quick Start
 
-### Installation
+### For Casual Users (Just Want Prompts)
 
 ```bash
-# Clone the repository
+# Clone and install
 git clone https://github.com/cleanshipcz/ai-tools.git
 cd ai-tools
-
-# Install dependencies
 npm install
 
-# Validate manifests
+# Generate interactive HTML browser
+npm run prompt-html
+# Open PROMPT_LIBRARY.html in your browser!
+
+# Or use the CLI tool
+npm run use-prompt
+npm run use-prompt write-tests
+```
+
+### For Developers (Managing Configs)
+
+```bash
+# Validate and build all configs
 npm run validate
-
-# Build tool-specific adapters
 npm run build
 
-# Generate documentation
-npm run docs
+# Import into Windsurf, Cursor, etc.
+ls adapters/windsurf/
+ls adapters/cursor/
 ```
 
-### Project Structure
+---
 
-```
-ai-tools/
-├── agents/              # Tool-agnostic agent definitions
-├── prompts/             # Atomic prompts with metadata
-│   ├── refactor/
-│   ├── docs/
-│   ├── qa/
-│   └── shared/          # Shared snippets
-├── rulepacks/           # Reusable rulesets
-├── skills/              # Executable tools and commands
-├── mcp/                 # MCP server configurations
-│   ├── servers/
-│   └── presets/
-├── schemas/             # JSON Schemas for validation
-├── scripts/             # Build, validation, and eval scripts
-├── evals/               # Evaluation datasets and suites
-│   ├── datasets/
-│   ├── suites/
-│   └── reports/
-├── redteam/             # Security and safety tests
-├── adapters/            # Generated tool configs (gitignored)
-│   ├── windsurf/
-│   ├── claude-code/
-│   └── cursor/
-├── config/              # Configuration templates
-└── docs/                # Documentation
-```
+## 📝 Prompts
 
-## 🚀 How to Use This Repository
+### What Are Prompts?
 
-### End-to-End Workflow: Using a Prompt with GPT-5
+Prompts are reusable instructions you give to AI models. Think of them as templates that solve common coding tasks:
 
-**Scenario**: You want to use the "extract-method" refactoring prompt with GPT-5.
+- **extract-method** - Refactor code into clean functions
+- **add-null-safety** - Add proper null/error handling
+- **write-tests** - Generate unit tests for your code
+- **summarize-pr** - Explain pull request changes
 
-#### Step 1: Find or Create a Prompt
+### Usage
+
+#### For Casual Users (ChatGPT, Claude.ai, etc.)
+
+**Option 1: Interactive HTML Browser (Recommended)**
 
 ```bash
-# Browse available prompts
-ls prompts/refactor/
-# Output: extract-method.yml, add-null-safety.yml
+# Generate interactive web page
+npm run prompt-html
 
-# Or create your own
-cat prompts/refactor/my-prompt.yml
+# Open in browser
+open PROMPT_LIBRARY.html
 ```
 
-#### Step 2: Build Adapters
+Features:
+- 🔍 **Search and filter** prompts by name/tag
+- 📝 **Fill variables** in interactive form
+- �️ **Live preview** - see prompt update as you type
+- �📋 **One-click copy** - copies the filled prompt
+- � **Example data** - auto-fill with sample values
+- 🎨 **Beautiful, responsive** UI
+
+**Option 2: Interactive CLI Tool**
 
 ```bash
+# List available prompts
+npm run use-prompt
+
+# Use a specific prompt (it will ask for variables)
+npm run use-prompt write-tests
+```
+
+The CLI will:
+1. Ask for required variables
+2. Fill them into the prompt
+3. Output ready-to-paste text
+
+**Option 3: Static Markdown Library**
+
+```bash
+# Generate markdown file
+npm run prompt-library
+
+# Open the file
+open PROMPT_LIBRARY.md
+```
+
+Browse prompts, click to expand, copy the text, replace `{{variables}}` manually.
+
+**Manual Method:**
+
+```bash
+# Build tool adapters
 npm run build
-```
 
-This generates tool-specific configs in `adapters/`:
-
-- `adapters/windsurf/` - For Windsurf IDE
-- `adapters/claude-code/` - For Claude Code
-- `adapters/cursor/` - For Cursor IDE
-
-#### Step 3: Use the Prompt
-
-**Option A: Copy the Generated Prompt Text**
-
-```bash
-# View the built prompt
+# View a prompt
 cat adapters/claude-code/prompts/extract-method.json
 ```
 
-Copy the `content` field and paste it into:
+Copy the `user` field, fill in variables, paste into ChatGPT/Claude.
 
-- ChatGPT (GPT-5)
-- Claude.ai
-- Any LLM interface
-
-Replace variables like `{{code}}` with your actual code.
-
-**Option B: Use with Your AI Tool**
+#### For Tool Users (Windsurf, Cursor, etc.)
 
 ```bash
-# For Windsurf
-# Import: adapters/windsurf/rules/extract-method.json
-
-# For Cursor
-# Import: adapters/cursor/recipes.json
-# Then select "extract-method" recipe
-
-# For Claude Code
-# Import: adapters/claude-code/prompts/extract-method.json
-```
-
-**Option C: Use Programmatically**
-
-```typescript
-import fs from 'fs';
-
-// Read the generated prompt
-const prompt = JSON.parse(
-  fs.readFileSync('adapters/claude-code/prompts/extract-method.json', 'utf-8')
-);
-
-// Fill in variables
-const finalPrompt = prompt.content
-  .replace('{{code}}', myCode)
-  .replace('{{language}}', 'TypeScript');
-
-// Send to your LLM API
-const response = await openai.chat.completions.create({
-  model: 'gpt-5',
-  messages: [{ role: 'user', content: finalPrompt }],
-});
-```
-
-#### Step 4: Use with Agents (Advanced)
-
-If you want rules and context bundled:
-
-```bash
-# Check agent configs
-cat adapters/windsurf/rules/code-reviewer.json
-
-# This includes:
-# - All rulepacks (base, security, etc.)
-# - System prompts
-# - Default settings
-# - MCP capabilities
-```
-
-Import the agent config into your tool, and it will automatically apply all rules and prompts.
-
-### Workflow Diagram
-
-```
-1. Create/Edit YAML manifests
-   ↓
-2. npm run validate (check for errors)
-   ↓
-3. npm run build (generate adapters)
-   ↓
-4. Use adapters in your AI tool
-   OR
-   Copy prompt text to ChatGPT/Claude
-   OR
-   Call LLM API programmatically
-```
-
-### Quick Usage Examples
-
-**Using an existing prompt manually:**
-
-```bash
-# 1. View available prompts
-ls prompts/*/
-
-# 2. Read the prompt
-cat prompts/refactor/extract-method.yml
-
-# 3. Copy the 'content' section
-# 4. Paste into ChatGPT/Claude
-# 5. Replace {{variables}} with your data
-```
-
-**Using with Windsurf IDE:**
-
-```bash
-# 1. Build adapters
+# Build tool-specific configs
 npm run build
 
-# 2. In Windsurf, go to Settings > Rules
-# 3. Import: /path/to/ai-tools/adapters/windsurf/rules/code-reviewer.json
-# 4. Chat with AI - rules are automatically applied
+# Import into your tool:
+# Windsurf: Settings → Rules → Import adapters/windsurf/rules/*.json
+# Cursor: Command Palette → Import adapters/cursor/recipes.json
+# Claude Code: Import from adapters/claude-code/
 ```
 
-**Using with Cursor IDE:**
+Your AI assistant will automatically have access to all prompts.
 
-```bash
-# 1. Build adapters
-npm run build
-
-# 2. In Cursor, open Command Palette (Cmd/Ctrl+Shift+P)
-# 3. Search: "Cursor: Import Custom Rules"
-# 4. Import: /path/to/ai-tools/adapters/cursor/recipes.json
-# 5. Use recipes in chat via @recipe-name
-```
-
-**Programmatic usage:**
-
-```python
-# Python example
-import json
-import os
-from openai import OpenAI
-
-# Read generated prompt
-with open('adapters/claude-code/prompts/write-tests.json') as f:
-    prompt_config = json.load(f)
-
-# Fill variables
-code = """
-def calculate_total(items):
-    return sum(item['price'] for item in items)
-"""
-
-final_prompt = prompt_config['content'].replace('{{code}}', code)
-
-# Call GPT-5
-client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
-response = client.chat.completions.create(
-    model='gpt-5',
-    messages=[{'role': 'user', 'content': final_prompt}]
-)
-
-print(response.choices[0].message.content)
-```
-
-## Creating Your First Agent
-
-### 1. Create a Rulepack
-
-```yaml
-# rulepacks/my-coding-rules.yml
-id: my-coding-rules
-version: 1.0.0
-description: My team's coding standards
-extends:
-  - base
-rules:
-  - 'Use meaningful variable names'
-  - 'Keep functions under 50 lines'
-  - 'Write tests for all public APIs'
-```
-
-### 2. Create an Agent
+### Creating Custom Prompts
 
 ````yaml
-# agents/my-reviewer.yml
-id: my-reviewer
+# prompts/refactor/my-prompt.yml
+id: my-prompt
 version: 1.0.0
-purpose: Review code according to team standards
-rulepacks:
-  - base
-  - my-coding-rules
-  - security
-capabilities:
-  - mcp:git
-  - mcp:filesystem
-defaults:
-  temperature: 0.2
-  model: claude-3-5-sonnet
-prompt:
-  system: |
-    You are a code reviewer for our team.
-    Review code for correctness, style, and security.
-  user_template: |
-    Review this code:
-    ```
-    {{code}}
-    ```
-````
-
-### 3. Build and Use
-
-```bash
-# Validate your manifests
-npm run validate
-
-# Build adapters
-npm run build
-
-# Check generated configs
-ls adapters/windsurf/rules/my-reviewer.json
-ls adapters/claude-code/prompts/
-```
-
-## Available Commands
-
-```bash
-npm run validate    # Validate all manifests against schemas
-npm run build       # Generate tool-specific adapters
-npm run eval        # Run evaluation suites
-npm run docs        # Generate documentation
-npm run diff        # Compare outputs (A/B testing)
-npm run ci          # Run full CI pipeline locally
-npm run lint        # Check code formatting
-npm run format      # Auto-format code
-npm run clean       # Remove generated files
-```
-
-## Creating Prompts
-
-Prompts are atomic, reusable templates with variables:
-
-````yaml
-# prompts/refactor/simplify-logic.yml
-id: simplify-logic
-version: 1.0.0
-description: Simplify complex conditional logic
+description: What this prompt does (10-500 chars)
 tags:
   - refactor
-  - readability
+  - cleanup
 variables:
   - name: code
     required: true
-    description: 'Code with complex logic'
+    description: "The code to process"
   - name: language
     required: true
-    description: 'Programming language'
-includes:
-  - ../shared/constraints.md
-  - ../shared/acceptance_criteria.md
+    description: "Programming language"
 rules:
-  - 'Preserve behavior exactly'
-  - 'Reduce nesting depth'
-  - 'Extract complex conditions to named functions'
+  - "Keep behavior identical"
+  - "Add helpful comments"
 content: |
-  Simplify the following {{language}} code:
+  Refactor this {{language}} code:
 
   ```{{language}}
   {{code}}
-````
+  ```
 
-Focus on:
-
-- Reducing nested if statements
-- Using early returns
-- Extracting complex conditions
-
-{{> constraints}}
-{{> acceptance_criteria}}
+  Make it cleaner and more maintainable.
 outputs:
-format: code
-
+  format: code
 ````
 
-## Creating Skills
+**Then:**
 
-Skills are executable tools that agents can use:
+```bash
+npm run validate  # Check for errors
+npm run build     # Generate adapters
+npm run prompt-library  # Update prompt library
+```
+
+---
+
+## 🤖 Agents
+
+### What Are Agents?
+
+Agents are complete AI assistants with bundled prompts, rules, and settings. They're designed for specific tasks and roles.
+
+**Included Agents:**
+
+- **code-reviewer** - Reviews code for quality and security
+- **bug-fixer** - Helps debug and fix issues
+- **tdd-navigator** - Guides test-driven development
+- **kotlin-style-enforcer** - Enforces Kotlin coding standards
+
+### Usage
+
+#### With AI Coding Tools
+
+```bash
+# Build agent configs
+npm run build
+
+# Import into tool:
+# Windsurf: Import adapters/windsurf/rules/code-reviewer.json
+# Cursor: Import adapters/cursor/recipes.json
+```
+
+The agent's rules and prompts are automatically applied when you chat with AI.
+
+#### Manually
+
+Agents bundle multiple components, so you'd typically use them through tools. But you can extract individual parts:
+
+```bash
+# View agent config
+cat agents/code-reviewer.yml
+
+# See what it includes
+cat adapters/windsurf/rules/code-reviewer.json
+```
+
+### Creating Custom Agents
 
 ```yaml
-# skills/run-linter.yml
-id: run-linter
+# agents/my-agent.yml
+id: my-agent
 version: 1.0.0
-description: Run project linter
+purpose: Brief description of agent's role
+rulepacks:
+  - base # Inherit rules from rulepacks
+  - security
+capabilities:
+  - mcp:git # What tools can it use?
+  - mcp:filesystem
+defaults:
+  temperature: 0.3
+  model: claude-3-5-sonnet
+prompt:
+  system: |
+    You are a specialized assistant for...
+  user_template: |
+    {{task_description}}
+```
+
+**Then validate and build:**
+
+```bash
+npm run validate
+npm run build
+```
+
+---
+
+## 📋 Rulepacks
+
+### What Are Rulepacks?
+
+Rulepacks are reusable collections of coding guidelines and best practices. They're designed to be mixed and matched.
+
+**Included Rulepacks:**
+
+- **base** - Universal coding standards (naming, formatting, etc.)
+- **security** - Security best practices (input validation, secrets)
+- **coding-python** - Python-specific conventions
+- **coding-kotlin** - Kotlin-specific conventions
+- **reviewer** - Code review guidelines
+
+### Usage
+
+Rulepacks are typically consumed through **agents** or **tool configs**, not used directly.
+
+```yaml
+# In an agent
+rulepacks:
+  - base
+  - security
+  - coding-python
+```
+
+When you build, these rules get merged into the agent configuration.
+
+### Creating Custom Rulepacks
+
+```yaml
+# rulepacks/my-rules.yml
+id: my-rules
+version: 1.0.0
+description: My team's coding standards
+extends:
+  - base # Inherit from other rulepacks
+rules:
+  - "Use meaningful variable names"
+  - "Functions under 50 lines"
+  - "Test all public APIs"
+  - "No console.log in production"
+```
+
+**Validation:**
+
+```bash
+npm run validate  # Checks for issues
+npm run build     # Bundles into agents/configs
+```
+
+---
+
+## 🛠️ Skills
+
+### What Are Skills?
+
+Skills are executable commands that AI agents can run - like running tests, linters, or searching the codebase.
+
+**Included Skills:**
+
+- **run-pytest** - Execute Python tests
+- **run-gradle-tests** - Run Gradle test suite
+- **run-detekt** - Kotlin static analysis
+- **run-ktlint** - Kotlin linter
+- **search-repo** - Search codebase with grep
+
+### Usage
+
+Skills are exposed to AI tools through MCP (Model Context Protocol) or tool adapters.
+
+```bash
+# Build skill configs
+npm run build
+
+# Skills are in:
+ls adapters/claude-code/skills.json
+ls adapters/windsurf/rules/*.json  # Bundled with agents
+```
+
+When the AI needs to run tests or check code, it uses these skill definitions.
+
+### Creating Custom Skills
+
+```yaml
+# skills/my-skill.yml
+id: my-skill
+version: 1.0.0
+description: What this skill does
 command:
   program: "npm"
   args:
     - "run"
-    - "lint"
+    - "my-command"
   cwd: "."
-timeout_sec: 120
+timeout_sec: 60
 outputs:
   stdout: true
   stderr: true
   exit_code: true
 tags:
-  - lint
-  - quality
-````
+  - build
+  - test
+```
 
-## Evaluation Framework
+---
 
-Create eval suites to test your agents and prompts:
+## 🔌 MCP (Model Context Protocol)
+
+### What Is MCP?
+
+MCP servers provide AI models with access to external tools and data sources - like filesystems, git, databases, APIs.
+
+**Included MCP Configs:**
+
+- **filesystem** - Read/write files
+- **git** - Git operations
+- **http** - Make HTTP requests
+- **shell** - Execute shell commands (use carefully!)
+
+**Presets:**
+
+- **base** - Safe defaults (filesystem + git)
+- **secure** - Extra restricted (no shell, limited HTTP)
+
+### Usage
+
+MCP configs are referenced in agents via the `capabilities` field:
+
+```yaml
+# In agents/my-agent.yml
+capabilities:
+  - mcp:git
+  - mcp:filesystem
+```
+
+When you build, the agent gets access to those MCP servers.
+
+### Creating Custom MCP Configs
+
+```yaml
+# mcp/servers/my-service.yaml
+server: my-service
+command: npx
+args:
+  - my-mcp-server
+description: What this MCP server provides
+capabilities:
+  - "read_database"
+  - "execute_queries"
+tags:
+  - database
+  - sql
+```
+
+**Create a preset:**
+
+```yaml
+# mcp/presets/my-preset.tools.yaml
+preset: my-preset
+description: My custom tool bundle
+includes:
+  - filesystem
+  - git
+  - my-service
+```
+
+---
+
+## 🧪 Evaluation Framework
+
+### What Is It?
+
+Test your prompts and agents with real datasets to ensure quality and track regressions.
+
+**Included Eval Suites:**
+
+- **code-refactor** - Tests refactoring prompts
+- **safety-guardrails** - Security and safety tests
+
+### Usage
+
+```bash
+# Run all evaluations
+npm run eval
+
+# Run specific suite
+npm run eval -- --suite code-refactor
+
+# Reports generated in evals/reports/
+```
+
+### Creating Custom Evals
 
 ```yaml
 # evals/suites/my-test.yml
@@ -430,58 +444,105 @@ version: 1.0.0
 description: Test my custom prompts
 targets:
   - type: prompt
-    id: simplify-logic
-    dataset: datasets/complex_code.jsonl
+    id: my-prompt
+    dataset: datasets/my-data.jsonl
 checks:
   - name: compiles
     type: command
-    cmd: 'python -m py_compile output.py'
+    cmd: "python -m py_compile output.py"
     required: true
-  - name: improved
+  - name: quality
     type: llm-judge
-    judge_prompt: 'Rate the improvement from 1-10'
+    judge_prompt: "Rate improvement from 1-10"
     weight: 1.0
 budgets:
-  max_tokens: 100000
-  max_cost_usd: 2.0
+  max_tokens: 50000
+  max_cost_usd: 1.0
 ```
 
-Run evaluations:
+---
 
-```bash
-npm run eval                    # Run all suites
-npm run eval -- --suite my-test # Run specific suite
+## 🏗️ Project Structure
+
+```
+ai-tools/
+├── prompts/             # Reusable prompt templates
+│   ├── refactor/
+│   ├── docs/
+│   ├── qa/
+│   └── shared/          # Shared snippets
+├── agents/              # Complete AI assistants
+├── rulepacks/           # Reusable rule collections
+├── skills/              # Executable commands
+├── mcp/                 # MCP server configs
+│   ├── servers/
+│   └── presets/
+├── schemas/             # JSON Schemas for validation
+├── scripts/             # Automation scripts
+├── evals/               # Evaluation framework
+│   ├── datasets/
+│   ├── suites/
+│   └── reports/
+├── adapters/            # Generated configs (gitignored)
+│   ├── windsurf/
+│   ├── claude-code/
+│   └── cursor/
+├── config/              # Configuration templates
+└── docs/                # Documentation
 ```
 
-## Consuming Generated Configs
+---
 
-### Windsurf
+## 🚀 Available Commands
 
-1. Build adapters: `npm run build`
-2. Point Windsurf to `adapters/windsurf/presets/base.json`
-3. Or use specific agent: `adapters/windsurf/rules/code-reviewer.json`
-
-### Claude Code
-
-1. Build adapters: `npm run build`
-2. Import `adapters/claude-code/skills.json`
-3. Use prompts from `adapters/claude-code/prompts/`
-
-### Cursor
-
-1. Build adapters: `npm run build`
-2. Import recipes from `adapters/cursor/recipes.json`
-
-## Configuration
-
-### Provider Setup
+### For Users (Using Prompts)
 
 ```bash
-# Copy example config
+npm run prompt-html      # Generate interactive HTML browser (⭐ Recommended)
+npm run use-prompt       # Interactive CLI tool to fill & copy prompts
+npm run prompt-library   # Generate markdown library
+```
+
+### For Developers (Managing Manifests)
+
+```bash
+npm run validate         # Validate all manifests
+npm run build            # Generate tool adapters
+npm run docs             # Generate documentation
+npm run eval             # Run evaluation suites
+npm run diff             # Compare outputs A/B
+npm run ci               # Run full CI pipeline
+npm run lint             # Check code formatting
+npm run format           # Auto-format code
+npm run clean            # Remove generated files
+```
+
+---
+
+## 📚 Documentation
+
+### User-Friendly Resources
+
+- **[PROMPT_LIBRARY.html](PROMPT_LIBRARY.html)** - 🌐 Interactive prompt browser (generated)
+- **[PROMPT_LIBRARY.md](PROMPT_LIBRARY.md)** - 📄 Markdown prompt library (generated)
+
+### Developer Resources
+
+- **[QUICKREF.md](QUICKREF.md)** - Quick reference guide
+- **[docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md)** - Writing effective prompts
+- **[docs/AGENTS.md](docs/AGENTS.md)** - Agent documentation (generated)
+- **[docs/CHANGELOG.md](docs/CHANGELOG.md)** - Version history
+- **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Implementation summary
+
+---
+
+## ⚙️ Configuration
+
+### Provider Setup (For Evals)
+
+```bash
 cp config/providers.example.yml config/providers.yml
-
-# Edit with your API keys
-# IMPORTANT: Never commit config/providers.yml!
+# Edit with your API keys (never commit this file!)
 ```
 
 ```yaml
@@ -490,7 +551,6 @@ providers:
   openai:
     api_key: ${OPENAI_API_KEY}
     default_model: gpt-4-turbo-preview
-
   anthropic:
     api_key: ${ANTHROPIC_API_KEY}
     default_model: claude-3-5-sonnet-20241022
@@ -498,187 +558,134 @@ providers:
 
 ### Budget Configuration
 
-Edit `config/budgets.yml` to control costs:
+Edit `config/budgets.yml` to control eval costs:
 
 ```yaml
 global:
   max_tokens_per_suite: 500000
   max_cost_usd_per_suite: 10.0
-
-suites:
-  my-test:
-    max_tokens: 100000
-    max_cost_usd: 2.0
 ```
 
-## CI/CD
+---
 
-The repository includes a complete GitHub Actions workflow:
+## 🔒 Security
 
-- **Validate**: Schema validation, security checks
-- **Build**: Generate all adapters
-- **Eval**: Run test suites
-- **Docs**: Auto-generate documentation
-- **Release**: Create GitHub releases with artifacts
+- **Never commit secrets** - Use `${ENV_VAR}` placeholders
+- **Validation catches secrets** - Pre-commit hooks prevent leaks
+- **MCP security** - Disable shell access by default
+- **Red team tests** - Security test cases in `redteam/`
 
-### Setting Up CI
+---
 
-1. Push to GitHub
-2. Actions run automatically on PR and push
-3. Artifacts are uploaded for each run
-4. Releases are created on version changes
+## 🤝 Contributing
 
-### Required Secrets
+1. Create a branch
+2. Add/modify YAML manifests
+3. Run `npm run ci` to validate
+4. Commit and open PR
+5. CI validates automatically
 
-Add these to your GitHub repository secrets:
+---
+
+## 🔄 CI/CD
+
+GitHub Actions workflow with 7 jobs:
+
+- **validate** - Schema validation, security checks
+- **build** - Generate all adapters
+- **docs** - Auto-generate documentation
+- **eval** - Run test suites
+- **lint** - Code formatting
+- **security** - Dependency audit
+- **release** - Auto-release on version changes
+
+### Required GitHub Secrets
 
 - `OPENAI_API_KEY` (optional, for evals)
 - `ANTHROPIC_API_KEY` (optional, for evals)
 
-## Best Practices
+---
+
+## 📝 Best Practices
 
 ### Manifest Design
 
-- **Keep IDs stable**: Use kebab-case, don't change once published
-- **Version semantically**: MAJOR.MINOR.PATCH
-- **Write clear descriptions**: 10-500 characters
+- **Stable IDs**: Use kebab-case, never change after publishing
+- **Semantic versioning**: MAJOR.MINOR.PATCH
+- **Clear descriptions**: 10-500 characters
 - **Document variables**: Always describe what they do
-- **Use rulepacks**: Don't duplicate rules across agents
+- **Reuse rulepacks**: Don't duplicate rules
 
 ### Security
 
-- **Never commit secrets**: Use `${ENV_VAR}` placeholders
-- **Run validation**: Pre-commit hooks catch issues
-- **Test safety**: Include red team cases
-- **Limit MCP access**: Disable shell by default
+- Use environment variables for secrets
+- Run validation before committing
+- Include red team test cases
+- Limit MCP access appropriately
 
 ### Testing
 
-- **Write evals**: Test prompts with real data
-- **Set budgets**: Prevent runaway costs
-- **Track baselines**: Know when behavior changes
-- **Review diffs**: Compare before/after outputs
+- Write eval suites for important prompts
+- Set budget limits
+- Track baseline performance
+- Review diff outputs
 
-## Troubleshooting
+---
 
-### Validation Fails
-
-```bash
-npm run validate
-# Read error messages - they point to specific issues
-```
-
-Common issues:
-
-- Missing required fields
-- Invalid semver
-- Duplicate IDs
-- Broken includes
-- Secrets in files
-
-### Build Fails
-
-```bash
-npm run build
-# Check for missing referenced rulepacks or files
-```
-
-### TypeScript Errors
-
-The scripts will work with `tsx` even with TypeScript errors during development. Install dependencies first:
-
-```bash
-npm install
-```
-
-## Contributing
-
-1. Create a new branch
-2. Add/modify manifests in source directories
-3. Run `npm run ci` to validate
-4. Commit changes
-5. Open a pull request
-6. CI will validate and build
-
-## Documentation
-
-- [Style Guide](docs/STYLE_GUIDE.md) - Writing effective prompts and rules
-- [Changelog](docs/CHANGELOG.md) - Version history
-- [Agents](docs/AGENTS.md) - Auto-generated agent documentation
-
-## Examples
-
-See the included examples:
-
-- **Rulepacks**: `rulepacks/*.yml`
-- **Agents**: `agents/*.yml`
-- **Prompts**: `prompts/*/`
-- **Skills**: `skills/*.yml`
-- **Eval Suites**: `evals/suites/*.yml`
-- **Red Team**: `redteam/*.md`
-
-## Architecture
+## 📦 Architecture
 
 ```
 ┌─────────────────┐
-│ Source Manifests│  (YAML)
-│  - Agents       │
-│  - Prompts      │
-│  - Rulepacks    │
-│  - Skills       │
+│ YAML Manifests  │  (Source of Truth)
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ Validation      │
-│  - Schema check │
-│  - Security scan│
-│  - ID uniqueness│
+│ Validation      │  (Schema + Security)
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ Build System    │
-│  - Compose rules│
-│  - Resolve deps │
-│  - Generate     │
+│ Build System    │  (Compose + Generate)
 └────────┬────────┘
          │
-         ▼
-┌─────────────────┐
-│ Tool Adapters   │
-│  - Windsurf     │
-│  - Claude Code  │
-│  - Cursor       │
-└─────────────────┘
+         ├─────────┬─────────┬─────────┐
+         ▼         ▼         ▼         ▼
+    Windsurf  Cursor  Claude   Library.md
+     (JSON)   (JSON)  (JSON)   (Markdown)
 ```
 
-## Versioning
+---
 
-Each manifest has independent versioning:
+## 🗺️ Roadmap
 
-- **Agents**: Track interface changes
-- **Prompts**: Track behavior changes
-- **Rulepacks**: Track rule additions/changes
-- **Skills**: Track command/API changes
+### ✅ Completed
 
-## License
+- [x] **Interactive HTML browser** - Beautiful web UI with search, filter, one-click copy
+- [x] **CLI tool** - Interactive prompt filling and variable replacement
+- [x] **Markdown library** - Copy-paste ready prompt collection
+
+### 🔮 Planned
+
+- [ ] More tool adapters (VSCode Copilot, Cody, GitHub Copilot Chat)
+- [ ] Prompt marketplace/sharing platform
+- [ ] Advanced eval metrics (BLEU, ROUGE, custom)
+- [ ] Cost analytics dashboard
+- [ ] Version control integration (Git hooks for prompt changes)
+- [ ] Prompt optimization suggestions (A/B testing automation)
+
+---
+
+## 📄 License
 
 Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
-## Support
+---
+
+## 💬 Support
 
 - **Issues**: [GitHub Issues](https://github.com/cleanshipcz/ai-tools/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/cleanshipcz/ai-tools/discussions)
-
-## Roadmap
-
-- [ ] More tool adapters (VSCode, Cody)
-- [ ] Web UI for manifest editing
-- [ ] Prompt marketplace/sharing
-- [ ] Advanced eval metrics
-- [ ] Cost analytics dashboard
-- [ ] Prompt optimization tools
 
 ---
 

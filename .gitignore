@@ -12,6 +12,11 @@ adapters/*/skills.json
 adapters/*/prompts/
 *.tsbuildinfo
 
+# Generated documentation
+PROMPT_LIBRARY.md
+PROMPT_LIBRARY.html
+docs/AGENTS.md
+
 # Eval reports
 evals/reports/
 
