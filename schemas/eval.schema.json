@@ -1,0 +1,174 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/cleanshipcz/ai-tools/schemas/eval.schema.json",
+  "title": "Eval Suite Manifest",
+  "description": "Schema for evaluation suite definitions",
+  "type": "object",
+  "required": ["suite", "targets"],
+  "properties": {
+    "suite": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Unique identifier for the eval suite"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the suite"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of what this suite evaluates"
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "id", "dataset"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["prompt", "agent", "skill"],
+            "description": "Type of target to evaluate"
+          },
+          "id": {
+            "type": "string",
+            "description": "ID of the prompt/agent/skill"
+          },
+          "dataset": {
+            "type": "string",
+            "description": "Path to dataset file (JSONL)"
+          },
+          "config": {
+            "type": "object",
+            "description": "Additional configuration for this target"
+          }
+        }
+      },
+      "minItems": 1,
+      "description": "List of targets to evaluate"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the check"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["command", "regex", "json-schema", "llm-judge", "exact-match", "contains", "not-contains"],
+            "description": "Type of check to perform"
+          },
+          "cmd": {
+            "type": "string",
+            "description": "Command to run (for command type)"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Regex pattern (for regex type)"
+          },
+          "schema": {
+            "type": "object",
+            "description": "JSON schema (for json-schema type)"
+          },
+          "value": {
+            "type": "string",
+            "description": "Value to match or search for"
+          },
+          "judge_prompt": {
+            "type": "string",
+            "description": "Prompt for LLM judge"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Weight of this check in overall score"
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this check must pass"
+          }
+        }
+      },
+      "description": "List of checks to perform on outputs"
+    },
+    "budgets": {
+      "type": "object",
+      "properties": {
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum tokens allowed for entire suite"
+        },
+        "max_cost_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum cost in USD"
+        },
+        "max_duration_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum duration in seconds"
+        }
+      },
+      "description": "Budget constraints for the suite"
+    },
+    "baseline": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Baseline version to compare against"
+        },
+        "min_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum acceptable score"
+        }
+      },
+      "description": "Baseline comparison settings"
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "temperature": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "Providers to test against"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

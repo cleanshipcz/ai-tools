@@ -1,0 +1,22 @@
+id: secure-tools
+version: 1.0.0
+description: Restricted set of MCP tools for corporate/secure environments
+servers:
+  - filesystem
+  - git
+tools:
+  filesystem:
+    - read_file
+    - list_directory
+    # Note: write_file and search are disabled for security
+  git:
+    - read_log
+    - read_diff
+    - read_status
+    # Note: commit and branch operations disabled
+security:
+  read_only: true
+  audit_log: true
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"

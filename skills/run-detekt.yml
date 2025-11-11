@@ -1,0 +1,25 @@
+id: run-detekt
+version: 1.0.0
+description: Run Detekt static analysis for Kotlin
+command:
+  program: "./gradlew"
+  args:
+    - "detekt"
+  cwd: "."
+constraints:
+  - "Requires Detekt to be configured in the project."
+timeout_sec: 600
+outputs:
+  stdout: true
+  stderr: true
+  exit_code: true
+  files:
+    - "build/reports/detekt/detekt.html"
+tags:
+  - detekt
+  - kotlin
+  - lint
+  - static-analysis
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"

@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/cleanshipcz/ai-tools/schemas/rulepack.schema.json",
+  "title": "Rulepack Manifest",
+  "description": "Schema for reusable rulesets",
+  "type": "object",
+  "required": ["id", "rules"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Unique kebab-case identifier for the rulepack"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (semver) of the rulepack"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the rulepack's purpose"
+    },
+    "extends": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      },
+      "description": "List of parent rulepack IDs to extend"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 500
+      },
+      "minItems": 1,
+      "description": "List of rules in this pack"
+    },
+    "overrides": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Rules that override parent rulepacks"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags for categorization"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    }
+  }
+}

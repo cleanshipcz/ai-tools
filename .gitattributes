@@ -1,0 +1,15 @@
+# Git attributes for better diffs
+
+# YAML files
+*.yml linguist-language=YAML
+*.yaml linguist-language=YAML
+
+# JSON files - pretty diffs
+*.json diff=json
+
+# Markdown files
+*.md linguist-detectable
+
+# Generated files - don't include in language stats
+adapters/** linguist-generated=true
+dist/** linguist-generated=true

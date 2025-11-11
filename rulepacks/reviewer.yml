@@ -1,0 +1,24 @@
+id: reviewer
+version: 1.0.0
+description: Code review standards and guidelines
+extends:
+  - base
+rules:
+  - "Identify bugs, logic errors, and edge cases."
+  - "Flag potential security vulnerabilities."
+  - "Suggest performance improvements where applicable."
+  - "Check for code duplication and recommend refactoring."
+  - "Verify that tests adequately cover new functionality."
+  - "Ensure error handling is comprehensive."
+  - "Check for proper resource cleanup (files, connections, etc.)."
+  - "Verify API contracts and backward compatibility."
+  - "Look for hard-coded values that should be configurable."
+  - "Ensure logging is appropriate and not excessive."
+  - "Check documentation and comments are up to date."
+  - "Provide constructive, actionable feedback."
+tags:
+  - review
+  - quality
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"

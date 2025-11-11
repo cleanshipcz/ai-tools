@@ -1,0 +1,19 @@
+id: base-tools
+version: 1.0.0
+description: Basic set of MCP tools for development
+servers:
+  - filesystem
+  - git
+tools:
+  filesystem:
+    - read_file
+    - list_directory
+    - search
+  git:
+    - read_log
+    - read_diff
+    - read_status
+    - read_blame
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"

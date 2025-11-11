@@ -1,0 +1,35 @@
+suite: code-refactor
+version: 1.0.0
+description: Evaluate code refactoring prompts and agents
+targets:
+  - type: prompt
+    id: extract-method
+    dataset: datasets/bugfix_small.jsonl
+    config:
+      language: python
+checks:
+  - name: syntax-valid
+    type: command
+    cmd: "python -m py_compile output.py"
+    required: true
+  - name: no-todos
+    type: regex
+    pattern: "(?i)TODO|FIXME"
+    required: false
+  - name: improved-readability
+    type: llm-judge
+    judge_prompt: "Rate the code improvement on a scale of 1-10 for readability"
+    weight: 0.5
+budgets:
+  max_tokens: 200000
+  max_cost_usd: 5.0
+  max_duration_sec: 300
+baseline:
+  version: "1.2.0"
+  min_score: 0.75
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  tags:
+    - refactoring
+    - code-quality

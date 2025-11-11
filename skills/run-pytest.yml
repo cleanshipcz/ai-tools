@@ -1,0 +1,23 @@
+id: run-pytest
+version: 1.0.0
+description: Run Python tests with pytest
+command:
+  program: "pytest"
+  args:
+    - "-v"
+    - "--tb=short"
+  cwd: "."
+constraints:
+  - "Requires pytest to be installed."
+timeout_sec: 1800
+outputs:
+  stdout: true
+  stderr: true
+  exit_code: true
+tags:
+  - pytest
+  - python
+  - testing
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"

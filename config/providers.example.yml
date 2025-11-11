@@ -1,0 +1,49 @@
+# Example provider configuration
+# Copy this file to providers.yml and fill in your API keys
+# Never commit the actual providers.yml file!
+
+providers:
+  openai:
+    api_key: ${OPENAI_API_KEY}
+    organization: ${OPENAI_ORG_ID}  # optional
+    models:
+      - gpt-4-turbo-preview
+      - gpt-3.5-turbo
+    default_model: gpt-4-turbo-preview
+
+  anthropic:
+    api_key: ${ANTHROPIC_API_KEY}
+    models:
+      - claude-3-5-sonnet-20241022
+      - claude-3-opus-20240229
+    default_model: claude-3-5-sonnet-20241022
+
+  google:
+    api_key: ${GOOGLE_AI_API_KEY}
+    models:
+      - gemini-pro
+    default_model: gemini-pro
+
+# Default parameters for all providers
+defaults:
+  temperature: 0.7
+  max_tokens: 2048
+  top_p: 1.0
+
+# Cost tracking (USD per 1K tokens)
+costs:
+  gpt-4-turbo-preview:
+    input: 0.01
+    output: 0.03
+  gpt-3.5-turbo:
+    input: 0.0005
+    output: 0.0015
+  claude-3-5-sonnet-20241022:
+    input: 0.003
+    output: 0.015
+  claude-3-opus-20240229:
+    input: 0.015
+    output: 0.075
+  gemini-pro:
+    input: 0.00025
+    output: 0.0005

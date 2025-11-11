@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: detect-private-key
+
+  - repo: https://github.com/prettier/prettier
+    rev: v3.2.4
+    hooks:
+      - id: prettier
+        types_or: [javascript, typescript, json, yaml, markdown]
+
+  - repo: local
+    hooks:
+      - id: validate-manifests
+        name: Validate AI manifests
+        entry: npm run validate
+        language: system
+        pass_filenames: false
+        files: \.(yml|yaml)$

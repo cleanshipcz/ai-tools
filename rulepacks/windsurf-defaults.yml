@@ -1,0 +1,19 @@
+id: windsurf-defaults
+version: 1.0.0
+description: Repository-level defaults for Windsurf tool configuration
+extends:
+  - base
+rules:
+  - "Always read the full context before making changes."
+  - "Test changes locally before committing."
+  - "Follow the repository's contribution guidelines."
+  - "Keep commits atomic and focused on single changes."
+  - "Write clear, descriptive commit messages."
+  - "Update tests when changing functionality."
+  - "Run the full test suite before opening a PR."
+tags:
+  - windsurf
+  - workflow
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"

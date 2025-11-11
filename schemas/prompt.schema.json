@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/cleanshipcz/ai-tools/schemas/prompt.schema.json",
+  "title": "Prompt Manifest",
+  "description": "Schema for atomic prompt manifests with metadata and variables",
+  "type": "object",
+  "required": ["id", "version", "description"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Unique kebab-case identifier for the prompt"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (semver) of the prompt"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "Clear description of what the prompt does"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      },
+      "uniqueItems": true,
+      "description": "Tags for categorization and search"
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "required"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z_][a-z0-9_]*$",
+            "description": "Variable name in snake_case"
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this variable is required"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the variable"
+          },
+          "default": {
+            "type": "string",
+            "description": "Default value if not provided"
+          }
+        }
+      },
+      "description": "Variables that can be interpolated in the prompt"
+    },
+    "includes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Relative path to file to include"
+      },
+      "description": "Files to include (e.g., shared snippets)"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 500
+      },
+      "description": "List of rules or constraints for this prompt"
+    },
+    "content": {
+      "type": "string",
+      "description": "The actual prompt content/template"
+    },
+    "system": {
+      "type": "string",
+      "description": "System-level instruction"
+    },
+    "user": {
+      "type": "string",
+      "description": "User-level prompt template"
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": ["markdown", "json", "yaml", "code", "text"],
+          "description": "Expected output format"
+        },
+        "schema": {
+          "type": "object",
+          "description": "JSON schema for structured outputs"
+        }
+      },
+      "description": "Output format specifications"
+    },
+    "examples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "object",
+            "description": "Example input variables"
+          },
+          "output": {
+            "type": "string",
+            "description": "Expected output"
+          }
+        }
+      },
+      "description": "Example inputs and outputs"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "description": "Additional metadata"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+id: summarize-pr
+version: 1.0.0
+description: Generate a concise summary of a pull request
+tags:
+  - docs
+  - pr
+  - git
+variables:
+  - name: diff
+    required: true
+    description: "The git diff to summarize"
+  - name: context
+    required: false
+    description: "Additional context about the PR"
+rules:
+  - "Be concise but comprehensive."
+  - "Highlight breaking changes prominently."
+  - "Group related changes together."
+  - "Use bullet points for clarity."
+content: |
+  Analyze this pull request and provide a clear summary:
+
+  ```diff
+  {{diff}}
+  ```
+
+  {{#context}}
+  Context: {{context}}
+  {{/context}}
+
+  Provide:
+  1. **Overview**: One-line summary of what this PR does
+  2. **Changes**: Bullet points of key changes
+  3. **Breaking Changes**: Any backward-incompatible changes (if any)
+  4. **Testing**: What testing was done or is needed
+  5. **Impact**: Areas of the codebase affected
+
+  Format as markdown suitable for a PR description.
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"

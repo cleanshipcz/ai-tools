@@ -1,0 +1,30 @@
+id: shell
+version: 1.0.0
+description: MCP server for shell command execution (use with caution)
+server:
+  command: "npx"
+  args:
+    - "@modelcontextprotocol/server-shell"
+  env:
+    SHELL: "/bin/bash"
+capabilities:
+  - execute_command
+  - run_script
+security:
+  # Shell access is powerful and dangerous - disable by default
+  enabled: false
+  allowed_commands:
+    - "ls"
+    - "cat"
+    - "grep"
+    - "find"
+    - "git"
+  denied_commands:
+    - "rm"
+    - "sudo"
+    - "chmod"
+    - "chown"
+  max_execution_time_sec: 300
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"

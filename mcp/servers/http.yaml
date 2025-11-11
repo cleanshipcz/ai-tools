@@ -1,0 +1,20 @@
+id: http
+version: 1.0.0
+description: MCP server for HTTP requests
+server:
+  command: "npx"
+  args:
+    - "@modelcontextprotocol/server-fetch"
+capabilities:
+  - http_get
+  - http_post
+security:
+  allowed_domains:
+    - "api.github.com"
+    - "*.githubusercontent.com"
+  rate_limit:
+    requests_per_minute: 60
+  timeout_sec: 30
+metadata:
+  author: "AI Tools Team"
+  created: "2025-01-01"

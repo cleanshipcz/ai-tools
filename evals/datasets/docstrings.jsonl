@@ -1,0 +1,2 @@
+{"input": "def calculate_sum(numbers):\n    total = 0\n    for n in numbers:\n        total += n\n    return total", "expected": "Should have docstring explaining parameters and return value"}
+{"input": "class UserManager:\n    def __init__(self):\n        self.users = []", "expected": "Should have class docstring and method documentation"}

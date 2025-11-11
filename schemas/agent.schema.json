@@ -1,0 +1,129 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/cleanshipcz/ai-tools/schemas/agent.schema.json",
+  "title": "Agent Manifest",
+  "description": "Schema for tool-agnostic agent definitions",
+  "type": "object",
+  "required": ["id", "version", "purpose"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Unique kebab-case identifier for the agent"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (semver) of the agent"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "Clear statement of the agent's purpose"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the agent"
+    },
+    "rulepacks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      },
+      "description": "List of rulepack IDs to include"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Required capabilities (e.g., mcp:git, mcp:filesystem)"
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "top_p": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "model": {
+          "type": "string"
+        },
+        "style": {
+          "type": "string",
+          "enum": ["terse", "verbose", "conversational", "technical"]
+        }
+      },
+      "description": "Default parameters for the agent"
+    },
+    "prompt": {
+      "type": "object",
+      "properties": {
+        "system": {
+          "type": "string",
+          "description": "System prompt template"
+        },
+        "user_template": {
+          "type": "string",
+          "description": "User prompt template"
+        },
+        "includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Files to include in prompt"
+        }
+      },
+      "description": "Prompt configuration"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of tool/skill IDs this agent can use"
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Constraints or limitations for this agent"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

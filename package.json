@@ -1,0 +1,46 @@
+{
+  "name": "ai-tools",
+  "version": "1.0.0",
+  "description": "A unified repository for AI agent prompts, rules, and tool configurations",
+  "type": "module",
+  "scripts": {
+    "validate": "tsx scripts/validate.ts",
+    "build": "tsx scripts/build.ts",
+    "eval": "tsx scripts/eval.ts",
+    "diff": "tsx scripts/diff.ts",
+    "docs": "tsx scripts/gen-docs.ts",
+    "ci": "npm run validate && npm run build && npm run eval && npm run docs",
+    "clean": "rm -rf adapters/*/rules adapters/*/presets adapters/*/skills.json adapters/*/prompts evals/reports/*.html",
+    "lint": "prettier --check .",
+    "format": "prettier --write .",
+    "test": "npm run validate && npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "prompts",
+    "rules",
+    "windsurf",
+    "claude",
+    "cursor",
+    "mcp"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "ajv": "^8.12.0",
+    "ajv-formats": "^3.0.1",
+    "js-yaml": "^4.1.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "prettier": "^3.2.4",
+    "glob": "^10.3.10",
+    "chalk": "^5.3.0",
+    "diff": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
