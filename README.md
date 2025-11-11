@@ -91,6 +91,190 @@ ai-tools/
 └── docs/                # Documentation
 ```
 
+## 🚀 How to Use This Repository
+
+### End-to-End Workflow: Using a Prompt with GPT-5
+
+**Scenario**: You want to use the "extract-method" refactoring prompt with GPT-5.
+
+#### Step 1: Find or Create a Prompt
+
+```bash
+# Browse available prompts
+ls prompts/refactor/
+# Output: extract-method.yml, add-null-safety.yml
+
+# Or create your own
+cat prompts/refactor/my-prompt.yml
+```
+
+#### Step 2: Build Adapters
+
+```bash
+npm run build
+```
+
+This generates tool-specific configs in `adapters/`:
+
+- `adapters/windsurf/` - For Windsurf IDE
+- `adapters/claude-code/` - For Claude Code
+- `adapters/cursor/` - For Cursor IDE
+
+#### Step 3: Use the Prompt
+
+**Option A: Copy the Generated Prompt Text**
+
+```bash
+# View the built prompt
+cat adapters/claude-code/prompts/extract-method.json
+```
+
+Copy the `content` field and paste it into:
+
+- ChatGPT (GPT-5)
+- Claude.ai
+- Any LLM interface
+
+Replace variables like `{{code}}` with your actual code.
+
+**Option B: Use with Your AI Tool**
+
+```bash
+# For Windsurf
+# Import: adapters/windsurf/rules/extract-method.json
+
+# For Cursor
+# Import: adapters/cursor/recipes.json
+# Then select "extract-method" recipe
+
+# For Claude Code
+# Import: adapters/claude-code/prompts/extract-method.json
+```
+
+**Option C: Use Programmatically**
+
+```typescript
+import fs from 'fs';
+
+// Read the generated prompt
+const prompt = JSON.parse(
+  fs.readFileSync('adapters/claude-code/prompts/extract-method.json', 'utf-8')
+);
+
+// Fill in variables
+const finalPrompt = prompt.content
+  .replace('{{code}}', myCode)
+  .replace('{{language}}', 'TypeScript');
+
+// Send to your LLM API
+const response = await openai.chat.completions.create({
+  model: 'gpt-5',
+  messages: [{ role: 'user', content: finalPrompt }],
+});
+```
+
+#### Step 4: Use with Agents (Advanced)
+
+If you want rules and context bundled:
+
+```bash
+# Check agent configs
+cat adapters/windsurf/rules/code-reviewer.json
+
+# This includes:
+# - All rulepacks (base, security, etc.)
+# - System prompts
+# - Default settings
+# - MCP capabilities
+```
+
+Import the agent config into your tool, and it will automatically apply all rules and prompts.
+
+### Workflow Diagram
+
+```
+1. Create/Edit YAML manifests
+   ↓
+2. npm run validate (check for errors)
+   ↓
+3. npm run build (generate adapters)
+   ↓
+4. Use adapters in your AI tool
+   OR
+   Copy prompt text to ChatGPT/Claude
+   OR
+   Call LLM API programmatically
+```
+
+### Quick Usage Examples
+
+**Using an existing prompt manually:**
+
+```bash
+# 1. View available prompts
+ls prompts/*/
+
+# 2. Read the prompt
+cat prompts/refactor/extract-method.yml
+
+# 3. Copy the 'content' section
+# 4. Paste into ChatGPT/Claude
+# 5. Replace {{variables}} with your data
+```
+
+**Using with Windsurf IDE:**
+
+```bash
+# 1. Build adapters
+npm run build
+
+# 2. In Windsurf, go to Settings > Rules
+# 3. Import: /path/to/ai-tools/adapters/windsurf/rules/code-reviewer.json
+# 4. Chat with AI - rules are automatically applied
+```
+
+**Using with Cursor IDE:**
+
+```bash
+# 1. Build adapters
+npm run build
+
+# 2. In Cursor, open Command Palette (Cmd/Ctrl+Shift+P)
+# 3. Search: "Cursor: Import Custom Rules"
+# 4. Import: /path/to/ai-tools/adapters/cursor/recipes.json
+# 5. Use recipes in chat via @recipe-name
+```
+
+**Programmatic usage:**
+
+```python
+# Python example
+import json
+import os
+from openai import OpenAI
+
+# Read generated prompt
+with open('adapters/claude-code/prompts/write-tests.json') as f:
+    prompt_config = json.load(f)
+
+# Fill variables
+code = """
+def calculate_total(items):
+    return sum(item['price'] for item in items)
+"""
+
+final_prompt = prompt_config['content'].replace('{{code}}', code)
+
+# Call GPT-5
+client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+response = client.chat.completions.create(
+    model='gpt-5',
+    messages=[{'role': 'user', 'content': final_prompt}]
+)
+
+print(response.choices[0].message.content)
+```
+
 ## Creating Your First Agent
 
 ### 1. Create a Rulepack
