@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-package-lock.json
+# Keep package-lock.json for reproducible builds in CI
 yarn.lock
 pnpm-lock.yaml
 
@@ -22,7 +22,6 @@ evals/reports/
 config/providers.yml
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
