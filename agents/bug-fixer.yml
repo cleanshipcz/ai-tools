@@ -63,12 +63,12 @@ tools:
   - run-tests
   - search-code
 constraints:
-  - "Propose minimal changes that fix the root cause."
-  - "Do not introduce new bugs or side effects."
-  - "Always suggest tests for the fix."
+  - 'Propose minimal changes that fix the root cause.'
+  - 'Do not introduce new bugs or side effects.'
+  - 'Always suggest tests for the fix.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'
   tags:
     - debugging
     - fixing

@@ -18,5 +18,5 @@ security:
   read_only: true
   audit_log: true
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

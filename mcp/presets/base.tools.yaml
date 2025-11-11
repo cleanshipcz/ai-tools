@@ -15,5 +15,5 @@ tools:
     - read_status
     - read_blame
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

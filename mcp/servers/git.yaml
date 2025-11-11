@@ -2,10 +2,10 @@ id: git
 version: 1.0.0
 description: MCP server for Git operations
 server:
-  command: "npx"
+  command: 'npx'
   args:
-    - "@modelcontextprotocol/server-git"
-    - "${PROJECT_ROOT}"
+    - '@modelcontextprotocol/server-git'
+    - '${PROJECT_ROOT}'
 capabilities:
   - read_log
   - read_diff
@@ -27,5 +27,5 @@ security:
     - force
     - reset_hard
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

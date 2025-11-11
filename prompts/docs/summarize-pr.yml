@@ -8,15 +8,15 @@ tags:
 variables:
   - name: diff
     required: true
-    description: "The git diff to summarize"
+    description: 'The git diff to summarize'
   - name: context
     required: false
-    description: "Additional context about the PR"
+    description: 'Additional context about the PR'
 rules:
-  - "Be concise but comprehensive."
-  - "Highlight breaking changes prominently."
-  - "Group related changes together."
-  - "Use bullet points for clarity."
+  - 'Be concise but comprehensive.'
+  - 'Highlight breaking changes prominently.'
+  - 'Group related changes together.'
+  - 'Use bullet points for clarity.'
 content: |
   Analyze this pull request and provide a clear summary:
 
@@ -39,5 +39,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

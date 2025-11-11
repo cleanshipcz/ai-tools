@@ -8,21 +8,21 @@ tags:
 variables:
   - name: code
     required: true
-    description: "The code to test"
+    description: 'The code to test'
   - name: language
     required: true
-    description: "Programming language"
+    description: 'Programming language'
   - name: test_framework
     required: false
-    description: "Testing framework to use (e.g., pytest, junit, jest)"
+    description: 'Testing framework to use (e.g., pytest, junit, jest)'
 includes:
   - ../shared/acceptance_criteria.md
 rules:
-  - "Cover happy path, edge cases, and error conditions."
-  - "Use descriptive test names that explain what is being tested."
-  - "Keep tests independent and deterministic."
-  - "Mock external dependencies."
-  - "Aim for high code coverage but prioritize meaningful tests."
+  - 'Cover happy path, edge cases, and error conditions.'
+  - 'Use descriptive test names that explain what is being tested.'
+  - 'Keep tests independent and deterministic.'
+  - 'Mock external dependencies.'
+  - 'Aim for high code coverage but prioritize meaningful tests.'
 content: |
   Write comprehensive unit tests for the following {{language}} code:
 
@@ -47,5 +47,5 @@ content: |
 outputs:
   format: code
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

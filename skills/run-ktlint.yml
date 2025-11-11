@@ -2,12 +2,12 @@ id: run-ktlint
 version: 1.0.0
 description: Run ktlint for Kotlin code formatting
 command:
-  program: "./gradlew"
+  program: './gradlew'
   args:
-    - "ktlintCheck"
-  cwd: "."
+    - 'ktlintCheck'
+  cwd: '.'
 constraints:
-  - "Requires ktlint to be configured in the project."
+  - 'Requires ktlint to be configured in the project.'
 timeout_sec: 300
 outputs:
   stdout: true
@@ -18,5 +18,5 @@ tags:
   - kotlin
   - formatting
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

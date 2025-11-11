@@ -2,12 +2,12 @@ id: filesystem
 version: 1.0.0
 description: MCP server for filesystem operations
 server:
-  command: "npx"
+  command: 'npx'
   args:
-    - "@modelcontextprotocol/server-filesystem"
-    - "${PROJECT_ROOT}"
+    - '@modelcontextprotocol/server-filesystem'
+    - '${PROJECT_ROOT}'
   env:
-    NODE_ENV: "production"
+    NODE_ENV: 'production'
 capabilities:
   - read_file
   - write_file
@@ -16,11 +16,11 @@ capabilities:
   - watch_files
 security:
   allowed_paths:
-    - "${PROJECT_ROOT}"
+    - '${PROJECT_ROOT}'
   denied_paths:
-    - "${PROJECT_ROOT}/node_modules"
-    - "${PROJECT_ROOT}/.git"
-    - "${PROJECT_ROOT}/.env"
+    - '${PROJECT_ROOT}/node_modules'
+    - '${PROJECT_ROOT}/.git'
+    - '${PROJECT_ROOT}/.env'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

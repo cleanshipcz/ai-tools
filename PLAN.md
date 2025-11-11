@@ -106,8 +106,8 @@ ai-repo/
 
 # File conventions
 
-* All “source” files are YAML. Each has metadata.
-* IDs are kebab-case and stable. Version with semver.
+- All “source” files are YAML. Each has metadata.
+- IDs are kebab-case and stable. Version with semver.
 
 ## Prompt manifest example (`/prompts/refactor/extract-method.yml`)
 
@@ -125,8 +125,8 @@ includes:
   - ../shared/constraints.md
   - ../shared/acceptance_criteria.md
 rules:
-  - "Preserve behavior. No side effects."
-  - "Add unit tests if none exist."
+  - 'Preserve behavior. No side effects.'
+  - 'Add unit tests if none exist.'
 outputs:
   format: markdown
 ```
@@ -162,10 +162,10 @@ prompt:
 id: coding-kotlin
 extends: [base]
 rules:
-  - "Prefer immutable data classes."
-  - "Use suspend + Structured Concurrency for async."
-  - "Public APIs must be null-safe."
-  - "Adopt Kotest + MockK or ScalaMock as per project policy."
+  - 'Prefer immutable data classes.'
+  - 'Use suspend + Structured Concurrency for async.'
+  - 'Public APIs must be null-safe.'
+  - 'Adopt Kotest + MockK or ScalaMock as per project policy.'
 ```
 
 ## Claude Code skill source (`/skills/run-gradle-tests.yml`)
@@ -174,36 +174,35 @@ rules:
 id: run-gradle-tests
 description: Run unit tests with Gradle
 command:
-  program: "./gradlew"
-  args: ["test", "--info"]
+  program: './gradlew'
+  args: ['test', '--info']
 constraints:
-  - "Do not run if repo has no Gradle wrapper."
+  - 'Do not run if repo has no Gradle wrapper.'
 timeout_sec: 1800
 ```
 
 # Build and validation
 
-* `scripts/build.ts` composes:
+- `scripts/build.ts` composes:
+  - Agents = base prompt + rulepacks + includes.
+  - Adapters for tools. Example: emit Windsurf `rules/*.json`, Claude Code `skills.json`.
 
-  * Agents = base prompt + rulepacks + includes.
-  * Adapters for tools. Example: emit Windsurf `rules/*.json`, Claude Code `skills.json`.
-* `scripts/validate.ts` runs JSON Schema on all manifests and enforces:
+- `scripts/validate.ts` runs JSON Schema on all manifests and enforces:
+  - unique IDs, semver present, referenced files exist.
+  - no secrets in YAML (regex checks).
+  - max token estimates per prompt.
 
-  * unique IDs, semver present, referenced files exist.
-  * no secrets in YAML (regex checks).
-  * max token estimates per prompt.
-* `scripts/gen-docs.ts` renders `docs/AGENTS.md` from manifests.
+- `scripts/gen-docs.ts` renders `docs/AGENTS.md` from manifests.
 
 # Evals
 
-* Keep golden tasks in `/evals/datasets/*.jsonl`.
-* Define suites mapping prompts/agents → datasets and success checks.
-* Use `promptfoo` or a simple custom harness.
-* Gate PRs on:
-
-  * deterministic cases equal or better,
-  * safety doesn’t regress,
-  * token cost within `/config/budgets.yml`.
+- Keep golden tasks in `/evals/datasets/*.jsonl`.
+- Define suites mapping prompts/agents → datasets and success checks.
+- Use `promptfoo` or a simple custom harness.
+- Gate PRs on:
+  - deterministic cases equal or better,
+  - safety doesn’t regress,
+  - token cost within `/config/budgets.yml`.
 
 Example suite (`/evals/suites/code-refactor.yml`)
 
@@ -214,25 +213,25 @@ targets:
     dataset: datasets/bugfix_small.jsonl
 checks:
   - name: builds
-    cmd: "./gradlew build"
+    cmd: './gradlew build'
   - name: tests-pass
-    cmd: "./gradlew test"
+    cmd: './gradlew test'
   - name: regex-no-todo
-    pattern: "(?i)TODO|FIXME"
+    pattern: '(?i)TODO|FIXME'
 budgets:
   max_tokens: 200000
 ```
 
 # CI workflow
 
-* Pre-commit: YAML lint, schema validate, link check.
-* CI stages:
-
+- Pre-commit: YAML lint, schema validate, link check.
+- CI stages:
   1. `validate` → fail fast.
   2. `build` → generate adapters.
   3. `eval` → run suites with tight budgets.
   4. `diff` → show A/B output changes; attach HTML report in `/evals/reports`.
-* Block merge if any suite regresses or budgets exceeded.
+
+- Block merge if any suite regresses or budgets exceeded.
 
 # Working model
 
@@ -240,46 +239,45 @@ budgets:
 2. Run `npm run validate && npm run build`.
 3. Run focused eval: `npm run eval -- --suite code-refactor`.
 4. Open PR with:
+   - change summary,
+   - before/after samples,
+   - eval deltas,
+   - token cost delta.
 
-   * change summary,
-   * before/after samples,
-   * eval deltas,
-   * token cost delta.
 5. On merge, publish adapters as a versioned artifact:
-
-   * Tag repo `vX.Y.Z`.
-   * Optionally publish `/adapters/*` as NPM or a GitHub Release for easy consumption in tools.
+   - Tag repo `vX.Y.Z`.
+   - Optionally publish `/adapters/*` as NPM or a GitHub Release for easy consumption in tools.
 
 # Consumption patterns
 
-* **Windsurf/Cursor**: point tool settings to `/adapters/windsuf/presets/*.json`. Keep them small and composable.
-* **Claude Code**: import generated `skills.json` and compiled prompts. Skills reference MCP tools by ID.
-* **MCP**: enable only `presets/secure.tools.yaml` on corp machines. Keep `shell` disabled by default.
+- **Windsurf/Cursor**: point tool settings to `/adapters/windsuf/presets/*.json`. Keep them small and composable.
+- **Claude Code**: import generated `skills.json` and compiled prompts. Skills reference MCP tools by ID.
+- **MCP**: enable only `presets/secure.tools.yaml` on corp machines. Keep `shell` disabled by default.
 
 # Secrets and environments
 
-* No secrets in repo. Use `${ENV_VAR}` placeholders.
-* Provide `/config/providers.example.yml`. Load real keys from CI secrets or local `.env`.
-* Keep dev vs prod toggles in agent defaults (temperature, model, safety).
+- No secrets in repo. Use `${ENV_VAR}` placeholders.
+- Provide `/config/providers.example.yml`. Load real keys from CI secrets or local `.env`.
+- Keep dev vs prod toggles in agent defaults (temperature, model, safety).
 
 # Versioning and change control
 
-* Semver for each manifest.
-* Changelog entries auto-generated from commit messages with conventional commits.
-* Deprecate by keeping old IDs and mapping them to new ones in `adapters/compat.json`.
+- Semver for each manifest.
+- Changelog entries auto-generated from commit messages with conventional commits.
+- Deprecate by keeping old IDs and mapping them to new ones in `adapters/compat.json`.
 
 # Guardrails and red-teaming
 
-* Store jailbreaks and unsafe prompts in `/redteam/`.
-* Add a safety eval suite. Fail CI on unsafe responses or policy violations to known probes.
+- Store jailbreaks and unsafe prompts in `/redteam/`.
+- Add a safety eval suite. Fail CI on unsafe responses or policy violations to known probes.
 
 # What you might not realize you need
 
-* **Token cost tracking** per prompt and per suite. Prevent silent bloat.
-* **Prompt lint rules**: ban vague verbs, cap sentence length in system prompts, enforce variable presence.
-* **Golden “negative” tests**: inputs where the correct action is refusal.
-* **Doc generator** for AGENTS.md so humans use the latest rules.
-* **Adapter diff tests** so generated tool configs stay stable across builds.
+- **Token cost tracking** per prompt and per suite. Prevent silent bloat.
+- **Prompt lint rules**: ban vague verbs, cap sentence length in system prompts, enforce variable presence.
+- **Golden “negative” tests**: inputs where the correct action is refusal.
+- **Doc generator** for AGENTS.md so humans use the latest rules.
+- **Adapter diff tests** so generated tool configs stay stable across builds.
 
 # Minimal command set (npm scripts)
 
@@ -298,9 +296,8 @@ budgets:
 
 # How to work with it day-to-day
 
-* Create or edit only YAML in `/prompts`, `/agents`, `/rulepacks`, `/skills`.
-* Run `npm run ci` locally before a PR.
-* Review the generated `docs/AGENTS.md` and the eval report.
-* Ship only the `/adapters/*` outputs to tools. Never edit them by hand.
-* Keep each change small and paired with an eval update.
-
+- Create or edit only YAML in `/prompts`, `/agents`, `/rulepacks`, `/skills`.
+- Run `npm run ci` locally before a PR.
+- Review the generated `docs/AGENTS.md` and the eval report.
+- Ship only the `/adapters/*` outputs to tools. Never edit them by hand.
+- Keep each change small and paired with an eval update.

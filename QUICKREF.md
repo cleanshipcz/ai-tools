@@ -39,10 +39,10 @@ id: my-rules
 version: 1.0.0
 description: Brief description
 extends:
-  - base                    # Optional: inherit from other packs
+  - base # Optional: inherit from other packs
 rules:
-  - "Rule 1"
-  - "Rule 2"
+  - 'Rule 1'
+  - 'Rule 2'
 ```
 
 ## Creating an Agent
@@ -78,15 +78,15 @@ tags:
 variables:
   - name: input
     required: true
-    description: "What this variable is"
+    description: 'What this variable is'
 includes:
-  - ../shared/constraints.md  # Optional shared content
+  - ../shared/constraints.md # Optional shared content
 rules:
-  - "Specific rule for this prompt"
+  - 'Specific rule for this prompt'
 content: |
   Your prompt template with {{input}}
 outputs:
-  format: code              # code, markdown, json, yaml, text
+  format: code # code, markdown, json, yaml, text
 ```
 
 ## Creating a Skill
@@ -96,11 +96,11 @@ id: my-skill
 version: 1.0.0
 description: What this skill does
 command:
-  program: "command"
+  program: 'command'
   args:
-    - "arg1"
-    - "arg2"
-  cwd: "."
+    - 'arg1'
+    - 'arg2'
+  cwd: '.'
 timeout_sec: 300
 outputs:
   stdout: true
@@ -115,13 +115,13 @@ suite: my-tests
 version: 1.0.0
 description: What you're testing
 targets:
-  - type: prompt            # or agent, skill
+  - type: prompt # or agent, skill
     id: my-prompt
     dataset: datasets/test.jsonl
 checks:
   - name: check-name
-    type: regex             # regex, command, llm-judge, etc.
-    pattern: "pattern"
+    type: regex # regex, command, llm-judge, etc.
+    pattern: 'pattern'
     required: true
 budgets:
   max_tokens: 100000
@@ -205,12 +205,14 @@ Your editor (with YAML extension) will show errors inline!
 ## Security
 
 Never commit:
+
 - API keys
 - Passwords
 - Tokens
 - PII
 
 Use environment variables:
+
 ```yaml
 api_key: ${OPENAI_API_KEY}
 ```

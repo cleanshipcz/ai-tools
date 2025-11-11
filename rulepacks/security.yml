@@ -4,21 +4,21 @@ description: Security-focused rules and guardrails
 extends:
   - base
 rules:
-  - "Never log or expose sensitive data (passwords, tokens, API keys)."
-  - "Validate and sanitize all user inputs."
-  - "Use parameterized queries to prevent SQL injection."
-  - "Avoid eval() and similar dynamic code execution."
-  - "Use secure random number generators for cryptographic purposes."
-  - "Implement proper authentication and authorization checks."
-  - "Keep dependencies up to date to patch known vulnerabilities."
-  - "Use HTTPS for all external communications."
-  - "Implement rate limiting for public APIs."
-  - "Follow the principle of least privilege."
-  - "Store secrets in secure vaults, not in code or config files."
-  - "Implement proper CSRF protection for web applications."
+  - 'Never log or expose sensitive data (passwords, tokens, API keys).'
+  - 'Validate and sanitize all user inputs.'
+  - 'Use parameterized queries to prevent SQL injection.'
+  - 'Avoid eval() and similar dynamic code execution.'
+  - 'Use secure random number generators for cryptographic purposes.'
+  - 'Implement proper authentication and authorization checks.'
+  - 'Keep dependencies up to date to patch known vulnerabilities.'
+  - 'Use HTTPS for all external communications.'
+  - 'Implement rate limiting for public APIs.'
+  - 'Follow the principle of least privilege.'
+  - 'Store secrets in secure vaults, not in code or config files.'
+  - 'Implement proper CSRF protection for web applications.'
 tags:
   - security
   - safety
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

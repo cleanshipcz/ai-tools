@@ -5,6 +5,7 @@
 ### Structure
 
 Every prompt should have:
+
 1. **Clear Objective**: What should the AI accomplish?
 2. **Context**: What information is relevant?
 3. **Constraints**: What limitations or requirements must be met?
@@ -20,11 +21,13 @@ Every prompt should have:
 ### Examples
 
 ❌ **Bad:**
+
 ```
 Make this code better.
 ```
 
 ✅ **Good:**
+
 ```
 Refactor this Python function to:
 - Improve readability by using list comprehensions
@@ -50,11 +53,11 @@ Refactor this Python function to:
 variables:
   - name: code
     required: true
-    description: "The code block to analyze"
+    description: 'The code block to analyze'
   - name: focus_areas
     required: false
-    description: "Specific areas to focus on (optional)"
-    default: "all"
+    description: 'Specific areas to focus on (optional)'
+    default: 'all'
 ```
 
 ## Evaluation Rubric
@@ -136,12 +139,15 @@ variables:
 ## [1.2.0] - 2025-01-15
 
 ### Added
+
 - New variable `max_iterations` for controlling loop count
 
 ### Changed
+
 - Improved clarity of error messages
 
 ### Fixed
+
 - Corrected handling of null values in code parser
 ```
 
@@ -219,5 +225,5 @@ rulepacks:
 ```yaml
 id: old-prompt
 version: 2.0.0
-description: "[DEPRECATED] Use new-prompt instead. This prompt will be removed in v3.0.0"
+description: '[DEPRECATED] Use new-prompt instead. This prompt will be removed in v3.0.0'
 ```

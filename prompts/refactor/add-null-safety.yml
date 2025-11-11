@@ -8,18 +8,18 @@ tags:
 variables:
   - name: code
     required: true
-    description: "The code to make null-safe"
+    description: 'The code to make null-safe'
   - name: language
     required: true
-    description: "Programming language"
+    description: 'Programming language'
 includes:
   - ../shared/constraints.md
   - ../shared/acceptance_criteria.md
 rules:
-  - "Use language-appropriate null safety patterns."
-  - "Prefer optional chaining or safe calls over explicit null checks."
-  - "Consider using nullable types where appropriate."
-  - "Add tests covering null cases."
+  - 'Use language-appropriate null safety patterns.'
+  - 'Prefer optional chaining or safe calls over explicit null checks.'
+  - 'Consider using nullable types where appropriate.'
+  - 'Add tests covering null cases.'
 content: |
   Analyze the following {{language}} code for potential null pointer issues and add appropriate null safety:
 
@@ -39,5 +39,5 @@ content: |
 outputs:
   format: code
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

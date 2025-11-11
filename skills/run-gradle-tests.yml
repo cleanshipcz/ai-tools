@@ -2,14 +2,14 @@ id: run-gradle-tests
 version: 1.0.0
 description: Run unit tests with Gradle
 command:
-  program: "./gradlew"
+  program: './gradlew'
   args:
-    - "test"
-    - "--info"
-  cwd: "."
+    - 'test'
+    - '--info'
+  cwd: '.'
 constraints:
-  - "Do not run if repo has no Gradle wrapper."
-  - "Ensure Java/Kotlin is available."
+  - 'Do not run if repo has no Gradle wrapper.'
+  - 'Ensure Java/Kotlin is available.'
 timeout_sec: 1800
 outputs:
   stdout: true
@@ -21,5 +21,5 @@ tags:
   - kotlin
   - java
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

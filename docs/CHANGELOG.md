@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Initial repository structure
 - JSON schemas for prompts, agents, rulepacks, skills, and eval suites
 - Example manifests for common use cases
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Actions CI/CD pipeline
 
 ### Rulepacks
+
 - `base`: Foundation rules for all agents
 - `coding-python`: Python-specific coding standards
 - `coding-kotlin`: Kotlin-specific coding standards
@@ -27,18 +29,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `windsurf-defaults`: Windsurf tool defaults
 
 ### Agents
+
 - `code-reviewer`: Structured code review agent
 - `bug-fixer`: Debugging and fix proposal agent
 - `tdd-navigator`: Test-driven development guide
 - `kotlin-style-enforcer`: Kotlin style checker
 
 ### Prompts
+
 - `extract-method`: Method extraction refactoring
 - `add-null-safety`: Null safety improvements
 - `summarize-pr`: Pull request summarization
 - `write-tests`: Unit test generation
 
 ### Skills
+
 - `run-gradle-tests`: Execute Gradle tests
 - `run-detekt`: Run Detekt static analysis
 - `run-ktlint`: Run ktlint formatter
@@ -46,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `search-repo`: Repository code search
 
 ### MCP Servers
+
 - `filesystem`: File system operations
 - `shell`: Shell command execution (disabled by default)
 - `git`: Git operations
@@ -54,4 +60,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2025-01-01
 
 ### Added
+
 - Initial release

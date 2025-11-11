@@ -5,7 +5,7 @@
 providers:
   openai:
     api_key: ${OPENAI_API_KEY}
-    organization: ${OPENAI_ORG_ID}  # optional
+    organization: ${OPENAI_ORG_ID} # optional
     models:
       - gpt-4-turbo-preview
       - gpt-3.5-turbo

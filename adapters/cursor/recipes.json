@@ -36,11 +36,7 @@
         "Use data classes for value objects.",
         "Leverage Kotlin's stdlib functions (map, filter, fold, etc.)."
       ],
-      "tools": [
-        "read-file",
-        "run-tests",
-        "search-code"
-      ]
+      "tools": ["read-file", "run-tests", "search-code"]
     },
     {
       "id": "code-reviewer",
@@ -82,11 +78,7 @@
         "Store secrets in secure vaults, not in code or config files.",
         "Implement proper CSRF protection for web applications."
       ],
-      "tools": [
-        "git-diff",
-        "read-file",
-        "search-code"
-      ]
+      "tools": ["git-diff", "read-file", "search-code"]
     },
     {
       "id": "kotlin-style-enforcer",
@@ -114,10 +106,7 @@
         "Use data classes for value objects.",
         "Leverage Kotlin's stdlib functions (map, filter, fold, etc.)."
       ],
-      "tools": [
-        "run-detekt",
-        "run-ktlint"
-      ]
+      "tools": ["run-detekt", "run-ktlint"]
     },
     {
       "id": "tdd-navigator",
@@ -155,11 +144,7 @@
         "Use data classes for value objects.",
         "Leverage Kotlin's stdlib functions (map, filter, fold, etc.)."
       ],
-      "tools": [
-        "run-tests",
-        "write-code",
-        "refactor"
-      ]
+      "tools": ["run-tests", "write-code", "refactor"]
     }
   ]
 }

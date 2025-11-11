@@ -1,26 +1,26 @@
 id: search-repo
 version: 1.0.0
 description: Search repository for code patterns or text
-mcp_tool: "filesystem:search"
+mcp_tool: 'filesystem:search'
 inputs:
   - name: pattern
     type: string
     required: true
-    description: "Search pattern (regex or plain text)"
+    description: 'Search pattern (regex or plain text)'
   - name: path
     type: directory
     required: false
-    description: "Directory to search in (defaults to repo root)"
+    description: 'Directory to search in (defaults to repo root)'
   - name: file_pattern
     type: string
     required: false
     description: "File pattern to filter (e.g., '*.py', '*.kt')"
 constraints:
-  - "Use ripgrep or similar fast search tool if available."
+  - 'Use ripgrep or similar fast search tool if available.'
 timeout_sec: 60
 tags:
   - search
   - filesystem
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

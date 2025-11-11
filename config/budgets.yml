@@ -25,7 +25,7 @@ suites:
 providers:
   openai:
     monthly_budget_usd: 100.0
-    alert_threshold: 0.8  # Alert at 80% of budget
+    alert_threshold: 0.8 # Alert at 80% of budget
 
   anthropic:
     monthly_budget_usd: 100.0
@@ -35,4 +35,4 @@ providers:
 tracking:
   enabled: true
   report_path: evals/reports/costs.json
-  alert_email: ${BUDGET_ALERT_EMAIL}  # optional
+  alert_email: ${BUDGET_ALERT_EMAIL} # optional

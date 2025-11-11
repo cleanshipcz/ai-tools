@@ -30,6 +30,7 @@ Write YAML → Validate → Build → Get configs for Windsurf, Claude, Cursor, 
 - ⚡ **Automated**: Full CI/CD with GitHub Actions
 
 **What's Included:**
+
 - 21 validated manifests (6 rulepacks, 4 agents, 4 prompts, 5 skills)
 - 5 comprehensive JSON schemas
 - 5 build and automation scripts
@@ -102,14 +103,14 @@ description: My team's coding standards
 extends:
   - base
 rules:
-  - "Use meaningful variable names"
-  - "Keep functions under 50 lines"
-  - "Write tests for all public APIs"
+  - 'Use meaningful variable names'
+  - 'Keep functions under 50 lines'
+  - 'Write tests for all public APIs'
 ```
 
 ### 2. Create an Agent
 
-```yaml
+````yaml
 # agents/my-reviewer.yml
 id: my-reviewer
 version: 1.0.0
@@ -133,7 +134,7 @@ prompt:
     ```
     {{code}}
     ```
-```
+````
 
 ### 3. Build and Use
 
@@ -167,7 +168,7 @@ npm run clean       # Remove generated files
 
 Prompts are atomic, reusable templates with variables:
 
-```yaml
+````yaml
 # prompts/refactor/simplify-logic.yml
 id: simplify-logic
 version: 1.0.0
@@ -178,34 +179,36 @@ tags:
 variables:
   - name: code
     required: true
-    description: "Code with complex logic"
+    description: 'Code with complex logic'
   - name: language
     required: true
-    description: "Programming language"
+    description: 'Programming language'
 includes:
   - ../shared/constraints.md
   - ../shared/acceptance_criteria.md
 rules:
-  - "Preserve behavior exactly"
-  - "Reduce nesting depth"
-  - "Extract complex conditions to named functions"
+  - 'Preserve behavior exactly'
+  - 'Reduce nesting depth'
+  - 'Extract complex conditions to named functions'
 content: |
   Simplify the following {{language}} code:
 
   ```{{language}}
   {{code}}
-  ```
+````
 
-  Focus on:
-  - Reducing nested if statements
-  - Using early returns
-  - Extracting complex conditions
+Focus on:
 
-  {{> constraints}}
-  {{> acceptance_criteria}}
+- Reducing nested if statements
+- Using early returns
+- Extracting complex conditions
+
+{{> constraints}}
+{{> acceptance_criteria}}
 outputs:
-  format: code
-```
+format: code
+
+````
 
 ## Creating Skills
 
@@ -230,7 +233,7 @@ outputs:
 tags:
   - lint
   - quality
-```
+````
 
 ## Evaluation Framework
 
@@ -248,11 +251,11 @@ targets:
 checks:
   - name: compiles
     type: command
-    cmd: "python -m py_compile output.py"
+    cmd: 'python -m py_compile output.py'
     required: true
   - name: improved
     type: llm-judge
-    judge_prompt: "Rate the improvement from 1-10"
+    judge_prompt: 'Rate the improvement from 1-10'
     weight: 1.0
 budgets:
   max_tokens: 100000
@@ -382,6 +385,7 @@ npm run validate
 ```
 
 Common issues:
+
 - Missing required fields
 - Invalid semver
 - Duplicate IDs

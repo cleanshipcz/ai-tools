@@ -4,20 +4,20 @@ description: Python coding standards and best practices
 extends:
   - base
 rules:
-  - "Follow PEP 8 style guidelines for Python code."
-  - "Use type hints for function arguments and return values."
-  - "Prefer f-strings for string formatting."
-  - "Use list/dict comprehensions where they improve readability."
-  - "Handle exceptions explicitly; avoid bare except clauses."
-  - "Write docstrings for all public functions and classes (Google or NumPy style)."
-  - "Use pathlib for file path operations instead of os.path."
-  - "Prefer context managers (with statements) for resource management."
-  - "Keep functions focused on a single responsibility."
-  - "Use async/await for I/O-bound operations where appropriate."
+  - 'Follow PEP 8 style guidelines for Python code.'
+  - 'Use type hints for function arguments and return values.'
+  - 'Prefer f-strings for string formatting.'
+  - 'Use list/dict comprehensions where they improve readability.'
+  - 'Handle exceptions explicitly; avoid bare except clauses.'
+  - 'Write docstrings for all public functions and classes (Google or NumPy style).'
+  - 'Use pathlib for file path operations instead of os.path.'
+  - 'Prefer context managers (with statements) for resource management.'
+  - 'Keep functions focused on a single responsibility.'
+  - 'Use async/await for I/O-bound operations where appropriate.'
 tags:
   - python
   - coding
   - style
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'

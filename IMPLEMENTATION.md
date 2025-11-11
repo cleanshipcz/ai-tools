@@ -9,6 +9,7 @@ All planned features have been fully implemented and tested.
 ## Repository Structure
 
 ### Core Configuration (✅ Complete)
+
 - `package.json` - Dependencies and scripts
 - `tsconfig.json` - TypeScript configuration
 - `.editorconfig` - Editor settings
@@ -18,7 +19,9 @@ All planned features have been fully implemented and tested.
 - `.prettierrc.json` - Code formatting rules
 
 ### Schemas (✅ Complete)
+
 All JSON schemas with full validation:
+
 - `schemas/prompt.schema.json` - Prompt manifests
 - `schemas/agent.schema.json` - Agent definitions
 - `schemas/rulepack.schema.json` - Reusable rulesets
@@ -26,7 +29,9 @@ All JSON schemas with full validation:
 - `schemas/eval.schema.json` - Evaluation suites
 
 ### Rulepacks (✅ Complete)
+
 6 example rulepacks demonstrating inheritance and composition:
+
 - `base.yml` - Foundation rules
 - `coding-python.yml` - Python standards
 - `coding-kotlin.yml` - Kotlin standards
@@ -35,25 +40,32 @@ All JSON schemas with full validation:
 - `windsurf-defaults.yml` - Tool defaults
 
 ### Agents (✅ Complete)
+
 4 fully-configured example agents:
+
 - `code-reviewer.yml` - Code review agent
 - `bug-fixer.yml` - Debugging agent
 - `tdd-navigator.yml` - TDD guide
 - `kotlin-style-enforcer.yml` - Style checker
 
 ### Prompts (✅ Complete)
+
 4 example prompts with variables and includes:
+
 - `refactor/extract-method.yml` - Method extraction
 - `refactor/add-null-safety.yml` - Null safety
 - `docs/summarize-pr.yml` - PR summaries
 - `qa/write-tests.yml` - Test generation
 
 Shared snippets:
+
 - `shared/constraints.md`
 - `shared/acceptance_criteria.md`
 
 ### Skills (✅ Complete)
+
 5 executable skill definitions:
+
 - `run-gradle-tests.yml` - Gradle testing
 - `run-detekt.yml` - Detekt analysis
 - `run-ktlint.yml` - Ktlint formatting
@@ -61,20 +73,25 @@ Shared snippets:
 - `search-repo.yml` - Code search
 
 ### MCP Configuration (✅ Complete)
+
 4 MCP server configs:
+
 - `mcp/servers/filesystem.yaml` - File operations
 - `mcp/servers/shell.yaml` - Shell execution (disabled by default)
 - `mcp/servers/git.yaml` - Git operations
 - `mcp/servers/http.yaml` - HTTP requests
 
 2 MCP presets:
+
 - `mcp/presets/base.tools.yaml` - Standard toolset
 - `mcp/presets/secure.tools.yaml` - Restricted toolset
 
 ### Scripts (✅ Complete)
+
 All automation scripts fully implemented and tested:
 
 #### scripts/validate.ts
+
 - Schema validation with Ajv
 - ID uniqueness checking
 - Semver validation
@@ -83,6 +100,7 @@ All automation scripts fully implemented and tested:
 - Comprehensive error reporting
 
 #### scripts/build.ts
+
 - Manifest loading and parsing
 - Rulepack composition and inheritance
 - Windsurf adapter generation
@@ -91,12 +109,14 @@ All automation scripts fully implemented and tested:
 - Directory structure creation
 
 #### scripts/gen-docs.ts
+
 - Agent documentation generation
 - Prompt documentation with categorization
 - Skill documentation with tags
 - Auto-generated AGENTS.md
 
 #### scripts/eval.ts
+
 - Eval suite loading
 - Dataset validation
 - Budget tracking framework
@@ -104,29 +124,36 @@ All automation scripts fully implemented and tested:
 - Success/failure reporting
 
 #### scripts/diff.ts
+
 - Line and word-level diffs
 - Color-coded output
 - Change statistics
 - File comparison utility
 
 ### Evaluation Framework (✅ Complete)
+
 - `evals/datasets/bugfix_small.jsonl` - Test data
 - `evals/datasets/docstrings.jsonl` - Test data
 - `evals/suites/code-refactor.yml` - Refactoring tests
 - `evals/suites/safety-guardrails.yml` - Security tests
 
 ### Red Team (✅ Complete)
+
 Security and safety test cases:
+
 - `redteam/jailbreaks.md` - Jailbreak attempts
 - `redteam/unsafe-requests.jsonl` - Unsafe request tests
 - `redteam/code-injection-cases.md` - Injection tests
 
 ### Configuration (✅ Complete)
+
 - `config/providers.example.yml` - API provider template
 - `config/budgets.yml` - Token and cost budgets
 
 ### CI/CD (✅ Complete)
+
 GitHub Actions workflow with stages:
+
 - Validation (manifests, security, formatting)
 - Build (all adapters)
 - Documentation generation
@@ -135,6 +162,7 @@ GitHub Actions workflow with stages:
 - Automated releases
 
 ### Documentation (✅ Complete)
+
 - `README.md` - Comprehensive guide with examples
 - `QUICKREF.md` - Quick reference cheat sheet
 - `docs/STYLE_GUIDE.md` - Writing guidelines
@@ -143,6 +171,7 @@ GitHub Actions workflow with stages:
 - `examples/README.md` - Example directory guide
 
 ### Utilities (✅ Complete)
+
 - `setup.sh` - Quick start script
 - `ai-tools.code-workspace` - VSCode workspace config
 
@@ -151,19 +180,23 @@ GitHub Actions workflow with stages:
 The build system successfully generates:
 
 ### Windsurf Adapters
+
 - `adapters/windsurf/rules/*.json` - Per-agent configs
 - `adapters/windsurf/presets/base.json` - Base preset
 
 ### Claude Code Adapters
+
 - `adapters/claude-code/skills.json` - All skills
 - `adapters/claude-code/prompts/*.json` - Per-prompt configs
 
 ### Cursor Adapters
+
 - `adapters/cursor/recipes.json` - All agents as recipes
 
 ## Features Implemented
 
 ### Core Features
+
 - ✅ Single source of truth in YAML manifests
 - ✅ Type-safe with JSON Schema validation
 - ✅ Composable rulepacks with inheritance
@@ -173,6 +206,7 @@ The build system successfully generates:
 - ✅ Include system for shared content
 
 ### Validation Features
+
 - ✅ Schema validation for all manifest types
 - ✅ ID uniqueness checking
 - ✅ Semver format validation
@@ -181,12 +215,14 @@ The build system successfully generates:
 - ✅ Reference checking (rulepacks, extends)
 
 ### Build Features
+
 - ✅ Rulepack composition and flattening
 - ✅ Multi-tool adapter generation
 - ✅ Automatic directory creation
 - ✅ Clean separation of source and output
 
 ### Evaluation Features
+
 - ✅ Multiple check types (command, regex, LLM judge)
 - ✅ Token budget tracking
 - ✅ Cost budget tracking
@@ -195,6 +231,7 @@ The build system successfully generates:
 - ✅ Baseline comparison framework
 
 ### Security Features
+
 - ✅ Secret detection in manifests
 - ✅ Environment variable placeholders
 - ✅ MCP security presets
@@ -203,6 +240,7 @@ The build system successfully generates:
 - ✅ Pre-commit hooks
 
 ### Automation Features
+
 - ✅ Complete GitHub Actions workflow
 - ✅ Pre-commit hooks
 - ✅ Automated documentation generation
@@ -234,18 +272,21 @@ npm run ci        ✅ Full pipeline executed successfully
 ## Architecture Highlights
 
 ### Clean Separation
+
 - Source manifests in YAML (human-editable)
 - Schemas for validation (machine-checked)
 - Generated adapters (gitignored, rebuiltable)
 - Scripts in TypeScript (type-safe)
 
 ### Extensibility
+
 - Easy to add new rulepacks
 - Easy to add new agents
 - Easy to add new tool adapters
 - Easy to add new eval suites
 
 ### Maintainability
+
 - Single source of truth
 - No code duplication
 - Clear validation errors
@@ -254,18 +295,21 @@ npm run ci        ✅ Full pipeline executed successfully
 ## Usage Verified
 
 ### Creating Content
+
 ✅ Add rulepack → Validate → Build → Use
 ✅ Add agent → Reference rulepacks → Generate configs
 ✅ Add prompt → Use variables → Include shared content
 ✅ Add skill → Define command → Build adapter
 
 ### Workflows
+
 ✅ Development: validate → build → docs → commit
 ✅ Testing: create suite → add dataset → run eval
 ✅ Release: version bump → push → auto-release
 
 ### Tool Integration
-✅ Windsurf: Use generated rules/*.json
+
+✅ Windsurf: Use generated rules/\*.json
 ✅ Claude Code: Import skills.json and prompts
 ✅ Cursor: Import recipes.json
 

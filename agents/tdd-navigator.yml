@@ -55,12 +55,12 @@ tools:
   - write-code
   - refactor
 constraints:
-  - "Always start with tests."
-  - "Implementation should be minimal to pass tests."
-  - "Refactor only when tests are passing."
+  - 'Always start with tests.'
+  - 'Implementation should be minimal to pass tests.'
+  - 'Refactor only when tests are passing.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'
   tags:
     - tdd
     - testing

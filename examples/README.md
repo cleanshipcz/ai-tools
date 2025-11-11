@@ -5,6 +5,7 @@ This directory contains complete, working examples of how to use the AI Tools re
 ## What's Included
 
 Each subdirectory contains a self-contained example with:
+
 - Source manifests (YAML files)
 - Expected generated outputs
 - Usage instructions
@@ -13,31 +14,41 @@ Each subdirectory contains a self-contained example with:
 ## Examples
 
 ### basic-workflow/
+
 Learn the fundamentals:
+
 - Creating a simple rulepack
 - Defining an agent with the rulepack
 - Building and using the generated configs
 
 ### prompt-with-variables/
+
 Advanced prompt features:
+
 - Using variables
 - Including shared snippets
 - Conditional content with Mustache templates
 
 ### agent-composition/
+
 Composing complex agents:
+
 - Extending multiple rulepacks
 - Configuring capabilities and tools
 - Setting appropriate defaults
 
 ### eval-suite/
+
 Testing and evaluation:
+
 - Creating test datasets
 - Writing eval suites with checks
 - Setting budgets and baselines
 
 ### mcp-integration/
+
 MCP server usage:
+
 - Configuring MCP servers
 - Creating presets
 - Security considerations

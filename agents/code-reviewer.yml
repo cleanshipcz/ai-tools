@@ -56,12 +56,12 @@ tools:
   - read-file
   - search-code
 constraints:
-  - "Do not approve code with security vulnerabilities."
-  - "Flag missing test coverage for new functionality."
-  - "Suggest specific improvements, not just criticism."
+  - 'Do not approve code with security vulnerabilities.'
+  - 'Flag missing test coverage for new functionality.'
+  - 'Suggest specific improvements, not just criticism.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
+  author: 'AI Tools Team'
+  created: '2025-01-01'
   tags:
     - review
     - quality
