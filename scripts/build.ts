@@ -73,6 +73,9 @@ class Builder {
     await this.generateClaudeCodeAdapters();
     await this.generateCursorAdapters();
 
+    // Generate Anthropic-compatible SKILL.md files
+    await this.generateAnthropicSkills();
+
     console.log(chalk.green('\n✅ Build complete!'));
   }
 
@@ -299,6 +302,22 @@ class Builder {
     await writeFile(join(outputDir, 'recipes.json'), JSON.stringify({ recipes }, null, 2));
 
     console.log(chalk.gray(`    Generated ${recipes.length} recipes`));
+  }
+
+  private async generateAnthropicSkills(): Promise<void> {
+    console.log(chalk.blue('  Generating Anthropic SKILL.md files...'));
+
+    const { execSync } = await import('child_process');
+    
+    try {
+      execSync('npm run skills', { 
+        cwd: rootDir,
+        stdio: 'inherit' 
+      });
+    } catch (error) {
+      console.error(chalk.red('    Failed to generate SKILL.md files'));
+      throw error;
+    }
   }
 }
 

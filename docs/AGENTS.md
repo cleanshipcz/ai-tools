@@ -24,26 +24,23 @@ An agent specialized in debugging and fixing issues in code.
 Analyzes error messages, traces, and code to identify root causes
 and propose fixes.
 
-**Rulepacks:**
 
+**Rulepacks:**
 - `base`
 - `coding-python`
 - `coding-kotlin`
 
 **Required Capabilities:**
-
 - `mcp:filesystem`
 - `mcp:shell`
 - `mcp:git`
 
 **Tools:**
-
 - `read-file`
 - `run-tests`
 - `search-code`
 
 **Default Settings:**
-
 ```yaml
 temperature: 0.3
 style: technical
@@ -60,25 +57,22 @@ style: technical
 A senior code reviewer agent that analyzes code changes, identifies issues,
 and provides constructive, actionable feedback.
 
-**Rulepacks:**
 
+**Rulepacks:**
 - `base`
 - `reviewer`
 - `security`
 
 **Required Capabilities:**
-
 - `mcp:git`
 - `mcp:filesystem`
 
 **Tools:**
-
 - `git-diff`
 - `read-file`
 - `search-code`
 
 **Default Settings:**
-
 ```yaml
 temperature: 0.2
 model: claude-3-5-sonnet
@@ -96,22 +90,19 @@ style: terse
 An agent that reviews Kotlin code for style violations and
 suggests idiomatic improvements.
 
-**Rulepacks:**
 
+**Rulepacks:**
 - `base`
 - `coding-kotlin`
 
 **Required Capabilities:**
-
 - `mcp:filesystem`
 
 **Tools:**
-
 - `run-detekt`
 - `run-ktlint`
 
 **Default Settings:**
-
 ```yaml
 temperature: 0.2
 style: terse
@@ -128,25 +119,22 @@ style: terse
 An agent that helps with test-driven development by writing tests first,
 then guiding implementation to make tests pass.
 
-**Rulepacks:**
 
+**Rulepacks:**
 - `base`
 - `coding-python`
 - `coding-kotlin`
 
 **Required Capabilities:**
-
 - `mcp:filesystem`
 - `mcp:shell`
 
 **Tools:**
-
 - `run-tests`
 - `write-code`
 - `refactor`
 
 **Default Settings:**
-
 ```yaml
 temperature: 0.4
 style: conversational
@@ -166,7 +154,6 @@ Prompts are atomic, reusable templates with variables and clear specifications.
 Generate a concise summary of a pull request
 
 **Variables:**
-
 - `diff` (required)
   The git diff to summarize
 - `context` (optional)
@@ -180,7 +167,6 @@ Generate a concise summary of a pull request
 Generate a concise summary of a pull request
 
 **Variables:**
-
 - `diff` (required)
   The git diff to summarize
 - `context` (optional)
@@ -194,7 +180,6 @@ Generate a concise summary of a pull request
 Extract a pure function from a selected block of code
 
 **Variables:**
-
 - `code` (required)
   The code block to extract
 - `target_name` (optional)
@@ -210,7 +195,6 @@ Extract a pure function from a selected block of code
 Add null safety checks to code that may have null pointer issues
 
 **Variables:**
-
 - `code` (required)
   The code to make null-safe
 - `language` (required)
@@ -222,7 +206,6 @@ Add null safety checks to code that may have null pointer issues
 Extract a pure function from a selected block of code
 
 **Variables:**
-
 - `code` (required)
   The code block to extract
 - `target_name` (optional)
@@ -238,7 +221,6 @@ Extract a pure function from a selected block of code
 Generate a concise summary of a pull request
 
 **Variables:**
-
 - `diff` (required)
   The git diff to summarize
 - `context` (optional)
@@ -252,7 +234,6 @@ Generate a concise summary of a pull request
 Extract a pure function from a selected block of code
 
 **Variables:**
-
 - `code` (required)
   The code block to extract
 - `target_name` (optional)
@@ -268,7 +249,6 @@ Extract a pure function from a selected block of code
 Generate comprehensive unit tests for given code
 
 **Variables:**
-
 - `code` (required)
   The code to test
 - `language` (required)
@@ -284,7 +264,6 @@ Generate comprehensive unit tests for given code
 Add null safety checks to code that may have null pointer issues
 
 **Variables:**
-
 - `code` (required)
   The code to make null-safe
 - `language` (required)
@@ -296,7 +275,6 @@ Add null safety checks to code that may have null pointer issues
 Extract a pure function from a selected block of code
 
 **Variables:**
-
 - `code` (required)
   The code block to extract
 - `target_name` (optional)
@@ -312,7 +290,6 @@ Extract a pure function from a selected block of code
 Add null safety checks to code that may have null pointer issues
 
 **Variables:**
-
 - `code` (required)
   The code to make null-safe
 - `language` (required)
@@ -326,7 +303,6 @@ Add null safety checks to code that may have null pointer issues
 Generate comprehensive unit tests for given code
 
 **Variables:**
-
 - `code` (required)
   The code to test
 - `language` (required)
@@ -342,7 +318,6 @@ Generate comprehensive unit tests for given code
 Generate comprehensive unit tests for given code
 
 **Variables:**
-
 - `code` (required)
   The code to test
 - `language` (required)

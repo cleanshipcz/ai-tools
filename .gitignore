@@ -9,6 +9,7 @@ dist/
 adapters/*/rules/
 adapters/*/presets/
 adapters/*/skills.json
+adapters/*/skills/
 adapters/*/prompts/
 *.tsbuildinfo
 

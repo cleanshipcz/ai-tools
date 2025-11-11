@@ -148,7 +148,7 @@ content: |
 ├── prompts/         # Your prompts
 │   └── shared/      # Shared includes
 ├── rulepacks/       # Your rulepacks
-├── skills/          # Your skills
+├── skills/          # Your skills (YAML → SKILL.md)
 ├── mcp/             # MCP configurations
 ├── evals/           # Evaluation suites
 │   ├── datasets/    # Test data (JSONL)

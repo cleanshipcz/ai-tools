@@ -158,20 +158,20 @@ Extract the following {{language}} code into a separate function...
 
 ## Comparison
 
-| Feature               | HTML Browser | CLI Tool | Markdown |
-| --------------------- | ------------ | -------- | -------- |
-| Search & Filter       | ✅           | ❌       | ❌       |
-| One-click Copy        | ✅           | ⚠️ CLI   | ❌       |
-| Variable Filling      | ✅           | ✅       | ❌       |
-| Live Preview          | ✅           | ❌       | ❌       |
-| Example Data          | ✅           | ❌       | ❌       |
-| Interactive           | ✅           | ✅       | ❌       |
-| No Build Required     | ❌           | ❌       | ❌       |
-| Works Offline         | ✅           | ✅       | ✅       |
-| Beautiful UI          | ✅           | ❌       | ⚠️       |
-| Terminal-Friendly     | ❌           | ✅       | ⚠️       |
-| Scriptable            | ❌           | ✅       | ❌       |
-| Mobile-Friendly       | ✅           | ❌       | ✅       |
+| Feature           | HTML Browser | CLI Tool | Markdown |
+| ----------------- | ------------ | -------- | -------- |
+| Search & Filter   | ✅            | ❌        | ❌        |
+| One-click Copy    | ✅            | ⚠️ CLI    | ❌        |
+| Variable Filling  | ✅            | ✅        | ❌        |
+| Live Preview      | ✅            | ❌        | ❌        |
+| Example Data      | ✅            | ❌        | ❌        |
+| Interactive       | ✅            | ✅        | ❌        |
+| No Build Required | ❌            | ❌        | ❌        |
+| Works Offline     | ✅            | ✅        | ✅        |
+| Beautiful UI      | ✅            | ❌        | ⚠️        |
+| Terminal-Friendly | ❌            | ✅        | ⚠️        |
+| Scriptable        | ❌            | ✅        | ❌        |
+| Mobile-Friendly   | ✅            | ❌        | ✅        |
 
 **Recommendation:**
 

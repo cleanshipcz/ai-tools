@@ -10,6 +10,41 @@ A comprehensive solution for managing AI agent prompts, rules, skills, and tool 
 
 ---
 
+## 📑 Table of Contents
+
+- [Quick Start](#quick-start)
+  - [For Casual Users](#for-casual-users-just-want-prompts)
+  - [For Developers](#for-developers-managing-configs)
+- [📝 Prompts](#-prompts)
+  - [What Are Prompts?](#what-are-prompts)
+  - [Usage](#usage)
+  - [Creating Custom Prompts](#creating-custom-prompts)
+- [🤖 Agents](#-agents)
+  - [What Are Agents?](#what-are-agents)
+  - [Usage](#usage-1)
+  - [Creating Custom Agents](#creating-custom-agents)
+- [📋 Rulepacks](#-rulepacks)
+  - [What Are Rulepacks?](#what-are-rulepacks)
+  - [Usage](#usage-2)
+  - [Creating Custom Rulepacks](#creating-custom-rulepacks)
+- [🛠️ Skills](#️-skills)
+- [🔌 MCP (Model Context Protocol)](#-mcp-model-context-protocol)
+- [🧪 Evaluation Framework](#-evaluation-framework)
+- [🏗️ Project Structure](#️-project-structure)
+- [🚀 Available Commands](#-available-commands)
+- [📚 Documentation](#-documentation)
+- [⚙️ Configuration](#️-configuration)
+- [🔒 Security](#-security)
+- [🤝 Contributing](#-contributing)
+- [🔄 CI/CD](#-cicd)
+- [📝 Best Practices](#-best-practices)
+- [📦 Architecture](#-architecture)
+- [🗺️ Roadmap](#️-roadmap)
+- [📄 License](#-license)
+- [💬 Support](#-support)
+
+---
+
 ## Quick Start
 
 ### For Casual Users (Just Want Prompts)
@@ -44,6 +79,8 @@ ls adapters/cursor/
 ---
 
 ## 📝 Prompts
+
+> **📖 [Detailed Guide](prompts/README.md)** - Complete documentation with step-by-step instructions for Windsurf, Cursor, Claude Code, and more.
 
 ### What Are Prompts?
 
@@ -173,6 +210,8 @@ npm run prompt-library  # Update prompt library
 
 ## 🤖 Agents
 
+> **📖 [Detailed Guide](agents/README.md)** - Complete documentation with step-by-step instructions for Windsurf, Cursor, Claude Code, GitHub Copilot, and more.
+
 ### What Are Agents?
 
 Agents are complete AI assistants with bundled prompts, rules, and settings. They're designed for specific tasks and roles.
@@ -245,6 +284,8 @@ npm run build
 
 ## 📋 Rulepacks
 
+> **📖 [Detailed Guide](rulepacks/README.md)** - Complete documentation on how rulepacks work, composition patterns, and usage in different tools.
+
 ### What Are Rulepacks?
 
 Rulepacks are reusable collections of coding guidelines and best practices. They're designed to be mixed and matched.
@@ -298,132 +339,67 @@ npm run build     # Bundles into agents/configs
 
 ## 🛠️ Skills
 
+> **📖 [Detailed Guide](skills/README.md)** - Complete documentation on the hybrid architecture, how skills work in different tools, and creating custom skills.
+
 ### What Are Skills?
 
 Skills are executable commands that AI agents can run - like running tests, linters, or searching the codebase.
 
-**Included Skills:**
+**Hybrid Architecture:** YAML manifests → Generated `SKILL.md` for native Anthropic support  
+**Included Skills:** run-pytest, run-gradle-tests, run-detekt, run-ktlint, search-repo
 
-- **run-pytest** - Execute Python tests
-- **run-gradle-tests** - Run Gradle test suite
-- **run-detekt** - Kotlin static analysis
-- **run-ktlint** - Kotlin linter
-- **search-repo** - Search codebase with grep
-
-### Usage
-
-Skills are exposed to AI tools through MCP (Model Context Protocol) or tool adapters.
+### Quick Usage
 
 ```bash
-# Build skill configs
+# Build all adapters (includes Anthropic SKILL.md generation)
 npm run build
 
-# Skills are in:
-ls adapters/claude-code/skills.json
-ls adapters/windsurf/rules/*.json  # Bundled with agents
+# Skills are bundled into agents automatically
+# Windsurf/Cursor: Import agent configs
+# Claude Code: Use generated adapters/claude-code/skills/
 ```
 
-When the AI needs to run tests or check code, it uses these skill definitions.
-
-### Creating Custom Skills
-
-```yaml
-# skills/my-skill.yml
-id: my-skill
-version: 1.0.0
-description: What this skill does
-command:
-  program: "npm"
-  args:
-    - "run"
-    - "my-command"
-  cwd: "."
-timeout_sec: 60
-outputs:
-  stdout: true
-  stderr: true
-  exit_code: true
-tags:
-  - build
-  - test
-```
+**Best of both worlds:** Tool-agnostic YAML source + native Anthropic Agent Skills format.
 
 ---
 
 ## 🔌 MCP (Model Context Protocol)
 
+> **📖 [Detailed Guide](mcp/README.md)** - Complete documentation on MCP servers, presets, security considerations, and tool-specific configuration.
+
 ### What Is MCP?
 
-MCP servers provide AI models with access to external tools and data sources - like filesystems, git, databases, APIs.
+MCP servers provide AI models with access to external tools and data sources - filesystems, git, databases, APIs.
 
-**Included MCP Configs:**
+**Servers:** filesystem, git, http, shell  
+**Presets:** base (safe defaults), secure (extra restricted)
 
-- **filesystem** - Read/write files
-- **git** - Git operations
-- **http** - Make HTTP requests
-- **shell** - Execute shell commands (use carefully!)
-
-**Presets:**
-
-- **base** - Safe defaults (filesystem + git)
-- **secure** - Extra restricted (no shell, limited HTTP)
-
-### Usage
-
-MCP configs are referenced in agents via the `capabilities` field:
+### Quick Usage
 
 ```yaml
 # In agents/my-agent.yml
 capabilities:
   - mcp:git
   - mcp:filesystem
+  # Or use preset:
+  - mcp-preset:base
 ```
 
-When you build, the agent gets access to those MCP servers.
-
-### Creating Custom MCP Configs
-
-```yaml
-# mcp/servers/my-service.yaml
-server: my-service
-command: npx
-args:
-  - my-mcp-server
-description: What this MCP server provides
-capabilities:
-  - "read_database"
-  - "execute_queries"
-tags:
-  - database
-  - sql
-```
-
-**Create a preset:**
-
-```yaml
-# mcp/presets/my-preset.tools.yaml
-preset: my-preset
-description: My custom tool bundle
-includes:
-  - filesystem
-  - git
-  - my-service
-```
+When you build, agents get access to those MCP capabilities.
 
 ---
 
 ## 🧪 Evaluation Framework
 
+> **📖 [Detailed Guide](evals/README.md)** - Complete documentation on running evals, creating test suites, understanding results, and best practices.
+
 ### What Is It?
 
 Test your prompts and agents with real datasets to ensure quality and track regressions.
 
-**Included Eval Suites:**
+**Included Eval Suites:** code-refactor, safety-guardrails
 
-- **code-refactor** - Tests refactoring prompts
-- **safety-guardrails** - Security and safety tests
-
-### Usage
+### Quick Usage
 
 ```bash
 # Run all evaluations
@@ -432,32 +408,7 @@ npm run eval
 # Run specific suite
 npm run eval -- --suite code-refactor
 
-# Reports generated in evals/reports/
-```
-
-### Creating Custom Evals
-
-```yaml
-# evals/suites/my-test.yml
-suite: my-test
-version: 1.0.0
-description: Test my custom prompts
-targets:
-  - type: prompt
-    id: my-prompt
-    dataset: datasets/my-data.jsonl
-checks:
-  - name: compiles
-    type: command
-    cmd: "python -m py_compile output.py"
-    required: true
-  - name: quality
-    type: llm-judge
-    judge_prompt: "Rate improvement from 1-10"
-    weight: 1.0
-budgets:
-  max_tokens: 50000
-  max_cost_usd: 1.0
+# Reports in evals/reports/
 ```
 
 ---
