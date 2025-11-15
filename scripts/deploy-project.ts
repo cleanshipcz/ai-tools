@@ -394,7 +394,6 @@ class ProjectDeployer {
         await access(toolOutputPath);
 
         // Copy the contents of toolOutputPath to targetPath
-        // e.g., copy .output/example-ecommerce/github-copilot/.github/* to /target/.github/
         const entries = await readdir(toolOutputPath, { withFileTypes: true });
 
         for (const entry of entries) {

@@ -240,17 +240,37 @@ Generates `.github/copilot-instructions.md` containing:
 - Project-specific rules
 - Documentation references
 
+**Note:** GitHub Copilot doesn't support CLI-based recipes, so no recipe scripts are deployed.
+
 #### Windsurf
 
 Generates `.windsurf/rules/project-rules.json` with project-specific rules.
 
+**Note:** Windsurf doesn't currently support CLI-based recipes, so no recipe scripts are deployed.
+
 #### Cursor
 
-Generates `.cursor/project-rules.json` with project rules and context.
+Generates `.cursor/project-rules.json` with project rules and context, plus:
+
+- **Recipe Scripts:** Deployed to `cleanship-recipes/` subdirectory
+- Tool-specific executable bash scripts for each recipe
+- Recipes that specify cursor support in their manifests
 
 #### Claude Code
 
-Generates `.claude/project-context.json` with project context.
+Generates `.claude/project-context.json` with project context, plus:
+
+- **Recipe Scripts:** Deployed to `cleanship-recipes/` subdirectory  
+- Executable bash scripts for automated multi-agent workflows
+- All recipes that support claude-code tool
+
+#### Copilot CLI
+
+Generates `AGENTS.md` with agent definitions and project context, plus:
+
+- **Recipe Scripts:** Deployed to `cleanship-recipes/` subdirectory
+- Scripts designed for GitHub Copilot CLI tool
+- All recipes that support copilot-cli tool
 
 ---
 
@@ -770,6 +790,87 @@ npm run project:generate-features my-project
 ### Feature Schema
 
 See [`schemas/feature.schema.json`](../schemas/feature.schema.json) for the complete schema reference.
+
+### Feature-Recipe Binding
+
+Features can be bound to recipes to create automated workflows with pre-populated context.
+
+#### Example: Feature with Recipe Binding
+
+```yaml
+# projects/local/my-project/features/user-authentication/feature.yml
+id: user-authentication
+version: 1.0.0
+name: 'User Authentication'
+description: 'Implement JWT-based user authentication'
+
+recipe:
+  id: feature-delivery  # Which recipe to use
+  context:
+    # Feature-specific context passed to the recipe
+    feature_description: |
+      Implement a complete authentication system with:
+      - User registration (POST /api/auth/register)
+      - User login (POST /api/auth/login)
+      - JWT token generation and validation
+      - Protected routes middleware
+      - Password hashing with bcrypt
+    
+    acceptance_criteria: |
+      - Users can register with email/password
+      - Passwords are hashed before storage
+      - Login returns JWT token (24h expiry)
+      - Protected routes verify JWT tokens
+      - Comprehensive input validation
+      - Unit and integration tests included
+      - API documentation updated
+  
+  tools:
+    - claude-code
+    - copilot-cli
+
+# ... rest of feature manifest
+```
+
+#### Generate and Run Feature Workflow
+
+```bash
+# Generate feature-bound recipe scripts
+npm run project:generate-features my-project
+
+# Scripts are created with context pre-populated:
+# .output/my-project/features/claude-code/user-authentication.sh
+# .output/my-project/features/copilot-cli/user-authentication.sh
+
+# Run the feature workflow
+cd .output/my-project/features/claude-code
+./user-authentication.sh
+
+# The script already contains:
+# - FEATURE_DESCRIPTION from recipe.context.feature_description
+# - ACCEPTANCE_CRITERIA from recipe.context.acceptance_criteria
+# - All workflow steps from the recipe
+```
+
+#### Benefits of Feature-Recipe Binding
+
+1. **Single Source of Truth**: Requirements live in feature.yml, not scattered across scripts
+2. **Reusable Workflows**: Same recipe can be used for multiple features with different context
+3. **Version Controlled**: Feature specifications are versioned with your project
+4. **Automated Execution**: No manual copy-paste of requirements into recipe commands
+5. **Self-Documenting**: Feature manifest serves as both spec and automation input
+
+#### Available Recipe Context Variables
+
+The `recipe.context` field accepts any variables needed by the recipe:
+
+- `feature_description` - For feature-delivery recipe
+- `acceptance_criteria` - For feature-delivery recipe
+- `bug_description` - For bug-fix-workflow recipe
+- `reproduction_steps` - For bug-fix-workflow recipe
+- Custom variables - Any variables defined in the recipe's `variables` section
+
+See [recipes/README.md](../recipes/README.md) for more information on recipe binding.
 
 ---
 

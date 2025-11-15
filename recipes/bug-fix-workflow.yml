@@ -1,0 +1,92 @@
+id: bug-fix-workflow
+version: 1.0.0
+description: Systematic bug fixing workflow with investigation, fix, testing, and verification
+tags:
+  - bugfix
+  - debugging
+  - testing
+tools:
+  - claude-code
+  - copilot-cli
+
+variables:
+  bug_description: "{{BUG_DESCRIPTION}}"
+  reproduction_steps: "{{REPRODUCTION_STEPS}}"
+
+steps:
+  - id: investigate
+    agent: bug-fixer
+    task: |
+      Investigate the following bug:
+      
+      Bug: {{bug_description}}
+      
+      Reproduction Steps:
+      {{reproduction_steps}}
+      
+      Please:
+      1. Analyze the codebase to locate the root cause
+      2. Explain why the bug occurs
+      3. Propose a fix strategy
+    continueConversation: false
+    waitForConfirmation: true
+
+  - id: implement-fix
+    agent: bug-fixer
+    task: |
+      Implement the fix for the bug based on the investigation.
+      
+      Ensure:
+      - The root cause is addressed, not just symptoms
+      - No regressions are introduced
+      - Existing tests still pass
+      - Add a test case that would have caught this bug
+    continueConversation: true
+    waitForConfirmation: false
+
+  - id: test-verification
+    agent: bug-fixer
+    task: |
+      Verify the bug fix by:
+      1. Running all existing tests
+      2. Testing the reproduction steps
+      3. Testing edge cases
+      4. Checking for potential regressions
+      
+      Report test results and confirm the bug is fixed.
+    continueConversation: true
+    waitForConfirmation: true
+
+  - id: review-fix
+    agent: code-reviewer
+    task: |
+      Review the bug fix implementation.
+      
+      Check:
+      - Fix addresses root cause
+      - No regressions introduced
+      - Test coverage is adequate
+      - Code quality is maintained
+      
+      Respond with "APPROVED" or provide feedback.
+    continueConversation: true
+    waitForConfirmation: false
+
+  - id: update-docs
+    agent: bug-fixer
+    task: |
+      Update documentation if needed:
+      - Add entry to CHANGELOG.md
+      - Update any affected documentation
+      - Add comments for non-obvious fixes
+    continueConversation: true
+    waitForConfirmation: false
+    condition:
+      type: on-success
+      check:
+        type: contains
+        value: "APPROVED"
+
+metadata:
+  author: ai-tools
+  created: "2025-01-15"

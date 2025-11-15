@@ -13,7 +13,7 @@ const rootDir = join(__dirname, '..');
 
 interface ManifestFile {
   path: string;
-  type: 'prompt' | 'agent' | 'rulepack' | 'skill' | 'eval' | 'project';
+  type: 'prompt' | 'agent' | 'rulepack' | 'skill' | 'eval' | 'project' | 'recipe';
   id: string;
   version?: string;
   content: any;
@@ -86,6 +86,7 @@ class Validator {
       skill: 'skill.schema.json',
       eval: 'eval.schema.json',
       project: 'project.schema.json',
+      recipe: 'recipe.schema.json',
     };
 
     const schemas: Record<string, any> = {};
@@ -108,6 +109,7 @@ class Validator {
       agents: 'agent',
       rulepacks: 'rulepack',
       skills: 'skill',
+      recipes: 'recipe',
       'evals/suites': 'eval',
       'projects/global': 'project',
       'projects/local': 'project',
@@ -121,6 +123,8 @@ class Validator {
           // Skip template files and deployment configs
           if (file.includes('/template/')) continue;
           if (file.endsWith('deploy.yml') || file.endsWith('deploy.local.yml')) continue;
+          // Skip feature manifests (validated separately)
+          if (file.includes('/features/') && file.endsWith('/feature.yml')) continue;
 
           try {
             const content = await readFile(file, 'utf-8');

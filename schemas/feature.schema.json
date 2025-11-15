@@ -114,6 +114,51 @@
       },
       "description": "Feature-specific conventions and patterns"
     },
+    "recipe": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Recipe ID to bind to this feature"
+        },
+        "context": {
+          "type": "object",
+          "description": "Feature-specific context to pass to the recipe as variables",
+          "properties": {
+            "feature_description": {
+              "type": "string",
+              "description": "Detailed feature description for the recipe"
+            },
+            "acceptance_criteria": {
+              "type": "string",
+              "description": "Acceptance criteria for the feature"
+            },
+            "bug_description": {
+              "type": "string",
+              "description": "Bug description (for bug-fix workflow)"
+            },
+            "reproduction_steps": {
+              "type": "string",
+              "description": "Bug reproduction steps (for bug-fix workflow)"
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["claude-code", "copilot-cli", "cursor"]
+          },
+          "description": "Tools to generate feature-bound recipe scripts for"
+        }
+      },
+      "required": ["id"],
+      "description": "Recipe binding configuration for automated workflows"
+    },
     "metadata": {
       "type": "object",
       "properties": {

@@ -207,6 +207,9 @@ export class ProjectGenerator {
       default:
         console.log(chalk.yellow(`    Unknown tool: ${tool}`));
     }
+
+    // Generate recipes for this tool (recipes go in shared directory)
+    await this.generateRecipes(tool, outputDir);
   }
 
   private async loadPromptsMap(): Promise<void> {
@@ -883,6 +886,262 @@ export class ProjectGenerator {
     }
 
     return lines.join('\n');
+  }
+
+  private async generateRecipes(tool: string, outputDir: string): Promise<void> {
+    // Only generate recipes for CLI-based tools that support automated workflows
+    const supportedTools = ['claude-code', 'copilot-cli', 'cursor'];
+    if (!supportedTools.includes(tool)) {
+      return;
+    }
+
+    const recipesDir = join(rootDir, 'recipes');
+    let recipeFiles: string[];
+    try {
+      const entries = await readdir(recipesDir);
+      recipeFiles = entries.filter((f) => f.endsWith('.yml') || f.endsWith('.yaml'));
+    } catch {
+      // No recipes directory
+      return;
+    }
+
+    if (recipeFiles.length === 0) {
+      return;
+    }
+
+    // Create cleanship-recipes inside the tool's config directory
+    const toolOutputDir = join(outputDir, tool);
+    let recipesOutputDir: string;
+    
+    // Tool-specific paths to keep recipes with their tool configs
+    if (tool === 'claude-code') {
+      recipesOutputDir = join(toolOutputDir, '.claude', 'cleanship-recipes');
+    } else if (tool === 'copilot-cli') {
+      // copilot-cli generates AGENTS.md at root, so put recipes alongside
+      recipesOutputDir = join(toolOutputDir, 'cleanship-recipes');
+    } else if (tool === 'cursor') {
+      recipesOutputDir = join(toolOutputDir, '.cursor', 'cleanship-recipes');
+    } else if (tool === 'github-copilot') {
+      recipesOutputDir = join(toolOutputDir, '.github', 'cleanship-recipes');
+    } else if (tool === 'windsurf') {
+      recipesOutputDir = join(toolOutputDir, '.windsurf', 'cleanship-recipes');
+    } else {
+      // Fallback for unknown tools
+      recipesOutputDir = join(toolOutputDir, 'cleanship-recipes');
+    }
+    
+    await mkdir(recipesOutputDir, { recursive: true });
+
+    let generatedCount = 0;
+
+    for (const recipeFile of recipeFiles) {
+      const recipeId = recipeFile.replace(/\.ya?ml$/, '');
+
+      // Load recipe to check if it supports this tool
+      const recipePath = join(recipesDir, recipeFile);
+      const recipeContent = await readFile(recipePath, 'utf-8');
+      const recipe = loadYaml(recipeContent) as any;
+
+      // Skip if recipe doesn't support this tool (when tools are specified)
+      if (recipe.tools && Array.isArray(recipe.tools) && !recipe.tools.includes(tool)) {
+        continue;
+      }
+
+      // Generate script inline (without verbose console output)
+      const scriptPath = join(recipesOutputDir, `${recipeId}.sh`);
+      await this.generateRecipeScript(recipe, tool, scriptPath);
+      generatedCount++;
+    }
+
+    if (generatedCount > 0) {
+      // Construct readable path based on tool
+      let pathDisplay: string;
+      if (tool === 'claude-code') {
+        pathDisplay = '.claude/cleanship-recipes/';
+      } else if (tool === 'copilot-cli') {
+        pathDisplay = 'cleanship-recipes/ (alongside AGENTS.md)';
+      } else if (tool === 'cursor') {
+        pathDisplay = '.cursor/cleanship-recipes/';
+      } else if (tool === 'github-copilot') {
+        pathDisplay = '.github/cleanship-recipes/';
+      } else if (tool === 'windsurf') {
+        pathDisplay = '.windsurf/cleanship-recipes/';
+      } else {
+        pathDisplay = 'cleanship-recipes/';
+      }
+      console.log(chalk.gray(`    Generated ${generatedCount} recipe script(s) in ${pathDisplay}`));
+    }
+  }
+
+  private async generateRecipeScript(recipe: any, tool: string, scriptPath: string): Promise<void> {
+    const script = this.buildRecipeScript(recipe, tool, null);
+    await writeFile(scriptPath, script, { mode: 0o755 });
+  }
+
+  private buildRecipeScript(recipe: any, tool: string, featureContext: any): string {
+    let script = '#!/bin/bash\n';
+    script += `# Auto-generated recipe script: ${recipe.id}\n`;
+    script += `# Description: ${recipe.description}\n`;
+    script += `# Tool: ${tool}\n`;
+    script += `# Generated: ${new Date().toISOString()}\n\n`;
+    script += 'set -e  # Exit on error\n\n';
+
+    // Add feature context variables if provided
+    if (featureContext) {
+      script += '# Feature Context\n';
+      for (const [key, value] of Object.entries(featureContext)) {
+        const varName = key.toUpperCase();
+        const escapedValue = (value as string).replace(/"/g, '\\"');
+        script += `${varName}="${escapedValue}"\n`;
+      }
+      script += '\n';
+    }
+
+    // Add recipe variables
+    if (recipe.variables) {
+      script += '# Variables\n';
+      for (const [key, value] of Object.entries(recipe.variables)) {
+        const varName = key.toUpperCase();
+        let varValue = (value as string).replace(/{{([^}]+)}}/g, (_, v) => `\${${v.toUpperCase()}}`);
+        
+        // If feature context provides this variable, use it as default
+        if (featureContext && featureContext[key.toLowerCase()]) {
+          varValue = `\${${varName}}`;
+        }
+        
+        script += `: \${${varName}:="${varValue}"}\n`;
+      }
+      script += '\n';
+    }
+
+    // Separate steps into pre-loop, loop, and post-loop
+    const loopStepIds = recipe.loop?.steps || [];
+    const loopStepIndices = loopStepIds.map((id: string) => 
+      recipe.steps.findIndex((s: any) => s.id === id)
+    );
+    
+    const preLoopSteps = recipe.steps.filter((_: any, i: number) => 
+      loopStepIndices.length === 0 || i < Math.min(...loopStepIndices)
+    );
+    const loopSteps = recipe.steps.filter((_: any, i: number) => 
+      loopStepIndices.includes(i)
+    );
+    const postLoopSteps = recipe.steps.filter((_: any, i: number) => 
+      loopStepIndices.length > 0 && i > Math.max(...loopStepIndices)
+    );
+
+    const conversationStrategy = recipe.conversationStrategy || 'separate';
+    const toolOptions = recipe.toolOptions;
+
+    // Generate pre-loop steps
+    for (let i = 0; i < preLoopSteps.length; i++) {
+      script += this.generateStepScript(preLoopSteps[i], i, tool, recipe.variables, conversationStrategy, toolOptions);
+    }
+
+    // Generate loop if defined
+    if (recipe.loop && loopSteps.length > 0) {
+      const maxIterations = recipe.loop.maxIterations || 3;
+      
+      script += `# Loop: ${loopStepIds.join(' → ')} (max ${maxIterations} iterations)\n`;
+      script += `for iteration in $(seq 1 ${maxIterations}); do\n`;
+      script += `  echo "\\n▶️  Iteration $iteration/${maxIterations}"\n`;
+      script += `  \n`;
+      
+      for (let i = 0; i < loopSteps.length; i++) {
+        const stepScript = this.generateStepScript(loopSteps[i], i, tool, recipe.variables, conversationStrategy, toolOptions);
+        // Indent loop content
+        script += stepScript.split('\n').map(line => line ? `  ${line}` : line).join('\n');
+      }
+      
+      script += `done\n\n`;
+    }
+
+    // Generate post-loop steps
+    const baseStepNum = preLoopSteps.length + (recipe.loop ? 1 : 0);
+    for (let i = 0; i < postLoopSteps.length; i++) {
+      script += this.generateStepScript(postLoopSteps[i], baseStepNum + i, tool, recipe.variables, conversationStrategy, toolOptions);
+    }
+
+    script += 'echo "✅ Recipe completed!"\n';
+    return script;
+  }
+
+  private generateStepScript(step: any, index: number, tool: string, variables: any, conversationStrategy: string = 'separate', toolOptions?: any): string {
+    let script = '';
+    
+    script += `# Step: ${step.id}\n`;
+    script += `echo "▶️  ${step.id} (${step.agent})"\n`;
+    
+    // Interpolate variables in task
+    let task = step.task;
+    if (variables) {
+      for (const key of Object.keys(variables)) {
+        task = task.replace(new RegExp(`{{${key}}}`, 'g'), `\${${key.toUpperCase()}}`);
+      }
+    }
+    
+    // Determine if should continue conversation based on strategy
+    const shouldContinue = conversationStrategy === 'continue' && step.continueConversation !== false && index > 0;
+    
+    // Generate tool-specific command with response capture
+    if (tool === 'claude-code') {
+      const continueFlag = shouldContinue ? '-c $CONVERSATION_ID' : '';
+      script += `RESPONSE=$(claude ${continueFlag} --agent ${step.agent} "${task.replace(/"/g, '\\"')}")\n`;
+      script += `echo "$RESPONSE"\n`;
+      if (index === 0 && conversationStrategy === 'continue') {
+        script += `CONVERSATION_ID=$(echo "$RESPONSE" | grep -oP 'Conversation ID: \\K[a-zA-Z0-9-]+')\n`;
+      }
+    } else if (tool === 'copilot-cli') {
+      const flags: string[] = [];
+      
+      if (shouldContinue) {
+        flags.push('--continue');
+      }
+      
+      // Add tool-specific options
+      if (toolOptions?.['copilot-cli']) {
+        const opts = toolOptions['copilot-cli'];
+        if (opts.allowAllTools) flags.push('--allow-all-tools');
+        if (opts.allowAllPaths) flags.push('--allow-all-paths');
+        if (opts.disallowTempDir) flags.push('--disallow-temp-dir');
+        if (opts.addDirs) {
+          opts.addDirs.forEach((dir: string) => flags.push(`--add-dir "${dir}"`));
+        }
+        if (opts.allowTools) {
+          opts.allowTools.forEach((tool: string) => flags.push(`--allow-tool "${tool}"`));
+        }
+        if (opts.denyTools) {
+          opts.denyTools.forEach((tool: string) => flags.push(`--deny-tool "${tool}"`));
+        }
+      }
+      
+      const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
+      script += `RESPONSE=$(echo "@${step.agent} ${task}" | copilot${flagsStr})\n`;
+      script += `echo "$RESPONSE"\n`;
+    } else if (tool === 'cursor') {
+      script += `# Manual: Open Cursor Composer and execute:\n`;
+      script += `# @${step.agent} ${task}\n`;
+      script += `echo "⚠️  Please execute in Cursor Composer and press Enter"\n`;
+      script += `read -p "Continue? "\n`;
+      script += `RESPONSE=""\n`;
+    }
+    
+    // Handle conditional execution of next steps
+    if (step.condition) {
+      if (step.condition.type === 'on-success' && step.condition.check) {
+        const check = step.condition.check;
+        if (check.type === 'contains' && check.value) {
+          script += `\n# Check condition for next step\n`;
+          script += `if [[ ! "$RESPONSE" == *"${check.value}"* ]]; then\n`;
+          script += `  echo "⚠️  Condition not met (expected: ${check.value})"\n`;
+          script += `  exit 1\n`;
+          script += `fi\n`;
+        }
+      }
+    }
+    
+    script += '\n';
+    return script;
   }
 
   private async copyClaudePromptsWithFiltering(src: string, dest: string): Promise<void> {

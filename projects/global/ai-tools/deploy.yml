@@ -12,6 +12,7 @@ tools:
   - windsurf
   - cursor
   - claude-code
+  - copilot-cli
 
 # Deployment mode: local or manual
 # local: Automatically deploy to the target directory

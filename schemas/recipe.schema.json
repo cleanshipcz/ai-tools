@@ -1,0 +1,251 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/cleanshipcz/ai-tools/schemas/recipe.schema.json",
+  "title": "Recipe Manifest",
+  "description": "Schema for multi-agent workflow recipes",
+  "type": "object",
+  "required": ["id", "version", "description", "steps"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Unique kebab-case identifier for the recipe"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (semver) of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "Clear description of what the recipe accomplishes"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+      },
+      "uniqueItems": true,
+      "description": "Tags for categorization and search"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["claude-code", "copilot-cli", "cursor"]
+      },
+      "uniqueItems": true,
+      "description": "Supported tools for executing this recipe"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "agent", "task"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Unique identifier for this step"
+          },
+          "agent": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Agent ID to use for this step"
+          },
+          "task": {
+            "type": "string",
+            "description": "Task description or prompt template for this step"
+          },
+          "prompt": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Optional prompt ID to use (instead of task text)"
+          },
+          "inputs": {
+            "type": "object",
+            "description": "Input variables for the task/prompt template"
+          },
+          "continueConversation": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether to continue the same conversation (true) or start new (false)"
+          },
+          "waitForConfirmation": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to wait for user confirmation before proceeding"
+          },
+          "condition": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["always", "on-success", "on-failure", "user-decision"],
+                "description": "Condition for executing this step"
+              },
+              "check": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["command", "regex", "contains", "user-approval"],
+                    "description": "Type of check to perform"
+                  },
+                  "cmd": {
+                    "type": "string",
+                    "description": "Command to run (for command type)"
+                  },
+                  "pattern": {
+                    "type": "string",
+                    "description": "Regex pattern (for regex type)"
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Value to search for (for contains type)"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "description": "Question to ask user (for user-approval type)"
+                  }
+                }
+              }
+            },
+            "description": "Condition for executing this step"
+          }
+        }
+      },
+      "minItems": 1,
+      "description": "Ordered list of steps in the workflow"
+    },
+    "loop": {
+      "type": "object",
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Step IDs to loop"
+          },
+          "minItems": 1,
+          "description": "List of step IDs to include in the loop"
+        },
+        "maxIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "Maximum number of loop iterations"
+        },
+        "condition": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["command", "user-decision", "max-iterations"],
+              "description": "Type of loop exit condition"
+            },
+            "cmd": {
+              "type": "string",
+              "description": "Command to run (for command type, exit code 0 = continue)"
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Question to ask user (for user-decision type)"
+            }
+          },
+          "required": ["type"]
+        }
+      },
+      "description": "Loop configuration for iterative workflows"
+    },
+    "variables": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z_][a-z0-9_]*$": {
+          "type": "string",
+          "description": "Variable value or template"
+        }
+      },
+      "description": "Global variables available to all steps"
+    },
+    "toolOptions": {
+      "type": "object",
+      "properties": {
+        "copilot-cli": {
+          "type": "object",
+          "properties": {
+            "allowAllTools": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allow all tools to run automatically without confirmation (--allow-all-tools)"
+            },
+            "allowAllPaths": {
+              "type": "boolean",
+              "default": false,
+              "description": "Disable file path verification and allow access to any path (--allow-all-paths)"
+            },
+            "allowTools": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Allow specific tools (--allow-tool)"
+            },
+            "denyTools": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Deny specific tools (--deny-tool)"
+            },
+            "addDirs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Add directories to the allowed list for file access (--add-dir)"
+            },
+            "disallowTempDir": {
+              "type": "boolean",
+              "default": false,
+              "description": "Prevent automatic access to system temporary directory (--disallow-temp-dir)"
+            }
+          },
+          "description": "Options for GitHub Copilot CLI"
+        },
+        "claude-code": {
+          "type": "object",
+          "properties": {},
+          "description": "Options for Claude Code CLI (reserved for future use)"
+        }
+      },
+      "description": "Tool-specific command-line options"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "author": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "description": "Additional metadata"
+    },
+    "conversationStrategy": {
+      "type": "string",
+      "enum": ["separate", "continue"],
+      "default": "separate",
+      "description": "How to handle conversation context between steps"
+    }
+  }
+}

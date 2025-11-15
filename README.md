@@ -29,7 +29,10 @@ A comprehensive solution for managing AI agent prompts, rules, skills, and tool 
       - [With AI Coding Tools](#with-ai-coding-tools)
       - [Manually](#manually)
     - [Creating Custom Agents](#creating-custom-agents)
-  - [📋 Rulepacks](#-rulepacks)
+  - [� Recipes (Multi-Agent Workflows)](#-recipes-multi-agent-workflows)
+    - [What Are Recipes?](#what-are-recipes)
+    - [Quick Usage](#quick-usage-recipes)
+  - [�📋 Rulepacks](#-rulepacks)
     - [What Are Rulepacks?](#what-are-rulepacks)
     - [Usage](#usage-2)
     - [Creating Custom Rulepacks](#creating-custom-rulepacks)
@@ -69,6 +72,8 @@ A comprehensive solution for managing AI agent prompts, rules, skills, and tool 
 
 ## Quick Start
 
+> **⚠️ Important**: This repo is a **configuration generator**. You create project configs here, deploy them to YOUR ACTUAL PROJECTS, then use them there.
+
 ### For Casual Users (Just Want Prompts)
 
 ```bash
@@ -85,6 +90,25 @@ npm run prompt-html
 npm run use-prompt
 npm run use-prompt write-tests
 ```
+
+### For Using With Your Projects
+
+```bash
+# 1. Create a project config
+npm run project:create my-app -- --local -d "My application"
+
+# 2. Edit deploy.yml: set target to your app directory
+vim projects/local/my-app/deploy.yml
+
+# 3. Deploy configs to your app
+npm run project:deploy my-app
+
+# 4. Use recipes in your app
+cd /path/to/your-actual-app
+./cleanship-recipes/feature-delivery.sh
+```
+
+**📖 [Recipe Guide](recipes/README.md)** - How to use multi-agent workflow recipes
 
 ### For Developers (Managing Configs)
 
@@ -324,7 +348,56 @@ npm run build
 
 ---
 
-## 📋 Rulepacks
+## � Recipes (Multi-Agent Workflows)
+
+> **📖 [Recipe Guide](recipes/README.md)** - Multi-agent workflow recipes
+
+### What Are Recipes?
+
+Recipes orchestrate multiple AI agents in sequence to accomplish complex tasks, like a team collaborating:
+
+- **feature-delivery** - Build → Review → Refactor → Document workflow
+- **code-review-cycle** - Iterative review until quality standards are met
+- **bug-fix-workflow** - Investigate → Fix → Test → Verify → Document
+
+### Quick Usage {#quick-usage-recipes}
+
+**Option 1: Standalone Recipe**
+
+```bash
+# Generate executable script
+npm run recipe:generate feature-delivery claude-code
+
+# Run it with variables
+FEATURE_DESCRIPTION="Add authentication" \
+ACCEPTANCE_CRITERIA="Login + JWT tokens" \
+.output/scripts/feature-delivery-claude-code.sh
+```
+
+**Option 2: Feature-Bound Recipe (Recommended)**
+
+```bash
+# 1. Define feature with recipe binding in feature.yml
+# 2. Generate feature-bound scripts
+npm run project:generate-features my-project
+
+# 3. Run with context pre-populated from feature manifest
+.output/my-project/features/claude-code/my-feature.sh
+```
+
+**Benefits:** Requirements are defined once in `feature.yml` and automatically passed to the recipe. No manual variable passing needed!
+
+**Example workflow:**
+
+```text
+Feature Builder → Code Reviewer → Feature Builder → Quality Check → Document
+```
+
+All steps execute automatically. See [recipes/README.md](recipes/README.md) for details on standalone and feature-bound recipes.
+
+---
+
+## �📋 Rulepacks
 
 > **📖 [Detailed Guide](rulepacks/README.md)** - Complete documentation on how rulepacks work, composition patterns, and usage in different tools.
 
@@ -517,6 +590,7 @@ ai-tools/
 │   ├── qa/
 │   └── shared/          # Shared snippets
 ├── agents/              # Complete AI assistants
+├── recipes/             # Multi-agent workflows (NEW!)
 ├── rulepacks/           # Reusable rule collections
 ├── skills/              # Executable commands
 ├── mcp/                 # MCP server configs
@@ -631,19 +705,29 @@ npm run use-prompt       # Interactive CLI tool to fill & copy prompts
 npm run prompt-library   # Generate markdown library
 ```
 
+### For Recipes (Multi-Agent Workflows)
+
+```bash
+npm run recipe:list                    # List available recipes
+npm run recipe:generate <id> [tool]    # Generate automated script
+                                       # Tools: claude-code, copilot-cli, cursor
+```
+
 ### For Projects (Project-Specific Configs)
 
 ```bash
 npm run project:create           # Create new project from template
 npm run project:init             # Initialize AI tools in external project
 npm run project:list             # List available projects (including external)
-npm run project:generate         # Generate project configurations
+npm run project:generate         # Generate project configurations (includes recipes)
 npm run project:generate-features # Generate feature-specific snippets
 npm run project:deploy           # Deploy to target project
 npm run project:deploy-all       # Deploy all projects at once
 npm run project:rollback         # Rollback deployment
 npm run project:external         # Manage external projects (add/remove/list)
 ```
+
+**Note:** Project generation automatically deploys recipe scripts to `cleanship-recipes/` subdirectories for supported tools (claude-code, copilot-cli, cursor).
 
 ### For Developers (Managing Manifests)
 
@@ -672,6 +756,8 @@ npm run clean            # Remove generated files
 
 - **[QUICKREF.md](QUICKREF.md)** - Quick reference guide
 - **[docs/TOOLS.md](docs/TOOLS.md)** - Tool integration reference (Windsurf, Cursor, Claude Code, Copilot)
+- **[recipes/README.md](recipes/README.md)** - Multi-agent workflow recipes (quick start)
+- **[recipes/GUIDE.md](recipes/GUIDE.md)** - Advanced recipe guide (complete reference)
 - **[docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md)** - Writing effective prompts
 - **[docs/AGENTS.md](docs/AGENTS.md)** - Agent documentation (generated)
 - **[docs/CHANGELOG.md](docs/CHANGELOG.md)** - Version history

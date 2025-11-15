@@ -48,19 +48,55 @@ copilot  # Automatically loads AGENTS.md
 
 See [`docs/TOOLS.md`](TOOLS.md) for details.
 
-### Multi-agent support
+### Multi-agent support (v1.2.0)
 
-- design and implement a feature that allows multiple agents to be used in a sequence
-- imagine:
-  - using a feature building agent to build a feature
-  - using a review agent to review the feature
-  - using a feature building/refactoring agent to reflect the review
-  - repeat until reaching certain quality
-  - use a documentation agent to reflect the changes
-- the configuration would be a certain recipe to deliver a full feature as if it was done by a team
-- I can see it working with claude code `-c` feature and some custom script, for example
-- I want it for major tools like claude code, copilot CLI, or if possible for GPT
-- if not possible, provide an analysis
+✅ **Fully Implemented**
+
+Multi-agent recipes enable orchestrating multiple AI agents in sequence to accomplish complex workflows.
+
+**Key features:**
+
+- Recipe manifests define multi-step workflows with agents, tasks, and conditions
+- **Fully automated execution** - Generate and run scripts with single command
+- **Interactive mode** - Manual control with quality gates and loops
+- Tool integration with Claude Code, Copilot CLI, and Cursor
+- Built-in recipes: feature-delivery, code-review-cycle, bug-fix-workflow
+- CI/CD compatible with generated bash scripts
+
+**Generated artifacts:**
+
+- `recipes/*.yml` - Recipe manifest definitions
+- `schemas/recipe.schema.json` - JSON Schema for validation
+- `.output/scripts/*.sh` - Auto-generated executable scripts
+
+**Usage (Automated):**
+
+```bash
+# Generate executable script
+npm run recipe:generate feature-delivery claude-code
+
+# Run with variables
+FEATURE_DESCRIPTION="Add auth" \
+.output/scripts/feature-delivery-claude-code.sh
+```
+
+**Usage (Interactive):**
+
+```bash
+# Step-by-step guidance
+npm run recipe:run feature-delivery claude-code
+```
+
+See [`recipes/README.md`](../recipes/README.md) for complete documentation.
+
+### Misc
+
+- [ ] Documentation - cleanup recipe docs
+- [ ] Create agents or prompts for creating projects files, feature files, agents, etc.
+- [ ] Rename cleanship-recipes to .cs.recipes
+- [ ] For all recipes, the first step needs to be: analysis of the relevant content with output to a document, then detailed plan of the change with output to a document; these documents then need to be included in context and maintained
+- [ ] Organization agent -> good in organizing files, folders, documents, topics, etc.
+- [ ] Organize this repository -> add enumerated prefix for folders (e.g. 01_Scriptsm, 02_Rulepacks, ..., 99_Docs)
 
 ## Other features NOT NOW
 

@@ -1,0 +1,115 @@
+id: feature-delivery
+version: 1.0.0
+description: Complete feature implementation workflow with build, review, refactor, and documentation cycles
+tags:
+  - workflow
+  - feature
+  - review
+  - documentation
+tools:
+  - claude-code
+  - copilot-cli
+
+# Conversation strategy: 'continue' (maintain context) or 'separate' (fresh conversation per agent)
+conversationStrategy: separate
+
+# Tool-specific options
+toolOptions:
+  copilot-cli:
+    allowAllTools: true  # Allow tools to run automatically without confirmation
+
+variables:
+  feature_description: "{{FEATURE_DESCRIPTION}}"
+  acceptance_criteria: "{{ACCEPTANCE_CRITERIA}}"
+
+steps:
+  - id: implement
+    agent: feature-builder
+    task: |
+      Implement the following feature:
+      
+      Feature: {{feature_description}}
+      
+      Acceptance Criteria:
+      {{acceptance_criteria}}
+      
+      Please implement this feature following best practices, including:
+      - Clean, maintainable code
+      - Proper error handling
+      - Comprehensive tests
+      - Documentation for public APIs
+    continueConversation: false
+    waitForConfirmation: false
+
+  - id: review
+    agent: code-reviewer
+    task: |
+      Review the changes made in the previous step.
+      
+      Focus on:
+      - Code quality and maintainability
+      - Test coverage and quality
+      - Security concerns
+      - Performance considerations
+      - Documentation completeness
+      
+      Provide specific, actionable feedback.
+    continueConversation: true
+    waitForConfirmation: false
+
+  - id: refactor
+    agent: feature-builder
+    task: |
+      Address the review feedback from the previous step.
+      
+      Please:
+      - Fix any issues identified
+      - Improve code quality as suggested
+      - Add missing tests or documentation
+      - Ensure all acceptance criteria are met
+    continueConversation: true
+    waitForConfirmation: false
+
+  - id: quality-check
+    agent: code-reviewer
+    task: |
+      Perform a final quality check on the implementation.
+      
+      Verify:
+      - All review feedback has been addressed
+      - Tests pass and cover edge cases
+      - Code follows project conventions
+      - Documentation is complete
+      
+      Respond with "APPROVED" if quality standards are met, or provide remaining issues.
+    continueConversation: true
+    waitForConfirmation: true
+    condition:
+      type: always
+
+  - id: document
+    agent: feature-builder
+    task: |
+      Update project documentation to reflect the new feature.
+      
+      Please update:
+      - README.md with feature description
+      - CHANGELOG.md with version entry
+      - Any relevant architecture docs
+    continueConversation: true
+    waitForConfirmation: false
+    condition:
+      type: on-success
+      check:
+        type: contains
+        value: "APPROVED"
+
+loop:
+  steps:
+    - review
+    - refactor
+  maxIterations: 3
+
+metadata:
+  author: ai-tools
+  created: "2025-01-15"

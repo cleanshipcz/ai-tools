@@ -1,0 +1,180 @@
+id: add-user-authentication
+version: 1.0.0
+name: Add User Authentication
+description: Implement user authentication system with JWT tokens and password hashing
+
+context:
+  overview: |
+    Add a complete user authentication system to the application, including:
+    - User registration and login endpoints
+    - JWT token generation and validation
+    - Password hashing with bcrypt
+    - Protected routes middleware
+    - Session management
+  
+  architecture: |
+    The authentication system will follow a stateless JWT approach:
+    - Auth routes in routes/auth.ts
+    - User model with password hashing in models/User.ts
+    - JWT middleware in middleware/auth.ts
+    - Token refresh mechanism
+  
+  dependencies:
+    - jsonwebtoken
+    - bcrypt
+    - express-validator
+
+files:
+  entry_points:
+    - src/routes/auth.ts
+    - src/middleware/auth.ts
+  key_files:
+    - src/models/User.ts
+    - src/services/AuthService.ts
+    - tests/auth.test.ts
+  patterns:
+    - src/routes/auth/**
+    - src/middleware/auth/**
+
+conventions:
+  - "Use async/await for all async operations"
+  - "Hash passwords with bcrypt (salt rounds: 10)"
+  - "JWT tokens expire after 24 hours"
+  - "Refresh tokens expire after 7 days"
+  - "Use HTTP-only cookies for refresh tokens"
+  - "Validate all inputs with express-validator"
+
+recipe:
+  id: feature-delivery
+  context:
+    feature_description: |
+      Implement a complete user authentication system with the following components:
+      
+      1. User Registration:
+         - POST /api/auth/register
+         - Validate email format and password strength
+         - Hash password with bcrypt (10 salt rounds)
+         - Store user in database
+         - Return JWT access token
+      
+      2. User Login:
+         - POST /api/auth/login
+         - Validate credentials
+         - Generate JWT access token (24h expiry)
+         - Generate refresh token (7d expiry, HTTP-only cookie)
+      
+      3. Token Refresh:
+         - POST /api/auth/refresh
+         - Validate refresh token from cookie
+         - Generate new access token
+      
+      4. Protected Routes Middleware:
+         - Verify JWT from Authorization header
+         - Attach user object to request
+         - Handle token expiration errors
+      
+      5. User Model:
+         - Email (unique, indexed)
+         - Password (hashed)
+         - CreatedAt, UpdatedAt timestamps
+         - comparePassword method
+    
+    acceptance_criteria: |
+      - User can register with email and password
+      - Password is hashed before storage (verify with bcrypt.compare)
+      - User can login and receive JWT token
+      - JWT token contains user ID and email
+      - Protected routes reject requests without valid token
+      - Protected routes accept requests with valid token
+      - Token refresh endpoint generates new access token
+      - All endpoints have comprehensive input validation
+      - Unit tests cover happy path and edge cases
+      - Integration tests verify authentication flow
+      - Error messages are user-friendly and secure (no sensitive info)
+      - Rate limiting on auth endpoints (5 attempts per 15 minutes)
+      - API documentation includes auth flow examples
+  
+  tools:
+    - claude-code
+    - copilot-cli
+
+snippets:
+  - id: user-model
+    title: User Model Example
+    description: Mongoose schema with password hashing
+    language: typescript
+    content: |
+      import mongoose from 'mongoose';
+      import bcrypt from 'bcrypt';
+      
+      const userSchema = new mongoose.Schema({
+        email: {
+          type: String,
+          required: true,
+          unique: true,
+          lowercase: true,
+          index: true
+        },
+        password: {
+          type: String,
+          required: true
+        }
+      }, {
+        timestamps: true
+      });
+      
+      // Hash password before saving
+      userSchema.pre('save', async function(next) {
+        if (!this.isModified('password')) return next();
+        this.password = await bcrypt.hash(this.password, 10);
+        next();
+      });
+      
+      // Compare password method
+      userSchema.methods.comparePassword = async function(candidatePassword: string) {
+        return bcrypt.compare(candidatePassword, this.password);
+      };
+      
+      export const User = mongoose.model('User', userSchema);
+
+  - id: auth-middleware
+    title: JWT Authentication Middleware
+    description: Express middleware to verify JWT tokens
+    language: typescript
+    content: |
+      import { Request, Response, NextFunction } from 'express';
+      import jwt from 'jsonwebtoken';
+      
+      export const authenticate = async (
+        req: Request,
+        res: Response,
+        next: NextFunction
+      ) => {
+        try {
+          const token = req.headers.authorization?.replace('Bearer ', '');
+          
+          if (!token) {
+            return res.status(401).json({ error: 'Authentication required' });
+          }
+          
+          const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
+            userId: string;
+            email: string;
+          };
+          
+          req.user = decoded;
+          next();
+        } catch (error) {
+          return res.status(401).json({ error: 'Invalid or expired token' });
+        }
+      };
+
+metadata:
+  status: draft
+  owner: ai-tools-team
+  created: "2025-11-15"
+  tags:
+    - authentication
+    - security
+    - jwt
+    - backend
