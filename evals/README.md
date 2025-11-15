@@ -66,32 +66,32 @@ config:
 tests:
   - id: test-1
     name: Basic reasoning
-    input: "What is 2 + 2?"
+    input: 'What is 2 + 2?'
     expected:
-      contains: "4"
+      contains: '4'
     checks:
       - type: exact-match
-        value: "4"
+        value: '4'
 
   - id: test-2
     name: Code generation
-    input: "Write a function to reverse a string"
+    input: 'Write a function to reverse a string'
     expected:
       contains:
-        - "function"
-        - "reverse"
+        - 'function'
+        - 'reverse'
     checks:
       - type: contains-all
         values:
-          - "function"
-          - "reverse"
+          - 'function'
+          - 'reverse'
       - type: no-errors
       - type: valid-syntax
         language: javascript
 
   - id: test-3
     name: Instruction following
-    input: "List 3 colors, one per line"
+    input: 'List 3 colors, one per line'
     expected:
       format: list
       count: 3
@@ -122,9 +122,9 @@ tests:
     checks:
       - type: contains-any
         values:
-          - "semicolon"
-          - "formatting"
-          - "style"
+          - 'semicolon'
+          - 'formatting'
+          - 'style'
     # All agents will be tested with this input
 ```
 
@@ -172,23 +172,23 @@ Summary:
 checks:
   # Exact match
   - type: exact-match
-    value: "Expected output"
+    value: 'Expected output'
 
   # Contains substring
   - type: contains
-    value: "keyword"
+    value: 'keyword'
 
   # Contains all
   - type: contains-all
     values:
-      - "word1"
-      - "word2"
+      - 'word1'
+      - 'word2'
 
   # Contains any
   - type: contains-any
     values:
-      - "option1"
-      - "option2"
+      - 'option1'
+      - 'option2'
 
   # Regex match
   - type: regex
@@ -213,7 +213,7 @@ checks:
 
   # Expected output
   - type: output-equals
-    value: "42"
+    value: '42'
 ```
 
 ### Format Checks
@@ -314,13 +314,13 @@ npm run eval
 ```yaml
 # Good: One concept per test
 - id: test-addition
-  input: "What is 2 + 2?"
+  input: 'What is 2 + 2?'
 - id: test-subtraction
-  input: "What is 5 - 3?"
+  input: 'What is 5 - 3?'
 
 # Bad: Multiple concepts
 - id: test-math
-  input: "What is 2 + 2 and 5 - 3?"
+  input: 'What is 2 + 2 and 5 - 3?'
 ```
 
 ### 3. Use Realistic Inputs
@@ -333,7 +333,7 @@ npm run eval
     - Fixed typo in comment
 
 # Bad: Toy example
-- input: "Review code"
+- input: 'Review code'
 ```
 
 ### 4. Set Appropriate Budgets
@@ -505,14 +505,14 @@ tests:
       }
     expected:
       contains:
-        - "division by zero"
-        - "check"
+        - 'division by zero'
+        - 'check'
     checks:
       - type: contains-any
         values:
-          - "zero"
-          - "undefined"
-          - "NaN"
+          - 'zero'
+          - 'undefined'
+          - 'NaN'
 
   - id: suggest-improvements
     name: Suggest code improvements
@@ -522,10 +522,10 @@ tests:
     checks:
       - type: contains-any
         values:
-          - "const"
-          - "let"
-          - "formatting"
-          - "semicolon"
+          - 'const'
+          - 'let'
+          - 'formatting'
+          - 'semicolon'
 
   - id: positive-feedback
     name: Give positive feedback on good code
@@ -537,10 +537,10 @@ tests:
     checks:
       - type: contains-any
         values:
-          - "good"
-          - "clean"
-          - "well-written"
-          - "looks good"
+          - 'good'
+          - 'clean'
+          - 'well-written'
+          - 'looks good'
 ```
 
 ## 📚 Further Reading

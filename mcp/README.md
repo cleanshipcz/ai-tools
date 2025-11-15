@@ -5,18 +5,21 @@ MCP servers provide AI models with access to external tools and data sources - f
 ## 📁 What's Here
 
 ### Servers (`servers/`)
+
 - **filesystem.yaml** - Read/write files
 - **git.yaml** - Git operations (status, diff, log, commit)
 - **http.yaml** - Make HTTP requests to APIs
 - **shell.yaml** - Execute shell commands (⚠️ use carefully!)
 
 ### Presets (`presets/`)
+
 - **base.tools.yaml** - Safe defaults (filesystem + git)
 - **secure.tools.yaml** - Extra restricted (no shell, limited HTTP)
 
 ## 🎯 Purpose
 
 MCP servers give AI agents **external capabilities**:
+
 - 📁 File system access (read, write, list)
 - 🔧 Git operations (commit, branch, diff)
 - 🌐 HTTP requests (APIs, webhooks)
@@ -32,6 +35,7 @@ MCP servers give AI agents **external capabilities**:
 MCP capabilities are configured in agents and automatically available.
 
 1. **In agent definition:**
+
    ```yaml
    # agents/my-agent.yml
    capabilities:
@@ -40,6 +44,7 @@ MCP capabilities are configured in agents and automatically available.
    ```
 
 2. **Build:**
+
    ```bash
    npm run build
    ```
@@ -56,6 +61,7 @@ MCP capabilities are configured in agents and automatically available.
 ### Cursor
 
 1. **Configure in agent:**
+
    ```yaml
    capabilities:
      - mcp:git
@@ -64,6 +70,7 @@ MCP capabilities are configured in agents and automatically available.
    ```
 
 2. **Build and import:**
+
    ```bash
    npm run build
    # Import adapters/cursor/recipes.json
@@ -76,6 +83,7 @@ MCP capabilities are configured in agents and automatically available.
 1. **MCP servers defined in:** `adapters/claude-code/mcp-config.json` (after build)
 
 2. **Add to Claude Desktop config:**
+
    ```json
    // ~/Library/Application Support/Claude/claude_desktop_config.json
    {
@@ -97,6 +105,7 @@ MCP capabilities are configured in agents and automatically available.
 ### VSCode / GitHub Copilot
 
 MCP support depends on the extension. Check:
+
 - GitHub Copilot Chat documentation
 - Extension-specific MCP configuration
 
@@ -109,17 +118,17 @@ MCP support depends on the extension. Check:
 server: database
 command: npx
 args:
-  - "-y"
-  - "@mycompany/mcp-server-database"
-  - "--host"
-  - "localhost"
-  - "--database"
-  - "mydb"
+  - '-y'
+  - '@mycompany/mcp-server-database'
+  - '--host'
+  - 'localhost'
+  - '--database'
+  - 'mydb'
 description: Database query and management
 capabilities:
-  - "query_database"
-  - "list_tables"
-  - "describe_schema"
+  - 'query_database'
+  - 'list_tables'
+  - 'describe_schema'
 tags:
   - database
   - sql
@@ -155,6 +164,7 @@ capabilities:
 ### filesystem (v1.0.0)
 
 **Provides:**
+
 - Read files
 - Write files
 - List directories
@@ -166,6 +176,7 @@ capabilities:
 ### git (v1.0.0)
 
 **Provides:**
+
 - Git status
 - Git diff
 - Git log
@@ -178,6 +189,7 @@ capabilities:
 ### http (v1.0.0)
 
 **Provides:**
+
 - HTTP GET/POST/PUT/DELETE
 - API calls
 - Webhook triggers
@@ -188,6 +200,7 @@ capabilities:
 ### shell (v1.0.0)
 
 **Provides:**
+
 - Execute arbitrary shell commands
 
 **Security:** ⚠️ **DANGEROUS** - Full shell access
@@ -198,32 +211,36 @@ capabilities:
 ### Security Levels
 
 **Safe (Recommended):**
+
 ```yaml
 capabilities:
-  - mcp:filesystem  # Limited to workspace
-  - mcp:git         # Limited to repository
+  - mcp:filesystem # Limited to workspace
+  - mcp:git # Limited to repository
 ```
 
 **Moderate Risk:**
+
 ```yaml
 capabilities:
-  - mcp:http  # Can call external APIs
+  - mcp:http # Can call external APIs
 ```
 
 **High Risk:**
+
 ```yaml
 capabilities:
-  - mcp:shell  # Full system access ⚠️
+  - mcp:shell # Full system access ⚠️
 ```
 
 ### Best Practices
 
 1. **Principle of Least Privilege**
+
    ```yaml
    # Good: Only what's needed
    capabilities:
      - mcp:git
-   
+
    # Bad: Everything
    capabilities:
      - mcp:filesystem
@@ -233,13 +250,15 @@ capabilities:
    ```
 
 2. **Use Presets**
+
    ```yaml
    # Instead of listing all:
    capabilities:
-     - mcp-preset:base  # filesystem + git only
+     - mcp-preset:base # filesystem + git only
    ```
 
 3. **Disable Shell by Default**
+
    ```yaml
    # Only enable for specific use cases
    # capabilities:
@@ -255,9 +274,9 @@ capabilities:
 
 | Preset | filesystem | git | http | shell |
 | ------ | ---------- | --- | ---- | ----- |
-| base   | ✅          | ✅   | ❌    | ❌     |
-| secure | ✅ (RO)     | ✅   | ❌    | ❌     |
-| full   | ✅          | ✅   | ✅    | ⚠️     |
+| base   | ✅         | ✅  | ❌   | ❌    |
+| secure | ✅ (RO)    | ✅  | ❌   | ❌    |
+| full   | ✅         | ✅  | ✅   | ⚠️    |
 
 ## 🔨 Building & Validation
 
@@ -278,6 +297,7 @@ cat adapters/claude-code/mcp-config.json
 ### Reading Files
 
 **Agent with filesystem MCP:**
+
 ```
 User: "Read the package.json file"
 Agent: Uses MCP filesystem to read file
@@ -287,6 +307,7 @@ Agent: "Here's your package.json content..."
 ### Git Operations
 
 **Agent with git MCP:**
+
 ```
 User: "What files changed in the last commit?"
 Agent: Uses MCP git to run: git diff HEAD~1
@@ -296,6 +317,7 @@ Agent: "These files changed: [list]"
 ### HTTP Requests
 
 **Agent with http MCP:**
+
 ```
 User: "Get the latest GitHub issues"
 Agent: Uses MCP http to: GET https://api.github.com/repos/.../issues
@@ -338,7 +360,7 @@ preset: ci-cd
 includes:
   - filesystem
   - git
-  - http  # For deployment webhooks
+  - http # For deployment webhooks
 # Excludes shell for security
 ```
 
@@ -353,11 +375,13 @@ includes:
 ### MCP Server Not Working
 
 1. **Check if server is installed:**
+
    ```bash
    npx -y @modelcontextprotocol/server-filesystem --help
    ```
 
 2. **Check configuration:**
+
    ```bash
    cat adapters/claude-code/mcp-config.json
    ```

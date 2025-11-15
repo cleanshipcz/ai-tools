@@ -12,6 +12,7 @@ Complete AI assistants with bundled prompts, rules, and settings. Ready to impor
 ## 🎯 Purpose
 
 Agents are **complete packages** that combine:
+
 - ✅ Rulepacks (coding guidelines)
 - ✅ System prompts (agent personality and goals)
 - ✅ Capabilities (what tools they can use - MCP servers)
@@ -26,6 +27,7 @@ Agents are **complete packages** that combine:
 **Step-by-step:**
 
 1. **Build the configs:**
+
    ```bash
    cd /path/to/ai-tools
    npm run build
@@ -60,6 +62,7 @@ Agents are **complete packages** that combine:
    - Start coding - the AI follows your agent's guidelines
 
 **Multiple Agents:**
+
 - You can import multiple agents
 - They'll all be active simultaneously
 - Rules from all agents are combined
@@ -69,6 +72,7 @@ Agents are **complete packages** that combine:
 **Step-by-step:**
 
 1. **Build the configs:**
+
    ```bash
    npm run build
    ```
@@ -90,7 +94,6 @@ Agents are **complete packages** that combine:
    - Option A: If there's an "Import" button:
      - Click **"Import Rules"**
      - Select: `adapters/cursor/recipes.json`
-   
    - Option B: Manual import:
      - Open `adapters/cursor/recipes.json`
      - Copy the contents
@@ -106,6 +109,7 @@ Agents are **complete packages** that combine:
    - Select one to activate its rules
 
 **Example:**
+
 ```
 @code-reviewer
 Please review this function:
@@ -117,20 +121,24 @@ Please review this function:
 **Step-by-step:**
 
 1. **Build the configs:**
+
    ```bash
    npm run build
    ```
 
 2. **Locate Agent Files:**
+
    ```bash
    ls adapters/claude-code/agents/
    ```
+
    You'll see:
    - `code-reviewer.json`
    - `bug-fixer.json`
    - etc.
 
 3. **Open an Agent File:**
+
    ```bash
    cat adapters/claude-code/agents/code-reviewer.json
    ```
@@ -148,6 +156,7 @@ Please review this function:
 ### GitHub Copilot (Visual Studio / VS Code)
 
 **What's generated:**
+
 - `.github/copilot-instructions.md` → Lists all available agents (passive)
 - `.github/prompts/*.prompt.md` → Agent prompts you can invoke (active)
 
@@ -163,6 +172,7 @@ cp -r adapters/github-copilot/.github ./
 **As workspace settings:**
 
 1. Create `.vscode/settings.json`:
+
    ```json
    {
      "aiAssistant.customInstructions": "See .github/copilot-instructions.md"
@@ -200,12 +210,12 @@ prompt:
   system: |
     You are a specialized coding assistant focused on [specific task].
     Your goal is to help developers [specific goal].
-    
+
     Always:
     - [Key behavior 1]
     - [Key behavior 2]
     - [Key behavior 3]
-  
+
   user_template: |
     {{task_description}}
 ```
@@ -213,33 +223,36 @@ prompt:
 ### Advanced Features
 
 **Multiple Rulepacks:**
+
 ```yaml
 rulepacks:
-  - base             # Universal standards
-  - security         # Security checks
-  - coding-python    # Python conventions
-  - my-custom-rules  # Your team rules
+  - base # Universal standards
+  - security # Security checks
+  - coding-python # Python conventions
+  - my-custom-rules # Your team rules
 ```
 
 **MCP Capabilities:**
+
 ```yaml
 capabilities:
-  - mcp:filesystem  # Read/write files
-  - mcp:git         # Git operations
-  - mcp:http        # API calls
+  - mcp:filesystem # Read/write files
+  - mcp:git # Git operations
+  - mcp:http # API calls
   # - mcp:shell     # Shell commands (use carefully!)
 ```
 
 **User Templates:**
+
 ```yaml
 prompt:
   user_template: |
     Task: {{task}}
-    
+
     {{#context}}
     Additional context: {{context}}
     {{/context}}
-    
+
     {{#files}}
     Files to consider:
     {{#files}}
@@ -270,11 +283,13 @@ ls -la adapters/claude-code/agents/
 **Purpose:** Reviews code for quality, style, security, and best practices
 
 **Includes:**
+
 - Rulepacks: `base`, `reviewer`, `security`
 - Capabilities: `mcp:git`, `mcp:filesystem`
 - Temperature: 0.2 (deterministic)
 
 **Use for:**
+
 - Pull request reviews
 - Code quality checks
 - Security audits
@@ -285,11 +300,13 @@ ls -la adapters/claude-code/agents/
 **Purpose:** Helps identify and fix bugs
 
 **Includes:**
+
 - Rulepacks: `base`
 - Capabilities: `mcp:git`, `mcp:filesystem`
 - Temperature: 0.3
 
 **Use for:**
+
 - Debugging issues
 - Finding root causes
 - Suggesting fixes
@@ -300,11 +317,13 @@ ls -la adapters/claude-code/agents/
 **Purpose:** Guides test-driven development workflow
 
 **Includes:**
+
 - Rulepacks: `base`, `reviewer`
 - Capabilities: `mcp:git`, `mcp:filesystem`
 - Temperature: 0.3
 
 **Use for:**
+
 - Writing tests first
 - TDD workflow guidance
 - Test coverage improvement
@@ -315,11 +334,13 @@ ls -la adapters/claude-code/agents/
 **Purpose:** Enforces Kotlin coding standards
 
 **Includes:**
+
 - Rulepacks: `base`, `coding-kotlin`, `security`
 - Capabilities: `mcp:git`, `mcp:filesystem`
 - Temperature: 0.2
 
 **Use for:**
+
 - Kotlin code reviews
 - Style consistency
 - Null safety checks
@@ -330,6 +351,7 @@ ls -la adapters/claude-code/agents/
 ### Single Responsibility
 
 Each agent should have ONE clear purpose:
+
 - ✅ `code-reviewer` - Reviews code
 - ✅ `bug-fixer` - Fixes bugs
 - ❌ `code-reviewer-bug-fixer-refactorer` - Too broad
@@ -337,6 +359,7 @@ Each agent should have ONE clear purpose:
 ### Composition
 
 Build agents from rulepacks:
+
 ```yaml
 # Instead of:
 rules:
@@ -378,21 +401,25 @@ rulepacks:
 ### Choosing the Right Agent
 
 **For Code Review:**
+
 - Use `code-reviewer`
 - Import into Windsurf/Cursor
 - Open PRs and ask for review
 
 **For Debugging:**
+
 - Use `bug-fixer`
 - Paste error messages
 - Share relevant code context
 
 **For TDD:**
+
 - Use `tdd-navigator`
 - Start with failing tests
 - Follow the red-green-refactor cycle
 
 **For Language-Specific:**
+
 - Use language-specific agents (`kotlin-style-enforcer`)
 - Or create your own (e.g., `python-style-enforcer`)
 
@@ -407,10 +434,12 @@ rulepacks:
 ### Switching Agents
 
 **Windsurf:**
+
 - Import multiple agents as different rule sets
 - Enable/disable as needed
 
 **Cursor:**
+
 - Use `@agent-name` to invoke specific agent
 - Switch between agents with `@`
 

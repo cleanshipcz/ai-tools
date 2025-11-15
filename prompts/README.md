@@ -41,6 +41,7 @@ Prompts are bundled into agents and imported into your AI coding tool. See [Agen
 ### Windsurf
 
 1. Build the configs:
+
    ```bash
    npm run build
    ```
@@ -64,6 +65,7 @@ Prompts are bundled into agents and imported into your AI coding tool. See [Agen
 ### Cursor
 
 1. Build the configs:
+
    ```bash
    npm run build
    ```
@@ -87,6 +89,7 @@ Prompts are bundled into agents and imported into your AI coding tool. See [Agen
 ### Claude Code
 
 1. Build the configs:
+
    ```bash
    npm run build
    ```
@@ -94,6 +97,7 @@ Prompts are bundled into agents and imported into your AI coding tool. See [Agen
 2. Prompts are in: `adapters/claude-code/prompts/`
 
 3. Each prompt is a standalone JSON file:
+
    ```
    extract-method.json
    write-tests.json
@@ -108,6 +112,7 @@ Prompts are bundled into agents and imported into your AI coding tool. See [Agen
 ### GitHub Copilot (Visual Studio / VS Code)
 
 **Generated:**
+
 - `.github/prompts/*.prompt.md` → Reusable prompts (invoke explicitly)
 - `.github/copilot-instructions.md` → Lists available prompts
 
@@ -123,7 +128,7 @@ cp -r adapters/github-copilot/.github ./
 
 ### Basic Prompt
 
-```yaml
+````yaml
 # prompts/refactor/my-prompt.yml
 id: my-prompt
 version: 1.0.0
@@ -133,21 +138,22 @@ tags:
 variables:
   - name: code
     required: true
-    description: "The code to refactor"
+    description: 'The code to refactor'
   - name: language
     required: true
-    description: "Programming language"
+    description: 'Programming language'
 content: |
   Refactor this {{language}} code:
 
   ```{{language}}
   {{code}}
-  ```
+````
 
-  Make it cleaner and more readable.
+Make it cleaner and more readable.
 outputs:
-  format: code
-```
+format: code
+
+````
 
 ### Advanced Features
 
@@ -159,17 +165,17 @@ includes:
   - ../shared/acceptance_criteria.md
 content: |
   Your prompt here...
-  
+
   {{> constraints}}
   {{> acceptance_criteria}}
-```
+````
 
 **Optional variables with Mustache:**
 
 ```yaml
 content: |
   Required: {{code}}
-  
+
   {{#context}}
   Optional context provided: {{context}}
   {{/context}}
@@ -179,9 +185,9 @@ content: |
 
 ```yaml
 rules:
-  - "Preserve exact behavior"
-  - "Add type hints"
-  - "Keep under 50 lines"
+  - 'Preserve exact behavior'
+  - 'Add type hints'
+  - 'Keep under 50 lines'
 ```
 
 ### Validation
@@ -191,6 +197,7 @@ npm run validate
 ```
 
 Checks for:
+
 - Valid YAML syntax
 - Required fields present
 - Unique IDs
@@ -205,6 +212,7 @@ npm run build
 ```
 
 Generates tool-specific configs in `adapters/`:
+
 - `adapters/windsurf/rules/` - Agent configs with prompts
 - `adapters/cursor/recipes.json` - Cursor recipes
 - `adapters/claude-code/prompts/` - Individual prompt files

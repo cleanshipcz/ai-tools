@@ -13,6 +13,7 @@ Executable commands that AI agents can run - like running tests, linters, or sea
 ## 🎯 Purpose
 
 Skills define **executable actions** that AI agents can perform:
+
 - Running tests
 - Code analysis
 - Searching code
@@ -20,6 +21,7 @@ Skills define **executable actions** that AI agents can perform:
 - Running linters
 
 **Skills are exposed through:**
+
 - MCP (Model Context Protocol) servers
 - Tool adapters for AI coding assistants
 - Agent capabilities
@@ -31,6 +33,7 @@ This repository uses a **hybrid approach** to support both tool-agnostic configu
 ### Source Format (YAML)
 
 Skills are authored in **YAML** for:
+
 - ✅ Tool-agnostic: Generate configs for Windsurf, Cursor, Claude, etc.
 - ✅ Validation: JSON Schema ensures correctness
 - ✅ Composition: Skills can be referenced in agents
@@ -58,6 +61,7 @@ npm run build
 ```
 
 **Generated structure:**
+
 ```
 adapters/claude-code/skills/
 ├── run-pytest/
@@ -68,6 +72,7 @@ adapters/claude-code/skills/
 ```
 
 **Why this approach?**
+
 - **Best of both worlds:** YAML source for all tools + native SKILL.md for Claude
 - **Single source of truth:** One YAML manifest → multiple output formats
 - **Progressive disclosure:** Claude loads SKILL.md content on-demand
@@ -84,6 +89,7 @@ npm run skills
 ```
 
 The build process:
+
 1. Reads YAML manifests from `skills/*.yml`
 2. Validates against JSON Schema
 3. Generates tool-specific configs (Windsurf, Cursor)
@@ -106,14 +112,18 @@ description: Run pytest unit tests
 # Run Pytest
 
 ## When to use this skill
+
 Use this skill when:
+
 - Working with test, python
 - User asks to "run pytest"
 
 ## Prerequisites
+
 - pytest must be installed
 
 ## How to use
+
 Run the following command:
 
 \`\`\`bash
@@ -123,18 +133,24 @@ pytest -v --tb=short
 **Timeout:** 300 seconds
 
 ## Understanding the output
+
 ### Exit code
+
 - `0`: Success
 - Non-zero: Error occurred (check stderr for details)
 
 ### Standard output (stdout)
+
 Contains the main output of the command.
 
 ### Standard error (stderr)
+
 Contains error messages and warnings.
 
 ## Examples
+
 ### Basic usage
+
 \`\`\`
 User: "Can you run pytest?"
 Assistant: [Runs: pytest -v --tb=short]
@@ -142,11 +158,15 @@ Assistant: [Interprets output and reports results]
 \`\`\`
 
 ## Troubleshooting
+
 ### Command not found
+
 Ensure `pytest` is installed and available in the PATH.
 
 ### Timeout
+
 If the command takes longer than 300 seconds, it will be terminated. Consider:
+
 - Breaking down the task into smaller steps
 - Running on a subset of files
 - Checking for performance issues
@@ -161,6 +181,7 @@ Skills are **automatically included** when you import agents. The agent's `capab
 ### Windsurf
 
 1. **Build configs:**
+
    ```bash
    npm run build
    ```
@@ -180,6 +201,7 @@ Skills are **automatically included** when you import agents. The agent's `capab
 ### Cursor
 
 1. **Build:**
+
    ```bash
    npm run build
    ```
@@ -194,11 +216,13 @@ Skills are **automatically included** when you import agents. The agent's `capab
 ### Claude Code
 
 1. **Build:**
+
    ```bash
    npm run build
    ```
 
 2. **Skills file:**
+
    ```bash
    cat adapters/claude-code/skills.json
    ```
@@ -222,11 +246,11 @@ id: my-lint
 version: 1.0.0
 description: Run my custom linter
 command:
-  program: "npm"
+  program: 'npm'
   args:
-    - "run"
-    - "lint"
-  cwd: "."
+    - 'run'
+    - 'lint'
+  cwd: '.'
 timeout_sec: 60
 outputs:
   stdout: true
@@ -240,35 +264,38 @@ tags:
 ### Advanced Features
 
 **With environment variables:**
+
 ```yaml
 command:
-  program: "python"
+  program: 'python'
   args:
-    - "-m"
-    - "pytest"
-    - "--maxfail=5"
-  cwd: "."
+    - '-m'
+    - 'pytest'
+    - '--maxfail=5'
+  cwd: '.'
   env:
-    PYTHONPATH: "src:tests"
-    CI: "true"
+    PYTHONPATH: 'src:tests'
+    CI: 'true'
 ```
 
 **Conditional execution:**
+
 ```yaml
 prerequisites:
-  - file_exists: "package.json"
-  - command_available: "npm"
+  - file_exists: 'package.json'
+  - command_available: 'npm'
 ```
 
 **Multiple outputs:**
+
 ```yaml
 outputs:
   stdout: true
   stderr: true
   exit_code: true
   files:
-    - "coverage/coverage.json"
-    - "test-results.xml"
+    - 'coverage/coverage.json'
+    - 'test-results.xml'
 ```
 
 ## 🔍 Validation & Building
@@ -295,6 +322,7 @@ Execute Python tests with pytest.
 **Outputs:** stdout, stderr, exit_code
 
 **Use for:**
+
 - Running Python test suites
 - Checking test coverage
 - Validating Python code
@@ -308,6 +336,7 @@ Run Gradle test suite.
 **Outputs:** stdout, stderr, exit_code
 
 **Use for:**
+
 - Running JVM/Kotlin tests
 - Gradle project testing
 - Integration test execution
@@ -321,6 +350,7 @@ Kotlin static analysis with Detekt.
 **Outputs:** stdout, stderr, exit_code
 
 **Use for:**
+
 - Kotlin code analysis
 - Finding code smells
 - Style checking
@@ -334,6 +364,7 @@ Kotlin linter.
 **Outputs:** stdout, stderr, exit_code
 
 **Use for:**
+
 - Kotlin code formatting
 - Style enforcement
 - Auto-fixing with ktlintFormat
@@ -347,6 +378,7 @@ Search codebase with grep.
 **Outputs:** stdout, stderr, exit_code
 
 **Use for:**
+
 - Finding code patterns
 - Searching for usages
 - Code exploration
@@ -370,20 +402,23 @@ Search codebase with grep.
 ### Security Considerations
 
 **Safe:**
+
 ```yaml
 command:
-  program: "npm"
-  args: ["test"]
+  program: 'npm'
+  args: ['test']
 ```
 
 **Unsafe:**
+
 ```yaml
 command:
-  program: "bash"
-  args: ["-c", "rm -rf /"]  # ❌ NEVER DO THIS
+  program: 'bash'
+  args: ['-c', 'rm -rf /'] # ❌ NEVER DO THIS
 ```
 
 **Guidelines:**
+
 - Use specific commands, not shells
 - Avoid `bash -c` or `sh -c`
 - Don't pass user input directly

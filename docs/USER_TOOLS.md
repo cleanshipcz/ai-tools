@@ -70,12 +70,12 @@ Output:
   REFACTOR:
     • extract-method           - Extract a pure function from code
     • add-null-safety          - Add null safety checks to code
-  
+
   QA:
     • write-tests              - Generate unit tests for code
 ```
 
-```bash
+````bash
 # Use a specific prompt
 npm run use-prompt write-tests
 
@@ -97,17 +97,19 @@ Generate comprehensive unit tests for the following code:
 
 ```python
 def add(a, b): return a + b
-```
+````
 
 Include:
+
 - Happy path tests
 - Edge cases
 - Error conditions
-...
-═══════════════════════════════════════
+  ...
+  ═══════════════════════════════════════
 
 💡 Paste this into ChatGPT, Claude, or any LLM
-```
+
+````
 
 ## 📄 Static Markdown Library
 
@@ -126,7 +128,7 @@ Include:
 ```bash
 npm run prompt-library
 # Creates PROMPT_LIBRARY.md - open in any text editor
-```
+````
 
 ### What You Get
 
@@ -143,6 +145,7 @@ npm run prompt-library
 📦 Version: `1.3.0`
 
 **Required Variables:**
+
 - `{{code}}` - ✅ Required - The code block to extract
 - `{{language}}` - ✅ Required - Programming language
 
@@ -160,18 +163,18 @@ Extract the following {{language}} code into a separate function...
 
 | Feature           | HTML Browser | CLI Tool | Markdown |
 | ----------------- | ------------ | -------- | -------- |
-| Search & Filter   | ✅            | ❌        | ❌        |
-| One-click Copy    | ✅            | ⚠️ CLI    | ❌        |
-| Variable Filling  | ✅            | ✅        | ❌        |
-| Live Preview      | ✅            | ❌        | ❌        |
-| Example Data      | ✅            | ❌        | ❌        |
-| Interactive       | ✅            | ✅        | ❌        |
-| No Build Required | ❌            | ❌        | ❌        |
-| Works Offline     | ✅            | ✅        | ✅        |
-| Beautiful UI      | ✅            | ❌        | ⚠️        |
-| Terminal-Friendly | ❌            | ✅        | ⚠️        |
-| Scriptable        | ❌            | ✅        | ❌        |
-| Mobile-Friendly   | ✅            | ❌        | ✅        |
+| Search & Filter   | ✅           | ❌       | ❌       |
+| One-click Copy    | ✅           | ⚠️ CLI   | ❌       |
+| Variable Filling  | ✅           | ✅       | ❌       |
+| Live Preview      | ✅           | ❌       | ❌       |
+| Example Data      | ✅           | ❌       | ❌       |
+| Interactive       | ✅           | ✅       | ❌       |
+| No Build Required | ❌           | ❌       | ❌       |
+| Works Offline     | ✅           | ✅       | ✅       |
+| Beautiful UI      | ✅           | ❌       | ⚠️       |
+| Terminal-Friendly | ❌           | ✅       | ⚠️       |
+| Scriptable        | ❌           | ✅       | ❌       |
+| Mobile-Friendly   | ✅           | ❌       | ✅       |
 
 **Recommendation:**
 

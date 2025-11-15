@@ -73,7 +73,7 @@ npm run build
 
 # Import into tools
 ls adapters/windsurf/          # Windsurf rules
-ls adapters/cursor/            # Cursor recipes  
+ls adapters/cursor/            # Cursor recipes
 ls adapters/claude-code/       # Claude Code skills & prompts
 ls adapters/github-copilot/    # GitHub Copilot instructions
 ```
@@ -108,6 +108,7 @@ open PROMPT_LIBRARY.html
 ```
 
 Features:
+
 - 🔍 **Search and filter** prompts by name/tag
 - 📝 **Fill variables** in interactive form
 - �️ **Live preview** - see prompt update as you type
@@ -126,6 +127,7 @@ npm run use-prompt write-tests
 ```
 
 The CLI will:
+
 1. Ask for required variables
 2. Fill them into the prompt
 3. Output ready-to-paste text
@@ -181,13 +183,13 @@ tags:
 variables:
   - name: code
     required: true
-    description: "The code to process"
+    description: 'The code to process'
   - name: language
     required: true
-    description: "Programming language"
+    description: 'Programming language'
 rules:
-  - "Keep behavior identical"
-  - "Add helpful comments"
+  - 'Keep behavior identical'
+  - 'Add helpful comments'
 content: |
   Refactor this {{language}} code:
 
@@ -222,6 +224,7 @@ Agents are complete AI assistants with bundled prompts, rules, and settings. The
 
 - **code-reviewer** - Reviews code for quality and security
 - **bug-fixer** - Helps debug and fix issues
+- **feature-builder** - Implement features from requirements
 - **tdd-navigator** - Guides test-driven development
 - **kotlin-style-enforcer** - Enforces Kotlin coding standards
 
@@ -236,9 +239,24 @@ npm run build
 # Import into tool:
 # Windsurf: Import adapters/windsurf/rules/code-reviewer.json
 # Cursor: Import adapters/cursor/recipes.json
+# GitHub Copilot: Copy adapters/github-copilot/.github/ to your repo
 ```
 
-The agent's rules and prompts are automatically applied when you chat with AI.
+**GitHub Copilot** - Agents become invokable prompts:
+
+```
+/agent-code-reviewer
+/agent-feature-builder
+/agent-bug-fixer
+```
+
+You can also **combine multiple prompts**:
+
+```
+/agent-code-reviewer /summarize-pr
+```
+
+This loads both the agent persona and task template together.
 
 #### Manually
 
@@ -324,10 +342,10 @@ description: My team's coding standards
 extends:
   - base # Inherit from other rulepacks
 rules:
-  - "Use meaningful variable names"
-  - "Functions under 50 lines"
-  - "Test all public APIs"
-  - "No console.log in production"
+  - 'Use meaningful variable names'
+  - 'Functions under 50 lines'
+  - 'Test all public APIs'
+  - 'No console.log in production'
 ```
 
 **Validation:**
@@ -649,14 +667,16 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 See **[docs/TOOLS.md](docs/TOOLS.md)** for complete tool-specific instructions.
 
-| Tool               | Format   | Location                   | Import Method                             |
-| ------------------ | -------- | -------------------------- | ----------------------------------------- |
-| **Windsurf**       | JSON     | `adapters/windsurf/`       | Rules panel → Import                      |
-| **Cursor**         | JSON     | `adapters/cursor/`         | Copy to project root                      |
-| **Claude Code**    | SKILL.md | `adapters/claude-code/`    | Copy to `~/.config/claude/skills/`        |
-| **GitHub Copilot** | Markdown | `adapters/github-copilot/` | Copy to `.github/copilot-instructions.md` |
+| Tool               | Format   | Location                   | Import Method                       | Usage                         |
+| ------------------ | -------- | -------------------------- | ----------------------------------- | ----------------------------- |
+| **Windsurf**       | JSON     | `adapters/windsurf/`       | Rules panel → Import                | Auto-applied                  |
+| **Cursor**         | JSON     | `adapters/cursor/`         | Copy to project root                | Auto-applied                  |
+| **Claude Code**    | SKILL.md | `adapters/claude-code/`    | Copy to `~/.config/claude/skills/`  | `claude skill <name>`         |
+| **GitHub Copilot** | Markdown | `adapters/github-copilot/` | Copy `.github/` folder to your repo | `/agent-name` or `/task-name` |
 
 **TL;DR:** `npm run build` → Import files → Done! ✅
+
+**GitHub Copilot Pro Tip:** Compose multiple prompts: `/agent-code-reviewer /summarize-pr`
 
 ---
 

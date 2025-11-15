@@ -1,0 +1,52 @@
+id: scaffold-feature
+version: 1.0.0
+description: Generate boilerplate code structure for a new feature
+tags:
+  - scaffold
+  - feature
+  - boilerplate
+variables:
+  - name: feature_name
+    required: true
+    description: "Name of the feature to scaffold"
+  - name: language
+    required: false
+    description: "Programming language (auto-detected if not specified)"
+  - name: components
+    required: false
+    description: "Components needed (e.g., service, controller, model, tests)"
+rules:
+  - "Generate clean, minimal boilerplate."
+  - "Follow naming conventions for the language."
+  - "Include placeholder comments for implementation."
+  - "Create empty test files with basic structure."
+content: |
+  Generate boilerplate code structure for: **{{feature_name}}**
+
+  {{#language}}
+  Language: {{language}}
+  {{/language}}
+
+  {{#components}}
+  Components: {{components}}
+  {{/components}}
+
+  Create:
+  1. **File structure**: Directory layout and empty files
+  2. **Class/function skeletons**: With method signatures and TODO comments
+  3. **Test files**: Empty test structure ready to fill
+  4. **Interfaces/types**: If applicable for the language
+  5. **Configuration**: Any config stubs needed
+
+  Use project conventions for:
+  - File naming
+  - Directory structure  
+  - Import/package statements
+  - Documentation comments
+
+  Output as a directory tree with file contents.
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

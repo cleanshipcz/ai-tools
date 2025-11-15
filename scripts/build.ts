@@ -408,6 +408,7 @@ class Builder {
       'coding-kotlin': '**/*.kt',
       'coding-python': '**/*.py',
       'coding-typescript': '**/*.ts,**/*.tsx',
+      'coding-java': '**/*.java',
     };
 
     for (const [rulepackId, pattern] of Object.entries(languagePatterns)) {

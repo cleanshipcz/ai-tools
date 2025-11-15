@@ -16,12 +16,13 @@ Reusable collections of coding guidelines and best practices. Mix and match to c
 Rulepacks are **building blocks** for agents. Instead of duplicating rules across agents, create reusable rulepacks that can be composed together.
 
 **Example:**
+
 ```yaml
 # agents/my-agent.yml
 rulepacks:
-  - base       # Everyone needs good fundamentals
-  - security   # Add security checks
-  - coding-python  # Python-specific rules
+  - base # Everyone needs good fundamentals
+  - security # Add security checks
+  - coding-python # Python-specific rules
 ```
 
 This agent now has ALL rules from all three rulepacks!
@@ -33,11 +34,13 @@ This agent now has ALL rules from all three rulepacks!
 Rulepacks are automatically bundled into agents when you import them.
 
 1. Build the configs:
+
    ```bash
    npm run build
    ```
 
 2. Import an agent (which includes its rulepacks):
+
    ```bash
    # In Windsurf: Settings → Cascade → Rules
    # Import: adapters/windsurf/rules/code-reviewer.json
@@ -49,6 +52,7 @@ Rulepacks are automatically bundled into agents when you import them.
    - `security` - Security checks
 
 **View what's included:**
+
 ```bash
 cat adapters/windsurf/rules/code-reviewer.json
 # Look for the "rules" array - it contains all merged rules
@@ -76,6 +80,7 @@ cat adapters/claude-code/agents/code-reviewer.json
 If you want to use rulepacks directly (outside of agents):
 
 1. Read the YAML file:
+
    ```bash
    cat rulepacks/base.yml
    ```
@@ -94,11 +99,11 @@ id: my-team-rules
 version: 1.0.0
 description: Our team's coding standards
 rules:
-  - "Use meaningful variable names"
-  - "Functions should do one thing"
-  - "Maximum 50 lines per function"
-  - "Write tests for all public APIs"
-  - "Document complex logic"
+  - 'Use meaningful variable names'
+  - 'Functions should do one thing'
+  - 'Maximum 50 lines per function'
+  - 'Write tests for all public APIs'
+  - 'Document complex logic'
 ```
 
 ### Extending Other Rulepacks
@@ -109,16 +114,17 @@ id: my-python-rules
 version: 1.0.0
 description: Our Python standards
 extends:
-  - base           # Include all base rules
-  - coding-python  # Include Python rules
+  - base # Include all base rules
+  - coding-python # Include Python rules
 rules:
   # Add your team-specific rules
-  - "Use Black for formatting"
-  - "Prefer dataclasses over dictionaries"
-  - "Type hints on all public functions"
+  - 'Use Black for formatting'
+  - 'Prefer dataclasses over dictionaries'
+  - 'Type hints on all public functions'
 ```
 
 **Inheritance chain:**
+
 ```
 my-python-rules
   ├─ base
@@ -134,22 +140,25 @@ All rules are merged together when building!
 ### Best Practices
 
 **Good Rules:**
+
 ```yaml
 rules:
-  - "Use descriptive variable names (not x, y, z)"
-  - "Prefer early returns over nested if statements"
-  - "Maximum cyclomatic complexity: 10"
+  - 'Use descriptive variable names (not x, y, z)'
+  - 'Prefer early returns over nested if statements'
+  - 'Maximum cyclomatic complexity: 10'
 ```
 
 **Bad Rules:**
+
 ```yaml
 rules:
-  - "Be good"  # Too vague
-  - "Don't write bad code"  # Not actionable
-  - "Follow best practices"  # What practices?
+  - 'Be good' # Too vague
+  - "Don't write bad code" # Not actionable
+  - 'Follow best practices' # What practices?
 ```
 
 **Rules should be:**
+
 - ✅ Specific and actionable
 - ✅ Measurable (can be checked)
 - ✅ Justified (explain why)
@@ -162,6 +171,7 @@ npm run validate
 ```
 
 Checks:
+
 - Valid YAML syntax
 - Required fields (id, version, description)
 - Unique IDs across all manifests
@@ -176,12 +186,14 @@ npm run build
 ```
 
 Process:
+
 1. Load all rulepacks
 2. Resolve inheritance (extends)
 3. Merge rules into agents
 4. Generate tool-specific configs
 
 **Output:**
+
 ```
 adapters/
 ├── windsurf/rules/
@@ -197,6 +209,7 @@ adapters/
 ### base (v1.2.0)
 
 Universal coding standards applicable to any language:
+
 - Meaningful naming conventions
 - Function size limits
 - Documentation requirements
@@ -208,6 +221,7 @@ Universal coding standards applicable to any language:
 ### security (v1.1.0)
 
 Security-focused guidelines:
+
 - Input validation and sanitization
 - Secrets management (no hardcoded keys)
 - SQL injection prevention
@@ -219,6 +233,7 @@ Security-focused guidelines:
 ### coding-python (v1.3.0)
 
 Python-specific conventions:
+
 - PEP 8 compliance
 - Type hints usage
 - Docstring format (Google style)
@@ -231,6 +246,7 @@ Python-specific conventions:
 ### coding-kotlin (v1.2.0)
 
 Kotlin-specific conventions:
+
 - Naming conventions (camelCase, PascalCase)
 - Null safety patterns
 - Data classes usage
@@ -242,6 +258,7 @@ Kotlin-specific conventions:
 ### reviewer (v1.1.0)
 
 Code review guidelines:
+
 - What to look for in reviews
 - How to provide feedback
 - Breaking changes detection
@@ -253,6 +270,7 @@ Code review guidelines:
 ### windsurf-defaults (v1.0.0)
 
 Default rules from Windsurf IDE:
+
 - Windsurf-specific conventions
 - IDE integration patterns
 - Cascade chat guidelines
@@ -264,18 +282,20 @@ Default rules from Windsurf IDE:
 ### Composition over Duplication
 
 **Bad:**
+
 ```yaml
 # agents/python-reviewer.yml
 rules:
-  - "Use meaningful names"
-  - "Functions under 50 lines"
-  - "Check for SQL injection"
-  - "Follow PEP 8"
-  - "Use type hints"
+  - 'Use meaningful names'
+  - 'Functions under 50 lines'
+  - 'Check for SQL injection'
+  - 'Follow PEP 8'
+  - 'Use type hints'
   # ... 50+ rules duplicated across agents
 ```
 
 **Good:**
+
 ```yaml
 # agents/python-reviewer.yml
 rulepacks:
@@ -301,6 +321,7 @@ agent: python-security-reviewer
 ### Single Responsibility
 
 Each rulepack should focus on ONE concern:
+
 - ✅ `security` - Only security rules
 - ✅ `coding-python` - Only Python conventions
 - ❌ `python-security-docs` - Too broad, split it
@@ -316,21 +337,26 @@ Each rulepack should focus on ONE concern:
 ### Finding the Right Granularity
 
 **Too granular:**
+
 ```yaml
 rulepacks/python-naming.yml
 rulepacks/python-imports.yml
 rulepacks/python-types.yml
 rulepacks/python-docs.yml
 ```
+
 Too many files, hard to manage.
 
 **Too broad:**
+
 ```yaml
-rulepacks/everything-python.yml  # 200+ rules
+rulepacks/everything-python.yml # 200+ rules
 ```
+
 Hard to reuse, monolithic.
 
 **Just right:**
+
 ```yaml
 rulepacks/coding-python.yml  # 20-30 focused rules
 rulepacks/testing-python.yml # Test-specific rules
