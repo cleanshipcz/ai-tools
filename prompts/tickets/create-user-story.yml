@@ -1,0 +1,98 @@
+id: create-user-story
+version: 1.0.0
+description: Create a well-structured user story with acceptance criteria
+tags:
+  - tickets
+  - user-story
+  - agile
+variables:
+  - name: feature
+    required: true
+    description: "The feature or functionality to create a story for"
+  - name: user_type
+    required: false
+    description: "Type of user (e.g., admin, customer, developer)"
+  - name: context
+    required: false
+    description: "Additional context or requirements"
+rules:
+  - 'Follow the "As a... I want... So that..." format.'
+  - "Make acceptance criteria specific and testable."
+  - "Keep stories small (1-3 days)."
+  - "Include technical notes for implementation."
+content: |
+  Create a user story for:
+
+  Feature: {{feature}}
+
+  {{#user_type}}
+  User type: {{user_type}}
+  {{/user_type}}
+
+  {{#context}}
+  Context: {{context}}
+  {{/context}}
+
+  Format:
+
+  ## Title
+  [Action-oriented, clear title]
+
+  ## User Story
+
+  **As a** [user type]
+  **I want** [feature/functionality]
+  **So that** [business value/benefit]
+
+  ## Acceptance Criteria
+
+  Given [precondition]
+  When [action]
+  Then [expected result]
+
+  - [ ] Specific, testable criterion 1
+  - [ ] Specific, testable criterion 2
+  - [ ] Specific, testable criterion 3
+  - [ ] Edge case handling
+  - [ ] Error handling
+
+  ## Technical Notes
+
+  - Implementation approach
+  - Components/files to modify
+  - Dependencies on other stories
+  - Database changes (if any)
+  - API changes (if any)
+
+  ## UI/UX Notes
+  [If applicable]
+  - Wireframes or mockups
+  - User flow
+  - Accessibility considerations
+
+  ## Test Strategy
+
+  - Unit tests needed
+  - Integration tests needed
+  - Manual test scenarios
+
+  ## Definition of Done
+
+  - [ ] Code complete and reviewed
+  - [ ] Tests written and passing (>80% coverage)
+  - [ ] Documentation updated
+  - [ ] Deployed to staging
+  - [ ] Acceptance criteria verified
+  - [ ] No regressions in existing functionality
+
+  ## Estimate
+  [Story points or time estimate]
+
+  ## Labels
+  [feature/bug/enhancement, priority, component]
+
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

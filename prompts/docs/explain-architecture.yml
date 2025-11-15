@@ -1,0 +1,71 @@
+id: explain-architecture
+version: 1.0.0
+description: Document system architecture with diagrams
+tags:
+  - docs
+  - architecture
+  - design
+variables:
+  - name: system
+    required: true
+    description: "The system or component to document"
+  - name: context
+    required: false
+    description: "Codebase or system context"
+rules:
+  - "Use diagrams to illustrate structure."
+  - "Explain component responsibilities."
+  - "Document key design decisions."
+  - "Include interaction patterns."
+content: |
+  Document the architecture of: {{system}}
+
+  {{#context}}
+  Context:
+  {{context}}
+  {{/context}}
+
+  Provide:
+
+  1. **Overview**: High-level summary of the system purpose
+
+  2. **Architecture Diagram**: Mermaid diagram showing components
+     ```mermaid
+     graph TD
+         A[Component A] --> B[Component B]
+     ```
+
+  3. **Components**: Describe each major component
+     - Responsibility
+     - Key dependencies
+     - Interface/API
+
+  4. **Data Flow**: How data moves through the system
+     - Use sequence diagrams for key interactions
+     - Explain the lifecycle of important entities
+
+  5. **Key Design Decisions**: Architectural decisions and rationale
+     - Why this architecture?
+     - Trade-offs considered
+     - Alternatives rejected
+
+  6. **Technology Stack**: 
+     - Languages and frameworks
+     - Infrastructure and deployment
+     - External dependencies
+
+  7. **Patterns Used**: Design patterns applied
+     - Where and why they're used
+     - Examples in the codebase
+
+  8. **Security Considerations**: Authentication, authorization, data protection
+
+  9. **Scalability**: How the system scales
+
+  10. **Known Limitations**: Current constraints and future improvements
+
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

@@ -1,0 +1,56 @@
+id: add-error-handling
+version: 1.0.0
+description: Add comprehensive error handling and validation
+tags:
+  - refactor
+  - error-handling
+  - robustness
+variables:
+  - name: code
+    required: true
+    description: "The code needing error handling"
+  - name: language
+    required: true
+    description: "Programming language of the code"
+includes:
+  - ../shared/constraints.md
+rules:
+  - "Handle expected error cases explicitly."
+  - "Use language-specific error handling patterns."
+  - "Validate inputs at boundaries."
+  - "Provide helpful error messages."
+  - "Clean up resources properly (try-finally, context managers)."
+content: |
+  Add proper error handling to this {{language}} code:
+
+  ```{{language}}
+  {{code}}
+  ```
+
+  Consider these error scenarios:
+  - Invalid input parameters
+  - Null/None values
+  - Resource unavailability (files, network, database)
+  - Boundary conditions (empty collections, overflow)
+  - Concurrent access issues
+  - External service failures
+
+  Apply these patterns:
+  - Input validation at function boundaries
+  - Use Result types or exceptions appropriately
+  - Provide context in error messages
+  - Clean up resources (RAII, try-finally, context managers)
+  - Fail fast for programming errors
+  - Handle expected errors gracefully
+
+  Provide:
+  1. **Refactored Code**: With comprehensive error handling
+  2. **Error Cases**: List of scenarios handled
+  3. **Error Messages**: Clear, actionable messages
+
+  {{> constraints}}
+outputs:
+  format: code
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

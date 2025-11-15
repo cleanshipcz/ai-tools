@@ -1,0 +1,96 @@
+id: prioritize-backlog
+version: 1.0.0
+description: Prioritize and organize a product backlog
+tags:
+  - tickets
+  - prioritization
+  - backlog
+variables:
+  - name: backlog_items
+    required: true
+    description: "List of backlog items to prioritize"
+  - name: business_goals
+    required: false
+    description: "Current business priorities"
+  - name: team_capacity
+    required: false
+    description: "Team size and velocity"
+rules:
+  - "Balance business value with technical necessity."
+  - "Consider dependencies and risks."
+  - "Account for technical debt."
+  - "Be transparent about trade-offs."
+content: |
+  Prioritize the following backlog:
+
+  Items:
+  {{backlog_items}}
+
+  {{#business_goals}}
+  Business goals: {{business_goals}}
+  {{/business_goals}}
+
+  {{#team_capacity}}
+  Team capacity: {{team_capacity}}
+  {{/team_capacity}}
+
+  Apply these prioritization frameworks:
+
+  ## 1. RICE Scoring
+  For each item, calculate:
+  - **Reach**: How many users affected? (1-10)
+  - **Impact**: How much does it move the needle? (1-10)
+  - **Confidence**: How sure are we? (1-10)
+  - **Effort**: How many person-days? (estimate)
+  - **Score**: (Reach × Impact × Confidence) / Effort
+
+  ## 2. MoSCoW Method
+  Categorize items:
+  - **Must Have**: Critical for this release
+  - **Should Have**: Important but not critical
+  - **Could Have**: Nice to have if time permits
+  - **Won't Have**: Not in this release
+
+  ## 3. Value vs Effort Matrix
+
+  ```
+  High Value  |  Quick Wins  |  Major Projects
+              |              |
+  ------------|--------------|------------------
+              |              |
+  Low Value   |  Fill-ins    |  Time Sinks
+              |  Low Effort  |  High Effort
+  ```
+
+  Provide:
+
+  1. **Prioritized Backlog**: Ordered list with rationale
+
+  For each item:
+  - **Priority Rank**: [1, 2, 3...]
+  - **Category**: [Must/Should/Could/Won't]
+  - **Value Score**: [1-10]
+  - **Effort**: [Story points or days]
+  - **RICE Score**: [Calculated]
+  - **Dependencies**: Blockers or prerequisites
+  - **Risk Level**: [Low/Medium/High]
+  - **Rationale**: Why this priority?
+
+  2. **Sprint Recommendations**: What to tackle in next sprint
+     - Capacity allocation
+     - Focus areas
+     - Items to defer
+
+  3. **Technical Debt Items**: Don't ignore technical health
+     - Critical tech debt to address
+     - When to tackle it
+
+  4. **Quick Wins**: High-value, low-effort items to build momentum
+
+  5. **Strategic Initiatives**: Longer-term items to keep in mind
+
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

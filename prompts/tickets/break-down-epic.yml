@@ -1,0 +1,80 @@
+id: break-down-epic
+version: 1.0.0
+description: Break down an epic into smaller, manageable user stories
+tags:
+  - tickets
+  - epic
+  - story-breakdown
+variables:
+  - name: epic
+    required: true
+    description: "The epic to break down"
+  - name: constraints
+    required: false
+    description: "Team size, timeline, or other constraints"
+rules:
+  - "Create vertical slices that deliver value independently."
+  - "Keep stories small and of similar size."
+  - "Identify dependencies between stories."
+  - "Prioritize by value and risk."
+content: |
+  Break down this epic into user stories:
+
+  Epic: {{epic}}
+
+  {{#constraints}}
+  Constraints: {{constraints}}
+  {{/constraints}}
+
+  Provide:
+
+  1. **Epic Overview**: Summary and business value
+
+  2. **User Stories**: List of stories that comprise the epic
+
+  For each story provide:
+
+  ### Story [N]: [Title]
+
+  **Priority**: [High/Medium/Low]
+
+  **User Story**:
+  As a [user type]
+  I want [functionality]
+  So that [benefit]
+
+  **Acceptance Criteria**:
+  - [ ] Criterion 1
+  - [ ] Criterion 2
+  - [ ] Criterion 3
+
+  **Dependencies**: 
+  - Depends on Story X
+  - Blocks Story Y
+
+  **Estimate**: [Story points]
+
+  **Technical Notes**: Key implementation considerations
+
+  **Value**: Why this story matters
+
+  3. **Implementation Order**: Recommended sequence
+     - Phase 1: Foundation stories (core functionality)
+     - Phase 2: Feature stories (main capabilities)
+     - Phase 3: Enhancement stories (polish and edge cases)
+
+  4. **Story Dependencies**: 
+     - Visual dependency graph if complex
+     - Critical path
+
+  5. **Risk Assessment**: Stories with higher uncertainty
+
+  6. **MVP Definition**: Minimum stories for initial release
+
+  7. **Total Estimate**: Sum of all story points
+
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

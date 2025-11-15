@@ -1,0 +1,52 @@
+id: improve-naming
+version: 1.0.0
+description: Rename variables, functions, and classes for better clarity
+tags:
+  - refactor
+  - naming
+  - readability
+variables:
+  - name: code
+    required: true
+    description: "The code with unclear names"
+  - name: language
+    required: true
+    description: "Programming language of the code"
+  - name: context
+    required: false
+    description: "Business/domain context"
+rules:
+  - "Use descriptive, intention-revealing names."
+  - "Follow language naming conventions."
+  - "Avoid abbreviations unless widely understood."
+  - "Make names searchable and pronounceable."
+  - "Use domain terminology consistently."
+content: |
+  Improve the naming in this {{language}} code:
+
+  ```{{language}}
+  {{code}}
+  ```
+
+  {{#context}}
+  Domain context: {{context}}
+  {{/context}}
+
+  Apply these naming principles:
+  - Use intention-revealing names that explain purpose
+  - Follow language conventions (camelCase, snake_case, PascalCase)
+  - Make names searchable (avoid single letters except loop counters)
+  - Use consistent terminology from the domain
+  - Avoid mental mapping (don't make reader translate)
+  - Use verbs for functions/methods, nouns for variables/classes
+
+  Provide:
+  1. **Refactored Code**: With improved names
+  2. **Naming Changes**: Table of old → new names with rationale
+  3. **Consistency Check**: Ensure domain terms are used consistently
+
+outputs:
+  format: code
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

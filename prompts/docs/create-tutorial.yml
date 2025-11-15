@@ -1,0 +1,60 @@
+id: create-tutorial
+version: 1.0.0
+description: Write a step-by-step tutorial for a specific task
+tags:
+  - docs
+  - tutorial
+  - guide
+variables:
+  - name: task
+    required: true
+    description: "The task to create a tutorial for"
+  - name: audience
+    required: false
+    description: "Target audience (beginner, intermediate, advanced)"
+  - name: context
+    required: false
+    description: "Additional context or requirements"
+rules:
+  - "Break down into clear, sequential steps."
+  - "Include prerequisites and setup."
+  - "Provide complete, runnable examples."
+  - "Explain WHY, not just HOW."
+  - "Add troubleshooting section."
+content: |
+  Create a tutorial for: {{task}}
+
+  {{#audience}}
+  Target audience: {{audience}}
+  {{/audience}}
+
+  {{#context}}
+  Context: {{context}}
+  {{/context}}
+
+  Structure the tutorial with:
+
+  1. **Introduction**: What you'll learn and why it's useful
+  2. **Prerequisites**: Required knowledge, tools, and setup
+  3. **Step-by-Step Guide**: Clear, numbered steps with explanations
+     - Each step should be actionable
+     - Include code examples that can be copy-pasted
+     - Explain what each code block does
+     - Show expected output or results
+  4. **Complete Example**: Full working code putting it all together
+  5. **Common Issues**: Troubleshooting tips for known problems
+  6. **Next Steps**: Where to go from here, related topics
+  7. **References**: Links to official docs and related resources
+
+  Writing style:
+  - Use second person ("you will", "your code")
+  - Be conversational but precise
+  - Explain concepts before introducing code
+  - Use consistent terminology
+  - Include visual aids or diagrams if helpful (Mermaid)
+
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

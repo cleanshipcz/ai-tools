@@ -1,0 +1,77 @@
+id: estimate-effort
+version: 1.0.0
+description: Estimate development effort for a feature or project
+tags:
+  - planning
+  - estimation
+  - sizing
+variables:
+  - name: feature
+    required: true
+    description: "Feature or task to estimate"
+  - name: context
+    required: false
+    description: "Codebase or team context"
+  - name: team_experience
+    required: false
+    description: "Team familiarity with required tech"
+rules:
+  - "Break down into estimatable tasks."
+  - "Include time for testing and polish."
+  - "Account for unknowns with buffer."
+  - "Consider team velocity and experience."
+content: |
+  Estimate effort for:
+
+  Feature: {{feature}}
+
+  {{#context}}
+  Context: {{context}}
+  {{/context}}
+
+  {{#team_experience}}
+  Team experience: {{team_experience}}
+  {{/team_experience}}
+
+  Provide:
+
+  1. **Task Breakdown**: Decompose into estimatable units
+     - Development tasks
+     - Testing tasks
+     - Documentation tasks
+     - Deployment/DevOps tasks
+
+  2. **Effort Estimates**: For each task
+     - Optimistic estimate (best case)
+     - Realistic estimate (most likely)
+     - Pessimistic estimate (worst case)
+     - Use three-point estimation: (Optimistic + 4×Realistic + Pessimistic) / 6
+
+  3. **Complexity Factors**:
+     - Technical complexity
+     - Domain complexity
+     - Integration complexity
+     - Testing complexity
+
+  4. **Dependencies**: External dependencies that could delay work
+
+  5. **Risks and Unknowns**: Things that could increase estimates
+     - Technical unknowns
+     - API changes required
+     - Database migrations
+     - Learning curve for new technologies
+
+  6. **Total Estimate**: 
+     - Sum of all tasks
+     - Add 20-30% buffer for unknowns
+     - Express in story points or ideal days
+
+  7. **Confidence Level**: How confident are we in this estimate?
+
+  8. **Assumptions**: What assumptions is this estimate based on?
+
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

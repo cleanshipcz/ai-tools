@@ -1,0 +1,109 @@
+id: create-bug-report
+version: 1.0.0
+description: Create a detailed bug report with reproduction steps
+tags:
+  - tickets
+  - bug
+  - issue
+variables:
+  - name: bug_description
+    required: true
+    description: "Description of the bug"
+  - name: steps_to_reproduce
+    required: false
+    description: "How to reproduce the bug"
+  - name: expected_behavior
+    required: false
+    description: "What should happen"
+  - name: actual_behavior
+    required: false
+    description: "What actually happens"
+rules:
+  - "Include clear reproduction steps."
+  - "Specify environment and version."
+  - "Assess severity and priority."
+  - "Include logs or screenshots if available."
+content: |
+  Create a bug report for:
+
+  Bug: {{bug_description}}
+
+  {{#steps_to_reproduce}}
+  Steps to reproduce: {{steps_to_reproduce}}
+  {{/steps_to_reproduce}}
+
+  {{#expected_behavior}}
+  Expected: {{expected_behavior}}
+  {{/expected_behavior}}
+
+  {{#actual_behavior}}
+  Actual: {{actual_behavior}}
+  {{/actual_behavior}}
+
+  Format:
+
+  ## Bug Title
+  [Clear, concise description of the issue]
+
+  ## Severity
+  - [ ] Critical (system down, data loss)
+  - [ ] High (major feature broken)
+  - [ ] Medium (feature partially broken)
+  - [ ] Low (minor issue, workaround available)
+
+  ## Environment
+  - OS: [Operating system and version]
+  - Browser/Platform: [If applicable]
+  - Version: [Software version where bug occurs]
+  - Configuration: [Relevant settings]
+
+  ## Description
+  [Detailed description of what's wrong]
+
+  ## Steps to Reproduce
+  1. Go to...
+  2. Click on...
+  3. Enter...
+  4. Observe...
+
+  ## Expected Behavior
+  [What should happen]
+
+  ## Actual Behavior
+  [What actually happens]
+
+  ## Screenshots/Logs
+  [If available, include error messages, stack traces, or screenshots]
+
+  ```
+  [Error logs or stack trace]
+  ```
+
+  ## Impact
+  - Who is affected? (all users, specific roles, edge case)
+  - How many users are impacted?
+  - Is there a workaround?
+
+  ## Root Cause Hypothesis
+  [If known, what might be causing this?]
+
+  ## Possible Solution
+  [If you have ideas for fixing it]
+
+  ## Related Issues
+  [Links to related bugs or features]
+
+  ## Priority
+  - [ ] P0: Drop everything, fix now
+  - [ ] P1: Fix in current sprint
+  - [ ] P2: Fix soon
+  - [ ] P3: Fix when convenient
+
+  ## Labels
+  [bug, component-name, severity-level]
+
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"

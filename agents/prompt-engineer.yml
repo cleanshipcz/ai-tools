@@ -124,20 +124,20 @@ tools:
   - search-code
   - validate-schema
 constraints:
-  - 'All IDs must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
+  - "All IDs must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
   - 'All versions must follow semver pattern ^\\d+\\.\\d+\\.\\d+$'
-  - 'Descriptions must be 10-500 characters'
-  - 'Variable names must be snake_case'
-  - 'Include author and created date in metadata'
-  - 'Reference existing rulepacks and capabilities accurately'
-  - 'Use Mustache template syntax for variables: {{variable}}'
-  - 'Keep prompts atomic - one clear purpose per prompt'
-  - 'Make agents goal-oriented with measurable outcomes'
-  - 'Include practical examples where helpful'
-  - 'Validate all manifests can be parsed as valid YAML'
+  - "Descriptions must be 10-500 characters"
+  - "Variable names must be snake_case"
+  - "Include author and created date in metadata"
+  - "Reference existing rulepacks and capabilities accurately"
+  - "Use Mustache template syntax for variables: {{variable}}"
+  - "Keep prompts atomic - one clear purpose per prompt"
+  - "Make agents goal-oriented with measurable outcomes"
+  - "Include practical examples where helpful"
+  - "Validate all manifests can be parsed as valid YAML"
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
+  author: "AI Tools Team"
+  created: "2025-11-15"
   tags:
     - prompt-engineering
     - agent-design

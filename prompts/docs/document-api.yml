@@ -1,0 +1,54 @@
+id: document-api
+version: 1.0.0
+description: Generate comprehensive API documentation
+tags:
+  - docs
+  - api
+  - reference
+variables:
+  - name: code
+    required: true
+    description: "The API code to document"
+  - name: language
+    required: true
+    description: "Programming language"
+  - name: doc_style
+    required: false
+    description: "Documentation style (javadoc, sphinx, jsdoc, etc.)"
+rules:
+  - "Document all public APIs."
+  - "Include parameter types and return values."
+  - "Provide usage examples."
+  - "Document exceptions and error cases."
+  - "Use consistent formatting."
+content: |
+  Generate API documentation for this {{language}} code:
+
+  ```{{language}}
+  {{code}}
+  ```
+
+  {{#doc_style}}
+  Use {{doc_style}} format.
+  {{/doc_style}}
+
+  Include:
+  - **Summary**: One-line description of what it does
+  - **Parameters**: Name, type, description for each parameter
+  - **Returns**: Type and description of return value
+  - **Raises/Throws**: Exceptions that can be thrown
+  - **Examples**: Practical usage examples with expected output
+  - **Notes**: Any important considerations or caveats
+  - **See Also**: Links to related functions/classes
+
+  Format the documentation according to the language standard:
+  - Python: Google/NumPy/Sphinx style docstrings
+  - Java/Kotlin: Javadoc/KDoc
+  - TypeScript/JavaScript: JSDoc/TSDoc
+  - Other: Follow language conventions
+
+outputs:
+  format: markdown
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-15"
