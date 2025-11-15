@@ -2,17 +2,18 @@ id: base
 version: 1.0.0
 description: Base rules applicable to all agents and prompts
 rules:
-  - 'Be precise and accurate in your responses.'
+  - "Be precise and accurate in your responses."
   - "Follow the user's requirements carefully and to the letter."
-  - 'If you are unsure, ask for clarification instead of guessing.'
-  - 'Break complex tasks into smaller, manageable steps.'
-  - 'Verify your work before presenting it.'
-  - 'Use clear, concise language.'
-  - 'Preserve existing functionality unless explicitly asked to change it.'
-  - 'Document non-obvious decisions and trade-offs.'
+  - "If you are unsure, ask for clarification instead of guessing."
+  - "Break complex tasks into smaller, manageable steps."
+  - "Verify your work before presenting it."
+  - "Use clear, concise language."
+  - "Preserve existing functionality unless explicitly asked to change it."
+  - "Document non-obvious decisions and trade-offs."
+  - "Search for up-to-date information and resources."
 tags:
   - foundation
   - general
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-01-01'
+  author: "AI Tools Team"
+  created: "2025-01-01"

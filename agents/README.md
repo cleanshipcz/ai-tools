@@ -145,30 +145,20 @@ Please review this function:
    - Copy the entire JSON
    - Use Claude Code's import feature (if available)
 
-### GitHub Copilot Chat
+### GitHub Copilot (Visual Studio / VS Code)
 
-1. **Build the configs:**
-   ```bash
-   npm run build
-   ```
+**What's generated:**
+- `.github/copilot-instructions.md` → Lists all available agents (passive)
+- `.github/prompts/*.prompt.md` → Agent prompts you can invoke (active)
 
-2. **Create Copilot Instructions:**
-   ```bash
-   mkdir -p .github
-   cat adapters/windsurf/rules/code-reviewer.json | jq -r '.rules[]' > .github/copilot-instructions.md
-   ```
+```bash
+npm run build
+cp -r adapters/github-copilot/.github ./
+```
 
-3. **Commit to Repository:**
-   ```bash
-   git add .github/copilot-instructions.md
-   git commit -m "Add Copilot instructions"
-   ```
+**Note:** Agents listed for reference. Use prompts to invoke specific agent behaviors.
 
-4. **Use in VSCode:**
-   - Open GitHub Copilot Chat
-   - Instructions are automatically applied to the repository
-
-### VSCode (Manual)
+### VSCode (Manual - Not Recommended)
 
 **As workspace settings:**
 

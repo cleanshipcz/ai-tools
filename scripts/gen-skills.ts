@@ -1,22 +1,22 @@
 #!/usr/bin/env tsx
 /**
  * Generate Anthropic-compatible SKILL.md files from YAML manifests
- * 
+ *
  * Hybrid Architecture:
  * - Source: skills/*.yml (tool-agnostic, validated, composable)
  * - Output: adapters/claude-code/skills/<skill-name>/SKILL.md (native Anthropic format)
- * 
+ *
  * Why hybrid?
  * - YAML source works across all tools (Windsurf, Cursor, Claude)
  * - Generated SKILL.md provides native Claude support with progressive disclosure
  * - Single source of truth for multi-tool deployment
- * 
+ *
  * Generated SKILL.md format:
  * - YAML frontmatter (name, description)
  * - Markdown instructions with usage examples
  * - Troubleshooting guides
  * - Metadata footer
- * 
+ *
  * Output: adapters/claude-code/skills/<skill-name>/SKILL.md
  */
 
@@ -231,9 +231,7 @@ function generateSkillMarkdown(skill: Skill): string {
   if (skill.command) {
     lines.push('### Command not found');
     lines.push('');
-    lines.push(
-      `Ensure \`${skill.command.program}\` is installed and available in the PATH.`
-    );
+    lines.push(`Ensure \`${skill.command.program}\` is installed and available in the PATH.`);
     lines.push('');
   }
 
@@ -241,7 +239,7 @@ function generateSkillMarkdown(skill: Skill): string {
     lines.push('### Timeout');
     lines.push('');
     lines.push(
-      `If the command takes longer than ${skill.timeout_sec} seconds, it will be terminated. Consider:`,
+      `If the command takes longer than ${skill.timeout_sec} seconds, it will be terminated. Consider:`
     );
     lines.push('- Breaking down the task into smaller steps');
     lines.push('- Running on a subset of files');

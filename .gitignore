@@ -11,6 +11,8 @@ adapters/*/presets/
 adapters/*/skills.json
 adapters/*/skills/
 adapters/*/prompts/
+adapters/github-copilot/.github/
+adapters/github-copilot/copilot-instructions.md
 *.tsbuildinfo
 
 # Generated documentation

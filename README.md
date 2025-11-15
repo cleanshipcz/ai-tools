@@ -71,9 +71,11 @@ npm run use-prompt write-tests
 npm run validate
 npm run build
 
-# Import into Windsurf, Cursor, etc.
-ls adapters/windsurf/
-ls adapters/cursor/
+# Import into tools
+ls adapters/windsurf/          # Windsurf rules
+ls adapters/cursor/            # Cursor recipes  
+ls adapters/claude-code/       # Claude Code skills & prompts
+ls adapters/github-copilot/    # GitHub Copilot instructions
 ```
 
 ---
@@ -480,6 +482,7 @@ npm run clean            # Remove generated files
 ### Developer Resources
 
 - **[QUICKREF.md](QUICKREF.md)** - Quick reference guide
+- **[docs/TOOLS.md](docs/TOOLS.md)** - Tool integration reference (Windsurf, Cursor, Claude Code, Copilot)
 - **[docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md)** - Writing effective prompts
 - **[docs/AGENTS.md](docs/AGENTS.md)** - Agent documentation (generated)
 - **[docs/CHANGELOG.md](docs/CHANGELOG.md)** - Version history
@@ -615,10 +618,12 @@ GitHub Actions workflow with 7 jobs:
 - [x] **Interactive HTML browser** - Beautiful web UI with search, filter, one-click copy
 - [x] **CLI tool** - Interactive prompt filling and variable replacement
 - [x] **Markdown library** - Copy-paste ready prompt collection
+- [x] **GitHub Copilot support** - Repository-wide custom instructions for Visual Studio / VS Code
+- [x] **Hybrid Skills architecture** - YAML source → native Anthropic SKILL.md generation
 
 ### 🔮 Planned
 
-- [ ] More tool adapters (VSCode Copilot, Cody, GitHub Copilot Chat)
+- [ ] More tool adapters (Cody, Neovim, JetBrains AI)
 - [ ] Prompt marketplace/sharing platform
 - [ ] Advanced eval metrics (BLEU, ROUGE, custom)
 - [ ] Cost analytics dashboard
@@ -637,6 +642,21 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 - **Issues**: [GitHub Issues](https://github.com/cleanshipcz/ai-tools/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/cleanshipcz/ai-tools/discussions)
+
+---
+
+## 🎯 Quick Tool Integration
+
+See **[docs/TOOLS.md](docs/TOOLS.md)** for complete tool-specific instructions.
+
+| Tool               | Format   | Location                   | Import Method                             |
+| ------------------ | -------- | -------------------------- | ----------------------------------------- |
+| **Windsurf**       | JSON     | `adapters/windsurf/`       | Rules panel → Import                      |
+| **Cursor**         | JSON     | `adapters/cursor/`         | Copy to project root                      |
+| **Claude Code**    | SKILL.md | `adapters/claude-code/`    | Copy to `~/.config/claude/skills/`        |
+| **GitHub Copilot** | Markdown | `adapters/github-copilot/` | Copy to `.github/copilot-instructions.md` |
+
+**TL;DR:** `npm run build` → Import files → Done! ✅
 
 ---
 

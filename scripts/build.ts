@@ -72,6 +72,7 @@ class Builder {
     await this.generateWindsurfAdapters();
     await this.generateClaudeCodeAdapters();
     await this.generateCursorAdapters();
+    await this.generateGitHubCopilotAdapters();
 
     // Generate Anthropic-compatible SKILL.md files
     await this.generateAnthropicSkills();
@@ -304,15 +305,229 @@ class Builder {
     console.log(chalk.gray(`    Generated ${recipes.length} recipes`));
   }
 
+  private async generateGitHubCopilotAdapters(): Promise<void> {
+    console.log(chalk.blue('  Generating GitHub Copilot adapters...'));
+
+    const baseDir = join(rootDir, 'adapters', 'github-copilot');
+    await mkdir(baseDir, { recursive: true });
+
+    // Create .github structure
+    const githubDir = join(baseDir, '.github');
+    const instructionsDir = join(githubDir, 'instructions');
+    const promptsDir = join(githubDir, 'prompts');
+    await mkdir(instructionsDir, { recursive: true });
+    await mkdir(promptsDir, { recursive: true });
+
+    // ========================================
+    // 1. GLOBAL INSTRUCTIONS (Available Tools + Template)
+    // ========================================
+    const global: string[] = [];
+
+    global.push(
+      '<!-- This file is loaded for ALL files. Lists available tools you can reference in chat. -->'
+    );
+    global.push('# Available AI Tools');
+    global.push('');
+    global.push(
+      'This repository provides reusable AI agent configurations. Copy relevant sections to your project.'
+    );
+    global.push('');
+
+    // List available agents (brief listing only - full definitions in prompts)
+    if (this.agents.size > 0) {
+      global.push('## Agents');
+      global.push('');
+      global.push('**Available agent personas (invoke via `#prompt:agent-<name>`):**');
+      global.push('');
+      for (const [id, agent] of this.agents) {
+        global.push(`- **${id}**: ${agent.purpose}`);
+      }
+      global.push('');
+      global.push('*Example: `@workspace #prompt:agent-code-reviewer` - Review this code*');
+      global.push('');
+    }
+
+    // List available prompts
+    if (this.prompts.size > 0) {
+      global.push('## Prompts');
+      global.push('');
+      global.push('**Reusable prompts (attach via paperclip or `#prompt:name`):**');
+      global.push('');
+      for (const [id, prompt] of this.prompts) {
+        global.push(`- **${id}**: ${prompt.description}`);
+      }
+      global.push('');
+    }
+
+    // List available skills
+    if (this.skills.size > 0) {
+      global.push('## Skills');
+      global.push('');
+      global.push('**Executable commands available:**');
+      global.push('');
+      for (const [id, skill] of this.skills) {
+        global.push(`- **${id}**: ${skill.description}`);
+      }
+      global.push('');
+    }
+
+    // Template guidance for users
+    global.push('---');
+    global.push('');
+    global.push('## Customize for Your Project');
+    global.push('');
+    global.push('**Add your project specifics above (keep concise):**');
+    global.push('');
+    global.push('1. **Project overview** - What it does (2-3 sentences)');
+    global.push('2. **Tech stack** - Languages, frameworks');
+    global.push('3. **Build commands** - How to run/test');
+    global.push('4. **Key conventions** - Naming, patterns');
+    global.push('');
+    global.push('**Example:**');
+    global.push('```markdown');
+    global.push('# My Project');
+    global.push('E-commerce platform with React + Node.js');
+    global.push('');
+    global.push('## Stack');
+    global.push('- Frontend: React, TypeScript');
+    global.push('- Backend: Node.js, PostgreSQL');
+    global.push('');
+    global.push('## Commands');
+    global.push('`npm run dev` - Start dev server');
+    global.push('`npm test` - Run tests');
+    global.push('```');
+
+    // Write global instructions
+    await writeFile(join(githubDir, 'copilot-instructions.md'), global.join('\n'), 'utf-8');
+    console.log(chalk.gray(`    Generated .github/copilot-instructions.md`));
+
+    // ========================================
+    // 2. PATH-SPECIFIC INSTRUCTIONS (By Rulepack Language)
+    // ========================================
+    const languagePatterns: Record<string, string> = {
+      'coding-kotlin': '**/*.kt',
+      'coding-python': '**/*.py',
+      'coding-typescript': '**/*.ts,**/*.tsx',
+    };
+
+    for (const [rulepackId, pattern] of Object.entries(languagePatterns)) {
+      const rulepack = this.rulepacks.get(rulepackId);
+      if (!rulepack) continue;
+
+      const pathInstructions: string[] = [];
+      pathInstructions.push('---');
+      pathInstructions.push(`applyTo: "${pattern}"`);
+      pathInstructions.push('---');
+      pathInstructions.push('');
+      pathInstructions.push(`# ${rulepack.description || rulepackId}`);
+      pathInstructions.push('');
+
+      const rules = this.resolveRulepacks([rulepackId]);
+      for (const rule of rules) {
+        pathInstructions.push(`- ${rule}`);
+      }
+      pathInstructions.push('');
+
+      await writeFile(
+        join(instructionsDir, `${rulepackId}.instructions.md`),
+        pathInstructions.join('\n'),
+        'utf-8'
+      );
+    }
+    console.log(
+      chalk.gray(
+        `    Generated ${Object.keys(languagePatterns).length} path-specific .instructions.md files`
+      )
+    );
+
+    // ========================================
+    // 3. PROMPT FILES (Task Prompts)
+    // ========================================
+    for (const [id, prompt] of this.prompts) {
+      const promptContent: string[] = [];
+      promptContent.push(`# ${id}`);
+      promptContent.push('');
+      promptContent.push(prompt.description);
+      promptContent.push('');
+
+      if (prompt.variables && prompt.variables.length > 0) {
+        promptContent.push('## Variables');
+        promptContent.push('');
+        for (const variable of prompt.variables) {
+          const required = variable.required ? ' (required)' : '';
+          promptContent.push(
+            `- \`{{${variable.name}}}\`${required}: ${variable.description || ''}`
+          );
+        }
+        promptContent.push('');
+      }
+
+      if (prompt.content) {
+        promptContent.push('## Prompt');
+        promptContent.push('');
+        promptContent.push(prompt.content);
+        promptContent.push('');
+      }
+
+      await writeFile(join(promptsDir, `${id}.prompt.md`), promptContent.join('\n'), 'utf-8');
+    }
+    console.log(chalk.gray(`    Generated ${this.prompts.size} task .prompt.md files`));
+
+    // ========================================
+    // 4. AGENT PROMPTS (Agent Personas)
+    // ========================================
+    for (const [id, agent] of this.agents) {
+      const agentPrompt: string[] = [];
+
+      agentPrompt.push(`# Agent: ${id}`);
+      agentPrompt.push('');
+      agentPrompt.push(`**Purpose:** ${agent.purpose}`);
+      agentPrompt.push('');
+
+      // Include system prompt (the actual agent behavior)
+      if (agent.prompt?.system) {
+        agentPrompt.push('## Persona');
+        agentPrompt.push('');
+        agentPrompt.push(agent.prompt.system.trim());
+        agentPrompt.push('');
+      }
+
+      // Include constraints
+      if (agent.constraints && agent.constraints.length > 0) {
+        agentPrompt.push('## Constraints');
+        agentPrompt.push('');
+        for (const constraint of agent.constraints) {
+          agentPrompt.push(`- ${constraint}`);
+        }
+        agentPrompt.push('');
+      }
+
+      // Include expanded rulepacks (actual rules)
+      if (agent.rulepacks && agent.rulepacks.length > 0) {
+        agentPrompt.push('## Rules to Follow');
+        agentPrompt.push('');
+
+        const rules = this.resolveRulepacks(agent.rulepacks);
+        for (const rule of rules) {
+          agentPrompt.push(`- ${rule}`);
+        }
+        agentPrompt.push('');
+      }
+
+      await writeFile(join(promptsDir, `agent-${id}.prompt.md`), agentPrompt.join('\n'), 'utf-8');
+    }
+    console.log(chalk.gray(`    Generated ${this.agents.size} agent .prompt.md files`));
+  }
+
   private async generateAnthropicSkills(): Promise<void> {
     console.log(chalk.blue('  Generating Anthropic SKILL.md files...'));
 
     const { execSync } = await import('child_process');
-    
+
     try {
-      execSync('npm run skills', { 
+      execSync('npm run skills', {
         cwd: rootDir,
-        stdio: 'inherit' 
+        stdio: 'inherit',
       });
     } catch (error) {
       console.error(chalk.red('    Failed to generate SKILL.md files'));

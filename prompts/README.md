@@ -105,13 +105,19 @@ Prompts are bundled into agents and imported into your AI coding tool. See [Agen
 
 5. Or copy the `user` field directly for manual use
 
-### VSCode (with GitHub Copilot or other extensions)
+### GitHub Copilot (Visual Studio / VS Code)
 
-Prompts can be used as:
+**Generated:**
+- `.github/prompts/*.prompt.md` → Reusable prompts (invoke explicitly)
+- `.github/copilot-instructions.md` → Lists available prompts
 
-1. **Copilot instructions** - Add to `.github/copilot-instructions.md`
-2. **Snippets** - Convert to VSCode snippets
-3. **Manual** - Copy from `adapters/claude-code/prompts/` and paste
+```bash
+npm run build
+cp -r adapters/github-copilot/.github ./
+```
+
+**Usage in VS Code:** Attach via paperclip → Prompt → select prompt  
+**Usage in Visual Studio:** Refer to copilot-instructions.md for available prompts
 
 ## 📝 Creating Your Own Prompts
 
