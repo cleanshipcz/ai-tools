@@ -1,0 +1,190 @@
+id: create-feature
+version: 1.0.0
+description: Generate a feature.yml manifest for documenting project features with context, files, and snippets
+
+tags:
+  - manifests
+  - features
+  - documentation
+  - yaml
+
+variables:
+  - name: feature_id
+    required: true
+    description: "Kebab-case unique identifier for the feature (e.g., user-authentication)"
+  
+  - name: feature_name
+    required: true
+    description: "Human-readable feature name (e.g., User Authentication System)"
+  
+  - name: description
+    required: true
+    description: "Brief feature description (10-500 characters)"
+  
+  - name: overview
+    required: false
+    description: "Detailed feature overview and purpose"
+  
+  - name: architecture
+    required: false
+    description: "Architecture and design notes for the feature"
+  
+  - name: entry_points
+    required: false
+    description: "Comma-separated list of main entry point files (e.g., src/auth/index.ts)"
+  
+  - name: key_files
+    required: false
+    description: "Comma-separated list of important files (e.g., src/auth/service.ts, src/auth/middleware.ts)"
+  
+  - name: recipe_id
+    required: false
+    description: "Recipe ID to bind (e.g., feature-delivery, bug-fix-workflow)"
+  
+  - name: acceptance_criteria
+    required: false
+    description: "Specific acceptance criteria for the feature"
+
+rules:
+  - "ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
+  - "Version must start at 1.0.0 following semver"
+  - "Description must be 10-500 characters"
+  - "Include context section with overview and architecture"
+  - "Define file patterns to scope the feature"
+  - "Add practical code snippets with examples"
+  - "Bind to a recipe for automated workflow support"
+  - "Include feature-specific conventions"
+  - "Set appropriate status (draft, active, deprecated, archived)"
+
+content: |
+  Generate a feature.yml manifest for the following feature:
+  
+  **Feature Details:**
+  - ID: {{feature_id}}
+  - Name: {{feature_name}}
+  - Description: {{description}}
+  
+  {{#overview}}
+  **Overview:**
+  {{overview}}
+  {{/overview}}
+  
+  {{#architecture}}
+  **Architecture:**
+  {{architecture}}
+  {{/architecture}}
+  
+  {{#entry_points}}
+  **Entry Points:**
+  {{entry_points}}
+  {{/entry_points}}
+  
+  {{#key_files}}
+  **Key Files:**
+  {{key_files}}
+  {{/key_files}}
+  
+  **Requirements:**
+  
+  1. **Required Fields:**
+     - id: {{feature_id}} (validate kebab-case)
+     - version: 1.0.0 (semver)
+     - name: "{{feature_name}}"
+     - description: "{{description}}" (10-500 chars)
+  
+  2. **Context Section:**
+     - overview: Detailed feature overview and purpose
+     - architecture: Architecture and design approach
+     - dependencies: Array of feature dependencies (other features, libraries)
+  
+  3. **Files Section:**
+     - entry_points: Array of main entry point files
+     - key_files: Array of important related files
+     - patterns: Array of glob patterns to include (e.g., src/auth/**)
+  
+  4. **Snippets Section:**
+     Array of code snippets, each with:
+     - id: Kebab-case snippet identifier
+     - title: Clear snippet title
+     - description: What the snippet demonstrates
+     - content: The actual code
+     - language: Programming language for syntax highlighting
+     
+     Create 2-5 practical snippets that demonstrate:
+     - Core functionality
+     - Common usage patterns
+     - Integration examples
+     - Test examples (if applicable)
+  
+  5. **Conventions Section:**
+     Array of feature-specific conventions (3-8 items):
+     - Code patterns to follow
+     - Naming conventions
+     - Error handling approaches
+     - Testing strategies
+     - Documentation requirements
+  
+  6. **Recipe Section (if applicable):**
+     {{#recipe_id}}
+     - id: {{recipe_id}}
+     - context:
+       - feature_description: Detailed implementation requirements
+       - acceptance_criteria: Specific criteria for completion
+       - (Additional context based on recipe type)
+     - tools: [claude-code, copilot-cli, cursor]
+     {{/recipe_id}}
+     {{^recipe_id}}
+     (Optional: Bind to feature-delivery, bug-fix-workflow, or custom recipe)
+     {{/recipe_id}}
+  
+  7. **Metadata Section:**
+     - status: "draft" (or active, deprecated, archived)
+     - owner: Feature owner or team name
+     - created: "2025-11-16"
+     - updated: "2025-11-16"
+     - tags: Relevant tags (e.g., authentication, security, backend)
+  
+  **Output Format:**
+  - Valid YAML with proper indentation (2 spaces)
+  - Include helpful inline comments
+  - Use string quotes where needed
+  - Follow the schema exactly
+  - Save to: projects/*/features/{{feature_id}}/feature.yml
+  
+  **Code Snippet Guidelines:**
+  - Keep snippets focused and practical
+  - Include enough context to be useful
+  - Add comments explaining key parts
+  - Use realistic variable names
+  - Show error handling where relevant
+  - Demonstrate best practices
+  
+  **Validation:**
+  After creating the file, remind user to run:
+  ```bash
+  npm run validate
+  npm run project:generate <project-id>
+  ```
+
+outputs:
+  format: yaml
+
+examples:
+  - input:
+      feature_id: "user-profile"
+      feature_name: "User Profile Management"
+      description: "Allow users to view and edit their profile information"
+      overview: "Complete user profile system with CRUD operations"
+      entry_points: "src/profile/index.ts"
+    output: |
+      # Creates a complete feature.yml with:
+      # - Profile management context
+      # - File patterns for profile-related code
+      # - CRUD operation snippets
+      # - Profile-specific conventions
+      # - Recipe binding for implementation
+
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

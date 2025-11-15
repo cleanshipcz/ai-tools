@@ -18,12 +18,12 @@ steps:
     agent: bug-fixer
     task: |
       Investigate the following bug:
-      
+
       Bug: {{bug_description}}
-      
+
       Reproduction Steps:
       {{reproduction_steps}}
-      
+
       Please:
       1. Analyze the codebase to locate the root cause
       2. Explain why the bug occurs
@@ -35,7 +35,7 @@ steps:
     agent: bug-fixer
     task: |
       Implement the fix for the bug based on the investigation.
-      
+
       Ensure:
       - The root cause is addressed, not just symptoms
       - No regressions are introduced
@@ -52,7 +52,7 @@ steps:
       2. Testing the reproduction steps
       3. Testing edge cases
       4. Checking for potential regressions
-      
+
       Report test results and confirm the bug is fixed.
     continueConversation: true
     waitForConfirmation: true
@@ -61,13 +61,13 @@ steps:
     agent: code-reviewer
     task: |
       Review the bug fix implementation.
-      
+
       Check:
       - Fix addresses root cause
       - No regressions introduced
       - Test coverage is adequate
       - Code quality is maintained
-      
+
       Respond with "APPROVED" or provide feedback.
     continueConversation: true
     waitForConfirmation: false

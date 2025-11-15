@@ -91,7 +91,6 @@ See [`recipes/README.md`](../recipes/README.md) for complete documentation.
 
 ### Misc
 
-- [ ] Documentation - cleanup recipe docs
 - [ ] Create agents or prompts for creating projects files, feature files, agents, etc.
 - [ ] Rename cleanship-recipes to .cs.recipes
 - [ ] For all recipes, the first step needs to be: analysis of the relevant content with output to a document, then detailed plan of the change with output to a document; these documents then need to be included in context and maintained

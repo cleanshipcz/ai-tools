@@ -330,7 +330,8 @@ export class FeatureGenerator {
         const recipe = loadYaml(recipeContent) as any;
 
         // Determine which tools to generate for
-        const tools = feature.recipe!.tools || recipe.tools || ['claude-code', 'copilot-cli', 'cursor'];
+        const tools = feature.recipe!.tools ||
+          recipe.tools || ['claude-code', 'copilot-cli', 'cursor'];
 
         // Generate a script for each tool
         for (const tool of tools) {
@@ -342,7 +343,7 @@ export class FeatureGenerator {
           // Put feature scripts in the tool's cleanship-recipes directory
           // so they're deployed alongside generic recipes
           const toolOutputDir = join(rootDir, '.output', projectId, tool);
-          
+
           let recipesDir: string;
           if (tool === 'claude-code') {
             recipesDir = join(toolOutputDir, '.claude', 'cleanship-recipes');
@@ -357,7 +358,7 @@ export class FeatureGenerator {
           } else {
             recipesDir = join(toolOutputDir, 'cleanship-recipes');
           }
-          
+
           await mkdir(recipesDir, { recursive: true });
 
           const scriptPath = join(recipesDir, `feature-${feature.id}.sh`);
@@ -367,7 +368,9 @@ export class FeatureGenerator {
         }
       } catch (error: any) {
         console.log(
-          chalk.yellow(`    ! Could not generate recipe for feature ${feature.name}: ${error.message}`)
+          chalk.yellow(
+            `    ! Could not generate recipe for feature ${feature.name}: ${error.message}`
+          )
         );
       }
     }
@@ -408,13 +411,16 @@ export class FeatureGenerator {
       script += '# Variables\n';
       for (const [key, value] of Object.entries(recipe.variables)) {
         const varName = key.toUpperCase();
-        let varValue = (value as string).replace(/{{([^}]+)}}/g, (_, v) => `\${${v.toUpperCase()}}`);
-        
+        let varValue = (value as string).replace(
+          /{{([^}]+)}}/g,
+          (_, v) => `\${${v.toUpperCase()}}`
+        );
+
         // If feature context provides this variable, use it as default
         if (feature.recipe?.context && feature.recipe.context[key.toLowerCase()]) {
           varValue = `\${${varName}}`;
         }
-        
+
         script += `: \${${varName}:="${varValue}"}\n`;
       }
       script += '\n';
@@ -422,18 +428,16 @@ export class FeatureGenerator {
 
     // Separate steps into pre-loop, loop, and post-loop
     const loopStepIds = recipe.loop?.steps || [];
-    const loopStepIndices = loopStepIds.map((id: string) => 
+    const loopStepIndices = loopStepIds.map((id: string) =>
       recipe.steps.findIndex((s: any) => s.id === id)
     );
-    
-    const preLoopSteps = recipe.steps.filter((_: any, i: number) => 
-      loopStepIndices.length === 0 || i < Math.min(...loopStepIndices)
+
+    const preLoopSteps = recipe.steps.filter(
+      (_: any, i: number) => loopStepIndices.length === 0 || i < Math.min(...loopStepIndices)
     );
-    const loopSteps = recipe.steps.filter((_: any, i: number) => 
-      loopStepIndices.includes(i)
-    );
-    const postLoopSteps = recipe.steps.filter((_: any, i: number) => 
-      loopStepIndices.length > 0 && i > Math.max(...loopStepIndices)
+    const loopSteps = recipe.steps.filter((_: any, i: number) => loopStepIndices.includes(i));
+    const postLoopSteps = recipe.steps.filter(
+      (_: any, i: number) => loopStepIndices.length > 0 && i > Math.max(...loopStepIndices)
     );
 
     const conversationStrategy = recipe.conversationStrategy || 'separate';
@@ -441,43 +445,74 @@ export class FeatureGenerator {
 
     // Generate pre-loop steps
     for (let i = 0; i < preLoopSteps.length; i++) {
-      script += this.generateStepScript(preLoopSteps[i], i, tool, recipe.variables, conversationStrategy, toolOptions);
+      script += this.generateStepScript(
+        preLoopSteps[i],
+        i,
+        tool,
+        recipe.variables,
+        conversationStrategy,
+        toolOptions
+      );
     }
 
     // Generate loop if defined
     if (recipe.loop && loopSteps.length > 0) {
       const maxIterations = recipe.loop.maxIterations || 3;
-      
+
       script += `# Loop: ${loopStepIds.join(' → ')} (max ${maxIterations} iterations)\n`;
       script += `for iteration in $(seq 1 ${maxIterations}); do\n`;
       script += `  echo "\\n▶️  Iteration $iteration/${maxIterations}"\n`;
       script += `  \n`;
-      
+
       for (let i = 0; i < loopSteps.length; i++) {
-        const stepScript = this.generateStepScript(loopSteps[i], i, tool, recipe.variables, conversationStrategy, toolOptions);
+        const stepScript = this.generateStepScript(
+          loopSteps[i],
+          i,
+          tool,
+          recipe.variables,
+          conversationStrategy,
+          toolOptions
+        );
         // Indent loop content
-        script += stepScript.split('\n').map(line => line ? `  ${line}` : line).join('\n');
+        script += stepScript
+          .split('\n')
+          .map((line) => (line ? `  ${line}` : line))
+          .join('\n');
       }
-      
+
       script += `done\n\n`;
     }
 
     // Generate post-loop steps
     const baseStepNum = preLoopSteps.length + (recipe.loop ? 1 : 0);
     for (let i = 0; i < postLoopSteps.length; i++) {
-      script += this.generateStepScript(postLoopSteps[i], baseStepNum + i, tool, recipe.variables, conversationStrategy, toolOptions);
+      script += this.generateStepScript(
+        postLoopSteps[i],
+        baseStepNum + i,
+        tool,
+        recipe.variables,
+        conversationStrategy,
+        toolOptions
+      );
     }
 
     script += `echo "✅ Feature '${feature.name}' workflow completed!"\n`;
     return script;
   }
 
-  private generateStepScript(step: any, index: number, tool: string, variables: any, conversationStrategy: string = 'separate', toolOptions?: any): string {
+  private generateStepScript(
+    step: any,
+    index: number,
+    tool: string,
+    variables: any,
+    conversationStrategy: string = 'separate',
+    toolOptions?: any
+  ): string {
     let script = '';
-    
+
     script += `# Step: ${step.id}\n`;
     script += `echo "▶️  ${step.id} (${step.agent})"\n`;
-    
+
     // Interpolate variables in task
     let task = step.task;
     if (variables) {
@@ -485,10 +520,11 @@ export class FeatureGenerator {
         task = task.replace(new RegExp(`{{${key}}}`, 'g'), `\${${key.toUpperCase()}}`);
       }
     }
-    
+
     // Determine if should continue conversation based on strategy
-    const shouldContinue = conversationStrategy === 'continue' && step.continueConversation !== false && index > 0;
-    
+    const shouldContinue =
+      conversationStrategy === 'continue' && step.continueConversation !== false && index > 0;
+
     // Generate tool-specific command with response capture
     if (tool === 'claude-code') {
       const continueFlag = shouldContinue ? '-c $CONVERSATION_ID' : '';
@@ -499,11 +535,11 @@ export class FeatureGenerator {
       }
     } else if (tool === 'copilot-cli') {
       const flags: string[] = [];
-      
+
       if (shouldContinue) {
         flags.push('--continue');
       }
-      
+
       // Add tool-specific options
       if (toolOptions?.['copilot-cli']) {
         const opts = toolOptions['copilot-cli'];
@@ -520,7 +556,7 @@ export class FeatureGenerator {
           opts.denyTools.forEach((tool: string) => flags.push(`--deny-tool "${tool}"`));
         }
       }
-      
+
       const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
       script += `RESPONSE=$(echo "@${step.agent} ${task}" | copilot${flagsStr})\n`;
       script += `echo "$RESPONSE"\n`;
@@ -531,7 +567,7 @@ export class FeatureGenerator {
       script += `read -p "Continue? "\n`;
       script += `RESPONSE=""\n`;
     }
-    
+
     // Handle conditional execution
     if (step.condition) {
       if (step.condition.type === 'on-success' && step.condition.check) {
@@ -545,7 +581,7 @@ export class FeatureGenerator {
         }
       }
     }
-    
+
     script += '\n';
     return script;
   }

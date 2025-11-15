@@ -401,7 +401,7 @@ async function listRecipes(): Promise<void> {
 async function generateScript(recipeId: string, tool: string, outputPath?: string): Promise<void> {
   const recipePath = join(rootDir, 'recipes', `${recipeId}.yml`);
   const recipe = await loadRecipe(recipePath);
-  
+
   const scriptPath = outputPath || join(rootDir, '.output', 'scripts', `${recipeId}-${tool}.sh`);
   await mkdir(dirname(scriptPath), { recursive: true });
 
@@ -425,10 +425,10 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
   // Generate commands for each step
   for (let i = 0; i < recipe.steps.length; i++) {
     const step = recipe.steps[i];
-    
+
     script += `# Step ${i + 1}: ${step.id}\n`;
     script += `echo "▶️  Step ${i + 1}/${recipe.steps.length}: ${step.id} (${step.agent})"\n`;
-    
+
     // Interpolate variables in task
     let task = step.task;
     if (recipe.variables) {
@@ -436,10 +436,11 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
         task = task.replace(new RegExp(`{{${key}}}`, 'g'), `\${${key.toUpperCase()}}`);
       }
     }
-    
+
     // Generate tool-specific command
     if (tool === 'claude-code') {
-      const continueFlag = step.continueConversation !== false && i > 0 ? '-c $CONVERSATION_ID' : '';
+      const continueFlag =
+        step.continueConversation !== false && i > 0 ? '-c $CONVERSATION_ID' : '';
       script += `RESPONSE=$(claude ${continueFlag} --agent ${step.agent} "${task.replace(/"/g, '\\"')}")\n`;
       script += `echo "$RESPONSE"\n`;
       if (i === 0) {
@@ -453,7 +454,7 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
       script += `echo "⚠️  Please execute in Cursor Composer and press Enter"\n`;
       script += `read -p "Continue? "\n`;
     }
-    
+
     script += '\n';
   }
 
@@ -497,9 +498,7 @@ async function main() {
     if (!recipeId) {
       console.log(chalk.red('Error: Recipe ID required'));
       console.log(chalk.gray('Usage: npm run recipe:run <recipe-id> [tool]'));
-      console.log(
-        chalk.gray('Tools: claude-code (default), copilot-cli, cursor')
-      );
+      console.log(chalk.gray('Tools: claude-code (default), copilot-cli, cursor'));
       process.exit(1);
     }
 

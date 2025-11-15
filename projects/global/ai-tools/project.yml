@@ -138,6 +138,8 @@ ai_tools:
     - refactoring-specialist
     - documentation-writer
     - project-planner
+    - manifest-builder
+    - ticket-manager
 
   whitelist_prompts:
     # Refactoring prompts
@@ -157,6 +159,11 @@ ai_tools:
     - planning/tech-decision-record
     # QA prompts
     - qa/write-tests
+    # Manifest prompts
+    - manifest/create-prompt
+    - manifest/create-agent
+    - manifest/create-project
+    - manifest/create-feature
 
   preferred_rulepacks:
     - base

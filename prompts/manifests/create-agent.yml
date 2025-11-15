@@ -1,0 +1,191 @@
+id: create-agent
+version: 1.0.0
+description: Generate an agent.yml manifest defining an AI agent with purpose, rulepacks, and capabilities
+
+tags:
+  - manifests
+  - agents
+  - ai
+  - yaml
+
+variables:
+  - name: agent_id
+    required: true
+    description: "Kebab-case unique identifier for the agent (e.g., security-auditor)"
+  
+  - name: purpose
+    required: true
+    description: "Clear statement of the agent's purpose (10-500 characters)"
+  
+  - name: persona
+    required: false
+    description: "Detailed persona describing the agent's role, expertise, and approach"
+  
+  - name: rulepacks
+    required: false
+    description: "Comma-separated list of rulepack IDs to include (e.g., base, coding-python, security)"
+    default: "base"
+  
+  - name: capabilities
+    required: false
+    description: "Comma-separated list of required capabilities (e.g., mcp:git, mcp:filesystem)"
+  
+  - name: temperature
+    required: false
+    description: "Temperature setting (0.0-2.0, lower = more focused)"
+    default: "0.7"
+  
+  - name: tools
+    required: false
+    description: "Comma-separated list of tool/skill IDs the agent can use"
+
+rules:
+  - "ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
+  - "Version must start at 1.0.0 following semver"
+  - "Purpose must be 10-500 characters, clear and specific"
+  - "Include detailed persona that guides agent behavior"
+  - "Select rulepacks that match agent's domain (coding languages, security, etc.)"
+  - "Define capabilities for MCP tools the agent needs"
+  - "Set appropriate temperature (lower for precise tasks, higher for creative)"
+  - "Create clear system prompt that establishes agent identity"
+  - "Include constraints that define agent boundaries"
+  - "Add comprehensive metadata with author and tags"
+
+content: |
+  Generate an agent.yml manifest for the following agent:
+  
+  **Agent Details:**
+  - ID: {{agent_id}}
+  - Purpose: {{purpose}}
+  
+  {{#persona}}
+  **Persona:**
+  {{persona}}
+  {{/persona}}
+  
+  {{#rulepacks}}
+  **Rulepacks:**
+  {{rulepacks}}
+  {{/rulepacks}}
+  
+  {{#capabilities}}
+  **Capabilities:**
+  {{capabilities}}
+  {{/capabilities}}
+  
+  **Requirements:**
+  
+  1. **Required Fields:**
+     - id: {{agent_id}} (validate kebab-case)
+     - version: 1.0.0 (semver)
+     - purpose: "{{purpose}}" (10-500 chars, clear and specific)
+  
+  2. **Description (optional but recommended):**
+     - Expanded description of the agent's role and capabilities
+  
+  3. **Rulepacks Section:**
+     - Array of rulepack IDs to include
+     - Choose based on agent's domain:
+       - base: General coding rules (always include)
+       - coding-python, coding-typescript, coding-java, coding-kotlin: Language-specific
+       - security: For security-focused agents
+       - reviewer: For code review agents
+     - Example: [base, {{rulepacks}}]
+  
+  4. **Capabilities Section:**
+     - Array of required MCP capabilities
+     - Common capabilities:
+       - mcp:git: Git operations
+       - mcp:filesystem: File system access
+       - mcp:docker: Container operations
+       - mcp:database: Database access
+     {{#capabilities}}
+     - Include: [{{capabilities}}]
+     {{/capabilities}}
+  
+  5. **Defaults Section:**
+     - temperature: {{temperature}} (0.0-2.0)
+       - 0.0-0.3: Precise, deterministic tasks (code review, testing)
+       - 0.4-0.7: Balanced (feature building, refactoring)
+       - 0.8-1.0: Creative tasks (design, brainstorming)
+       - 1.1-2.0: Highly creative (rarely used)
+     - max_tokens: (optional, e.g., 4096)
+     - style: "terse" | "verbose" | "conversational" | "technical"
+     - model: (optional, e.g., "gpt-4")
+  
+  6. **Prompt Section:**
+     - system: Comprehensive system prompt that:
+       - Establishes agent identity and expertise
+       - Defines the agent's approach and methodology
+       - Lists what the agent focuses on
+       - Explains the agent's process or workflow
+       - Sets tone and communication style
+     - user_template: (optional) Template for user messages
+     - includes: (optional) Array of files to include in prompt
+  
+  7. **Tools Section (optional):**
+     {{#tools}}
+     - Array of tool/skill IDs: [{{tools}}]
+     {{/tools}}
+     - Examples: search-repo, run-tests, run-linter
+  
+  8. **Constraints Section:**
+     - Array of constraints or limitations (3-10 items)
+     - What the agent should NOT do
+     - Boundaries and safety guidelines
+     - Quality requirements
+     - Examples:
+       - "Never approve code with security vulnerabilities"
+       - "Always include test coverage for new features"
+       - "Follow existing code style and conventions"
+  
+  9. **Metadata Section:**
+     - author: "AI Tools Team"
+     - created: "2025-11-16"
+     - updated: "2025-11-16"
+     - tags: Array of relevant tags (e.g., coding, security, documentation)
+  
+  **System Prompt Guidelines:**
+  Create a persona-driven system prompt that includes:
+  - "You are [role/expertise]..."
+  - "Your goal is to..."
+  - "Process:" or "Approach:" with numbered steps
+  - "Focus on:" with bullet points
+  - Specific techniques or methodologies
+  - Expected output format or structure
+  
+  **Output Format:**
+  - Valid YAML with proper indentation (2 spaces)
+  - Use block scalars (|) for multi-line content
+  - Include helpful inline comments
+  - Follow the schema exactly
+  - Save to: agents/{{agent_id}}.yml
+  
+  **Validation:**
+  After creating the file, remind user to run:
+  ```bash
+  npm run validate
+  npm run build
+  ```
+
+outputs:
+  format: yaml
+
+examples:
+  - input:
+      agent_id: "api-designer"
+      purpose: "Design RESTful API endpoints with best practices and OpenAPI documentation"
+      rulepacks: "base, coding-typescript"
+      temperature: "0.5"
+    output: |
+      # Creates a complete agent.yml with:
+      # - API design expertise persona
+      # - RESTful best practices focus
+      # - OpenAPI documentation generation
+      # - Appropriate rulepacks and constraints
+      # - Balanced temperature for design work
+
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

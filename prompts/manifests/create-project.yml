@@ -1,0 +1,174 @@
+id: create-project
+version: 1.0.0
+description: Generate a complete project.yml manifest for the ai-tools repository
+
+tags:
+  - manifests
+  - projects
+  - configuration
+  - yaml
+
+variables:
+  - name: project_id
+    required: true
+    description: "Kebab-case unique identifier for the project (e.g., my-web-app)"
+  
+  - name: project_name
+    required: true
+    description: "Human-readable project name (e.g., My Web Application)"
+  
+  - name: description
+    required: true
+    description: "Brief project description (10-500 characters)"
+  
+  - name: overview
+    required: false
+    description: "Detailed project overview and background"
+  
+  - name: purpose
+    required: false
+    description: "Primary purpose or goal of the project"
+  
+  - name: languages
+    required: false
+    description: "Comma-separated list of programming languages (e.g., typescript, python)"
+  
+  - name: tech_stack
+    required: false
+    description: "Technology stack details (frontend, backend, database, infrastructure)"
+  
+  - name: preferred_agents
+    required: false
+    description: "Comma-separated list of preferred agent IDs (e.g., code-reviewer, feature-builder)"
+    default: "code-reviewer,feature-builder,bug-fixer"
+
+rules:
+  - "ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
+  - "Version must start at 1.0.0 following semver"
+  - "Description must be 10-500 characters"
+  - "Include metadata with repository, maintainers, created date"
+  - "Organize commands by logical categories (dev, build, test, etc.)"
+  - "Include comprehensive conventions (naming, patterns, testing)"
+  - "Configure ai_tools section with preferred agents and rulepacks"
+  - "Reference documentation files that exist in the project"
+
+content: |
+  Generate a project.yml manifest for the following project:
+  
+  **Project Details:**
+  - ID: {{project_id}}
+  - Name: {{project_name}}
+  - Description: {{description}}
+  
+  {{#overview}}
+  **Overview:**
+  {{overview}}
+  {{/overview}}
+  
+  {{#purpose}}
+  **Purpose:**
+  {{purpose}}
+  {{/purpose}}
+  
+  {{#languages}}
+  **Languages:**
+  {{languages}}
+  {{/languages}}
+  
+  {{#tech_stack}}
+  **Tech Stack:**
+  {{tech_stack}}
+  {{/tech_stack}}
+  
+  **Requirements:**
+  
+  1. **Required Fields:**
+     - id: {{project_id}} (validate kebab-case)
+     - version: 1.0.0 (semver)
+     - name: "{{project_name}}"
+     - description: "{{description}}" (10-500 chars)
+  
+  2. **Context Section:**
+     - overview: Detailed project background
+     - purpose: Primary goal of the project
+  
+  3. **Tech Stack Section:**
+     - languages: Array of programming languages
+     - frontend: Frontend frameworks/libraries (if applicable)
+     - backend: Backend frameworks/libraries (if applicable)
+     - database: Database systems (if applicable)
+     - infrastructure: Deployment tools (if applicable)
+     - tools: Development tools and utilities
+  
+  4. **Documentation Section:**
+     - readme: Path to README.md
+     - Reference other docs that exist (architecture, API docs, style guide)
+     - Use custom object for additional documentation
+  
+  5. **Commands Section:**
+     Organize by categories:
+     - dev: Development commands (start, watch)
+     - build: Build commands (compile, bundle)
+     - test: Testing commands (unit, integration)
+     - lint: Linting and formatting
+     - deploy: Deployment commands
+     - Other logical categories as needed
+  
+  6. **Conventions Section:**
+     - naming: Array of naming conventions
+     - patterns: Code patterns and best practices
+     - testing: Testing conventions
+     - structure: Project structure conventions
+     - documentation: Documentation standards
+  
+  7. **AI Tools Section:**
+     - preferred_agents: [{{preferred_agents}}]
+     - whitelist_agents: Include agents relevant to project tech stack
+     - whitelist_prompts: Prompts useful for this project type
+     - preferred_rulepacks: Rulepacks matching project languages
+     - whitelist_rulepacks: All applicable rulepacks
+     - custom_rules: Project-specific rules (3-10 rules)
+  
+  8. **Metadata Section:**
+     - repository: Git repository URL (if known)
+     - maintainers: Array of maintainer names/emails
+     - created: "2025-11-16"
+     - updated: "2025-11-16"
+     - tags: Relevant tags for categorization
+  
+  **Output Format:**
+  - Valid YAML with proper indentation (2 spaces)
+  - Include helpful inline comments
+  - Use string quotes where needed
+  - Follow the schema exactly
+  - Save to: projects/local/{{project_id}}/project.yml (or projects/global/{{project_id}}/project.yml for shared)
+  
+  **Validation:**
+  After creating the file, remind user to run:
+  ```bash
+  npm run validate
+  npm run project:list
+  npm run project:generate {{project_id}}
+  ```
+
+outputs:
+  format: yaml
+
+examples:
+  - input:
+      project_id: "my-api"
+      project_name: "My REST API"
+      description: "A RESTful API service built with Node.js and Express"
+      languages: "typescript, javascript"
+      preferred_agents: "code-reviewer, feature-builder, bug-fixer"
+    output: |
+      # Creates a complete project.yml with:
+      # - Proper structure for REST API project
+      # - TypeScript-focused tech stack
+      # - API-specific commands and conventions
+      # - Relevant agents and rulepacks
+
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

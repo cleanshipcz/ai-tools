@@ -15,7 +15,7 @@ steps:
     agent: code-reviewer
     task: |
       Perform a comprehensive code review of the current changes.
-      
+
       Review checklist:
       - Code quality and maintainability
       - Design patterns and architecture
@@ -25,7 +25,7 @@ steps:
       - Performance considerations
       - Documentation completeness
       - Adherence to project conventions
-      
+
       Provide specific, actionable feedback organized by priority (Critical, High, Medium, Low).
       Rate overall quality on a scale of 1-10.
     continueConversation: false
@@ -35,12 +35,12 @@ steps:
     agent: feature-builder
     task: |
       Address all Critical and High priority issues from the review.
-      
+
       For each issue:
       - Implement the suggested fix
       - Add tests if applicable
       - Update documentation if needed
-      
+
       Summarize the changes made.
     continueConversation: true
     waitForConfirmation: false
@@ -49,13 +49,13 @@ steps:
     agent: code-reviewer
     task: |
       Verify that the issues have been properly addressed.
-      
+
       Check:
       - All Critical issues are resolved
       - All High priority issues are resolved
       - New code follows best practices
       - Tests are adequate
-      
+
       Respond with:
       - "PASS" if all issues are resolved and quality is acceptable (8+/10)
       - "CONTINUE" with remaining issues if more work is needed

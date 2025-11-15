@@ -1,0 +1,209 @@
+id: create-rulepack
+version: 1.0.0
+description: Generate a rulepack.yml manifest defining reusable coding rules and standards
+
+tags:
+  - manifests
+  - rulepacks
+  - standards
+  - yaml
+
+variables:
+  - name: rulepack_id
+    required: true
+    description: "Kebab-case unique identifier for the rulepack (e.g., coding-python, security)"
+  
+  - name: description
+    required: true
+    description: "Clear description of the rulepack's purpose (10-500 characters)"
+  
+  - name: rules
+    required: true
+    description: "Description of the rules to include (e.g., 'Python PEP 8 style guidelines, type hints, docstrings')"
+  
+  - name: extends
+    required: false
+    description: "Comma-separated list of parent rulepack IDs to extend (e.g., base)"
+  
+  - name: category
+    required: false
+    description: "Category: coding, security, testing, documentation, or general"
+    default: "coding"
+  
+  - name: language
+    required: false
+    description: "Programming language if applicable (python, typescript, java, kotlin)"
+
+rules:
+  - "ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
+  - "Version must start at 1.0.0 following semver"
+  - "Description should be clear and concise"
+  - "Rules must be 5-500 characters each"
+  - "Include at least 5 rules, preferably 10-20"
+  - "Make rules specific, actionable, and measurable"
+  - "Group related rules together logically"
+  - "Use consistent language and tone"
+  - "Add tags for discoverability"
+  - "Include metadata with author and creation date"
+
+content: |
+  Generate a rulepack.yml manifest for the following rulepack:
+  
+  **Rulepack Details:**
+  - ID: {{rulepack_id}}
+  - Description: {{description}}
+  - Category: {{category}}
+  
+  {{#language}}
+  **Language:**
+  {{language}}
+  {{/language}}
+  
+  {{#rules}}
+  **Rules to Include:**
+  {{rules}}
+  {{/rules}}
+  
+  {{#extends}}
+  **Extends:**
+  {{extends}}
+  {{/extends}}
+  
+  **Requirements:**
+  
+  1. **Required Fields:**
+     - id: {{rulepack_id}} (validate kebab-case)
+     - rules: Array of rule strings (minimum 1, recommended 10-20)
+  
+  2. **Optional Fields:**
+     - version: 1.0.0 (semver) - recommended
+     - description: "{{description}}" (recommended for clarity)
+  
+  3. **Extends Section (optional):**
+     {{#extends}}
+     - Array of parent rulepack IDs: [{{extends}}]
+     - Rules from parent packs are inherited
+     - Use for building on top of existing rulepacks (e.g., extends: [base])
+     {{/extends}}
+     {{^extends}}
+     - Optional: Extend existing rulepacks (e.g., [base])
+     - Common base: "base" rulepack for general rules
+     {{/extends}}
+  
+  4. **Rules Section:**
+     Array of specific, actionable rules (5-500 chars each):
+     
+     **Rule Writing Guidelines:**
+     - Be specific and actionable: "Use type hints for function arguments" not "Write good code"
+     - Make them measurable: Can you check if the rule is followed?
+     - Use imperative mood: "Prefer X over Y" not "X should be preferred"
+     - Include rationale when helpful: "Use async/await for I/O operations (improves readability)"
+     - Keep consistent format across rules
+     - Group related rules together
+     
+     **Rule Categories:**
+     - **Style:** Formatting, naming, structure
+     - **Best Practices:** Idioms, patterns, anti-patterns
+     - **Performance:** Optimization guidelines
+     - **Security:** Safety and security rules
+     - **Testing:** Test coverage and quality
+     - **Documentation:** Comment and doc requirements
+     - **Error Handling:** Exception and error practices
+     
+     {{#rules}}
+     Based on: {{rules}}
+     {{/rules}}
+     
+     Create 10-20 specific rules following these guidelines.
+  
+  5. **Overrides Section (optional):**
+     - Array of rules that override parent rulepack rules
+     - Use sparingly - only when you need to contradict a parent rule
+     - Example: If base says "Use verbose naming" but your pack needs "Use short names"
+  
+  6. **Tags Section:**
+     Array of relevant tags for categorization (3-7 tags):
+     - Category tags: coding, security, testing, documentation
+     - Language tags: python, typescript, java, kotlin, javascript
+     - Domain tags: backend, frontend, api, database
+     - Tool tags: eslint, prettier, pylint, ktlint
+     
+     {{#language}}
+     Include: {{language}}
+     {{/language}}
+  
+  7. **Metadata Section:**
+     - author: "AI Tools Team"
+     - created: "2025-11-16"
+     - updated: "2025-11-16"
+  
+  **Rulepack Naming Conventions:**
+  - Language-specific: `coding-{language}` (e.g., coding-python, coding-typescript)
+  - Domain-specific: `{domain}` (e.g., security, reviewer, testing)
+  - Framework-specific: `{framework}-{aspect}` (e.g., react-hooks, django-rest)
+  - Tool-specific: `{tool}-rules` (e.g., eslint-rules)
+  
+  **Common Rulepack Patterns:**
+  
+  **Base Rulepack:**
+  - General rules applicable to all languages
+  - Foundation for language-specific packs
+  - Example rules: clarity, documentation, testing
+  
+  **Language Rulepack:**
+  - Language-specific idioms and best practices
+  - Extends base rulepack
+  - Example: coding-python, coding-typescript
+  
+  **Domain Rulepack:**
+  - Specific domain concerns (security, performance)
+  - Can be combined with language packs
+  - Example: security, reviewer
+  
+  **Output Format:**
+  - Valid YAML with proper indentation (2 spaces)
+  - Use array format for rules (each rule on its own line with '- ')
+  - Include helpful inline comments for sections
+  - Use single quotes for strings with special characters
+  - Follow the schema exactly
+  - Save to: rulepacks/{{rulepack_id}}.yml
+  
+  **Quality Checklist:**
+  - [ ] All rules are specific and actionable
+  - [ ] Rules are 5-500 characters
+  - [ ] Rules use consistent language
+  - [ ] Related rules are grouped
+  - [ ] At least 5 rules included (10-20 recommended)
+  - [ ] Tags accurately describe the rulepack
+  - [ ] Extends appropriate parent packs
+  - [ ] Metadata is complete
+  
+  **Validation:**
+  After creating the file, remind user to run:
+  ```bash
+  npm run validate
+  npm run build
+  ```
+
+outputs:
+  format: yaml
+
+examples:
+  - input:
+      rulepack_id: "coding-go"
+      description: "Go language coding standards and best practices"
+      rules: "Go idioms, error handling, goroutines, channels, naming conventions"
+      extends: "base"
+      language: "go"
+    output: |
+      # Creates a complete rulepack.yml with:
+      # - Go-specific coding standards
+      # - Idiomatic Go patterns
+      # - Concurrency best practices
+      # - Error handling guidelines
+      # - Extends base rulepack
+
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

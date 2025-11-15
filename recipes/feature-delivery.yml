@@ -16,7 +16,7 @@ conversationStrategy: separate
 # Tool-specific options
 toolOptions:
   copilot-cli:
-    allowAllTools: true  # Allow tools to run automatically without confirmation
+    allowAllTools: true # Allow tools to run automatically without confirmation
 
 variables:
   feature_description: "{{FEATURE_DESCRIPTION}}"
@@ -27,12 +27,12 @@ steps:
     agent: feature-builder
     task: |
       Implement the following feature:
-      
+
       Feature: {{feature_description}}
-      
+
       Acceptance Criteria:
       {{acceptance_criteria}}
-      
+
       Please implement this feature following best practices, including:
       - Clean, maintainable code
       - Proper error handling
@@ -45,14 +45,14 @@ steps:
     agent: code-reviewer
     task: |
       Review the changes made in the previous step.
-      
+
       Focus on:
       - Code quality and maintainability
       - Test coverage and quality
       - Security concerns
       - Performance considerations
       - Documentation completeness
-      
+
       Provide specific, actionable feedback.
     continueConversation: true
     waitForConfirmation: false
@@ -61,7 +61,7 @@ steps:
     agent: feature-builder
     task: |
       Address the review feedback from the previous step.
-      
+
       Please:
       - Fix any issues identified
       - Improve code quality as suggested
@@ -74,13 +74,13 @@ steps:
     agent: code-reviewer
     task: |
       Perform a final quality check on the implementation.
-      
+
       Verify:
       - All review feedback has been addressed
       - Tests pass and cover edge cases
       - Code follows project conventions
       - Documentation is complete
-      
+
       Respond with "APPROVED" if quality standards are met, or provide remaining issues.
     continueConversation: true
     waitForConfirmation: true
@@ -91,7 +91,7 @@ steps:
     agent: feature-builder
     task: |
       Update project documentation to reflect the new feature.
-      
+
       Please update:
       - README.md with feature description
       - CHANGELOG.md with version entry
