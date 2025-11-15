@@ -334,10 +334,10 @@ adapters/anthropic/run-pytest/SKILL.md
 | --------------- | --------------- | ----------- | ---------- |
 | **Granularity** | Per-agent       | Per-skill   | All-in-one |
 | **Format**      | JSON            | SKILL.md    | Markdown   |
-| **Agents**      | ✅               | ❌           | ✅ (docs)   |
-| **Prompts**     | ✅               | ❌           | ✅ (docs)   |
-| **Skills**      | ❌               | ✅ (exec)    | ✅ (docs)   |
-| **Rulepacks**   | ✅ (merged)      | ❌           | ✅ (docs)   |
+| **Agents**      | ✅              | ❌          | ✅ (docs)  |
+| **Prompts**     | ✅              | ❌          | ✅ (docs)  |
+| **Skills**      | ❌              | ✅ (exec)   | ✅ (docs)  |
+| **Rulepacks**   | ✅ (merged)     | ❌          | ✅ (docs)  |
 | **Scope**       | Project/global  | Global CLI  | Repository |
 | **Execution**   | IDE             | CLI         | AI assist  |
 

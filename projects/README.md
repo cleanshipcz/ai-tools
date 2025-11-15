@@ -55,6 +55,7 @@ npm run project:create my-api -- --global -d "Company REST API"
 ```
 
 This will:
+
 - Create the project directory
 - Copy template files (`project.yml`, `deploy.yml`)
 - Set up initial configuration
@@ -94,6 +95,7 @@ npm run project:list
 ```
 
 You'll see:
+
 - **Global projects** - Shared, versioned projects in `projects/global/`
 - **Local projects** - Your private projects in `projects/local/`
 
@@ -104,12 +106,14 @@ You'll see:
 ### Global vs Local Projects
 
 **Global Projects** (`projects/global/`)
+
 - Versioned in git
 - Shared across the team
 - Examples and templates
 - Use for: Reference implementations, team standards
 
 **Local Projects** (`projects/local/`)
+
 - Gitignored (private)
 - User-specific
 - Use for: Personal projects, client work, experiments
@@ -117,6 +121,7 @@ You'll see:
 ### Project Manifest
 
 A YAML file (`project.yml`) containing:
+
 - **Metadata**: ID, name, description, version
 - **Context**: Overview, purpose
 - **Tech Stack**: Languages, frameworks, tools
@@ -130,15 +135,19 @@ A YAML file (`project.yml`) containing:
 For each tool, the generator creates:
 
 **GitHub Copilot**
+
 - `.github/copilot-instructions.md` - Project-specific instructions
 
 **Windsurf**
+
 - `.windsurf/rules/project-rules.json` - Project rules
 
 **Cursor**
+
 - `.cursor/project-rules.json` - Project configuration
 
 **Claude Code**
+
 - `.claude/project-context.json` - Project context
 
 ### Deployment
@@ -255,16 +264,16 @@ Each project has its own `deploy.yml` file created during project creation.
 
    ```yaml
    # Target project directory (absolute or relative path)
-   target: "../my-actual-project"
-   
+   target: '../my-actual-project'
+
    # Tools to deploy
    tools:
      - github-copilot
      - windsurf
-   
+
    # Deployment mode
    mode: local
-   
+
    # Settings
    backup: true
    auto_commit: false
@@ -288,11 +297,13 @@ Deployment automatically generates outputs and copies them to your target projec
 ### Deployment Modes
 
 **Local Mode** (`mode: local`)
+
 - Copies files to target directory
 - Can auto-commit if `auto_commit: true`
 - Requires absolute path to project
 
 **Manual Mode** (`mode: manual`)
+
 - Generates files
 - Shows instructions
 - You copy manually
@@ -300,11 +311,13 @@ Deployment automatically generates outputs and copies them to your target projec
 ### Deployment Options
 
 **Backup** (`backup: true`)
+
 - Backs up existing files before deploying
 - Stored in `.backups/<project>/<timestamp>/`
 - Recommended: `true`
 
 **Auto-commit** (`auto_commit: true`)
+
 - Automatically commits changes
 - Creates/uses branch specified in `git_branch`
 - Requires `mode: local`
@@ -346,10 +359,10 @@ npm run project:rollback my-project 2024-11-15T10-30-00
 ### Required Fields
 
 ```yaml
-id: my-project                  # Unique ID (kebab-case)
-version: 1.0.0                  # Semantic version
-name: "My Project"              # Human-readable name
-description: "Brief description (10-500 chars)"
+id: my-project # Unique ID (kebab-case)
+version: 1.0.0 # Semantic version
+name: 'My Project' # Human-readable name
+description: 'Brief description (10-500 chars)'
 ```
 
 ### Context (Optional but Recommended)
@@ -359,7 +372,7 @@ context:
   overview: |
     Detailed project overview.
     Multiple lines supported.
-  purpose: "Primary goal of the project"
+  purpose: 'Primary goal of the project'
 ```
 
 ### Tech Stack (Optional)
@@ -389,13 +402,13 @@ tech_stack:
 
 ```yaml
 documentation:
-  readme: "README.md"
-  contributing: "CONTRIBUTING.md"
-  architecture: "docs/ARCHITECTURE.md"
-  code_style: "docs/CODE_STYLE.md"
-  api_docs: "docs/API.md"
+  readme: 'README.md'
+  contributing: 'CONTRIBUTING.md'
+  architecture: 'docs/ARCHITECTURE.md'
+  code_style: 'docs/CODE_STYLE.md'
+  api_docs: 'docs/API.md'
   custom:
-    deployment: "docs/DEPLOYMENT.md"
+    deployment: 'docs/DEPLOYMENT.md'
 ```
 
 ### Commands (Optional)
@@ -403,13 +416,13 @@ documentation:
 ```yaml
 commands:
   dev:
-    all: "npm run dev"
-    frontend: "cd frontend && npm run dev"
+    all: 'npm run dev'
+    frontend: 'cd frontend && npm run dev'
   build:
-    all: "npm run build"
+    all: 'npm run build'
   test:
-    unit: "npm test"
-    e2e: "npm run test:e2e"
+    unit: 'npm test'
+    e2e: 'npm run test:e2e'
 ```
 
 ### Conventions (Optional but Recommended)
@@ -417,17 +430,17 @@ commands:
 ```yaml
 conventions:
   naming:
-    - "Use PascalCase for React components"
-    - "Use camelCase for functions"
+    - 'Use PascalCase for React components'
+    - 'Use camelCase for functions'
   patterns:
-    - "Prefer functional components"
-    - "Use TypeScript strict mode"
+    - 'Prefer functional components'
+    - 'Use TypeScript strict mode'
   testing:
-    - "Test coverage minimum 80%"
+    - 'Test coverage minimum 80%'
   structure:
-    - "Follow feature-based structure"
+    - 'Follow feature-based structure'
   custom:
-    - "Any other conventions"
+    - 'Any other conventions'
 ```
 
 ### AI Tools Configuration (Optional but Recommended)
@@ -442,8 +455,8 @@ ai_tools:
     - coding-typescript
     - security
   custom_rules:
-    - "Always use our logger utility"
-    - "API responses must follow standard format"
+    - 'Always use our logger utility'
+    - 'API responses must follow standard format'
   excluded_agents:
     - kotlin-style-enforcer
   excluded_rulepacks:
@@ -454,11 +467,11 @@ ai_tools:
 
 ```yaml
 metadata:
-  repository: "https://github.com/user/project"
+  repository: 'https://github.com/user/project'
   maintainers:
-    - "email@example.com"
-  created: "2024-01-15"
-  updated: "2024-11-15"
+    - 'email@example.com'
+  created: '2024-01-15'
+  updated: '2024-11-15'
   tags:
     - web
     - api
@@ -581,9 +594,9 @@ Features are sub-components of your project that have their own:
    # projects/local/my-project/features/user-authentication/feature.yml
    id: user-authentication
    version: 1.0.0
-   name: "User Authentication"
-   description: "JWT-based user authentication and session management"
-   
+   name: 'User Authentication'
+   description: 'JWT-based user authentication and session management'
+
    context:
      overview: |
        Handles user login, registration, and session management using JWT tokens.
@@ -593,7 +606,7 @@ Features are sub-components of your project that have their own:
        - jsonwebtoken
        - passport
        - bcrypt
-   
+
    files:
      entry_points:
        - src/auth/index.ts
@@ -602,11 +615,11 @@ Features are sub-components of your project that have their own:
        - src/middleware/auth.ts
      patterns:
        - src/auth/**/*.ts
-   
+
    snippets:
      - id: protect-route
-       title: "Protect a Route"
-       description: "Apply authentication middleware to protect an endpoint"
+       title: 'Protect a Route'
+       description: 'Apply authentication middleware to protect an endpoint'
        language: typescript
        content: |
          router.get('/protected',
@@ -615,12 +628,12 @@ Features are sub-components of your project that have their own:
              res.json({ user: req.user });
            }
          );
-   
+
    conventions:
-     - "Always hash passwords before storing"
-     - "Use HTTP-only cookies for token storage"
-     - "Implement refresh token rotation"
-   
+     - 'Always hash passwords before storing'
+     - 'Use HTTP-only cookies for token storage'
+     - 'Implement refresh token rotation'
+
    metadata:
      status: active
      owner: security-team
@@ -690,6 +703,7 @@ npm run project:init /path/to/your-project --no-register
 ```
 
 This will:
+
 1. Create `.cleanship-ai-tools/` folder in your project
 2. Copy and customize `project.yml` from template
 3. Create `deploy.yml` configured to deploy to project root
@@ -713,7 +727,7 @@ If you prefer manual setup:
    # Copy template from ai-tools repo
    cp /path/to/ai-tools/projects/global/template/project.yml \
       .cleanship-ai-tools/project.yml
-   
+
    # Edit it
    code .cleanship-ai-tools/project.yml
    ```
@@ -722,7 +736,7 @@ If you prefer manual setup:
 
    ```yaml
    # .cleanship-ai-tools/deploy.yml
-   target: ".."  # Deploy to project root (parent of .cleanship-ai-tools)
+   target: '..' # Deploy to project root (parent of .cleanship-ai-tools)
    tools:
      - github-copilot
      - windsurf
@@ -734,10 +748,10 @@ If you prefer manual setup:
 
    ```bash
    cd /path/to/ai-tools
-   
+
    # Add to local registry (gitignored)
    npm run project:external add /path/to/your-project/.cleanship-ai-tools --alias my-app
-   
+
    # Or add to global registry (versioned, shared)
    npm run project:external add /path/to/your-project/.cleanship-ai-tools --alias my-app --global
    ```
@@ -859,6 +873,7 @@ Always start from `projects/local/.template/project.yml` - it has helpful commen
 ### 2. Use Semantic Versioning
 
 Update `version` when making significant changes:
+
 - `1.0.0` → `1.1.0` - Added new conventions
 - `1.1.0` → `2.0.0` - Breaking change (removed/changed rules)
 
@@ -879,6 +894,7 @@ Update configurations when project conventions change.
 ### 6. Test Before Deploying
 
 Always run with `--dry-run` first:
+
 ```bash
 npm run project:deploy my-project -- --dry-run
 ```
@@ -906,6 +922,7 @@ Always deploy with `backup: true` in your deployment config.
 **Error**: `Schema validation failed`
 
 **Solution**:
+
 1. Run `npm run validate` to see specific errors
 2. Check required fields: `id`, `version`, `name`, `description`
 3. Verify `id` is kebab-case
@@ -916,6 +933,7 @@ Always deploy with `backup: true` in your deployment config.
 **Error**: `Failed to generate project outputs`
 
 **Solution**:
+
 1. Check project manifest is valid YAML
 2. Run `npm run validate`
 3. Check file permissions
@@ -935,6 +953,7 @@ Always deploy with `backup: true` in your deployment config.
 **Issue**: Deployment succeeds but files aren't where expected
 
 **Solution**:
+
 1. Run with `--dry-run` to see what would be copied
 2. Check tool-specific target paths:
    - GitHub Copilot → `.github/`
@@ -951,8 +970,8 @@ Always deploy with `backup: true` in your deployment config.
 ```yaml
 id: simple-ts-app
 version: 1.0.0
-name: "Simple TypeScript App"
-description: "A simple TypeScript application with basic conventions"
+name: 'Simple TypeScript App'
+description: 'A simple TypeScript application with basic conventions'
 
 tech_stack:
   languages:
@@ -960,10 +979,10 @@ tech_stack:
 
 conventions:
   naming:
-    - "Use camelCase for variables and functions"
-    - "Use PascalCase for classes"
+    - 'Use camelCase for variables and functions'
+    - 'Use PascalCase for classes'
   patterns:
-    - "Use TypeScript strict mode"
+    - 'Use TypeScript strict mode'
 
 ai_tools:
   preferred_rulepacks:
@@ -976,12 +995,12 @@ ai_tools:
 ```yaml
 id: fullstack-app
 version: 1.0.0
-name: "Full-Stack Web App"
-description: "React frontend with Node.js backend"
+name: 'Full-Stack Web App'
+description: 'React frontend with Node.js backend'
 
 context:
-  overview: "E-commerce web application with React and Node.js"
-  purpose: "Provide online shopping experience"
+  overview: 'E-commerce web application with React and Node.js'
+  purpose: 'Provide online shopping experience'
 
 tech_stack:
   languages:
@@ -997,18 +1016,18 @@ tech_stack:
 
 commands:
   dev:
-    frontend: "cd frontend && npm run dev"
-    backend: "cd backend && npm run dev"
+    frontend: 'cd frontend && npm run dev'
+    backend: 'cd backend && npm run dev'
   test:
-    all: "npm test"
+    all: 'npm test'
 
 conventions:
   naming:
-    - "Use PascalCase for React components"
+    - 'Use PascalCase for React components'
   patterns:
-    - "Use hooks for state management"
+    - 'Use hooks for state management'
   testing:
-    - "Minimum 80% test coverage"
+    - 'Minimum 80% test coverage'
 
 ai_tools:
   preferred_agents:
@@ -1019,8 +1038,8 @@ ai_tools:
     - coding-typescript
     - security
   custom_rules:
-    - "Always use our custom logger (src/utils/logger.ts)"
-    - "API responses must follow { success, data, error } format"
+    - 'Always use our custom logger (src/utils/logger.ts)'
+    - 'API responses must follow { success, data, error } format'
 ```
 
 ### Example 3: Deployment Configuration
@@ -1033,7 +1052,7 @@ tools:
   - windsurf
 mode: local
 auto_commit: true
-git_branch: "chore/update-ai-config"
+git_branch: 'chore/update-ai-config'
 backup: true
 ```
 

@@ -42,7 +42,7 @@ deployments:
 # Global deployment settings
 settings:
   # Default backup location (relative to ai-tools root)
-  backup_dir: ".backups"
+  backup_dir: '.backups'
   # Confirm before deploying
   confirm_deploy: true
   # Verbose output

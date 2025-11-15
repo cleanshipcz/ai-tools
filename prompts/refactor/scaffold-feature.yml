@@ -8,18 +8,18 @@ tags:
 variables:
   - name: feature_name
     required: true
-    description: "Name of the feature to scaffold"
+    description: 'Name of the feature to scaffold'
   - name: language
     required: false
-    description: "Programming language (auto-detected if not specified)"
+    description: 'Programming language (auto-detected if not specified)'
   - name: components
     required: false
-    description: "Components needed (e.g., service, controller, model, tests)"
+    description: 'Components needed (e.g., service, controller, model, tests)'
 rules:
-  - "Generate clean, minimal boilerplate."
-  - "Follow naming conventions for the language."
-  - "Include placeholder comments for implementation."
-  - "Create empty test files with basic structure."
+  - 'Generate clean, minimal boilerplate.'
+  - 'Follow naming conventions for the language.'
+  - 'Include placeholder comments for implementation.'
+  - 'Create empty test files with basic structure.'
 content: |
   Generate boilerplate code structure for: **{{feature_name}}**
 
@@ -48,5 +48,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

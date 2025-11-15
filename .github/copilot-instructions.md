@@ -130,3 +130,4 @@ This project uses ai-tools for enhanced AI assistance. See the base configuratio
 - code-reviewer
 - feature-builder
 - bug-fixer
+- prompt-engineer

@@ -13,10 +13,10 @@ id: my-project
 version: 1.0.0
 
 # Human-readable project name
-name: "My Project"
+name: 'My Project'
 
 # Brief description (10-500 characters)
-description: "A brief description of what this project does"
+description: 'A brief description of what this project does'
 
 # ================================
 # PROJECT CONTEXT (Optional but Recommended)
@@ -30,7 +30,7 @@ context:
     This helps AI understand your project better.
 
   # Primary purpose or goal
-  purpose: "What is the main goal of this project?"
+  purpose: 'What is the main goal of this project?'
 
 # ================================
 # TECHNOLOGY STACK (Optional)
@@ -82,7 +82,7 @@ tech_stack:
 # ================================
 
 documentation:
-  readme: "README.md"
+  readme: 'README.md'
   # contributing: "CONTRIBUTING.md"
   # architecture: "docs/ARCHITECTURE.md"
   # code_style: "docs/CODE_STYLE.md"
@@ -100,25 +100,25 @@ documentation:
 commands:
   # Development commands
   dev:
-    all: "npm run dev"
+    all: 'npm run dev'
     # frontend: "cd frontend && npm run dev"
     # backend: "cd backend && npm run dev"
 
   # Build commands
   build:
-    all: "npm run build"
+    all: 'npm run build'
     # frontend: "npm run build:frontend"
     # backend: "npm run build:backend"
 
   # Test commands
   test:
-    unit: "npm test"
+    unit: 'npm test'
     # integration: "npm run test:integration"
     # e2e: "npm run test:e2e"
 
   # Lint and format commands
   lint:
-    all: "npm run lint"
+    all: 'npm run lint'
     # fix: "npm run lint:fix"
 
   # Deployment commands
@@ -133,21 +133,21 @@ commands:
 conventions:
   # Naming conventions
   naming:
-    - "Use PascalCase for React components"
-    - "Use camelCase for functions and variables"
-    - "Use kebab-case for file names"
+    - 'Use PascalCase for React components'
+    - 'Use camelCase for functions and variables'
+    - 'Use kebab-case for file names'
     # Add your project-specific naming conventions
 
   # Code patterns and best practices
   patterns:
-    - "Prefer functional components over class components"
-    - "Use TypeScript strict mode"
+    - 'Prefer functional components over class components'
+    - 'Use TypeScript strict mode'
     # Add your project-specific patterns
 
   # Testing conventions
   testing:
-    - "Test coverage minimum 80%"
-    - "Write tests alongside implementation"
+    - 'Test coverage minimum 80%'
+    - 'Write tests alongside implementation'
     # Add your project-specific testing conventions
 
   # Project structure conventions
@@ -180,8 +180,8 @@ ai_tools:
 
   # Project-specific custom rules for AI tools
   custom_rules:
-    - "Always use our custom logger utility instead of console.log"
-    - "Follow our API response format: { success: boolean, data: any, error?: string }"
+    - 'Always use our custom logger utility instead of console.log'
+    - 'Follow our API response format: { success: boolean, data: any, error?: string }'
     # Add any project-specific rules here
 
   # Optionally exclude specific agents or rulepacks
@@ -200,11 +200,11 @@ metadata:
 
   # Maintainers
   maintainers:
-    - "your.email@example.com"
+    - 'your.email@example.com'
 
   # Dates (YYYY-MM-DD format)
-  created: "2024-11-15"
-  updated: "2024-11-15"
+  created: '2024-11-15'
+  updated: '2024-11-15'
 
   # Tags for categorization
   # tags:

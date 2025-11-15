@@ -551,6 +551,7 @@ Generate and deploy project-specific AI tool configurations with your tech stack
 ### What Are Projects?
 
 Projects let you create customized AI configurations for specific codebases. Each project defines:
+
 - Tech stack (languages, frameworks)
 - Conventions (naming, patterns, testing)
 - Commands (dev, build, test, deploy)
@@ -578,8 +579,8 @@ npm run project:list
 ```yaml
 id: my-api
 version: 1.0.0
-name: "My REST API"
-description: "Node.js REST API with TypeScript"
+name: 'My REST API'
+description: 'Node.js REST API with TypeScript'
 
 tech_stack:
   languages: [typescript]
@@ -588,17 +589,17 @@ tech_stack:
 
 conventions:
   naming:
-    - "Use camelCase for functions"
-    - "Use PascalCase for classes"
+    - 'Use camelCase for functions'
+    - 'Use PascalCase for classes'
   patterns:
-    - "Use TypeScript strict mode"
-    - "API responses: { success, data, error }"
+    - 'Use TypeScript strict mode'
+    - 'API responses: { success, data, error }'
 
 ai_tools:
   preferred_agents: [code-reviewer, feature-builder]
   preferred_rulepacks: [base, coding-typescript, security]
   custom_rules:
-    - "Always use our logger utility (src/utils/logger.ts)"
+    - 'Always use our logger utility (src/utils/logger.ts)'
 ```
 
 ### What Gets Generated?

@@ -8,6 +8,7 @@ Complete AI assistants with bundled prompts, rules, and settings. Ready to impor
 - **bug-fixer.yml** - Helps debug and fix issues
 - **tdd-navigator.yml** - Guides test-driven development
 - **kotlin-style-enforcer.yml** - Enforces Kotlin coding standards
+- **prompt-engineer.yml** - Designs and creates high-quality prompts and agents
 
 ## 🎯 Purpose
 
@@ -345,6 +346,25 @@ ls -la adapters/claude-code/agents/
 - Style consistency
 - Null safety checks
 - Idiomatic Kotlin patterns
+
+### prompt-engineer (v1.0.0)
+
+**Purpose:** Designs and creates high-quality prompts and agents for the ai-tools repository
+
+**Includes:**
+
+- Rulepacks: `base`
+- Capabilities: `mcp:filesystem`, `mcp:git`
+- Temperature: 0.6
+
+**Use for:**
+
+- Creating new prompt manifests
+- Designing new agent manifests
+- Improving existing prompts/agents
+- Understanding prompt engineering patterns
+- Ensuring schema compliance
+- Building reusable prompt components
 
 ## 🎨 Design Patterns
 
