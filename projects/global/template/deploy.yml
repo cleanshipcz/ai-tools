@@ -1,0 +1,27 @@
+# Deployment Configuration for this Project
+# This file should be committed to version control
+# Create deploy.local.yml for local overrides (gitignored)
+
+# Target project directory (can be relative or absolute)
+# Override in deploy.local.yml with your local path
+target: "../my-project"
+
+# Tools to deploy
+tools:
+  - github-copilot
+  - windsurf
+  # - cursor
+  # - claude-code
+
+# Deployment mode: local or manual
+# local: Automatically deploy to the target directory
+# manual: Generate configs and show manual copy instructions
+mode: local
+
+# Backup existing files before deploying
+backup: true
+
+# Auto-commit changes to git (requires mode: local and git repository)
+auto_commit: false
+# Git branch to use for auto-commit (optional)
+# git_branch: "chore/update-ai-config"

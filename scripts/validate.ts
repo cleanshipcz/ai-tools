@@ -13,7 +13,7 @@ const rootDir = join(__dirname, '..');
 
 interface ManifestFile {
   path: string;
-  type: 'prompt' | 'agent' | 'rulepack' | 'skill' | 'eval';
+  type: 'prompt' | 'agent' | 'rulepack' | 'skill' | 'eval' | 'project';
   id: string;
   version?: string;
   content: any;
@@ -85,6 +85,7 @@ class Validator {
       rulepack: 'rulepack.schema.json',
       skill: 'skill.schema.json',
       eval: 'eval.schema.json',
+      project: 'project.schema.json',
     };
 
     const schemas: Record<string, any> = {};
@@ -108,6 +109,7 @@ class Validator {
       rulepacks: 'rulepack',
       skills: 'skill',
       'evals/suites': 'eval',
+      'projects/global': 'project',
     };
 
     for (const [dir, type] of Object.entries(dirs)) {
@@ -115,6 +117,10 @@ class Validator {
       try {
         const files = await this.findYamlFiles(fullPath);
         for (const file of files) {
+          // Skip template files and deployment configs
+          if (file.includes('/template/')) continue;
+          if (file.endsWith('deploy.yml') || file.endsWith('deploy.local.yml')) continue;
+
           try {
             const content = await readFile(file, 'utf-8');
             const parsed = loadYaml(content) as any;

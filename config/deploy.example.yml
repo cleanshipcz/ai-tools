@@ -1,0 +1,49 @@
+# Deployment Configuration
+# Copy this file to config/deploy.yml and customize for your projects
+# DO NOT commit config/deploy.yml - it's gitignored as it contains local paths
+
+deployments:
+  # Example deployment configuration
+  - project: example-ecommerce
+    # Absolute path to target project directory
+    target: /home/user/projects/ecommerce
+    # Tools to deploy (github-copilot, windsurf, cursor, claude-code)
+    tools:
+      - github-copilot
+      - windsurf
+    # Deployment mode: local, manual
+    mode: local
+    # Auto-commit changes to git (requires mode: local)
+    auto_commit: false
+    # Git branch to use for auto-commit
+    # git_branch: "chore/update-ai-config"
+    # Backup existing files before deploying
+    backup: true
+
+  # # Another example
+  # - project: my-backend-api
+  #   target: /home/user/work/api
+  #   tools:
+  #     - github-copilot
+  #     - cursor
+  #   mode: local
+  #   auto_commit: true
+  #   git_branch: "chore/update-ai-config"
+  #   backup: true
+
+  # # Manual deployment (just generates and shows instructions)
+  # - project: client-project
+  #   target: ~/clients/project-x
+  #   tools:
+  #     - github-copilot
+  #   mode: manual
+  #   backup: false
+
+# Global deployment settings
+settings:
+  # Default backup location (relative to ai-tools root)
+  backup_dir: ".backups"
+  # Confirm before deploying
+  confirm_deploy: true
+  # Verbose output
+  verbose: false

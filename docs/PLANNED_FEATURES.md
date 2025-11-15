@@ -1,37 +1,31 @@
 # Planned features
 
-## Project base
+## Miscs
 
-- Defines some kind of standardized yaml that serves as a project base
-  - gives context (project overview, purpose)
-  - tech stack
-  - reference to specific docs
-    - readme
-    - code style
-    - contributing guide
-    - etc.
-  - commands
-  - etc.
+- clean - build cleans generated files and rebuilds them
+- project - deploy all available projects at once (possibly if found?) ->  this serves when a rule is e.g. updated so that it's applied to all projects
 
-### Specific projects
+## Large features
 
-- project-specific output files are generated based on the project
-- two directories:
-  - global projects (versioned)
-  - local projects (gitignored)
-- takes from both and generates project specific outputs for all tools (e.g. copilot-instructions.md contains project specific data)
-  - similarly output for all tools
+- similar to projects, local features with context can be defined
+- it a subfolder of the project folder
+  - meaning in projects/<global|local>/project-name/features/feature-name
+- doesn't add anything to the global context but generates snippets to be used as feature-specific context for import (like e.g. prompts in copilot)
 
-## Installation to tools
+## Project specific
 
-- Based on some local config file copy the outputs to projects
-- e.g. the config would contain list of projects and for each projects list of tools to suppor
-  - then upon some command (not necessarily build, something custom, like deploy:project-name) it would generate the outputs for the project and put them int he project folder to be used by the tools (cursor, windwsurf, ...)
-  - this config can also be per project
-- should also contain some example usage
-  - example project (see feature above) with config
+- expect a custom ".cleanship-ai-tools" folder in the project root
+- it will contain project and feature specific information (so that the project maintains it and not this repository) -> it will be treated just like the local projects folder
+- it can be supplied as an argument to the generation command
+  - it treats the folder as a project folder (looks for project.yml, deploy.yml, features/, etc.)
+  - it outputs to the project folder
+- here in this repo, in projects/ there will be also two lists:
+  - projects.global.yml (versioned)
+  - projects.local.yml (gitignored)
+  - these lists will contain paths to the project folders that are to be loaded along with the content of projects/global and projects/local
+  - that should be reflected for all project:X commands (e.g. list, deploy, generate, ...)
 
-## Other features
+## Other features NOT NOW
 
 - [ ] More tool adapters (Cody, Neovim, JetBrains AI)
 - [ ] Prompt marketplace/sharing platform

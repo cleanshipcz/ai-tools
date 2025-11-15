@@ -20,7 +20,6 @@ Context: {{context}}
 {{/context}}
 
 Provide:
-
 1. **Overview**: One-line summary of what this PR does
 2. **Changes**: Bullet points of key changes
 3. **Breaking Changes**: Any backward-incompatible changes (if any)
@@ -28,3 +27,4 @@ Provide:
 5. **Impact**: Areas of the codebase affected
 
 Format as markdown suitable for a PR description.
+

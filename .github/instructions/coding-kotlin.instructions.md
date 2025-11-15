@@ -1,5 +1,5 @@
 ---
-applyTo: '**/*.kt'
+applyTo: "**/*.kt"
 ---
 
 # Kotlin coding standards and best practices
@@ -13,6 +13,7 @@ applyTo: '**/*.kt'
 - Preserve existing functionality unless explicitly asked to change it.
 - Document non-obvious decisions and trade-offs.
 - Search for up-to-date information and resources.
+- Reflect changes in the relevant documentation.
 - Prefer immutable data classes over mutable classes.
 - Use suspend functions and Structured Concurrency for async operations.
 - Public APIs must be null-safe; use explicit nullable types when needed.

@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/cleanshipcz/ai-tools/schemas/project.schema.json",
+  "title": "Project Manifest",
+  "description": "Schema for project-specific configuration manifests",
+  "type": "object",
+  "required": ["id", "version", "name", "description"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Unique kebab-case identifier for the project"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (semver) of the project configuration"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 100,
+      "description": "Human-readable project name"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500,
+      "description": "Brief description of the project"
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "overview": {
+          "type": "string",
+          "description": "Detailed project overview and background"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "Primary purpose or goal of the project"
+        }
+      },
+      "description": "Contextual information about the project"
+    },
+    "tech_stack": {
+      "type": "object",
+      "properties": {
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Programming languages used"
+        },
+        "frontend": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Frontend frameworks and libraries"
+        },
+        "backend": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Backend frameworks and libraries"
+        },
+        "database": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Database systems"
+        },
+        "infrastructure": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Infrastructure and deployment tools"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Development tools and utilities"
+        }
+      },
+      "description": "Technology stack used in the project"
+    },
+    "documentation": {
+      "type": "object",
+      "properties": {
+        "readme": {
+          "type": "string",
+          "description": "Path to README file"
+        },
+        "contributing": {
+          "type": "string",
+          "description": "Path to CONTRIBUTING guide"
+        },
+        "architecture": {
+          "type": "string",
+          "description": "Path to architecture documentation"
+        },
+        "code_style": {
+          "type": "string",
+          "description": "Path to code style guide"
+        },
+        "api_docs": {
+          "type": "string",
+          "description": "Path to API documentation"
+        },
+        "custom": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional custom documentation references"
+        }
+      },
+      "description": "References to project documentation"
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "description": "Common commands organized by category (dev, build, test, etc.)"
+    },
+    "conventions": {
+      "type": "object",
+      "properties": {
+        "naming": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Naming conventions"
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Code patterns and best practices"
+        },
+        "testing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Testing conventions"
+        },
+        "structure": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Project structure conventions"
+        },
+        "custom": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Custom project-specific conventions"
+        }
+      },
+      "description": "Project conventions and standards"
+    },
+    "ai_tools": {
+      "type": "object",
+      "properties": {
+        "preferred_agents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "description": "List of preferred agent IDs for this project"
+        },
+        "preferred_rulepacks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "description": "List of preferred rulepack IDs for this project"
+        },
+        "custom_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Project-specific rules for AI tools"
+        },
+        "excluded_agents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Agent IDs to exclude from this project"
+        },
+        "excluded_rulepacks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Rulepack IDs to exclude from this project"
+        }
+      },
+      "description": "AI tool configuration for this project"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri",
+          "description": "Repository URL"
+        },
+        "maintainers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of maintainer emails or names"
+        },
+        "created": {
+          "type": "string",
+          "format": "date",
+          "description": "Creation date"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date",
+          "description": "Last update date"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags for categorization"
+        }
+      },
+      "description": "Project metadata"
+    }
+  }
+}

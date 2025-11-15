@@ -1,64 +1,131 @@
-<!-- This file is loaded for ALL files. Lists available tools you can reference in chat. -->
+# AI Tools Repository
 
-# Available AI Tools
+A unified mono-repository for AI agent configuration - define once in YAML, deploy everywhere
 
-This repository provides reusable AI agent configurations. Copy relevant sections to your project.
+## Project Overview
 
-## Agents
+A comprehensive solution for managing AI agent prompts, rules, skills, and tool configurations.
+Keep your "source of truth" in small, typed YAML manifests and automatically generate
+tool-specific artifacts for Windsurf, Claude Code, Cursor, GitHub Copilot, and other AI coding assistants.
 
-**Available agent personas (invoke via `#prompt:agent-<name>`):**
+The repository provides a build system that transforms unified YAML manifests into
+tool-specific formats, ensuring consistency across different AI coding environments.
+It includes prompts for common tasks, agents for specific roles, rulepacks for coding standards,
+skills for tool integrations, and a project system for per-project configurations.
 
-- **bug-fixer**: Diagnose and fix bugs in code
-- **code-reviewer**: Structured code review with actionable findings
-- **kotlin-style-enforcer**: Enforce Kotlin coding standards and idioms
-- **tdd-navigator**: Guide test-driven development workflow
+**Purpose**: Enable teams to manage AI coding assistant configurations as code, with version control, validation, and automated deployment
 
-_Example: `@workspace #prompt:agent-code-reviewer` - Review this code_
+## Tech Stack
 
-## Prompts
+**Languages**: typescript, yaml, markdown
+**Backend**: node.js
+**Infrastructure**: github-actions, git
 
-**Reusable prompts (attach via paperclip or `#prompt:name`):**
+## Key Commands
 
-- **summarize-pr**: Generate a concise summary of a pull request
-- **write-tests**: Generate comprehensive unit tests for given code
-- **add-null-safety**: Add null safety checks to code that may have null pointer issues
-- **extract-method**: Extract a pure function from a selected block of code
+### Validation
+- `npm run validate` - all
+- `npm run lint` - lint
+- `npm run format` - format
 
-## Skills
+### Build
+- `npm run build` - all
+- `npm run docs` - docs
+- `npm run skills` - skills
 
-**Executable commands available:**
+### Generation
+- `npm run prompt-library` - prompt_library
+- `npm run prompt-html` - prompt_html
+- `npm run use-prompt` - use_prompt
 
-- **run-detekt**: Run Detekt static analysis for Kotlin
-- **run-gradle-tests**: Run unit tests with Gradle
-- **run-ktlint**: Run ktlint for Kotlin code formatting
-- **run-pytest**: Run Python tests with pytest
-- **search-repo**: Search repository for code patterns or text
+### Projects
+- `npm run project:create <name>` - create
+- `npm run project:list` - list
+- `npm run project:generate <project-id>` - generate
+- `npm run project:deploy <project-id>` - deploy
+
+### Testing
+- `npm test` - validate_and_build
+- `npm run ci` - full_ci
+- `npm run eval` - eval
+
+### Cleanup
+- `npm run clean` - clean
+
+
+## Conventions
+
+### Naming
+
+- Use kebab-case for manifest IDs (e.g., write-tests, code-reviewer)
+- Use kebab-case for file names (e.g., extract-method.yml)
+- Use camelCase for TypeScript functions and variables
+- Use PascalCase for TypeScript classes
+
+### Patterns
+
+- All manifests must be YAML files with .yml extension
+- Follow JSON Schema definitions in schemas/ directory
+- Use semantic versioning for manifest versions (semver)
+- Include comprehensive descriptions (10-500 characters)
+- Organize manifests by category in appropriate directories
+
+### Testing
+
+- Run npm run validate before committing
+- Ensure all schemas pass validation
+- Test generated outputs with npm run build
+- Verify tool-specific adapters are correct
+
+### Project Structure
+
+- prompts/ - Organized by category (refactor/, qa/, docs/)
+- agents/ - Agent manifests defining roles and behaviors
+- rulepacks/ - Coding standards and style rules
+- skills/ - Tool integrations and capabilities
+- projects/ - Project-specific configurations (global/ and local/)
+- schemas/ - JSON Schema definitions for validation
+- scripts/ - Build and utility scripts in TypeScript
+- adapters/ - Generated tool-specific outputs (gitignored)
+
+## Project-Specific Rules
+
+- Always use chalk for colored terminal output
+- Use Ajv with ajv-formats for JSON Schema validation
+- Export classes from scripts for reusability (e.g., ProjectGenerator)
+- Use import.meta.url guards for CLI entry points
+- Follow the existing manifest structure - id, version, description are required
+- Generate tool-specific outputs in adapters/ directory (gitignored)
+- Keep source manifests in prompts/, agents/, rulepacks/, skills/
+- Use TypeScript strict mode with ES modules
+- Prefer async/await over callbacks
+- Use js-yaml for YAML parsing and dumping
+
+## Documentation
+
+- **readme**: README.md
+- **prompts**: prompts/README.md
+- **agents**: docs/AGENTS.md
+- **skills**: skills/README.md
+- **projects**: docs/PROJECTS.md
+- **tools**: docs/TOOLS.md
+- **user_tools**: docs/USER_TOOLS.md
+- **style_guide**: docs/STYLE_GUIDE.md
+- **changelog**: docs/CHANGELOG.md
+- **planned_features**: docs/PLANNED_FEATURES.md
+- **prompt**: schemas/prompt.schema.json
+- **agent**: schemas/agent.schema.json
+- **rulepack**: schemas/rulepack.schema.json
+- **skill**: schemas/skill.schema.json
+- **project**: schemas/project.schema.json
+- **eval**: schemas/eval.schema.json
 
 ---
 
-## Customize for Your Project
+## Available AI Tools
 
-**Add your project specifics above (keep concise):**
+This project uses ai-tools for enhanced AI assistance. See the base configurations for available agents, prompts, and skills.
 
-1. **Project overview** - What it does (2-3 sentences)
-2. **Tech stack** - Languages, frameworks
-3. **Build commands** - How to run/test
-4. **Key conventions** - Naming, patterns
-
-**Example:**
-
-```markdown
-# My Project
-
-E-commerce platform with React + Node.js
-
-## Stack
-
-- Frontend: React, TypeScript
-- Backend: Node.js, PostgreSQL
-
-## Commands
-
-`npm run dev` - Start dev server
-`npm test` - Run tests
-```
+**Preferred Agents for this project**:
+- code-reviewer
+- feature-builder

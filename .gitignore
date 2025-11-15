@@ -14,6 +14,10 @@ PROMPT_LIBRARY.md
 PROMPT_LIBRARY.html
 docs/AGENTS.md
 
+# Projects
+projects/local/
+.output/
+
 # Eval reports
 evals/reports/
 
@@ -22,6 +26,11 @@ evals/reports/
 .env.local
 .env.*.local
 config/providers.yml
+config/deploy.yml
+deploy.local.yml
+
+# Backups
+.backups/
 
 # IDE
 .idea/

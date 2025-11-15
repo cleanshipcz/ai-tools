@@ -1,0 +1,113 @@
+{
+  "skills": [
+    {
+      "id": "run-detekt",
+      "version": "1.0.0",
+      "description": "Run Detekt static analysis for Kotlin",
+      "command": {
+        "program": "./gradlew",
+        "args": [
+          "detekt"
+        ],
+        "cwd": "."
+      },
+      "timeout_sec": 600,
+      "inputs": [],
+      "outputs": {
+        "stdout": true,
+        "stderr": true,
+        "exit_code": true,
+        "files": [
+          "build/reports/detekt/detekt.html"
+        ]
+      }
+    },
+    {
+      "id": "run-gradle-tests",
+      "version": "1.0.0",
+      "description": "Run unit tests with Gradle",
+      "command": {
+        "program": "./gradlew",
+        "args": [
+          "test",
+          "--info"
+        ],
+        "cwd": "."
+      },
+      "timeout_sec": 1800,
+      "inputs": [],
+      "outputs": {
+        "stdout": true,
+        "stderr": true,
+        "exit_code": true
+      }
+    },
+    {
+      "id": "run-ktlint",
+      "version": "1.0.0",
+      "description": "Run ktlint for Kotlin code formatting",
+      "command": {
+        "program": "./gradlew",
+        "args": [
+          "ktlintCheck"
+        ],
+        "cwd": "."
+      },
+      "timeout_sec": 300,
+      "inputs": [],
+      "outputs": {
+        "stdout": true,
+        "stderr": true,
+        "exit_code": true
+      }
+    },
+    {
+      "id": "run-pytest",
+      "version": "1.0.0",
+      "description": "Run Python tests with pytest",
+      "command": {
+        "program": "pytest",
+        "args": [
+          "-v",
+          "--tb=short"
+        ],
+        "cwd": "."
+      },
+      "timeout_sec": 1800,
+      "inputs": [],
+      "outputs": {
+        "stdout": true,
+        "stderr": true,
+        "exit_code": true
+      }
+    },
+    {
+      "id": "search-repo",
+      "version": "1.0.0",
+      "description": "Search repository for code patterns or text",
+      "mcp_tool": "filesystem:search",
+      "timeout_sec": 60,
+      "inputs": [
+        {
+          "name": "pattern",
+          "type": "string",
+          "required": true,
+          "description": "Search pattern (regex or plain text)"
+        },
+        {
+          "name": "path",
+          "type": "directory",
+          "required": false,
+          "description": "Directory to search in (defaults to repo root)"
+        },
+        {
+          "name": "file_pattern",
+          "type": "string",
+          "required": false,
+          "description": "File pattern to filter (e.g., '*.py', '*.kt')"
+        }
+      ],
+      "outputs": {}
+    }
+  ]
+}

@@ -21,7 +21,6 @@ Suggested function name: {{target_name}}
 {{/target_name}}
 
 Requirements:
-
 - Create a focused, single-purpose function
 - Use appropriate parameter types
 - Return a clear, well-typed result
@@ -30,3 +29,4 @@ Requirements:
 
 {{> constraints}}
 {{> acceptance_criteria}}
+

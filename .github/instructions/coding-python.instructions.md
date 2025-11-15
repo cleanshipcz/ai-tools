@@ -1,5 +1,5 @@
 ---
-applyTo: '**/*.py'
+applyTo: "**/*.py"
 ---
 
 # Python coding standards and best practices
@@ -13,6 +13,7 @@ applyTo: '**/*.py'
 - Preserve existing functionality unless explicitly asked to change it.
 - Document non-obvious decisions and trade-offs.
 - Search for up-to-date information and resources.
+- Reflect changes in the relevant documentation.
 - Follow PEP 8 style guidelines for Python code.
 - Use type hints for function arguments and return values.
 - Prefer f-strings for string formatting.

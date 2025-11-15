@@ -1,0 +1,22 @@
+{
+  "id": "add-null-safety",
+  "version": "1.0.0",
+  "description": "Add null safety checks to code that may have null pointer issues",
+  "system": "",
+  "user": "Analyze the following {{language}} code for potential null pointer issues and add appropriate null safety:\n\n```{{language}}\n{{code}}\n```\n\nTasks:\n1. Identify all places where null/undefined could cause issues\n2. Add appropriate null checks or safe navigation\n3. Use language idioms (e.g., Kotlin's `?.`, Python's `Optional`, etc.)\n4. Consider returning early with null checks where appropriate\n5. Add defensive assertions if needed\n\n{{> constraints}}\n{{> acceptance_criteria}}\n",
+  "variables": [
+    {
+      "name": "code",
+      "required": true,
+      "description": "The code to make null-safe"
+    },
+    {
+      "name": "language",
+      "required": true,
+      "description": "Programming language"
+    }
+  ],
+  "outputs": {
+    "format": "code"
+  }
+}

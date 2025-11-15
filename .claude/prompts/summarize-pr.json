@@ -1,0 +1,22 @@
+{
+  "id": "summarize-pr",
+  "version": "1.0.0",
+  "description": "Generate a concise summary of a pull request",
+  "system": "",
+  "user": "Analyze this pull request and provide a clear summary:\n\n```diff\n{{diff}}\n```\n\n{{#context}}\nContext: {{context}}\n{{/context}}\n\nProvide:\n1. **Overview**: One-line summary of what this PR does\n2. **Changes**: Bullet points of key changes\n3. **Breaking Changes**: Any backward-incompatible changes (if any)\n4. **Testing**: What testing was done or is needed\n5. **Impact**: Areas of the codebase affected\n\nFormat as markdown suitable for a PR description.\n",
+  "variables": [
+    {
+      "name": "diff",
+      "required": true,
+      "description": "The git diff to summarize"
+    },
+    {
+      "name": "context",
+      "required": false,
+      "description": "Additional context about the PR"
+    }
+  ],
+  "outputs": {
+    "format": "markdown"
+  }
+}

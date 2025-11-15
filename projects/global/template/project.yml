@@ -1,0 +1,226 @@
+# Project Configuration Template
+# Copy this file to projects/local/your-project-name/project.yml
+# Remove comments and fill in your project details
+
+# ================================
+# REQUIRED FIELDS
+# ================================
+
+# Unique identifier (lowercase, hyphen-separated)
+id: my-project
+
+# Semantic version for this configuration
+version: 1.0.0
+
+# Human-readable project name
+name: "My Project"
+
+# Brief description (10-500 characters)
+description: "A brief description of what this project does"
+
+# ================================
+# PROJECT CONTEXT (Optional but Recommended)
+# ================================
+
+context:
+  # Detailed overview of the project
+  overview: |
+    Provide a more detailed description of your project here.
+    Include background, goals, and key features.
+    This helps AI understand your project better.
+  
+  # Primary purpose or goal
+  purpose: "What is the main goal of this project?"
+
+# ================================
+# TECHNOLOGY STACK (Optional)
+# ================================
+
+tech_stack:
+  # Programming languages used
+  languages:
+    - typescript
+    # - python
+    # - java
+    # - kotlin
+  
+  # Frontend frameworks and libraries
+  frontend:
+    - react
+    # - vue
+    # - angular
+    # - svelte
+  
+  # Backend frameworks and libraries
+  backend:
+    - node.js
+    # - express
+    # - django
+    # - spring-boot
+  
+  # Database systems
+  database:
+    # - postgresql
+    # - mongodb
+    # - mysql
+  
+  # Infrastructure and deployment tools
+  infrastructure:
+    # - docker
+    # - kubernetes
+    # - aws
+    # - terraform
+  
+  # Development tools and utilities
+  tools:
+    # - jest
+    # - eslint
+    # - prettier
+
+# ================================
+# DOCUMENTATION REFERENCES (Optional)
+# ================================
+
+documentation:
+  readme: "README.md"
+  # contributing: "CONTRIBUTING.md"
+  # architecture: "docs/ARCHITECTURE.md"
+  # code_style: "docs/CODE_STYLE.md"
+  # api_docs: "docs/API.md"
+  
+  # Additional custom documentation
+  # custom:
+  #   deployment: "docs/DEPLOYMENT.md"
+  #   security: "docs/SECURITY.md"
+
+# ================================
+# COMMON COMMANDS (Optional)
+# ================================
+
+commands:
+  # Development commands
+  dev:
+    all: "npm run dev"
+    # frontend: "cd frontend && npm run dev"
+    # backend: "cd backend && npm run dev"
+  
+  # Build commands
+  build:
+    all: "npm run build"
+    # frontend: "npm run build:frontend"
+    # backend: "npm run build:backend"
+  
+  # Test commands
+  test:
+    unit: "npm test"
+    # integration: "npm run test:integration"
+    # e2e: "npm run test:e2e"
+  
+  # Lint and format commands
+  lint:
+    all: "npm run lint"
+    # fix: "npm run lint:fix"
+  
+  # Deployment commands
+  # deploy:
+  #   staging: "npm run deploy:staging"
+  #   production: "npm run deploy:production"
+
+# ================================
+# PROJECT CONVENTIONS (Optional but Recommended)
+# ================================
+
+conventions:
+  # Naming conventions
+  naming:
+    - "Use PascalCase for React components"
+    - "Use camelCase for functions and variables"
+    - "Use kebab-case for file names"
+    # Add your project-specific naming conventions
+  
+  # Code patterns and best practices
+  patterns:
+    - "Prefer functional components over class components"
+    - "Use TypeScript strict mode"
+    # Add your project-specific patterns
+  
+  # Testing conventions
+  testing:
+    - "Test coverage minimum 80%"
+    - "Write tests alongside implementation"
+    # Add your project-specific testing conventions
+  
+  # Project structure conventions
+  # structure:
+  #   - "Follow feature-based folder structure"
+  #   - "Keep shared components in src/components"
+  
+  # Custom project-specific conventions
+  # custom:
+  #   - "Any other conventions specific to your project"
+
+# ================================
+# AI TOOLS CONFIGURATION (Optional but Recommended)
+# ================================
+
+ai_tools:
+  # Preferred agents to use with this project
+  # Available: code-reviewer, feature-builder, bug-fixer, tdd-navigator, kotlin-style-enforcer
+  preferred_agents:
+    - code-reviewer
+    - feature-builder
+  
+  # Preferred rulepacks to apply
+  # Available: base, security, reviewer, coding-typescript, coding-python, coding-kotlin, coding-java
+  preferred_rulepacks:
+    - base
+    - coding-typescript
+    # - coding-python
+    # - security
+  
+  # Project-specific custom rules for AI tools
+  custom_rules:
+    - "Always use our custom logger utility instead of console.log"
+    - "Follow our API response format: { success: boolean, data: any, error?: string }"
+    # Add any project-specific rules here
+  
+  # Optionally exclude specific agents or rulepacks
+  # excluded_agents:
+  #   - kotlin-style-enforcer
+  # excluded_rulepacks:
+  #   - coding-java
+
+# ================================
+# METADATA (Optional)
+# ================================
+
+metadata:
+  # Repository URL
+  # repository: "https://github.com/username/project"
+  
+  # Maintainers
+  maintainers:
+    - "your.email@example.com"
+  
+  # Dates (YYYY-MM-DD format)
+  created: "2024-11-15"
+  updated: "2024-11-15"
+  
+  # Tags for categorization
+  # tags:
+  #   - web
+  #   - api
+  #   - typescript
+
+# ================================
+# USAGE INSTRUCTIONS
+# ================================
+#
+# 1. Copy this file to projects/local/your-project-name/project.yml
+# 2. Fill in your project details
+# 3. Remove unused sections and comments
+# 4. Validate: npm run validate
+# 5. Generate outputs: npm run project:generate your-project-name
+# 6. Deploy: npm run project:deploy your-project-name
+#
+# For more information, see docs/PROJECTS.md

@@ -21,7 +21,6 @@ Use {{test_framework}} as the testing framework.
 {{/test_framework}}
 
 Requirements:
-
 - Test normal/expected inputs (happy path)
 - Test edge cases (empty, null, boundary values)
 - Test error conditions and exceptions
@@ -31,3 +30,4 @@ Requirements:
 - Add comments for non-obvious test logic
 
 {{> acceptance_criteria}}
+

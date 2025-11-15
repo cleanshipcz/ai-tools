@@ -1,0 +1,27 @@
+{
+  "id": "scaffold-feature",
+  "version": "1.0.0",
+  "description": "Generate boilerplate code structure for a new feature",
+  "system": "",
+  "user": "Generate boilerplate code structure for: **{{feature_name}}**\n\n{{#language}}\nLanguage: {{language}}\n{{/language}}\n\n{{#components}}\nComponents: {{components}}\n{{/components}}\n\nCreate:\n1. **File structure**: Directory layout and empty files\n2. **Class/function skeletons**: With method signatures and TODO comments\n3. **Test files**: Empty test structure ready to fill\n4. **Interfaces/types**: If applicable for the language\n5. **Configuration**: Any config stubs needed\n\nUse project conventions for:\n- File naming\n- Directory structure  \n- Import/package statements\n- Documentation comments\n\nOutput as a directory tree with file contents.\n",
+  "variables": [
+    {
+      "name": "feature_name",
+      "required": true,
+      "description": "Name of the feature to scaffold"
+    },
+    {
+      "name": "language",
+      "required": false,
+      "description": "Programming language (auto-detected if not specified)"
+    },
+    {
+      "name": "components",
+      "required": false,
+      "description": "Components needed (e.g., service, controller, model, tests)"
+    }
+  ],
+  "outputs": {
+    "format": "markdown"
+  }
+}

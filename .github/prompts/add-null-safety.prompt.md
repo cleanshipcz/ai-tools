@@ -16,7 +16,6 @@ Analyze the following {{language}} code for potential null pointer issues and ad
 ```
 
 Tasks:
-
 1. Identify all places where null/undefined could cause issues
 2. Add appropriate null checks or safe navigation
 3. Use language idioms (e.g., Kotlin's `?.`, Python's `Optional`, etc.)
@@ -25,3 +24,4 @@ Tasks:
 
 {{> constraints}}
 {{> acceptance_criteria}}
+

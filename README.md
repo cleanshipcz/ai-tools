@@ -481,8 +481,90 @@ ai-tools/
 │   ├── claude-code/
 │   └── cursor/
 ├── config/              # Configuration templates
+├── projects/            # Project-specific configurations
+│   ├── global/          # Versioned projects
+│   └── local/           # Gitignored user projects
+├── templates/           # Project output templates
 └── docs/                # Documentation
 ```
+
+---
+
+## 📁 Projects (NEW!)
+
+> **📖 [Complete Guide: docs/PROJECTS.md](docs/PROJECTS.md)**
+
+Generate and deploy project-specific AI tool configurations with your tech stack, conventions, and commands.
+
+### What Are Projects?
+
+Projects let you create customized AI configurations for specific codebases. Each project defines:
+- Tech stack (languages, frameworks)
+- Conventions (naming, patterns, testing)
+- Commands (dev, build, test, deploy)
+- Project-specific rules for AI tools
+
+### Quick Start
+
+```bash
+# 1. Create a new project
+npm run project:create my-project -- -d "Brief description"
+
+# 2. Edit configuration
+code projects/local/my-project/project.yml
+code projects/local/my-project/deploy.yml
+
+# 3. Deploy (automatically generates outputs)
+npm run project:deploy my-project
+
+# 4. List all projects
+npm run project:list
+```
+
+### Example Project Manifest
+
+```yaml
+id: my-api
+version: 1.0.0
+name: "My REST API"
+description: "Node.js REST API with TypeScript"
+
+tech_stack:
+  languages: [typescript]
+  backend: [node.js, express]
+  database: [postgresql]
+
+conventions:
+  naming:
+    - "Use camelCase for functions"
+    - "Use PascalCase for classes"
+  patterns:
+    - "Use TypeScript strict mode"
+    - "API responses: { success, data, error }"
+
+ai_tools:
+  preferred_agents: [code-reviewer, feature-builder]
+  preferred_rulepacks: [base, coding-typescript, security]
+  custom_rules:
+    - "Always use our logger utility (src/utils/logger.ts)"
+```
+
+### What Gets Generated?
+
+- **GitHub Copilot**: `.github/copilot-instructions.md` with project context
+- **Windsurf**: `.windsurf/rules/project-rules.json`
+- **Cursor**: `.cursor/project-rules.json`
+- **Claude Code**: `.claude/project-context.json`
+
+### Features
+
+✅ **Global & Local Projects** - Share team standards or keep projects private  
+✅ **Auto-deployment** - Deploy to multiple projects with one command  
+✅ **Version Control** - Track changes to project configurations  
+✅ **Tool Agnostic** - Works with all supported AI coding tools  
+✅ **Validation** - Schema validation ensures correctness
+
+**[→ Read the full guide](docs/PROJECTS.md)** for detailed instructions, examples, and best practices.
 
 ---
 
@@ -494,6 +576,16 @@ ai-tools/
 npm run prompt-html      # Generate interactive HTML browser (⭐ Recommended)
 npm run use-prompt       # Interactive CLI tool to fill & copy prompts
 npm run prompt-library   # Generate markdown library
+```
+
+### For Projects (Project-Specific Configs)
+
+```bash
+npm run project:create       # Create new project from template
+npm run project:list         # List available projects
+npm run project:generate     # Generate project configurations (optional - happens during deploy)
+npm run project:deploy       # Deploy to target project (auto-generates)
+npm run project:rollback     # Rollback deployment
 ```
 
 ### For Developers (Managing Manifests)
