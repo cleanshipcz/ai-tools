@@ -455,6 +455,58 @@ npm run eval -- --suite code-refactor
 
 ---
 
+## 📦 Projects & Features
+
+> **📖 [Detailed Guide](projects/README.md)** - Complete documentation on project system, features, and external projects.
+
+### What Are Projects?
+
+Projects allow you to maintain project-specific AI configurations that bundle together relevant prompts, agents, rules, and custom context.
+
+**Key Capabilities:**
+
+- **Project Manifests:** Define tech stack, conventions, documentation links
+- **Feature System:** Create feature-specific context and code snippets
+- **External Projects:** Link projects in other repositories via `.cleanship-ai-tools` folder
+- **Multi-Tool Support:** Generate configs for GitHub Copilot, Windsurf, Cursor, Claude Code
+
+### Project Quick Start
+
+```bash
+# Option 1: Create a managed project (in this repo)
+npm run project:create my-app
+
+# Option 2: Initialize AI tools in an existing external project
+npm run project:init /path/to/my-project --alias my-app
+
+# Add features to your project
+# Create features/user-auth/feature.yml in your project directory
+
+# Generate and deploy
+npm run project:deploy my-app
+
+# Deploy all projects at once (useful after updating global rules)
+npm run project:deploy-all
+```
+
+**Example Project Structure:**
+
+```
+projects/
+├── global/                    # Shared projects (versioned)
+│   └── my-app/
+│       ├── project.yml       # Project manifest
+│       ├── deploy.yml        # Deployment config
+│       └── features/         # Feature-specific context
+│           └── user-auth/
+│               └── feature.yml
+├── local/                     # Your personal projects (gitignored)
+└── projects.global.yml       # External project registry (versioned)
+└── projects.local.yml        # External project registry (gitignored)
+```
+
+---
+
 ## 🏗️ Project Structure
 
 ```
@@ -492,7 +544,7 @@ ai-tools/
 
 ## 📁 Projects (NEW!)
 
-> **📖 [Complete Guide: docs/PROJECTS.md](docs/PROJECTS.md)**
+> **📖 [Complete Guide: projects/README.md](projects/README.md)**
 
 Generate and deploy project-specific AI tool configurations with your tech stack, conventions, and commands.
 
@@ -564,7 +616,7 @@ ai_tools:
 ✅ **Tool Agnostic** - Works with all supported AI coding tools  
 ✅ **Validation** - Schema validation ensures correctness
 
-**[→ Read the full guide](docs/PROJECTS.md)** for detailed instructions, examples, and best practices.
+**[→ Read the full guide](projects/README.md)** for detailed instructions, examples, and best practices.
 
 ---
 
@@ -581,11 +633,15 @@ npm run prompt-library   # Generate markdown library
 ### For Projects (Project-Specific Configs)
 
 ```bash
-npm run project:create       # Create new project from template
-npm run project:list         # List available projects
-npm run project:generate     # Generate project configurations (optional - happens during deploy)
-npm run project:deploy       # Deploy to target project (auto-generates)
-npm run project:rollback     # Rollback deployment
+npm run project:create           # Create new project from template
+npm run project:init             # Initialize AI tools in external project
+npm run project:list             # List available projects (including external)
+npm run project:generate         # Generate project configurations
+npm run project:generate-features # Generate feature-specific snippets
+npm run project:deploy           # Deploy to target project
+npm run project:deploy-all       # Deploy all projects at once
+npm run project:rollback         # Rollback deployment
+npm run project:external         # Manage external projects (add/remove/list)
 ```
 
 ### For Developers (Managing Manifests)

@@ -78,7 +78,25 @@ export class ProjectGenerator {
       await this.generateForTool(tool, outputDir);
     }
 
+    // Generate features if they exist
+    await this.generateFeatures(projectId, outputDir);
+
     console.log(chalk.green(`\n✅ Generation complete! Output in: ${outputDir}\n`));
+  }
+
+  private async generateFeatures(projectId: string, outputDir: string): Promise<void> {
+    // Check if features directory exists
+    const featuresDir = join(this.projectDir, 'features');
+    try {
+      await access(featuresDir);
+
+      // Import and use FeatureGenerator
+      const { FeatureGenerator } = await import('./gen-features.js');
+      const featureGen = new FeatureGenerator();
+      await featureGen.generateFeatures(projectId);
+    } catch {
+      // No features directory, skip
+    }
   }
 
   private async loadProject(projectId: string): Promise<void> {
@@ -93,7 +111,16 @@ export class ProjectGenerator {
     }
 
     if (!exists) {
-      throw new Error(`Project "${projectId}" not found in global or local projects`);
+      // Check external projects
+      const externalPath = await this.findExternalProject(projectId);
+      if (externalPath) {
+        projectPath = join(externalPath, 'project.yml');
+        exists = await this.fileExists(projectPath);
+      }
+    }
+
+    if (!exists) {
+      throw new Error(`Project "${projectId}" not found in global, local, or external projects`);
     }
 
     this.projectDir = dirname(projectPath);
@@ -101,6 +128,19 @@ export class ProjectGenerator {
     this.project = loadYaml(content) as Project;
 
     console.log(chalk.gray(`  Loaded project: ${this.project.name}`));
+  }
+
+  private async findExternalProject(projectId: string): Promise<string | null> {
+    try {
+      const { ExternalProjectManager } = await import('./external-projects.js');
+      const manager = new ExternalProjectManager();
+      const projects = await manager.getAllProjects();
+
+      const found = projects.find((p) => p.alias === projectId);
+      return found ? found.path : null;
+    } catch {
+      return null;
+    }
   }
 
   private async fileExists(path: string): Promise<boolean> {
@@ -505,6 +545,45 @@ export class ProjectGenerator {
     await this.listProjectsInDir(join(rootDir, 'projects', 'local'));
 
     console.log('');
+    console.log(chalk.bold('External Projects:'));
+    await this.listExternalProjects();
+
+    console.log('');
+  }
+
+  private async listExternalProjects(): Promise<void> {
+    try {
+      const { ExternalProjectManager } = await import('./external-projects.js');
+      const manager = new ExternalProjectManager();
+      const projects = await manager.getAllProjects();
+
+      if (projects.length === 0) {
+        console.log(chalk.gray('  (none)'));
+        return;
+      }
+
+      for (const project of projects) {
+        const projectPath = join(project.path, 'project.yml');
+        if (await this.fileExists(projectPath)) {
+          const content = await readFile(projectPath, 'utf-8');
+          const projectData = loadYaml(content) as Project;
+          const scopeLabel = project.scope === 'global' ? '[global]' : '[local]';
+          console.log(
+            chalk.green(`  • ${project.alias}`) +
+              chalk.gray(` - ${projectData.description}`) +
+              chalk.dim(` ${scopeLabel}`)
+          );
+        } else {
+          console.log(
+            chalk.yellow(`  • ${project.alias}`) +
+              chalk.gray(` - No project.yml found`) +
+              chalk.dim(` [${project.scope}]`)
+          );
+        }
+      }
+    } catch (error) {
+      console.log(chalk.gray('  (none)'));
+    }
   }
 
   private async listProjectsInDir(dir: string): Promise<void> {

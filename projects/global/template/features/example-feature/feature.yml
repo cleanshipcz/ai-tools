@@ -1,0 +1,72 @@
+id: user-authentication
+version: 1.0.0
+name: User Authentication
+description: Feature handling user login, registration, and session management
+
+context:
+  overview: |
+    This feature provides comprehensive user authentication including JWT-based
+    session management, OAuth providers, and password reset functionality.
+  architecture: |
+    Uses a middleware-based approach with token validation on protected routes.
+    Supports multiple authentication strategies through passport.js.
+  dependencies:
+    - jsonwebtoken
+    - passport
+    - bcrypt
+
+files:
+  entry_points:
+    - src/auth/index.ts
+    - src/middleware/auth.ts
+  key_files:
+    - src/auth/strategies/jwt.ts
+    - src/auth/strategies/oauth.ts
+    - src/auth/controllers/auth.controller.ts
+  patterns:
+    - src/auth/**/*.ts
+    - tests/auth/**/*.test.ts
+
+snippets:
+  - id: protect-route
+    title: Protect a Route with Authentication
+    description: Apply authentication middleware to a route
+    language: typescript
+    content: |
+      router.get('/protected', 
+        authenticate('jwt'), 
+        (req, res) => {
+          res.json({ user: req.user });
+        }
+      );
+
+  - id: register-user
+    title: Register a New User
+    description: Example user registration with password hashing
+    language: typescript
+    content: |
+      async function registerUser(email: string, password: string) {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const user = await User.create({
+          email,
+          password: hashedPassword
+        });
+        return generateToken(user);
+      }
+
+conventions:
+  - Always hash passwords before storing them in the database
+  - Use JWT tokens with appropriate expiration times
+  - Implement refresh token rotation for enhanced security
+  - Validate email format on registration
+  - Use HTTP-only cookies for token storage in web clients
+
+metadata:
+  status: active
+  owner: security-team
+  created: 2025-01-15
+  updated: 2025-01-15
+  tags:
+    - security
+    - authentication
+    - jwt

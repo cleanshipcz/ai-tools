@@ -1,29 +1,25 @@
 # Planned features
 
-## Miscs
+## ✅ Implemented
 
-- clean - build cleans generated files and rebuilds them
-- project - deploy all available projects at once (possibly if found?) ->  this serves when a rule is e.g. updated so that it's applied to all projects
+### Miscs (v1.1.0)
 
-## Large features
+- ✅ clean - Cleans generated files and rebuilds them (`npm run clean`)
+- ✅ project - Deploy all available projects at once (`npm run project:deploy-all`)
 
-- similar to projects, local features with context can be defined
-- it a subfolder of the project folder
-  - meaning in projects/<global|local>/project-name/features/feature-name
-- doesn't add anything to the global context but generates snippets to be used as feature-specific context for import (like e.g. prompts in copilot)
+### Large features (v1.1.0)
 
-## Project specific
+- ✅ Feature-specific context system in `projects/<global|local>/project-name/features/feature-name`
+- ✅ Feature manifests with snippets and conventions
+- ✅ Generates feature-specific context for all tools (GitHub Copilot, Windsurf, Claude Code, Cursor)
+- ✅ Feature generation integrated into project generation workflow
 
-- expect a custom ".cleanship-ai-tools" folder in the project root
-- it will contain project and feature specific information (so that the project maintains it and not this repository) -> it will be treated just like the local projects folder
-- it can be supplied as an argument to the generation command
-  - it treats the folder as a project folder (looks for project.yml, deploy.yml, features/, etc.)
-  - it outputs to the project folder
-- here in this repo, in projects/ there will be also two lists:
-  - projects.global.yml (versioned)
-  - projects.local.yml (gitignored)
-  - these lists will contain paths to the project folders that are to be loaded along with the content of projects/global and projects/local
-  - that should be reflected for all project:X commands (e.g. list, deploy, generate, ...)
+### Project specific (v1.1.0)
+
+- ✅ Support for external projects via `.cleanship-ai-tools` folders
+- ✅ Project registry system with `projects.global.yml` (versioned) and `projects.local.yml` (gitignored)
+- ✅ External project management commands (`npm run project:external`)
+- ✅ External projects integrated into all project commands (list, generate, deploy)
 
 ## Other features NOT NOW
 

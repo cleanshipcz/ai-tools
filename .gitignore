@@ -16,6 +16,7 @@ docs/AGENTS.md
 
 # Projects
 projects/local/
+projects/projects.local.yml
 .output/
 
 # Eval reports

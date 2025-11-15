@@ -1,0 +1,9 @@
+# Project Registry Lists
+
+# Global projects (tracked in version control)
+# Add external project paths here that should be shared across all developers
+
+projects:
+  # Example:
+  # - path: /path/to/external/project/.cleanship-ai-tools
+  #   alias: my-external-project

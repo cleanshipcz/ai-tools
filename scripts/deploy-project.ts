@@ -46,8 +46,130 @@ class ProjectDeployer {
     console.log(chalk.green('\n✅ Deployment complete!\n'));
   }
 
+  async deployAll(
+    options: { dryRun?: boolean; force?: boolean; confirm?: boolean } = {}
+  ): Promise<void> {
+    this.dryRun = options.dryRun || false;
+    this.force = options.force || false;
+    this.confirm = options.confirm !== false;
+
+    console.log(chalk.blue(`\n🚀 ${this.dryRun ? '[DRY RUN] ' : ''}Deploying all projects\n`));
+
+    // Get all project IDs
+    const projectIds: string[] = [];
+
+    // Check global projects
+    const globalDir = join(rootDir, 'projects', 'global');
+    try {
+      const globalEntries = await readdir(globalDir, { withFileTypes: true });
+      for (const entry of globalEntries) {
+        if (entry.isDirectory() && entry.name !== 'template') {
+          const deployPath = join(globalDir, entry.name, 'deploy.yml');
+          try {
+            await access(deployPath);
+            projectIds.push(entry.name);
+          } catch {
+            // No deploy.yml, skip
+          }
+        }
+      }
+    } catch {
+      // No global directory
+    }
+
+    // Check local projects
+    const localDir = join(rootDir, 'projects', 'local');
+    try {
+      const localEntries = await readdir(localDir, { withFileTypes: true });
+      for (const entry of localEntries) {
+        if (entry.isDirectory() && entry.name !== 'README.md' && !entry.name.startsWith('.')) {
+          const deployPath = join(localDir, entry.name, 'deploy.yml');
+          try {
+            await access(deployPath);
+            projectIds.push(entry.name);
+          } catch {
+            // No deploy.yml, skip
+          }
+        }
+      }
+    } catch {
+      // No local directory
+    }
+
+    // Check external projects
+    try {
+      const { ExternalProjectManager } = await import('./external-projects.js');
+      const manager = new ExternalProjectManager();
+      const externalProjects = await manager.getAllProjects();
+      for (const project of externalProjects) {
+        const deployPath = join(project.path, 'deploy.yml');
+        try {
+          await access(deployPath);
+          projectIds.push(project.alias);
+        } catch {
+          // No deploy.yml, skip
+        }
+      }
+    } catch {
+      // No external projects
+    }
+
+    if (projectIds.length === 0) {
+      console.log(chalk.yellow('No projects with deploy.yml found'));
+      return;
+    }
+
+    console.log(chalk.gray(`  Found ${projectIds.length} project(s) to deploy:\n`));
+    for (const id of projectIds) {
+      console.log(chalk.gray(`    - ${id}`));
+    }
+    console.log('');
+
+    // Confirm if needed
+    if (!this.force && !this.dryRun && this.confirm) {
+      const readline = await import('readline');
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      const answer = await new Promise<string>((resolve) => {
+        rl.question(chalk.yellow('  Continue with all deployments? (y/N): '), resolve);
+      });
+
+      rl.close();
+
+      if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
+        console.log(chalk.yellow('  Cancelled'));
+        return;
+      }
+    }
+
+    // Deploy each project
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const projectId of projectIds) {
+      try {
+        const config = await this.loadDeployConfig(projectId);
+        await this.deployOne(projectId, config);
+        succeeded++;
+      } catch (error: any) {
+        console.error(chalk.red(`  ❌ Failed to deploy ${projectId}: ${error.message}`));
+        failed++;
+      }
+      console.log(''); // Separator between projects
+    }
+
+    console.log(chalk.green(`\n✅ Deployed ${succeeded} project(s)`));
+    if (failed > 0) {
+      console.log(chalk.red(`   Failed: ${failed} project(s)`));
+    }
+    console.log('');
+  }
+
   private async loadDeployConfig(projectId: string): Promise<DeploymentConfig> {
-    // Find project directory (check global first, then local)
+    // Find project directory (check global first, then local, then external)
     let projectDir: string | null = null;
 
     const globalProjectDir = join(rootDir, 'projects', 'global', projectId);
@@ -61,7 +183,22 @@ class ProjectDeployer {
         await access(localProjectDir);
         projectDir = localProjectDir;
       } catch {
-        throw new Error(`Project not found: ${projectId}`);
+        // Check external projects
+        try {
+          const { ExternalProjectManager } = await import('./external-projects.js');
+          const manager = new ExternalProjectManager();
+          const projects = await manager.getAllProjects();
+          const found = projects.find((p) => p.alias === projectId);
+          if (found) {
+            projectDir = found.path;
+          }
+        } catch {
+          // No external projects
+        }
+
+        if (!projectDir) {
+          throw new Error(`Project not found: ${projectId}`);
+        }
       }
     }
 
@@ -439,6 +576,11 @@ if (command === 'deploy') {
     console.error(chalk.red('\n❌ Error:'), error.message);
     process.exit(1);
   });
+} else if (command === 'deploy-all') {
+  deployer.deployAll(flags).catch((error) => {
+    console.error(chalk.red('\n❌ Error:'), error.message);
+    process.exit(1);
+  });
 } else if (command === 'rollback') {
   if (!projectId) {
     console.error(chalk.red('Error: Project ID required for rollback'));
@@ -454,6 +596,7 @@ if (command === 'deploy') {
   console.error(chalk.red(`Unknown command: ${command || '(none)'}`));
   console.log('\nAvailable commands:');
   console.log('  deploy <project-id> [--dry-run] [--force] [--no-confirm]');
+  console.log('  deploy-all [--dry-run] [--force] [--no-confirm]');
   console.log('  rollback <project-id> [timestamp]');
   process.exit(1);
 }

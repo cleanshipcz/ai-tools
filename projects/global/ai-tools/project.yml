@@ -41,7 +41,7 @@ documentation:
     prompts: "prompts/README.md"
     agents: "docs/AGENTS.md"
     skills: "skills/README.md"
-    projects: "docs/PROJECTS.md"
+    projects: "projects/README.md"
     tools: "docs/TOOLS.md"
     user_tools: "docs/USER_TOOLS.md"
   development:
@@ -127,6 +127,7 @@ ai_tools:
   preferred_agents:
     - code-reviewer
     - feature-builder
+    - bug-fixer
 
   preferred_rulepacks:
     - base

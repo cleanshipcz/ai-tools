@@ -16,6 +16,8 @@ This guide explains how to use the Projects feature to create customized AI tool
 - [Deploying to Projects](#deploying-to-projects)
 - [Project Manifest Reference](#project-manifest-reference)
 - [Commands](#commands)
+- [Features System](#features-system)
+- [External Projects](#external-projects)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
 - [Examples](#examples)
@@ -469,7 +471,7 @@ metadata:
 ### Project Creation
 
 ```bash
-# Create a new local project
+# Create a new local project (managed in this repo)
 npm run project:create <name>
 
 # Create with description
@@ -477,6 +479,28 @@ npm run project:create <name> -- -d "Description"
 
 # Create a global project
 npm run project:create <name> -- --global -d "Description"
+```
+
+### External Project Initialization
+
+```bash
+# Initialize AI tools in an external project
+npm run project:init <path>
+
+# With custom alias
+npm run project:init <path> -- --alias <name>
+
+# With description
+npm run project:init <path> -- -d "Description"
+
+# Register in global registry (shared with team)
+npm run project:init <path> -- --register-global
+
+# Initialize without auto-registering
+npm run project:init <path> -- --no-register
+
+# Complete example
+npm run project:init /home/user/my-app -- --alias my-app -d "My application" --register-local
 ```
 
 ### Project Management
@@ -527,6 +551,302 @@ npm run project:rollback <project-id>
 # Rollback to specific backup
 npm run project:rollback <project-id> <timestamp>
 ```
+
+---
+
+## Features System
+
+The Features system allows you to define feature-specific context and code snippets within your projects.
+
+### What Are Features?
+
+Features are sub-components of your project that have their own:
+
+- Context and documentation
+- Architecture notes
+- Code snippets and examples
+- Conventions specific to that feature
+
+### Creating Features
+
+1. Create a features directory in your project:
+
+   ```bash
+   mkdir -p projects/local/my-project/features/user-authentication
+   ```
+
+2. Create a `feature.yml` manifest:
+
+   ```yaml
+   # projects/local/my-project/features/user-authentication/feature.yml
+   id: user-authentication
+   version: 1.0.0
+   name: "User Authentication"
+   description: "JWT-based user authentication and session management"
+   
+   context:
+     overview: |
+       Handles user login, registration, and session management using JWT tokens.
+     architecture: |
+       Uses middleware-based approach with token validation on protected routes.
+     dependencies:
+       - jsonwebtoken
+       - passport
+       - bcrypt
+   
+   files:
+     entry_points:
+       - src/auth/index.ts
+     key_files:
+       - src/auth/strategies/jwt.ts
+       - src/middleware/auth.ts
+     patterns:
+       - src/auth/**/*.ts
+   
+   snippets:
+     - id: protect-route
+       title: "Protect a Route"
+       description: "Apply authentication middleware to protect an endpoint"
+       language: typescript
+       content: |
+         router.get('/protected',
+           authenticate('jwt'),
+           (req, res) => {
+             res.json({ user: req.user });
+           }
+         );
+   
+   conventions:
+     - "Always hash passwords before storing"
+     - "Use HTTP-only cookies for token storage"
+     - "Implement refresh token rotation"
+   
+   metadata:
+     status: active
+     owner: security-team
+   ```
+
+### Feature Generation
+
+Features are automatically generated when you deploy your project:
+
+```bash
+# Features are generated during deploy
+npm run project:deploy my-project
+
+# Or generate manually
+npm run project:generate-features my-project
+```
+
+### What Gets Generated for Features?
+
+**GitHub Copilot**: `feature-<id>.md` files with full feature documentation
+
+**Windsurf**: `feature-<id>.json` files with structured feature data
+
+**Claude Code**: `feature-<id>.md` files with examples and context
+
+**Cursor**: `features.json` with all features combined
+
+### Feature Schema
+
+See [`schemas/feature.schema.json`](../schemas/feature.schema.json) for the complete schema reference.
+
+---
+
+## External Projects
+
+External Projects allow you to link projects from other repositories without duplicating configuration.
+
+### What Are External Projects?
+
+External projects are projects that live in other repositories but use this ai-tools configuration system. They're tracked via project registries.
+
+### Why Use External Projects?
+
+- **Centralized management**: Manage all project configs from one place
+- **No duplication**: Projects maintain their own `.cleanship-ai-tools` folder
+- **Team consistency**: Share global project configs, keep local ones private
+- **Flexible deployment**: Deploy updates to multiple projects at once
+
+### Setting Up an External Project
+
+#### Method 1: Using project:init (Recommended)
+
+The easiest way to set up an external project:
+
+```bash
+# Initialize AI tools in an existing project
+npm run project:init /path/to/your-project
+
+# With custom alias and description
+npm run project:init /path/to/your-project --alias my-app -d "My application"
+
+# Register in global registry (shared with team)
+npm run project:init /path/to/your-project --register-global
+
+# Initialize without auto-registering
+npm run project:init /path/to/your-project --no-register
+```
+
+This will:
+1. Create `.cleanship-ai-tools/` folder in your project
+2. Copy and customize `project.yml` from template
+3. Create `deploy.yml` configured to deploy to project root
+4. Create example feature template
+5. Auto-register in external projects registry (by default in local)
+
+#### Method 2: Manual Setup
+
+If you prefer manual setup:
+
+1. **In the external project repository**, create a `.cleanship-ai-tools` folder:
+
+   ```bash
+   cd /path/to/your-project
+   mkdir .cleanship-ai-tools
+   ```
+
+2. **Create project manifest** in the external project:
+
+   ```bash
+   # Copy template from ai-tools repo
+   cp /path/to/ai-tools/projects/global/template/project.yml \
+      .cleanship-ai-tools/project.yml
+   
+   # Edit it
+   code .cleanship-ai-tools/project.yml
+   ```
+
+3. **Create deployment config** in the external project:
+
+   ```yaml
+   # .cleanship-ai-tools/deploy.yml
+   target: ".."  # Deploy to project root (parent of .cleanship-ai-tools)
+   tools:
+     - github-copilot
+     - windsurf
+   mode: local
+   backup: true
+   ```
+
+4. **Register in ai-tools repository**:
+
+   ```bash
+   cd /path/to/ai-tools
+   
+   # Add to local registry (gitignored)
+   npm run project:external add /path/to/your-project/.cleanship-ai-tools --alias my-app
+   
+   # Or add to global registry (versioned, shared)
+   npm run project:external add /path/to/your-project/.cleanship-ai-tools --alias my-app --global
+   ```
+
+### Managing External Projects
+
+```bash
+# List all external projects
+npm run project:external list
+
+# Add external project (local registry)
+npm run project:external add /path/to/project/.cleanship-ai-tools --alias my-app
+
+# Add external project (global registry, shared with team)
+npm run project:external add /path/to/project/.cleanship-ai-tools --alias my-app --global
+
+# Remove external project
+npm run project:external remove my-app
+
+# Remove from global registry
+npm run project:external remove my-app --global
+```
+
+### Project Registries
+
+**Global Registry** (`projects/projects.global.yml`)
+
+- Versioned in git
+- Shared with entire team
+- Use for: Company projects, shared services
+
+**Local Registry** (`projects/projects.local.yml`)
+
+- Gitignored
+- Private to you
+- Use for: Personal projects, client work, experiments
+
+Example registry structure:
+
+```yaml
+# projects/projects.global.yml
+projects:
+  - path: /opt/company/services/api-gateway/.cleanship-ai-tools
+    alias: api-gateway
+  - path: /opt/company/services/auth-service/.cleanship-ai-tools
+    alias: auth-service
+```
+
+```yaml
+# projects/projects.local.yml (gitignored)
+projects:
+  - path: /home/user/personal/my-app/.cleanship-ai-tools
+    alias: my-personal-app
+```
+
+### Using External Projects
+
+Once registered, external projects work just like local projects:
+
+```bash
+# List (includes external)
+npm run project:list
+
+# Generate
+npm run project:generate my-app
+
+# Deploy
+npm run project:deploy my-app
+
+# Deploy all (includes external)
+npm run project:deploy-all
+```
+
+### External Project Structure
+
+```
+your-project/
+├── src/
+├── package.json
+├── README.md
+└── .cleanship-ai-tools/      # AI tools configuration
+    ├── project.yml           # Project manifest
+    ├── deploy.yml            # Deployment config
+    └── features/             # Optional: Feature-specific context
+        └── user-auth/
+            └── feature.yml
+```
+
+After deployment:
+
+```
+your-project/
+├── src/
+├── .github/                  # Generated by deployment
+│   └── copilot-instructions.md
+├── .windsurf/                # Generated by deployment
+│   └── rules/
+└── .cleanship-ai-tools/      # Your configuration
+    ├── project.yml
+    └── deploy.yml
+```
+
+### Best Practices for External Projects
+
+1. **Keep `.cleanship-ai-tools` in the project**: Let each project maintain its own configuration
+2. **Use global registry for team projects**: Share paths to company projects
+3. **Use local registry for personal work**: Keep client/personal projects private
+4. **Document in project README**: Mention that the project uses ai-tools
+5. **Version the manifests**: Track changes to project configs in the project's git history
 
 ---
 

@@ -107,7 +107,7 @@ skills for tool integrations, and a project system for per-project configuration
 - **prompts**: prompts/README.md
 - **agents**: docs/AGENTS.md
 - **skills**: skills/README.md
-- **projects**: docs/PROJECTS.md
+- **projects**: projects/README.md
 - **tools**: docs/TOOLS.md
 - **user_tools**: docs/USER_TOOLS.md
 - **style_guide**: docs/STYLE_GUIDE.md
@@ -129,3 +129,4 @@ This project uses ai-tools for enhanced AI assistance. See the base configuratio
 **Preferred Agents for this project**:
 - code-reviewer
 - feature-builder
+- bug-fixer

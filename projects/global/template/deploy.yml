@@ -4,7 +4,7 @@
 
 # Target project directory (can be relative or absolute)
 # Override in deploy.local.yml with your local path
-target: "../my-project"
+target: "./.output/"
 
 # Tools to deploy
 tools:
