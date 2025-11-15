@@ -12,36 +12,58 @@ A comprehensive solution for managing AI agent prompts, rules, skills, and tool 
 
 ## 📑 Table of Contents
 
-- [Quick Start](#quick-start)
-  - [For Casual Users](#for-casual-users-just-want-prompts)
-  - [For Developers](#for-developers-managing-configs)
-- [📝 Prompts](#-prompts)
-  - [What Are Prompts?](#what-are-prompts)
-  - [Usage](#usage)
-  - [Creating Custom Prompts](#creating-custom-prompts)
-- [🤖 Agents](#-agents)
-  - [What Are Agents?](#what-are-agents)
-  - [Usage](#usage-1)
-  - [Creating Custom Agents](#creating-custom-agents)
-- [📋 Rulepacks](#-rulepacks)
-  - [What Are Rulepacks?](#what-are-rulepacks)
-  - [Usage](#usage-2)
-  - [Creating Custom Rulepacks](#creating-custom-rulepacks)
-- [🛠️ Skills](#️-skills)
-- [🔌 MCP (Model Context Protocol)](#-mcp-model-context-protocol)
-- [🧪 Evaluation Framework](#-evaluation-framework)
-- [🏗️ Project Structure](#️-project-structure)
-- [🚀 Available Commands](#-available-commands)
-- [📚 Documentation](#-documentation)
-- [⚙️ Configuration](#️-configuration)
-- [🔒 Security](#-security)
-- [🤝 Contributing](#-contributing)
-- [🔄 CI/CD](#-cicd)
-- [📝 Best Practices](#-best-practices)
-- [📦 Architecture](#-architecture)
-- [🗺️ Roadmap](#️-roadmap)
-- [📄 License](#-license)
-- [💬 Support](#-support)
+- [AI Tools Repository](#ai-tools-repository)
+  - [📑 Table of Contents](#-table-of-contents)
+  - [Quick Start](#quick-start)
+    - [For Casual Users (Just Want Prompts)](#for-casual-users-just-want-prompts)
+    - [For Developers (Managing Configs)](#for-developers-managing-configs)
+  - [📝 Prompts](#-prompts)
+    - [What Are Prompts?](#what-are-prompts)
+    - [Usage](#usage)
+      - [For Casual Users (ChatGPT, Claude.ai, etc.)](#for-casual-users-chatgpt-claudeai-etc)
+      - [For Tool Users (Windsurf, Cursor, etc.)](#for-tool-users-windsurf-cursor-etc)
+    - [Creating Custom Prompts](#creating-custom-prompts)
+  - [🤖 Agents](#-agents)
+    - [What Are Agents?](#what-are-agents)
+    - [Usage](#usage-1)
+      - [With AI Coding Tools](#with-ai-coding-tools)
+      - [Manually](#manually)
+    - [Creating Custom Agents](#creating-custom-agents)
+  - [📋 Rulepacks](#-rulepacks)
+    - [What Are Rulepacks?](#what-are-rulepacks)
+    - [Usage](#usage-2)
+    - [Creating Custom Rulepacks](#creating-custom-rulepacks)
+  - [🛠️ Skills](#️-skills)
+    - [What Are Skills?](#what-are-skills)
+    - [Quick Usage](#quick-usage)
+  - [🔌 MCP (Model Context Protocol)](#-mcp-model-context-protocol)
+    - [What Is MCP?](#what-is-mcp)
+    - [Quick Usage](#quick-usage-1)
+  - [🧪 Evaluation Framework](#-evaluation-framework)
+    - [What Is It?](#what-is-it)
+    - [Quick Usage](#quick-usage-2)
+  - [🏗️ Project Structure](#️-project-structure)
+  - [🚀 Available Commands](#-available-commands)
+    - [For Users (Using Prompts)](#for-users-using-prompts)
+    - [For Developers (Managing Manifests)](#for-developers-managing-manifests)
+  - [📚 Documentation](#-documentation)
+    - [User-Friendly Resources](#user-friendly-resources)
+    - [Developer Resources](#developer-resources)
+  - [⚙️ Configuration](#️-configuration)
+    - [Provider Setup (For Evals)](#provider-setup-for-evals)
+    - [Budget Configuration](#budget-configuration)
+  - [🔒 Security](#-security)
+  - [🤝 Contributing](#-contributing)
+  - [🔄 CI/CD](#-cicd)
+    - [Required GitHub Secrets](#required-github-secrets)
+  - [📝 Best Practices](#-best-practices)
+    - [Manifest Design](#manifest-design)
+    - [Security](#security)
+    - [Testing](#testing)
+  - [📦 Architecture](#-architecture)
+  - [📄 License](#-license)
+  - [💬 Support](#-support)
+  - [🎯 Quick Tool Integration](#-quick-tool-integration)
 
 ---
 
@@ -626,29 +648,6 @@ GitHub Actions workflow with 7 jobs:
     Windsurf  Cursor  Claude   Library.md
      (JSON)   (JSON)  (JSON)   (Markdown)
 ```
-
----
-
-## 🗺️ Roadmap
-
-### ✅ Completed
-
-- [x] **Interactive HTML browser** - Beautiful web UI with search, filter, one-click copy
-- [x] **CLI tool** - Interactive prompt filling and variable replacement
-- [x] **Markdown library** - Copy-paste ready prompt collection
-- [x] **GitHub Copilot support** - Repository-wide custom instructions for Visual Studio / VS Code
-- [x] **Hybrid Skills architecture** - YAML source → native Anthropic SKILL.md generation
-
-### 🔮 Planned
-
-- [ ] More tool adapters (Cody, Neovim, JetBrains AI)
-- [ ] Prompt marketplace/sharing platform
-- [ ] Advanced eval metrics (BLEU, ROUGE, custom)
-- [ ] Cost analytics dashboard
-- [ ] Version control integration (Git hooks for prompt changes)
-- [ ] Prompt optimization suggestions (A/B testing automation)
-
----
 
 ## 📄 License
 

@@ -30,3 +30,12 @@
   - this config can also be per project
 - should also contain some example usage
   - example project (see feature above) with config
+
+## Other features
+
+- [ ] More tool adapters (Cody, Neovim, JetBrains AI)
+- [ ] Prompt marketplace/sharing platform
+- [ ] Advanced eval metrics (BLEU, ROUGE, custom)
+- [ ] Cost analytics dashboard
+- [ ] Version control integration (Git hooks for prompt changes)
+- [ ] Prompt optimization suggestions (A/B testing automation)

@@ -6,13 +6,7 @@ pnpm-lock.yaml
 
 # Build outputs
 dist/
-adapters/*/rules/
-adapters/*/presets/
-adapters/*/skills.json
-adapters/*/skills/
-adapters/*/prompts/
-adapters/github-copilot/.github/
-adapters/github-copilot/copilot-instructions.md
+adapters/
 *.tsbuildinfo
 
 # Generated documentation
