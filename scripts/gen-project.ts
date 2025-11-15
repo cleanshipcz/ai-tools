@@ -39,8 +39,12 @@ interface Project {
     preferred_agents?: string[];
     preferred_rulepacks?: string[];
     custom_rules?: string[];
-    excluded_agents?: string[];
-    excluded_rulepacks?: string[];
+    whitelist_agents?: string[];
+    whitelist_prompts?: string[];
+    whitelist_rulepacks?: string[];
+    blacklist_agents?: string[];
+    blacklist_prompts?: string[];
+    blacklist_rulepacks?: string[];
   };
   metadata?: {
     repository?: string;
@@ -51,12 +55,21 @@ interface Project {
   };
 }
 
+interface PromptInfo {
+  id: string;
+  path: string; // e.g., "refactor/extract-method"
+}
+
 export class ProjectGenerator {
   private project: Project | null = null;
   private projectDir: string = '';
+  private promptsMap = new Map<string, string>(); // Maps prompt ID to its path
 
   async generate(projectId: string, tools: string[] = ['all']): Promise<void> {
     console.log(chalk.blue(`\n🔨 Generating project configurations for: ${projectId}\n`));
+
+    // Load prompts map
+    await this.loadPromptsMap();
 
     // Find and load project
     await this.loadProject(projectId);
@@ -193,15 +206,136 @@ export class ProjectGenerator {
     }
   }
 
+  private async loadPromptsMap(): Promise<void> {
+    const promptsDir = join(rootDir, 'prompts');
+    try {
+      const files = await this.findYamlFilesRelative(promptsDir);
+
+      for (const file of files) {
+        const fullPath = join(promptsDir, file);
+        const content = await readFile(fullPath, 'utf-8');
+        const prompt = loadYaml(content) as any;
+
+        if (prompt.id) {
+          // Store the path without extension (e.g., "refactor/extract-method")
+          const pathWithoutExt = file.replace(/\.ya?ml$/, '').replace(/\\/g, '/');
+          this.promptsMap.set(prompt.id, pathWithoutExt);
+        }
+      }
+    } catch (error) {
+      // Prompts directory might not exist
+    }
+  }
+
+  private async findYamlFilesRelative(dir: string, basePath: string = ''): Promise<string[]> {
+    const files: string[] = [];
+
+    try {
+      const entries = await readdir(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const relativePath = join(basePath, entry.name).replace(/\\/g, '/');
+        const fullPath = join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+          // Skip shared directory as it contains includes, not prompts
+          if (entry.name !== 'shared') {
+            files.push(...(await this.findYamlFilesRelative(fullPath, relativePath)));
+          }
+        } else if (
+          entry.isFile() &&
+          (entry.name.endsWith('.yml') || entry.name.endsWith('.yaml'))
+        ) {
+          files.push(relativePath);
+        }
+      }
+    } catch (error) {
+      // Directory doesn't exist
+    }
+
+    return files;
+  }
+
+  private shouldIncludeAgent(agentId: string): boolean {
+    if (!this.project?.ai_tools) return true;
+
+    const { whitelist_agents, blacklist_agents } = this.project.ai_tools;
+
+    // If whitelist is defined, only include agents in the whitelist
+    if (whitelist_agents && whitelist_agents.length > 0) {
+      return whitelist_agents.includes(agentId);
+    }
+
+    // If blacklist is defined, exclude agents in the blacklist
+    if (blacklist_agents && blacklist_agents.length > 0) {
+      return !blacklist_agents.includes(agentId);
+    }
+
+    // No filtering configured, include all
+    return true;
+  }
+
+  private shouldIncludePrompt(promptIdOrPath: string): boolean {
+    if (!this.project?.ai_tools) return true;
+
+    const { whitelist_prompts, blacklist_prompts } = this.project.ai_tools;
+
+    // Get the full path for this prompt (e.g., "refactor/extract-method")
+    // promptIdOrPath could be either the ID or already a path
+    const promptPath = this.promptsMap.get(promptIdOrPath) || promptIdOrPath;
+
+    // If whitelist is defined, only include prompts in the whitelist
+    if (whitelist_prompts && whitelist_prompts.length > 0) {
+      return whitelist_prompts.some((pattern) => {
+        // Support both "extract-method" and "refactor/extract-method" formats
+        return (
+          promptPath === pattern || promptPath.endsWith(`/${pattern}`) || promptIdOrPath === pattern
+        );
+      });
+    }
+
+    // If blacklist is defined, exclude prompts in the blacklist
+    if (blacklist_prompts && blacklist_prompts.length > 0) {
+      return !blacklist_prompts.some((pattern) => {
+        // Support both "extract-method" and "refactor/extract-method" formats
+        return (
+          promptPath === pattern || promptPath.endsWith(`/${pattern}`) || promptIdOrPath === pattern
+        );
+      });
+    }
+
+    // No filtering configured, include all
+    return true;
+  }
+
+  private shouldIncludeRulepack(rulepackId: string): boolean {
+    if (!this.project?.ai_tools) return true;
+
+    const { whitelist_rulepacks, blacklist_rulepacks } = this.project.ai_tools;
+
+    // If whitelist is defined, only include rulepacks in the whitelist
+    if (whitelist_rulepacks && whitelist_rulepacks.length > 0) {
+      return whitelist_rulepacks.includes(rulepackId);
+    }
+
+    // If blacklist is defined, exclude rulepacks in the blacklist
+    if (blacklist_rulepacks && blacklist_rulepacks.length > 0) {
+      return !blacklist_rulepacks.includes(rulepackId);
+    }
+
+    // No filtering configured, include all
+    return true;
+  }
+
   private async generateGitHubCopilot(outputDir: string): Promise<void> {
     const githubDir = join(outputDir, '.github');
     await mkdir(githubDir, { recursive: true });
 
-    // Copy base adapters (prompts, instructions)
+    // Copy base adapters (prompts, instructions) with filtering
     const adapterSrcDir = join(rootDir, 'adapters', 'github-copilot', '.github');
     try {
       await access(adapterSrcDir);
-      await this.copyDirectory(adapterSrcDir, githubDir);
+      await this.copyDirectoryWithFiltering(adapterSrcDir, githubDir);
       console.log(chalk.gray(`    Copied base prompts and instructions`));
     } catch {
       console.log(chalk.yellow(`    ! Base adapters not found. Run 'npm run build' first.`));
@@ -212,6 +346,62 @@ export class ProjectGenerator {
     await writeFile(join(githubDir, 'copilot-instructions.md'), instructions, 'utf-8');
 
     console.log(chalk.gray(`    Generated .github/copilot-instructions.md`));
+  }
+
+  private async copyDirectoryWithFiltering(src: string, dest: string): Promise<void> {
+    await mkdir(dest, { recursive: true });
+
+    const entries = await readdir(src, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = join(src, entry.name);
+      const destPath = join(dest, entry.name);
+
+      if (entry.isDirectory()) {
+        await this.copyDirectoryWithFiltering(srcPath, destPath);
+      } else {
+        // Apply filtering based on file name patterns
+        if (entry.name.startsWith('agent-')) {
+          // Extract agent ID from filename: agent-code-reviewer.prompt.md -> code-reviewer
+          const agentId = entry.name.replace(/^agent-/, '').replace(/\.prompt\.md$/, '');
+          if (!this.shouldIncludeAgent(agentId)) {
+            continue; // Skip this agent file
+          }
+        } else if (entry.name.endsWith('.prompt.md') && entry.name.startsWith('prompt-')) {
+          // Regular prompt file - the filename format is "prompt-<category>-<prompt-id>.prompt.md"
+          // where only the first hyphen after "prompt-" separates category from ID
+          // (e.g., "prompt-refactor-extract-method.prompt.md")
+          const filenameWithoutExt = entry.name.replace(/\.prompt\.md$/, '').replace(/^prompt-/, '');
+
+          // Convert filename back to path format by replacing only the first hyphen
+          // (e.g., "refactor-extract-method" -> "refactor/extract-method")
+          const promptPath = filenameWithoutExt.replace('-', '/');
+
+          // Check against our prompts map to find which prompt this corresponds to
+          // and pass the path to shouldIncludePrompt for matching
+          let shouldInclude = false;
+          for (const [id, path] of this.promptsMap.entries()) {
+            if (path === promptPath) {
+              // Pass the path (not the ID) since the whitelist uses paths
+              shouldInclude = this.shouldIncludePrompt(path);
+              break;
+            }
+          }
+
+          if (!shouldInclude) {
+            continue; // Skip this prompt file
+          }
+        } else if (entry.name.endsWith('.instructions.md')) {
+          // Rulepack instructions file
+          const rulepackId = entry.name.replace(/\.instructions\.md$/, '');
+          if (!this.shouldIncludeRulepack(rulepackId)) {
+            continue; // Skip this rulepack file
+          }
+        }
+
+        await copyFile(srcPath, destPath);
+      }
+    }
   }
 
   private buildCopilotInstructions(): string {
@@ -381,16 +571,16 @@ export class ProjectGenerator {
     const windsurfDir = join(outputDir, '.windsurf');
     await mkdir(windsurfDir, { recursive: true });
 
-    // Copy base adapters (rules, presets)
+    // Copy base adapters (rules, presets) with filtering
     const adapterSrcDir = join(rootDir, 'adapters', 'windsurf');
     try {
       await access(adapterSrcDir);
 
-      // Copy rules
+      // Copy rules with filtering
       const rulesDir = join(adapterSrcDir, 'rules');
       const destRulesDir = join(windsurfDir, 'rules');
       await access(rulesDir);
-      await this.copyDirectory(rulesDir, destRulesDir);
+      await this.copyWindsurfRulesWithFiltering(rulesDir, destRulesDir);
 
       // Copy presets
       const presetsDir = join(adapterSrcDir, 'presets');
@@ -422,21 +612,55 @@ export class ProjectGenerator {
     console.log(chalk.gray(`    Generated .windsurf/rules/project-rules.json`));
   }
 
+  private async copyWindsurfRulesWithFiltering(src: string, dest: string): Promise<void> {
+    await mkdir(dest, { recursive: true });
+
+    const entries = await readdir(src, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = join(src, entry.name);
+      const destPath = join(dest, entry.name);
+
+      if (entry.isDirectory()) {
+        await this.copyWindsurfRulesWithFiltering(srcPath, destPath);
+      } else if (entry.name.endsWith('.json')) {
+        // Check if this is an agent rule file
+        const agentId = entry.name.replace(/\.json$/, '');
+        if (!this.shouldIncludeAgent(agentId)) {
+          continue; // Skip this agent file
+        }
+        await copyFile(srcPath, destPath);
+      } else {
+        await copyFile(srcPath, destPath);
+      }
+    }
+  }
+
   private async generateCursor(outputDir: string): Promise<void> {
     const cursorDir = join(outputDir, '.cursor');
     await mkdir(cursorDir, { recursive: true });
 
-    // Copy base adapters (recipes)
+    // Copy base adapters (recipes) with filtering
     const adapterSrcDir = join(rootDir, 'adapters', 'cursor');
     try {
       await access(adapterSrcDir);
 
-      // Copy recipes.json if it exists
+      // Copy and filter recipes.json if it exists
       const recipesFile = join(adapterSrcDir, 'recipes.json');
       try {
         await access(recipesFile);
-        await copyFile(recipesFile, join(cursorDir, 'recipes.json'));
-        console.log(chalk.gray(`    Copied base recipes`));
+        const recipesContent = await readFile(recipesFile, 'utf-8');
+        const recipesData = JSON.parse(recipesContent);
+
+        // Filter recipes (agents)
+        if (recipesData.recipes) {
+          recipesData.recipes = recipesData.recipes.filter((recipe: any) =>
+            this.shouldIncludeAgent(recipe.id)
+          );
+        }
+
+        await writeFile(join(cursorDir, 'recipes.json'), JSON.stringify(recipesData, null, 2));
+        console.log(chalk.gray(`    Copied and filtered recipes`));
       } catch {
         // Recipes might not exist yet
       }
@@ -462,21 +686,21 @@ export class ProjectGenerator {
     const claudeDir = join(outputDir, '.claude');
     await mkdir(claudeDir, { recursive: true });
 
-    // Copy base adapters (prompts, skills)
+    // Copy base adapters (prompts, skills) with filtering
     const adapterSrcDir = join(rootDir, 'adapters', 'claude-code');
     try {
       await access(adapterSrcDir);
 
-      // Copy prompts
+      // Copy prompts with filtering
       const promptsDir = join(adapterSrcDir, 'prompts');
       try {
         await access(promptsDir);
-        await this.copyDirectory(promptsDir, join(claudeDir, 'prompts'));
+        await this.copyClaudePromptsWithFiltering(promptsDir, join(claudeDir, 'prompts'));
       } catch {
         // Prompts might not exist
       }
 
-      // Copy skills
+      // Copy skills (not filtered by agents/prompts)
       const skillsDir = join(adapterSrcDir, 'skills');
       try {
         await access(skillsDir);
@@ -485,7 +709,7 @@ export class ProjectGenerator {
         // Skills might not exist
       }
 
-      // Copy skills.json
+      // Copy skills.json (not filtered)
       const skillsFile = join(adapterSrcDir, 'skills.json');
       try {
         await access(skillsFile);
@@ -510,6 +734,30 @@ export class ProjectGenerator {
 
     await writeFile(join(claudeDir, 'project-context.json'), JSON.stringify(context, null, 2));
     console.log(chalk.gray(`    Generated .claude/project-context.json`));
+  }
+
+  private async copyClaudePromptsWithFiltering(src: string, dest: string): Promise<void> {
+    await mkdir(dest, { recursive: true });
+
+    const entries = await readdir(src, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = join(src, entry.name);
+      const destPath = join(dest, entry.name);
+
+      if (entry.isDirectory()) {
+        await this.copyClaudePromptsWithFiltering(srcPath, destPath);
+      } else if (entry.name.endsWith('.json')) {
+        // Claude Code uses JSON files for prompts
+        const promptId = entry.name.replace(/\.json$/, '');
+        if (!this.shouldIncludePrompt(promptId)) {
+          continue; // Skip this prompt file
+        }
+        await copyFile(srcPath, destPath);
+      } else {
+        await copyFile(srcPath, destPath);
+      }
+    }
   }
 
   private buildProjectRules(): string[] {

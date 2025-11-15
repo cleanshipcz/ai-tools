@@ -54,3 +54,11 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Agentic files - they are managed by this project
+.claude
+.cursor
+.github/instructions
+.github/prompts
+.github/copilot-instructions.md
+.windsurf

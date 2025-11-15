@@ -130,7 +130,39 @@ ai_tools:
     - bug-fixer
     - prompt-engineer
 
+  whitelist_agents:
+    - code-reviewer
+    - feature-builder
+    - bug-fixer
+    - prompt-engineer
+    - refactoring-specialist
+    - documentation-writer
+    - project-planner
+
+  whitelist_prompts:
+    # Refactoring prompts
+    - refactor/extract-method
+    - refactor/simplify-conditionals
+    - refactor/remove-duplication
+    - refactor/improve-naming
+    - refactor/add-error-handling
+    # Documentation prompts
+    - docs/document-api
+    - docs/write-readme
+    - docs/create-tutorial
+    - docs/summarize-pr
+    # Planning prompts
+    - planning/design-architecture
+    - planning/create-implementation-plan
+    - planning/tech-decision-record
+    # QA prompts
+    - qa/write-tests
+
   preferred_rulepacks:
+    - base
+    - coding-typescript
+
+  whitelist_rulepacks:
     - base
     - coding-typescript
 
@@ -145,14 +177,6 @@ ai_tools:
     - "Use TypeScript strict mode with ES modules"
     - "Prefer async/await over callbacks"
     - "Use js-yaml for YAML parsing and dumping"
-
-  excluded_agents:
-    - kotlin-style-enforcer
-
-  excluded_rulepacks:
-    - coding-kotlin
-    - coding-java
-    - coding-python
 
 metadata:
   repository: "https://github.com/cleanshipcz/ai-tools"

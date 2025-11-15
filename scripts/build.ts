@@ -40,6 +40,7 @@ interface Prompt {
   rules?: string[];
   variables?: any[];
   outputs?: any;
+  _sourcePath?: string; // Relative path from prompts/ directory
 }
 
 interface Skill {
@@ -118,6 +119,13 @@ class Builder {
       for (const file of files) {
         const content = await readFile(file, 'utf-8');
         const prompt = loadYaml(content) as Prompt;
+
+        // Calculate relative path from prompts/ directory (e.g., "refactor/extract-method")
+        const relativePath = relative(dir, file)
+          .replace(/\.ya?ml$/, '') // Remove .yml or .yaml extension
+          .replace(/\\/g, '/'); // Normalize path separators
+
+        prompt._sourcePath = relativePath;
         this.prompts.set(prompt.id, prompt);
       }
 
@@ -470,7 +478,14 @@ class Builder {
         promptContent.push('');
       }
 
-      await writeFile(join(promptsDir, `${id}.prompt.md`), promptContent.join('\n'), 'utf-8');
+      // Use source path to generate filename with subdirectory prefix
+      // Format: "prompt-<category>-<prompt-id>.prompt.md" (e.g., "prompt-refactor-extract-method.prompt.md")
+      // We only replace the first slash to preserve hyphens in the prompt ID
+      const filename = prompt._sourcePath
+        ? 'prompt-' + prompt._sourcePath.replace('/', '-') + '.prompt.md'
+        : `prompt-${id}.prompt.md`;
+
+      await writeFile(join(promptsDir, filename), promptContent.join('\n'), 'utf-8');
     }
     console.log(chalk.gray(`    Generated ${this.prompts.size} task .prompt.md files`));
 

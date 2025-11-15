@@ -110,6 +110,7 @@ class Validator {
       skills: 'skill',
       'evals/suites': 'eval',
       'projects/global': 'project',
+      'projects/local': 'project',
     };
 
     for (const [dir, type] of Object.entries(dirs)) {

@@ -21,6 +21,24 @@
 - ✅ External project management commands (`npm run project:external`)
 - ✅ External projects integrated into all project commands (list, generate, deploy)
 
+### Copilot CLI support
+
+- add Copilot CLI as a supported/exported tool
+
+### Multi-agent support
+
+- design and implement a feature that allows multiple agents to be used in a sequence
+- imagine:
+  - using a feature building agent to build a feature
+  - using a review agent to review the feature
+  - using a feature building/refactoring agent to reflect the review
+  - repeat until reaching certain quality
+  - use a documentation agent to reflect the changes
+- the configuration would be a certain recipe to deliver a full feature as if it was done by a team
+- I can see it working with claude code `-c ` feature and some custom script, for example
+- I want it for major tools like claude code, copilot CLI, or if possible for GPT
+- if not possible, provide an analysis
+
 ## Other features NOT NOW
 
 - [ ] More tool adapters (Cody, Neovim, JetBrains AI)

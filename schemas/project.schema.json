@@ -207,21 +207,95 @@
           },
           "description": "Project-specific rules for AI tools"
         },
-        "excluded_agents": {
+        "whitelist_agents": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
-          "description": "Agent IDs to exclude from this project"
+          "description": "Agent IDs to include (mutually exclusive with blacklist_agents)"
         },
-        "excluded_rulepacks": {
+        "whitelist_prompts": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Rulepack IDs to exclude from this project"
+          "description": "Prompt IDs or paths to include (e.g., 'extract-method' or 'refactor/extract-method') (mutually exclusive with blacklist_prompts)"
+        },
+        "whitelist_rulepacks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "description": "Rulepack IDs to include (mutually exclusive with blacklist_rulepacks)"
+        },
+        "blacklist_agents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Agent IDs to exclude from this project (mutually exclusive with whitelist_agents)"
+        },
+        "blacklist_prompts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Prompt IDs or paths to exclude (e.g., 'extract-method' or 'refactor/extract-method') (mutually exclusive with whitelist_prompts)"
+        },
+        "blacklist_rulepacks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Rulepack IDs to exclude from this project (mutually exclusive with whitelist_rulepacks)"
         }
       },
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  { "required": ["whitelist_agents"] },
+                  { "required": ["blacklist_agents"] }
+                ]
+              }
+            },
+            { "required": ["whitelist_agents"] },
+            { "required": ["blacklist_agents"] }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  { "required": ["whitelist_prompts"] },
+                  { "required": ["blacklist_prompts"] }
+                ]
+              }
+            },
+            { "required": ["whitelist_prompts"] },
+            { "required": ["blacklist_prompts"] }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "not": {
+                "anyOf": [
+                  { "required": ["whitelist_rulepacks"] },
+                  { "required": ["blacklist_rulepacks"] }
+                ]
+              }
+            },
+            { "required": ["whitelist_rulepacks"] },
+            { "required": ["blacklist_rulepacks"] }
+          ]
+        }
+      ],
       "description": "AI tool configuration for this project"
     },
     "metadata": {

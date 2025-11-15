@@ -457,11 +457,117 @@ ai_tools:
   custom_rules:
     - 'Always use our logger utility'
     - 'API responses must follow standard format'
-  excluded_agents:
+  blacklist_agents:
     - kotlin-style-enforcer
-  excluded_rulepacks:
+  blacklist_rulepacks:
     - coding-java
 ```
+
+#### Filtering: Whitelist vs Blacklist
+
+You can control which agents, prompts, and rulepacks are included in your project using either **whitelist** (inclusive) or **blacklist** (exclusive) approaches. These are mutually exclusive - you can use one or the other, but not both for the same category.
+
+**Whitelist** - Only include specified items:
+
+```yaml
+ai_tools:
+  whitelist_agents:
+    - code-reviewer
+    - refactoring-specialist
+  whitelist_prompts:
+    # You can reference prompts by ID (if unique)
+    - write-tests
+    # Or by path (recommended for clarity)
+    - refactor/extract-method
+    - refactor/simplify-conditionals
+    - docs/document-api
+    - planning/design-architecture
+  whitelist_rulepacks:
+    - base
+    - coding-typescript
+```
+
+With whitelist, **only** the listed agents, prompts, and rulepacks will be included in the generated project configurations. All others are excluded.
+
+**Blacklist** - Exclude specified items:
+
+```yaml
+ai_tools:
+  blacklist_agents:
+    - kotlin-style-enforcer
+    - tdd-navigator
+  blacklist_prompts:
+    # You can exclude by ID
+    - add-null-safety
+    # Or by path
+    - refactor/add-null-safety
+    - planning/estimate-effort
+  blacklist_rulepacks:
+    - coding-kotlin
+    - coding-java
+```
+
+With blacklist, all agents, prompts, and rulepacks **except** the listed ones will be included in the generated project configurations.
+
+##### Referencing Prompts
+
+Prompts are organized in subdirectories (e.g., `prompts/refactor/`, `prompts/docs/`, `prompts/planning/`, `prompts/qa/`). You can reference them in two ways:
+
+1. **By ID only** (works if the ID is unique across all subdirectories):
+
+   ```yaml
+   whitelist_prompts:
+     - write-tests
+     - extract-method
+   ```
+
+2. **By path** (recommended for clarity and to avoid ambiguity):
+
+   ```yaml
+   whitelist_prompts:
+     - refactor/extract-method
+     - refactor/simplify-conditionals
+     - docs/document-api
+     - docs/write-readme
+     - planning/design-architecture
+     - qa/write-tests
+   ```
+
+The path-based approach is recommended because:
+
+- It's more explicit and clear
+- It avoids potential naming conflicts
+- It makes the project manifest more maintainable
+
+**Generated filenames:** When prompts are built into adapters, their filenames include the subdirectory prefix and a `prompt-` prefix to prevent conflicts and make them easily distinguishable from agents. For example:
+
+- `refactor/extract-method.yml` → `prompt-refactor-extract-method.prompt.md`
+- `docs/document-api.yml` → `prompt-docs-document-api.prompt.md`
+- `planning/design-architecture.yml` → `prompt-planning-design-architecture.prompt.md`
+
+Agents are prefixed with `agent-` (e.g., `agent-code-reviewer.prompt.md`), making it easy to distinguish between prompts and agents at a glance. This naming convention also ensures that prompts from different categories with similar names don't collide in the generated output.
+
+**Use cases:**
+
+- **Whitelist**: When you want to include only a small, specific set of tools
+  - Small focused projects
+  - Projects with strict requirements
+  - Projects that only need a few specific prompts
+
+- **Blacklist**: When you want most tools but need to exclude a few
+  - Large projects with many needs
+  - Projects that want default behavior except for specific exclusions
+  - Excluding language-specific tools not relevant to the project
+
+**Validation:**
+
+The schema enforces mutual exclusivity - if you try to use both `whitelist_agents` and `excluded_agents` in the same project, validation will fail with:
+
+```text
+Schema validation failed: must match exactly one schema in oneOf
+```
+
+This ensures clarity and prevents conflicting configurations.
 
 ### Metadata (Optional)
 
