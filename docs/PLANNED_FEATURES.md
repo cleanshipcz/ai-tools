@@ -23,7 +23,30 @@
 
 ### Copilot CLI support
 
-- add Copilot CLI as a supported/exported tool
+✅ **Fully Supported**
+
+GitHub Copilot CLI (standalone `copilot` command) is now a fully supported tool with native custom instructions support via `AGENTS.md`.
+
+**Generated artifacts:**
+
+- `AGENTS.md` - Complete file with all agents, prompts, rules, and project-specific context
+
+**Usage:**
+
+```bash
+# Build adapters
+npm run build
+
+# Generate for project
+npm run project:generate <project-id> copilot-cli
+
+# Copy to your project and use
+cp .output/<project-id>/copilot-cli/AGENTS.md /path/to/project/
+cd /path/to/project
+copilot  # Automatically loads AGENTS.md
+```
+
+See [`docs/TOOLS.md`](TOOLS.md) for details.
 
 ### Multi-agent support
 
@@ -35,7 +58,7 @@
   - repeat until reaching certain quality
   - use a documentation agent to reflect the changes
 - the configuration would be a certain recipe to deliver a full feature as if it was done by a team
-- I can see it working with claude code `-c ` feature and some custom script, for example
+- I can see it working with claude code `-c` feature and some custom script, for example
 - I want it for major tools like claude code, copilot CLI, or if possible for GPT
 - if not possible, provide an analysis
 

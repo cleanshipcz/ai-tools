@@ -33,13 +33,14 @@ Quick reference for importing AI Tools configs into different coding assistants.
 npm run build  # Generates all adapters
 ```
 
-| Tool             | Format                  | Location                       |
-| ---------------- | ----------------------- | ------------------------------ |
-| Windsurf         | `.windsurfrules` (JSON) | `adapters/windsurf/`           |
-| Cursor           | `.cursorrules` (JSON)   | `adapters/cursor/`             |
-| Claude Code      | `SKILL.md` (Markdown)   | `adapters/claude-code/skills/` |
-| GitHub Copilot   | `.md` (Markdown)        | `adapters/github-copilot/`     |
-| Anthropic Skills | `SKILL.md` (Markdown)   | `adapters/anthropic/`          |
+| Tool               | Format                  | Location                       |
+| ------------------ | ----------------------- | ------------------------------ |
+| Windsurf           | `.windsurfrules` (JSON) | `adapters/windsurf/`           |
+| Cursor             | `.cursorrules` (JSON)   | `adapters/cursor/`             |
+| Claude Code        | `SKILL.md` (Markdown)   | `adapters/claude-code/skills/` |
+| GitHub Copilot IDE | `.md` (Markdown)        | `adapters/github-copilot/`     |
+| GitHub Copilot CLI | `AGENTS.md` (Markdown)  | `adapters/copilot-cli/`        |
+| Anthropic Skills   | `SKILL.md` (Markdown)   | `adapters/anthropic/`          |
 
 ---
 
@@ -311,6 +312,49 @@ adapters/github-copilot/.github/
 
 Copy to your repo: `cp -r adapters/github-copilot/.github ./`
 
+### GitHub Copilot CLI (Standalone)
+
+**Format:** `AGENTS.md` with all agents, prompts, and project context  
+**Import:** Copy generated file to project root
+
+```bash
+adapters/copilot-cli/AGENTS.md
+```
+
+**Differences:**
+
+- Single AGENTS.md file with everything (agents + project context)
+- Automatically loaded by GitHub Copilot CLI from project root
+- Includes expanded rulepacks for each agent
+
+**Usage:**
+
+```bash
+# Generate for your project
+npm run project:generate <project-id> copilot-cli
+
+# Copy to your project
+cp .output/<project-id>/copilot-cli/AGENTS.md /path/to/your/project/
+
+# Use in your project (AGENTS.md auto-loads)
+cd /path/to/your/project
+copilot  # Starts interactive mode with all agents and rules loaded
+
+# Or use non-interactive mode
+copilot -p "As the code-reviewer agent, review UserService.kt"
+
+# Or use --agent flag if you defined custom agents in AGENTS.md
+copilot --agent code-reviewer -p "Review UserService.kt"
+```
+
+**How it works:**
+
+- The CLI automatically loads `AGENTS.md` from the current directory (or parent directories)
+- All agents, prompts, and project-specific rules are available immediately
+- Reference agents in prompts: "As the [agent-name] agent, ..." or use `--agent [name]` flag
+- The `--agent` flag is for custom agents you define in your `AGENTS.md` (optional)
+- No manual configuration needed
+
 ---
 
 ## Anthropic Skills (Native)
@@ -330,16 +374,17 @@ adapters/anthropic/run-pytest/SKILL.md
 
 ## Comparison
 
-| Feature         | Windsurf/Cursor | Claude Code | Copilot    |
-| --------------- | --------------- | ----------- | ---------- |
-| **Granularity** | Per-agent       | Per-skill   | All-in-one |
-| **Format**      | JSON            | SKILL.md    | Markdown   |
-| **Agents**      | ✅              | ❌          | ✅ (docs)  |
-| **Prompts**     | ✅              | ❌          | ✅ (docs)  |
-| **Skills**      | ❌              | ✅ (exec)   | ✅ (docs)  |
-| **Rulepacks**   | ✅ (merged)     | ❌          | ✅ (docs)  |
-| **Scope**       | Project/global  | Global CLI  | Repository |
-| **Execution**   | IDE             | CLI         | AI assist  |
+| Feature          | Windsurf/Cursor | Claude Code | Copilot IDE | Copilot CLI     |
+| ---------------- | --------------- | ----------- | ----------- | --------------- |
+| **Granularity**  | Per-agent       | Per-skill   | All-in-one  | All-in-one      |
+| **Format**       | JSON            | SKILL.md    | Markdown    | AGENTS.md       |
+| **Agents**       | ✅               | ❌           | ✅ (docs)    | ✅ (native)      |
+| **Prompts**      | ✅               | ❌           | ✅ (docs)    | ✅ (listed)      |
+| **Skills**       | ❌               | ✅ (exec)    | ✅ (docs)    | ✅ (listed)      |
+| **Rulepacks**    | ✅ (merged)      | ❌           | ✅ (docs)    | ✅ (expanded)    |
+| **Auto-Applied** | ✅               | ❌           | ✅           | ✅               |
+| **Scope**        | Project/global  | Global CLI  | Repository  | Directory-based |
+| **Execution**    | IDE             | CLI         | AI assist   | CLI interactive |
 
 ---
 
@@ -347,7 +392,8 @@ adapters/anthropic/run-pytest/SKILL.md
 
 **Windsurf/Cursor:** IDE coding with agents + rules  
 **Claude Code:** CLI automation with executable skills  
-**Copilot:** Repository-wide context with flexible file organization (global, path-specific, prompts)
+**Copilot IDE:** Repository-wide context with flexible file organization (global, path-specific, prompts)  
+**Copilot CLI:** Interactive CLI coding with native agent support and automatic context loading
 
 ---
 

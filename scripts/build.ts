@@ -74,6 +74,7 @@ class Builder {
     await this.generateClaudeCodeAdapters();
     await this.generateCursorAdapters();
     await this.generateGitHubCopilotAdapters();
+    await this.generateCopilotCLIAdapters();
 
     // Generate Anthropic-compatible SKILL.md files
     await this.generateAnthropicSkills();
@@ -533,6 +534,101 @@ class Builder {
       await writeFile(join(promptsDir, `agent-${id}.prompt.md`), agentPrompt.join('\n'), 'utf-8');
     }
     console.log(chalk.gray(`    Generated ${this.agents.size} agent .prompt.md files`));
+  }
+
+  private async generateCopilotCLIAdapters(): Promise<void> {
+    console.log(chalk.blue('  Generating Copilot CLI adapters...'));
+
+    const baseDir = join(rootDir, 'adapters', 'copilot-cli');
+    await mkdir(baseDir, { recursive: true });
+
+    // Generate AGENTS.md with all agents, prompts, and base instructions
+    const agentsContent: string[] = [];
+
+    agentsContent.push('# AI Agents Configuration');
+    agentsContent.push('');
+    agentsContent.push(
+      '> Custom instructions for GitHub Copilot CLI. This file is automatically loaded.'
+    );
+    agentsContent.push('');
+    agentsContent.push('---');
+    agentsContent.push('');
+
+    // Add available agents
+    if (this.agents.size > 0) {
+      agentsContent.push('## Available Agents');
+      agentsContent.push('');
+      agentsContent.push(
+        'Invoke agents by referencing them in your prompts (e.g., "As the code-reviewer agent..."):'
+      );
+      agentsContent.push('');
+
+      for (const [id, agent] of this.agents) {
+        agentsContent.push(`### ${id}`);
+        agentsContent.push('');
+        agentsContent.push(`**Purpose:** ${agent.purpose}`);
+        agentsContent.push('');
+
+        if (agent.prompt?.system) {
+          agentsContent.push('**Persona:**');
+          agentsContent.push('');
+          agentsContent.push(agent.prompt.system.trim());
+          agentsContent.push('');
+        }
+
+        if (agent.constraints && agent.constraints.length > 0) {
+          agentsContent.push('**Constraints:**');
+          agentsContent.push('');
+          for (const constraint of agent.constraints) {
+            agentsContent.push(`- ${constraint}`);
+          }
+          agentsContent.push('');
+        }
+
+        if (agent.rulepacks && agent.rulepacks.length > 0) {
+          agentsContent.push('**Rules:**');
+          agentsContent.push('');
+          const rules = this.resolveRulepacks(agent.rulepacks);
+          for (const rule of rules) {
+            agentsContent.push(`- ${rule}`);
+          }
+          agentsContent.push('');
+        }
+
+        agentsContent.push('---');
+        agentsContent.push('');
+      }
+    }
+
+    // Add available prompts
+    if (this.prompts.size > 0) {
+      agentsContent.push('## Available Task Prompts');
+      agentsContent.push('');
+      agentsContent.push(
+        'Reference these task templates in your prompts (see generated `.github/prompts/` for full details):'
+      );
+      agentsContent.push('');
+
+      for (const [id, prompt] of this.prompts) {
+        const path = prompt._sourcePath || id;
+        agentsContent.push(`- **${path}**: ${prompt.description}`);
+      }
+      agentsContent.push('');
+      agentsContent.push('---');
+      agentsContent.push('');
+    }
+
+    // Add base rulepacks
+    agentsContent.push('## General Coding Rules');
+    agentsContent.push('');
+    const baseRules = this.resolveRulepacks(['base']);
+    for (const rule of baseRules) {
+      agentsContent.push(`- ${rule}`);
+    }
+    agentsContent.push('');
+
+    await writeFile(join(baseDir, 'AGENTS.md'), agentsContent.join('\n'), 'utf-8');
+    console.log(chalk.gray(`    Generated AGENTS.md with ${this.agents.size} agents`));
   }
 
   private async generateAnthropicSkills(): Promise<void> {

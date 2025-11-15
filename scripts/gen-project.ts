@@ -84,7 +84,7 @@ export class ProjectGenerator {
 
     // Generate for each tool
     const toolsToGenerate = tools.includes('all')
-      ? ['github-copilot', 'windsurf', 'cursor', 'claude-code']
+      ? ['github-copilot', 'windsurf', 'cursor', 'claude-code', 'copilot-cli']
       : tools;
 
     for (const tool of toolsToGenerate) {
@@ -200,6 +200,9 @@ export class ProjectGenerator {
         break;
       case 'claude-code':
         await this.generateClaudeCode(toolOutputDir);
+        break;
+      case 'copilot-cli':
+        await this.generateCopilotCLI(toolOutputDir);
         break;
       default:
         console.log(chalk.yellow(`    Unknown tool: ${tool}`));
@@ -371,7 +374,9 @@ export class ProjectGenerator {
           // Regular prompt file - the filename format is "prompt-<category>-<prompt-id>.prompt.md"
           // where only the first hyphen after "prompt-" separates category from ID
           // (e.g., "prompt-refactor-extract-method.prompt.md")
-          const filenameWithoutExt = entry.name.replace(/\.prompt\.md$/, '').replace(/^prompt-/, '');
+          const filenameWithoutExt = entry.name
+            .replace(/\.prompt\.md$/, '')
+            .replace(/^prompt-/, '');
 
           // Convert filename back to path format by replacing only the first hyphen
           // (e.g., "refactor-extract-method" -> "refactor/extract-method")
@@ -734,6 +739,150 @@ export class ProjectGenerator {
 
     await writeFile(join(claudeDir, 'project-context.json'), JSON.stringify(context, null, 2));
     console.log(chalk.gray(`    Generated .claude/project-context.json`));
+  }
+
+  private async generateCopilotCLI(outputDir: string): Promise<void> {
+    console.log(chalk.blue(`  Generating for copilot-cli...`));
+
+    // Generate complete AGENTS.md with base agents + project-specific content
+    const agentsContent = await this.buildCopilotCLIAgentsFile();
+    await writeFile(join(outputDir, 'AGENTS.md'), agentsContent, 'utf-8');
+
+    console.log(chalk.gray(`    Generated AGENTS.md with project context`));
+  }
+
+  private async buildCopilotCLIAgentsFile(): Promise<string> {
+    const lines: string[] = [];
+
+    // Read base AGENTS.md from adapters
+    const adapterSrcDir = join(rootDir, 'adapters', 'copilot-cli');
+    try {
+      await access(adapterSrcDir);
+      const baseAgentsFile = join(adapterSrcDir, 'AGENTS.md');
+      const baseContent = await readFile(baseAgentsFile, 'utf-8');
+      lines.push(baseContent);
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+    } catch {
+      // Base adapters not found, continue with project-specific content only
+    }
+
+    if (!this.project) return lines.join('\n');
+
+    // Add project-specific section
+    lines.push(`# Project: ${this.project.name}`);
+    lines.push('');
+    lines.push(this.project.description);
+    lines.push('');
+
+    // Context
+    if (this.project.context) {
+      lines.push('## Project Overview');
+      lines.push('');
+      if (this.project.context.overview) {
+        lines.push(this.project.context.overview.trim());
+        lines.push('');
+      }
+      if (this.project.context.purpose) {
+        lines.push(`**Purpose:** ${this.project.context.purpose}`);
+        lines.push('');
+      }
+    }
+
+    // Tech Stack
+    if (this.project.tech_stack) {
+      lines.push('## Tech Stack');
+      lines.push('');
+      if (this.project.tech_stack.languages?.length) {
+        lines.push(`**Languages:** ${this.project.tech_stack.languages.join(', ')}`);
+      }
+      if (this.project.tech_stack.frontend?.length) {
+        lines.push(`**Frontend:** ${this.project.tech_stack.frontend.join(', ')}`);
+      }
+      if (this.project.tech_stack.backend?.length) {
+        lines.push(`**Backend:** ${this.project.tech_stack.backend.join(', ')}`);
+      }
+      if (this.project.tech_stack.database?.length) {
+        lines.push(`**Database:** ${this.project.tech_stack.database.join(', ')}`);
+      }
+      if (this.project.tech_stack.infrastructure?.length) {
+        lines.push(`**Infrastructure:** ${this.project.tech_stack.infrastructure.join(', ')}`);
+      }
+      lines.push('');
+    }
+
+    // Commands
+    if (this.project.commands) {
+      lines.push('## Key Commands');
+      lines.push('');
+      for (const [category, cmds] of Object.entries(this.project.commands)) {
+        if (typeof cmds === 'string') {
+          lines.push(`- \`${cmds}\` - ${category}`);
+        } else {
+          lines.push(`### ${category.charAt(0).toUpperCase() + category.slice(1)}`);
+          for (const [name, cmd] of Object.entries(cmds)) {
+            lines.push(`- \`${cmd}\` - ${name}`);
+          }
+          lines.push('');
+        }
+      }
+      lines.push('');
+    }
+
+    // Conventions
+    if (this.project.conventions) {
+      lines.push('## Project Conventions');
+      lines.push('');
+
+      if (this.project.conventions.naming?.length) {
+        lines.push('### Naming');
+        lines.push('');
+        for (const rule of this.project.conventions.naming) {
+          lines.push(`- ${rule}`);
+        }
+        lines.push('');
+      }
+
+      if (this.project.conventions.patterns?.length) {
+        lines.push('### Patterns');
+        lines.push('');
+        for (const rule of this.project.conventions.patterns) {
+          lines.push(`- ${rule}`);
+        }
+        lines.push('');
+      }
+
+      if (this.project.conventions.testing?.length) {
+        lines.push('### Testing');
+        lines.push('');
+        for (const rule of this.project.conventions.testing) {
+          lines.push(`- ${rule}`);
+        }
+        lines.push('');
+      }
+    }
+
+    // AI Tools custom rules
+    if (this.project.ai_tools?.custom_rules?.length) {
+      lines.push('## Project-Specific Rules');
+      lines.push('');
+      for (const rule of this.project.ai_tools.custom_rules) {
+        lines.push(`- ${rule}`);
+      }
+      lines.push('');
+    }
+
+    if (this.project.ai_tools?.preferred_agents?.length) {
+      lines.push('## Preferred Agents');
+      lines.push('');
+      for (const agent of this.project.ai_tools.preferred_agents) {
+        lines.push(`- ${agent}`);
+      }
+      lines.push('');
+    }
+
+    return lines.join('\n');
   }
 
   private async copyClaudePromptsWithFiltering(src: string, dest: string): Promise<void> {
