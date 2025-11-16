@@ -93,7 +93,7 @@ steps:
   - id: review
     agent: code-reviewer
     task: |
-      Review the changes made in the previous step against the plan and acceptance criteria.
+      Review the changes made in the previous step against the plan and acceptance criteria, expect the highest quality.
 
       Focus on:
       - Adherence to the implementation plan

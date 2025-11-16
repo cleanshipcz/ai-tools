@@ -1,0 +1,315 @@
+id: major-refactoring-cycle
+version: 1.0.0
+description: Comprehensive refactoring workflow with test coverage, iterative improvements, and quality validation until 9+/10 achieved
+
+tags:
+  - workflow
+  - refactor
+  - testing
+  - quality
+  - iterative
+
+tools:
+  - claude-code
+  - copilot-cli
+  - cursor
+
+# Separate conversations prevent context bloat and allow fresh perspectives
+conversationStrategy: separate
+
+# Enable automation for copilot-cli
+toolOptions:
+  copilot-cli:
+    allowAllTools: true
+
+variables:
+  target_code: "{{TARGET_CODE}}"
+  quality_threshold: "9"
+  max_iterations: "5"
+
+steps:
+  # STEP 1: Analysis - Identify improvement points
+  - id: analyze-code-quality
+    agent: refactoring-specialist
+    task: |
+      Analyze the target code and identify improvement opportunities.
+
+      Target: {{target_code}}
+
+      Perform comprehensive analysis:
+
+      1. **Code Quality Issues:**
+         - Complexity metrics (cyclomatic complexity, nesting depth)
+         - Code duplication (DRY violations)
+         - Long methods/classes that need decomposition
+         - Poor naming and unclear intent
+         - Missing abstractions
+
+      2. **Design Issues:**
+         - SOLID principle violations
+         - Inappropriate coupling
+         - Missing or misused design patterns
+         - Responsibility distribution problems
+
+      3. **Maintainability Issues:**
+         - Hard-to-test code
+         - Hidden dependencies
+         - Side effects and mutations
+         - Magic numbers and strings
+         - Inadequate error handling
+
+      4. **Performance Issues:**
+         - Inefficient algorithms
+         - Unnecessary computations
+         - Resource leaks
+
+      5. **Test Coverage Gaps:**
+         - Critical paths without tests
+         - Edge cases not covered
+         - Integration points untested
+
+      For each issue:
+      - Rate severity (Critical/High/Medium/Low)
+      - Estimate refactoring effort
+      - Identify testing requirements
+      - Note dependencies and risks
+
+      Prioritize issues by value/risk and create a quality baseline (rate current quality 1-10).
+
+      Output a structured analysis document.
+    outputDocument: ".recipe-docs/refactoring-analysis.md"
+    continueConversation: false
+    waitForConfirmation: false
+
+  # STEP 2: Planning - Create refactoring strategy
+  - id: create-refactoring-plan
+    agent: project-planner
+    task: |
+      Based on the analysis, create a detailed refactoring plan.
+
+      Quality Threshold: {{quality_threshold}}/10
+
+      Create a structured plan with:
+
+      1. **Refactoring Priority Order:**
+         - List issues in order of attack
+         - Group related refactorings together
+         - Identify incremental milestones
+
+      2. **For Each Refactoring:**
+         - Specific changes to make
+         - Test coverage needed BEFORE refactoring
+         - Expected improvements
+         - Risk mitigation strategies
+         - Validation criteria
+
+      3. **Test Strategy:**
+         - Tests to add/strengthen before each refactoring
+         - Integration tests needed
+         - Acceptance criteria for each step
+
+      4. **Quality Gates:**
+         - How to measure improvement
+         - Definition of "done" for each iteration
+         - Path to {{quality_threshold}}/10 quality
+
+      5. **Rollback Strategy:**
+         - How to undo if issues arise
+         - Safe checkpoints
+
+      Output an actionable, step-by-step plan that can be executed incrementally.
+    outputDocument: ".recipe-docs/refactoring-plan.md"
+    includeDocuments:
+      - ".recipe-docs/refactoring-analysis.md"
+    continueConversation: true
+    waitForConfirmation: true
+
+  # STEP 3: Test Coverage - Ensure safety net
+  - id: add-test-coverage
+    agent: tdd-navigator
+    task: |
+      Before refactoring, establish comprehensive test coverage as a safety net.
+
+      Follow the analysis and plan to:
+
+      1. **Identify Critical Paths:**
+         - Focus on code sections being refactored
+         - Cover existing behavior exactly
+         - Test edge cases and error conditions
+
+      2. **Write Characterization Tests:**
+         - Document current behavior (even if suboptimal)
+         - Ensure tests pass with current implementation
+         - Create regression detection
+
+      3. **Add Missing Unit Tests:**
+         - Test public interfaces
+         - Test internal logic for complex methods
+         - Mock dependencies appropriately
+
+      4. **Add Integration Tests:**
+         - Test component interactions
+         - Verify end-to-end flows
+         - Cover critical user paths
+
+      5. **Verify Test Quality:**
+         - Run tests and confirm they pass
+         - Check code coverage metrics
+         - Ensure tests are maintainable
+
+      Document what was tested and coverage achieved.
+
+      DO NOT refactor yet - only add tests!
+    includeDocuments:
+      - ".recipe-docs/refactoring-analysis.md"
+      - ".recipe-docs/refactoring-plan.md"
+    continueConversation: false
+    waitForConfirmation: false
+
+  # STEP 4: Refactor - Execute improvements
+  - id: execute-refactoring
+    agent: refactoring-specialist
+    task: |
+      Execute the refactoring plan incrementally with tests as safety net.
+
+      Follow the plan strictly:
+
+      1. **For Each Refactoring in Priority Order:**
+         - Make the smallest safe change
+         - Run tests after each change
+         - Commit working state before next change
+
+      2. **Apply Refactoring Patterns:**
+         - Extract Method for complex logic
+         - Extract Class for multiple responsibilities
+         - Introduce Parameter Object for long parameter lists
+         - Replace Conditional with Polymorphism
+         - Move Method to better location
+         - Rename for clarity
+         - Remove duplication
+
+      3. **Maintain Behavior:**
+         - All existing tests must pass
+         - No functional changes
+         - Preserve public interfaces where possible
+
+      4. **Improve Design:**
+         - Reduce complexity
+         - Increase cohesion
+         - Reduce coupling
+         - Follow SOLID principles
+         - Add appropriate abstractions
+
+      5. **Document Changes:**
+         - Note what was refactored
+         - Explain significant decisions
+         - Update inline documentation
+         - Update external docs if needed
+
+      Work incrementally - commit after each successful refactoring step.
+    includeDocuments:
+      - ".recipe-docs/refactoring-analysis.md"
+      - ".recipe-docs/refactoring-plan.md"
+    continueConversation: false
+    waitForConfirmation: false
+
+  # STEP 5: Review - Evaluate quality
+  - id: review-refactoring
+    agent: code-reviewer
+    task: |
+      Review the refactored code against quality standards and the plan.
+
+      Perform comprehensive quality assessment:
+
+      1. **Code Quality (rate 1-10):**
+         - Readability and clarity
+         - Simplicity and maintainability
+         - Proper abstraction levels
+         - Consistent naming and style
+
+      2. **Design Quality (rate 1-10):**
+         - SOLID principles adherence
+         - Appropriate patterns usage
+         - Proper separation of concerns
+         - Loose coupling, high cohesion
+
+      3. **Test Quality (rate 1-10):**
+         - Adequate coverage
+         - Test maintainability
+         - Clear test names and structure
+         - Proper test isolation
+
+      4. **Overall Quality (rate 1-10):**
+         - Average of above metrics
+         - Holistic assessment
+         - Comparison to baseline from analysis
+
+      5. **Remaining Issues:**
+         - What still needs improvement?
+         - Prioritize by impact
+         - Estimate effort for next iteration
+
+      6. **Recommendations:**
+         - If quality >= {{quality_threshold}}/10: APPROVE and list achievements
+         - If quality < {{quality_threshold}}/10: List specific improvements needed for next iteration
+
+      Output:
+      - Quality scores for each dimension
+      - Overall quality score
+      - APPROVE or specific action items for next iteration
+      - Progress toward quality threshold
+    outputDocument: ".recipe-docs/review-results.md"
+    includeDocuments:
+      - ".recipe-docs/refactoring-analysis.md"
+      - ".recipe-docs/refactoring-plan.md"
+    continueConversation: true
+    waitForConfirmation: true
+
+  # STEP 6: Iterate - Address remaining issues
+  - id: address-review-feedback
+    agent: refactoring-specialist
+    task: |
+      Address the specific issues identified in the review.
+
+      Based on review feedback:
+
+      1. **Focus on Highest Impact Issues:**
+         - Prioritize items that most improve quality score
+         - Work incrementally with test safety net
+
+      2. **Apply Targeted Improvements:**
+         - Follow review recommendations exactly
+         - Make one improvement at a time
+         - Run tests after each change
+
+      3. **Document Progress:**
+         - Note what was improved
+         - Explain decisions made
+         - Track quality improvements
+
+      This is an incremental improvement - not a complete refactoring.
+      Focus on moving closer to {{quality_threshold}}/10 threshold.
+    includeDocuments:
+      - ".recipe-docs/refactoring-analysis.md"
+      - ".recipe-docs/refactoring-plan.md"
+      - ".recipe-docs/review-results.md"
+    continueConversation: false
+    waitForConfirmation: false
+
+# Loop for iterative quality improvement
+loop:
+  steps:
+    - review-refactoring
+    - address-review-feedback
+  maxIterations: 5
+  continueUntil: "Quality score >= {{quality_threshold}}/10 or max iterations reached"
+
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  tags:
+    - refactoring
+    - quality
+    - testing
+    - iterative
+    - tdd
