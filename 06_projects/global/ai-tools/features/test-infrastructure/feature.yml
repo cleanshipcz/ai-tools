@@ -1,0 +1,598 @@
+id: test-infrastructure
+version: 1.0.0
+name: Automated Test Infrastructure
+description: Comprehensive automated testing system with unit tests, integration tests, and CI/CD integration for the ai-tools repository
+
+context:
+  overview: |
+    Establish a complete automated testing infrastructure for the ai-tools repository to ensure
+    reliability and prevent regressions. The system enables test-driven development with unit tests
+    for internal functionality and integration tests for output generation validation.
+
+    This infrastructure is critical for:
+    - Automated validation of all TypeScript scripts in 11_scripts/
+    - Testing output generation for all tools (GitHub Copilot, Windsurf, Claude Code, Cursor)
+    - Regression testing for future changes
+    - Continuous integration and quality assurance
+    - Test-driven development workflow enforcement
+
+    The test infrastructure follows the project's core principle: "Automated tests are mandatory,
+    not optional. Manual testing is insufficient for verification."
+
+  architecture: |
+    The test infrastructure follows a layered approach:
+
+    1. **Test Framework**: Vitest as the primary test runner
+       - Fast, TypeScript-native testing framework
+       - Built-in coverage reporting
+       - Watch mode for development
+       - Compatible with ES modules
+
+    2. **Test Organization**:
+       - Mirror source structure: 11_scripts/foo.ts → 11_scripts/foo.test.ts
+       - Test files colocated with source for easy navigation
+       - Separate unit tests and integration tests by naming convention
+       - Test utilities and fixtures in dedicated directories
+
+    3. **Test Types**:
+       - **Unit Tests**: Test individual functions, classes, and methods in isolation
+       - **Integration Tests**: Test script execution and output generation end-to-end
+       - **Schema Validation Tests**: Verify manifest validation logic
+       - **Output Generation Tests**: Validate generated adapter files
+
+    4. **Test Data Management**:
+       - Use .gitignored test output directory (.test-output/)
+       - Clean up test artifacts after each run
+       - Generate test fixtures for consistent testing
+       - Mock file system operations where appropriate
+
+    5. **Coverage Requirements**:
+       - Target: 80% code coverage on new code
+       - Track coverage trends over time
+       - Fail CI if coverage drops below threshold
+
+    6. **CI/CD Integration**:
+       - Run tests on every commit via GitHub Actions
+       - Generate coverage reports
+       - Block merges if tests fail
+       - Report test results in PRs
+
+  dependencies:
+    - vitest (test framework)
+    - '@vitest/coverage-v8 (coverage reporting)'
+    - TypeScript (source language)
+    - tsx (TypeScript execution)
+    - Existing build system (11_scripts/build.ts)
+    - Existing validation system (11_scripts/validate.ts)
+
+files:
+  entry_points:
+    - package.json
+    - vitest.config.ts
+    - 11_scripts/*.test.ts
+
+  key_files:
+    - 11_scripts/build.ts
+    - 11_scripts/validate.ts
+    - 11_scripts/gen-project.ts
+    - 11_scripts/gen-prompt-library.ts
+    - 10_schemas/*.schema.json
+
+  patterns:
+    - 11_scripts/**/*.test.ts
+    - vitest.config.ts
+    - package.json
+    - .github/workflows/test.yml
+
+snippets:
+  - id: vitest-config
+    title: Vitest Configuration
+    description: Complete vitest.config.ts with coverage and TypeScript support
+    language: typescript
+    content: |
+      import { defineConfig } from 'vitest/config';
+
+      export default defineConfig({
+        test: {
+          globals: true,
+          environment: 'node',
+          coverage: {
+            provider: 'v8',
+            reporter: ['text', 'json', 'html', 'lcov'],
+            exclude: [
+              'node_modules/**',
+              '**/*.test.ts',
+              '**/*.spec.ts',
+              'adapters/**',
+              '.output/**',
+              '.test-output/**',
+              '**/*.config.ts',
+            ],
+            thresholds: {
+              lines: 80,
+              functions: 80,
+              branches: 80,
+              statements: 80,
+            },
+          },
+          include: ['11_scripts/**/*.test.ts'],
+          exclude: ['node_modules', 'adapters', '.output', '.test-output'],
+        },
+      });
+
+  - id: package-json-scripts
+    title: NPM Test Scripts
+    description: Add test commands to package.json
+    language: json
+    content: |
+      {
+        "scripts": {
+          "test": "vitest run",
+          "test:watch": "vitest",
+          "test:coverage": "vitest run --coverage",
+          "test:ui": "vitest --ui",
+          "ci": "npm run validate && npm run test:coverage && npm run build"
+        },
+        "devDependencies": {
+          "vitest": "^1.0.0",
+          "@vitest/coverage-v8": "^1.0.0",
+          "@vitest/ui": "^1.0.0"
+        }
+      }
+
+  - id: unit-test-example
+    title: Unit Test Example
+    description: Example unit test for a utility function
+    language: typescript
+    content: |
+      import { describe, it, expect } from 'vitest';
+      import { someUtilityFunction } from './utils.js';
+
+      describe('someUtilityFunction', () => {
+        it('should return expected value for valid input', () => {
+          // Arrange
+          const input = 'test-input';
+
+          // Act
+          const result = someUtilityFunction(input);
+
+          // Assert
+          expect(result).toBe('expected-output');
+        });
+
+        it('should handle edge case with empty string', () => {
+          // Arrange
+          const input = '';
+
+          // Act
+          const result = someUtilityFunction(input);
+
+          // Assert
+          expect(result).toBe('');
+        });
+
+        it('should throw error for invalid input', () => {
+          // Arrange
+          const input = null;
+
+          // Act & Assert
+          expect(() => someUtilityFunction(input)).toThrow('Invalid input');
+        });
+      });
+
+  - id: integration-test-example
+    title: Integration Test Example
+    description: Example integration test for output generation
+    language: typescript
+    content: |
+      import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+      import { existsSync, mkdirSync, rmSync, readFileSync } from 'fs';
+      import { join } from 'path';
+      import { ProjectGenerator } from './gen-project.js';
+
+      describe('ProjectGenerator Integration Tests', () => {
+        const testOutputDir = '.test-output';
+        const testProjectId = 'test-project';
+
+        beforeEach(() => {
+          // Setup: Create test output directory
+          if (!existsSync(testOutputDir)) {
+            mkdirSync(testOutputDir, { recursive: true });
+          }
+        });
+
+        afterEach(() => {
+          // Cleanup: Remove test output directory
+          if (existsSync(testOutputDir)) {
+            rmSync(testOutputDir, { recursive: true, force: true });
+          }
+        });
+
+        it('should generate GitHub Copilot adapter successfully', async () => {
+          // Arrange
+          const generator = new ProjectGenerator(testProjectId);
+          const outputPath = join(testOutputDir, 'github-copilot');
+
+          // Act
+          await generator.generate('github-copilot', outputPath);
+
+          // Assert
+          expect(existsSync(outputPath)).toBe(true);
+          const instructionsFile = join(outputPath, '.github/copilot-instructions.md');
+          expect(existsSync(instructionsFile)).toBe(true);
+
+          const content = readFileSync(instructionsFile, 'utf-8');
+          expect(content).toContain('# AI Tools Repository');
+          expect(content).toContain('## Available Agents');
+        });
+
+        it('should include only whitelisted agents in output', async () => {
+          // Arrange
+          const generator = new ProjectGenerator(testProjectId);
+          const outputPath = join(testOutputDir, 'github-copilot');
+
+          // Act
+          await generator.generate('github-copilot', outputPath);
+
+          // Assert
+          const instructionsFile = join(outputPath, '.github/copilot-instructions.md');
+          const content = readFileSync(instructionsFile, 'utf-8');
+
+          // Verify whitelisted agents are included
+          expect(content).toContain('code-reviewer');
+          expect(content).toContain('feature-builder');
+
+          // Verify non-whitelisted agents are excluded (if applicable)
+          // expect(content).not.toContain('non-whitelisted-agent');
+        });
+      });
+
+  - id: test-utilities
+    title: Test Utilities Module
+    description: Shared test utilities and fixtures
+    language: typescript
+    content: |
+      import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+      import { join } from 'path';
+
+      /**
+       * Create a temporary test directory
+       */
+      export function createTestDir(path: string): void {
+        if (!existsSync(path)) {
+          mkdirSync(path, { recursive: true });
+        }
+      }
+
+      /**
+       * Clean up test directory
+       */
+      export function cleanupTestDir(path: string): void {
+        if (existsSync(path)) {
+          rmSync(path, { recursive: true, force: true });
+        }
+      }
+
+      /**
+       * Create a test fixture file
+       */
+      export function createFixture(dir: string, filename: string, content: string): string {
+        const filepath = join(dir, filename);
+        writeFileSync(filepath, content, 'utf-8');
+        return filepath;
+      }
+
+      /**
+       * Load a test fixture from file
+       */
+      export function loadFixture(filepath: string): any {
+        // Implementation
+      }
+
+      /**
+       * Create a minimal valid project manifest for testing
+       */
+      export function createTestProjectManifest(overrides = {}): any {
+        return {
+          id: 'test-project',
+          version: '1.0.0',
+          name: 'Test Project',
+          description: 'A test project for unit testing',
+          ...overrides,
+        };
+      }
+
+  - id: github-actions-workflow
+    title: GitHub Actions CI Workflow
+    description: CI workflow for running tests on every commit
+    language: yaml
+    content: |
+      name: Test
+
+      on:
+        push:
+          branches: [main, develop]
+        pull_request:
+          branches: [main, develop]
+
+      jobs:
+        test:
+          runs-on: ubuntu-latest
+
+          steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                node-version: '20'
+                cache: 'npm'
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Run linter
+              run: npm run lint
+
+            - name: Run validation
+              run: npm run validate
+
+            - name: Run tests with coverage
+              run: npm run test:coverage
+
+            - name: Upload coverage reports
+              uses: codecov/codecov-action@v3
+              with:
+                files: ./coverage/lcov.info
+                flags: unittests
+                name: codecov-umbrella
+
+            - name: Build project
+              run: npm run build
+
+  - id: example-script-with-tests
+    title: Example Script with Test Suite
+    description: Shows a script file and its corresponding test file structure
+    language: typescript
+    content: |
+      // 11_scripts/example-utils.ts
+      export function formatManifestId(id: string): string {
+        if (!id) throw new Error('ID is required');
+        return id.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      }
+
+      export function validateKebabCase(str: string): boolean {
+        return /^[a-z0-9]+(-[a-z0-9]+)*$/.test(str);
+      }
+
+      // 11_scripts/example-utils.test.ts
+      import { describe, it, expect } from 'vitest';
+      import { formatManifestId, validateKebabCase } from './example-utils.js';
+
+      describe('formatManifestId', () => {
+        it('should convert uppercase to lowercase', () => {
+          expect(formatManifestId('MyFeature')).toBe('myfeature');
+        });
+
+        it('should replace spaces with hyphens', () => {
+          expect(formatManifestId('my feature')).toBe('my-feature');
+        });
+
+        it('should throw error for empty string', () => {
+          expect(() => formatManifestId('')).toThrow('ID is required');
+        });
+      });
+
+      describe('validateKebabCase', () => {
+        it('should return true for valid kebab-case', () => {
+          expect(validateKebabCase('my-feature')).toBe(true);
+          expect(validateKebabCase('feature-123')).toBe(true);
+        });
+
+        it('should return false for invalid kebab-case', () => {
+          expect(validateKebabCase('MyFeature')).toBe(false);
+          expect(validateKebabCase('my_feature')).toBe(false);
+          expect(validateKebabCase('my feature')).toBe(false);
+        });
+      });
+
+conventions:
+  - 'Use Vitest as the test framework for all TypeScript code'
+  - 'Test files must mirror source structure: 11_scripts/foo.ts → 11_scripts/foo.test.ts'
+  - 'Follow AAA pattern: Arrange, Act, Assert in all test cases'
+  - 'Use descriptive test names: "should [expected behavior] when [condition]"'
+  - 'Every public function/method must have at least one test case'
+  - 'Organize tests with describe/it blocks for clarity'
+  - 'Mock external dependencies to keep tests isolated and fast'
+  - 'Clean up test artifacts in afterEach hooks'
+  - 'Use .test-output/ for temporary test files (gitignored)'
+  - 'Target 80%+ code coverage on new code'
+  - 'Tests must run via: npm test (no manual intervention)'
+  - 'Integration tests should test end-to-end functionality'
+  - 'Unit tests should be fast (< 100ms) and deterministic'
+  - 'Include edge cases, error conditions, and boundary values'
+  - 'Test both happy path and failure scenarios'
+  - 'Never commit code without corresponding tests'
+
+recipe:
+  id: feature-delivery
+  context:
+    feature_description: |
+      Set up comprehensive automated testing infrastructure for the ai-tools repository using Vitest.
+
+      **Phase 0: Test Infrastructure Setup (This Feature)**
+      This is the foundational testing system that must be completed FIRST before any other feature work.
+
+      **Requirements:**
+
+      1. **Install Test Framework Dependencies**:
+         ```bash
+         npm install --save-dev vitest @vitest/coverage-v8 @vitest/ui
+         ```
+
+      2. **Create vitest.config.ts**:
+         - Set up TypeScript/Node environment
+         - Configure coverage provider (v8)
+         - Set coverage thresholds (80% for lines, functions, branches, statements)
+         - Exclude node_modules, adapters, .output, .test-output from coverage
+         - Include only 11_scripts/**/*.test.ts files
+
+      3. **Update package.json Scripts**:
+         - `test`: Run tests once (vitest run)
+         - `test:watch`: Run tests in watch mode (vitest)
+         - `test:coverage`: Run tests with coverage report (vitest run --coverage)
+         - `test:ui`: Run tests with UI (vitest --ui)
+         - Update `ci` script to include test:coverage
+
+      4. **Create Test Utilities Module** (11_scripts/test-utils.ts):
+         - createTestDir() - Create temporary test directories
+         - cleanupTestDir() - Clean up after tests
+         - createFixture() - Create test fixture files
+         - createTestProjectManifest() - Generate test project manifests
+
+      5. **Write Example Test Suites**:
+
+         a) Unit Tests (11_scripts/validate.test.ts):
+         - Test schema validation functions
+         - Test manifest loading and parsing
+         - Test error handling and edge cases
+
+         b) Integration Tests (11_scripts/gen-project.test.ts):
+         - Test complete project generation for each adapter
+         - Verify output file structure
+         - Validate generated content includes expected elements
+         - Test filtering (agents, prompts, rulepacks, recipes)
+         - Use .test-output/ directory for generated files
+         - Clean up after each test
+
+         c) Output Generation Tests:
+         - Generate adapters for a test project
+         - Verify GitHub Copilot instructions format
+         - Verify Windsurf rules format
+         - Verify Claude Code format
+         - Verify Cursor format
+
+      6. **Add .test-output/ to .gitignore**:
+         ```
+         # Test output directory
+         .test-output/
+         ```
+
+      7. **Create GitHub Actions Workflow** (.github/workflows/test.yml):
+         - Run on push to main/develop
+         - Run on pull requests
+         - Steps: checkout, setup node, install deps, lint, validate, test with coverage, build
+         - Upload coverage to Codecov
+         - Fail if tests fail or coverage drops
+
+      8. **Update Documentation**:
+         - Add "Testing" section to README.md
+         - Explain how to run tests (npm test, npm run test:watch, npm run test:coverage)
+         - Document test structure and conventions
+         - Add badge for test status and coverage
+
+      9. **Write Tests for Existing Scripts**:
+         Priority order (start with these):
+         - validate.ts (schema validation logic)
+         - gen-project.ts (project generation logic)
+         - gen-prompt-library.ts (prompt library generation)
+         - build.ts (build orchestration)
+
+         Lower priority (can be added later):
+         - Other scripts in 11_scripts/
+
+      10. **Validate Everything Works**:
+          ```bash
+          npm run validate        # Schemas and manifests validate
+          npm test                # All tests pass
+          npm run test:coverage   # Coverage meets 80% threshold
+          npm run build           # Build succeeds
+          npm run ci              # Full CI pipeline passes
+          ```
+
+    acceptance_criteria: |
+      **Setup & Configuration:**
+      - [ ] vitest, @vitest/coverage-v8, @vitest/ui installed as dev dependencies
+      - [ ] vitest.config.ts created with proper configuration
+      - [ ] Coverage thresholds set to 80% for all metrics
+      - [ ] Test scripts added to package.json (test, test:watch, test:coverage, test:ui)
+      - [ ] .test-output/ added to .gitignore
+      - [ ] npm test runs successfully
+
+      **Test Utilities:**
+      - [ ] test-utils.ts created with helper functions
+      - [ ] createTestDir() implemented and tested
+      - [ ] cleanupTestDir() implemented and tested
+      - [ ] createTestProjectManifest() implemented with sensible defaults
+
+      **Unit Tests:**
+      - [ ] validate.test.ts created with schema validation tests
+      - [ ] Tests cover valid manifests (should pass validation)
+      - [ ] Tests cover invalid manifests (should fail validation)
+      - [ ] Tests cover edge cases (empty files, malformed YAML, etc.)
+      - [ ] All unit tests pass
+
+      **Integration Tests:**
+      - [ ] gen-project.test.ts created with end-to-end tests
+      - [ ] Test generates GitHub Copilot adapter successfully
+      - [ ] Test generates Windsurf adapter successfully
+      - [ ] Test generates Claude Code adapter successfully
+      - [ ] Test generates Cursor adapter successfully
+      - [ ] Tests verify correct file structure
+      - [ ] Tests verify content includes expected elements
+      - [ ] Tests use .test-output/ directory
+      - [ ] Tests clean up after themselves (no leftover files)
+      - [ ] All integration tests pass
+
+      **Coverage:**
+      - [ ] Code coverage meets 80% threshold for new test files
+      - [ ] Coverage report generated successfully (npm run test:coverage)
+      - [ ] HTML coverage report available in coverage/ directory
+
+      **CI/CD:**
+      - [ ] .github/workflows/test.yml created
+      - [ ] Workflow runs on push to main/develop
+      - [ ] Workflow runs on pull requests
+      - [ ] Workflow fails if tests fail
+      - [ ] Workflow fails if coverage drops below threshold
+      - [ ] Coverage uploaded to Codecov (optional but recommended)
+
+      **Documentation:**
+      - [ ] README.md updated with Testing section
+      - [ ] Instructions for running tests documented
+      - [ ] Test structure explained
+      - [ ] Test conventions documented
+      - [ ] Test status badge added (if using CI)
+
+      **Validation:**
+      - [ ] npm run validate passes
+      - [ ] npm test passes (all tests green)
+      - [ ] npm run test:coverage passes (meets 80% threshold)
+      - [ ] npm run build succeeds
+      - [ ] npm run ci passes (full pipeline)
+      - [ ] No flaky tests (tests pass consistently)
+
+      **Example Tests Created:**
+      - [ ] At least 3 test suites created (validate, gen-project, and one more)
+      - [ ] At least 15 test cases total
+      - [ ] Tests demonstrate unit testing patterns
+      - [ ] Tests demonstrate integration testing patterns
+      - [ ] Tests demonstrate proper setup/teardown
+
+  tools:
+    - copilot-cli
+    - claude-code
+
+metadata:
+  status: draft
+  owner: ai-tools-team
+  created: '2025-11-16'
+  updated: '2025-11-16'
+  tags:
+    - testing
+    - vitest
+    - ci-cd
+    - quality-assurance
+    - infrastructure
+    - unit-tests
+    - integration-tests
