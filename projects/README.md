@@ -78,14 +78,14 @@ code projects/local/my-project/deploy.local.yml
 ### 3. Deploy to Your Project
 
 ```bash
-# Deploy automatically generates and copies files
+# Deploy automatically generates and copies files (no confirmation by default)
 npm run project:deploy my-project
 
 # Dry run to preview
 npm run project:deploy my-project -- --dry-run
 
-# Skip confirmation prompt
-npm run project:deploy my-project -- --no-confirm
+# Interactive mode with step-by-step confirmation
+npm run project:deploy my-project -- --interactive
 ```
 
 ### 4. List Projects
@@ -674,11 +674,11 @@ npm run project:deploy <project-id>
 # Dry run (preview changes)
 npm run project:deploy <project-id> -- --dry-run
 
-# Skip confirmation
-npm run project:deploy <project-id> -- --no-confirm
+# Interactive mode with step-by-step confirmation
+npm run project:deploy <project-id> -- --interactive
 
-# Dry run + skip confirmation
-npm run project:deploy <project-id> -- --dry-run --no-confirm
+# Dry run + interactive mode
+npm run project:deploy <project-id> -- --dry-run --interactive
 ```
 
 ### Rollback
@@ -1300,7 +1300,7 @@ jobs:
       - uses: actions/setup-node@v3
       - run: npm install
       - run: npm run validate
-      - run: npm run project:deploy my-project -- --no-confirm
+      - run: npm run project:deploy my-project
 ```
 
 ---

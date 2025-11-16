@@ -559,7 +559,7 @@ const projectId = args[1];
 const flags = {
   dryRun: args.includes('--dry-run') || args.includes('-n'),
   force: args.includes('--force') || args.includes('-f'),
-  confirm: !args.includes('--no-confirm'),
+  confirm: args.includes('--interactive') || args.includes('-i'),
 };
 
 const deployer = new ProjectDeployer();
@@ -567,7 +567,7 @@ const deployer = new ProjectDeployer();
 if (command === 'deploy') {
   if (!projectId) {
     console.error(chalk.red('Error: Project ID required'));
-    console.log('\nUsage: deploy <project-id> [--dry-run] [--force] [--no-confirm]');
+    console.log('\nUsage: deploy <project-id> [--dry-run] [--force] [--interactive]');
     process.exit(1);
   }
 
@@ -594,8 +594,8 @@ if (command === 'deploy') {
 } else {
   console.error(chalk.red(`Unknown command: ${command || '(none)'}`));
   console.log('\nAvailable commands:');
-  console.log('  deploy <project-id> [--dry-run] [--force] [--no-confirm]');
-  console.log('  deploy-all [--dry-run] [--force] [--no-confirm]');
+  console.log('  deploy <project-id> [--dry-run] [--force] [--interactive]');
+  console.log('  deploy-all [--dry-run] [--force] [--interactive]');
   console.log('  rollback <project-id> [timestamp]');
   process.exit(1);
 }

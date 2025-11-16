@@ -92,7 +92,7 @@ See [`recipes/README.md`](../recipes/README.md) for complete documentation.
 ### Misc
 
 - [x] Rename cleanship-recipes to .cs.recipes
-- [ ] switch --no-confirm to --interactive for step-by-step with confirmation (by default doesn't require confirmation)
+- [x] switch --no-confirm to --interactive for step-by-step with confirmation (by default doesn't require confirmation)
 - [ ] For all recipes, the first step needs to be: analysis of the relevant content with output to a document, then detailed plan of the change with output to a document; these documents then need to be included in context and maintained
 - [ ] Organization agent -> good in organizing files, folders, documents, topics, etc.
 - [ ] Organize this repository -> add enumerated prefix for folders (e.g. 01_Scriptsm, 02_Rulepacks, ..., 99_Docs)
