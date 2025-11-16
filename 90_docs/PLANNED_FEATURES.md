@@ -9,7 +9,7 @@
 
 ### Large features (v1.1.0)
 
-- ✅ Feature-specific context system in `projects/<global|local>/project-name/features/feature-name`
+- ✅ Feature-specific context system in `06_projects/<global|local>/project-name/features/feature-name`
 - ✅ Feature manifests with snippets and conventions
 - ✅ Generates feature-specific context for all tools (GitHub Copilot, Windsurf, Claude Code, Cursor)
 - ✅ Feature generation integrated into project generation workflow
@@ -65,8 +65,8 @@ Multi-agent recipes enable orchestrating multiple AI agents in sequence to accom
 
 **Generated artifacts:**
 
-- `recipes/*.yml` - Recipe manifest definitions
-- `schemas/recipe.schema.json` - JSON Schema for validation
+- `05_recipes/*.yml` - Recipe manifest definitions
+- `10_schemas/recipe.schema.json` - JSON Schema for validation
 - `.output/scripts/*.sh` - Auto-generated executable scripts
 
 **Usage (Automated):**
@@ -87,7 +87,7 @@ FEATURE_DESCRIPTION="Add auth" \
 npm run recipe:run feature-delivery claude-code
 ```
 
-See [`recipes/README.md`](../recipes/README.md) for complete documentation.
+See [`05_recipes/README.md`](../05_recipes/README.md) for complete documentation.
 
 ### Misc
 
@@ -95,7 +95,7 @@ See [`recipes/README.md`](../recipes/README.md) for complete documentation.
 - [x] switch --no-confirm to --interactive for step-by-step with confirmation (by default doesn't require confirmation)
 - [x] For all recipes, the first step needs to be: analysis of the relevant content with output to a document, then detailed plan of the change with output to a document; these documents then need to be included in context and maintained
 - [x] Organization agent -> good in organizing files, folders, documents, topics, etc.
-- [ ] Organize this repository -> add enumerated prefix for folders (e.g. 01_Scriptsm, 02_Rulepacks, ..., 99_Docs)
+- [x] Organize this repository -> add enumerated prefix for folders (e.g. 01_rulepacks, 02_skills, ..., 90_docs)
 
 ## Other features NOT NOW
 

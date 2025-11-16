@@ -366,9 +366,9 @@ includes:
 
 ## 🔗 Related
 
-- [Agents](../agents/README.md) - Agents that use MCP capabilities
-- [Skills](../skills/README.md) - Skills can be exposed via MCP
-- [Security](../docs/SECURITY.md) - Security best practices
+- [Agents](../04_agents/README.md) - Agents that use MCP capabilities
+- [Skills](../02_skills/README.md) - Skills can be exposed via MCP
+- [Security](../90_docs/SECURITY.md) - Security best practices
 
 ## 🐛 Troubleshooting
 
@@ -416,4 +416,4 @@ npm install -g @mycompany/mcp-server-custom
 
 - [MCP Documentation](https://modelcontextprotocol.io) - Official MCP docs
 - [Main README](../README.md) - Full project documentation
-- [Security Guide](../docs/SECURITY.md) - Security best practices
+- [Security Guide](../90_docs/SECURITY.md) - Security best practices

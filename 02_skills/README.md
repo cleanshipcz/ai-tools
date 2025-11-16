@@ -90,7 +90,7 @@ npm run skills
 
 The build process:
 
-1. Reads YAML manifests from `skills/*.yml`
+1. Reads YAML manifests from `02_skills/*.yml`
 2. Validates against JSON Schema
 3. Generates tool-specific configs (Windsurf, Cursor)
 4. Generates Anthropic SKILL.md files with:
@@ -234,7 +234,7 @@ Skills are **automatically included** when you import agents. The agent's `capab
 
 ### MCP Integration
 
-Skills can be exposed through MCP servers. See [MCP README](../mcp/README.md) for details.
+Skills can be exposed through MCP servers. See [MCP README](../07_mcp/README.md) for details.
 
 ## 📝 Creating Your Own Skills
 
@@ -427,9 +427,9 @@ command:
 
 ## 🔗 Related
 
-- [Agents](../agents/README.md) - Agents that use skills
-- [MCP](../mcp/README.md) - MCP servers expose skills to agents
-- [Rulepacks](../rulepacks/README.md) - Guidelines for using skills
+- [Agents](../04_agents/README.md) - Agents that use skills
+- [MCP](../07_mcp/README.md) - MCP servers expose skills to agents
+- [Rulepacks](../01_rulepacks/README.md) - Guidelines for using skills
 
 ## 💡 Usage Examples
 

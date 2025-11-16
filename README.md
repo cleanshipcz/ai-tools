@@ -108,7 +108,7 @@ cd /path/to/your-actual-app
 ./.cs.recipes/feature-delivery.sh
 ```
 
-**📖 [Recipe Guide](recipes/README.md)** - How to use multi-agent workflow recipes
+**📖 [Recipe Guide](05_recipes/README.md)** - How to use multi-agent workflow recipes
 
 ### For Developers (Managing Configs)
 
@@ -128,7 +128,7 @@ ls adapters/github-copilot/    # GitHub Copilot instructions
 
 ## 📝 Prompts
 
-> **📖 [Detailed Guide](prompts/README.md)** - Complete documentation with step-by-step instructions for Windsurf, Cursor, Claude Code, and more.
+> **📖 [Detailed Guide](03_prompts/README.md)** - Complete documentation with step-by-step instructions for Windsurf, Cursor, Claude Code, and more.
 
 ### What Are Prompts?
 
@@ -260,7 +260,7 @@ npm run prompt-library  # Update prompt library
 
 ## 🤖 Agents
 
-> **📖 [Detailed Guide](agents/README.md)** - Complete documentation with step-by-step instructions for Windsurf, Cursor, Claude Code, GitHub Copilot, and more.
+> **📖 [Detailed Guide](04_agents/README.md)** - Complete documentation with step-by-step instructions for Windsurf, Cursor, Claude Code, GitHub Copilot, and more.
 
 ### What Are Agents?
 
@@ -350,7 +350,7 @@ npm run build
 
 ## � Recipes (Multi-Agent Workflows)
 
-> **📖 [Recipe Guide](recipes/README.md)** - Multi-agent workflow recipes
+> **📖 [Recipe Guide](05_recipes/README.md)** - Multi-agent workflow recipes
 
 ### What Are Recipes?
 
@@ -393,13 +393,13 @@ npm run project:generate-features my-project
 Feature Builder → Code Reviewer → Feature Builder → Quality Check → Document
 ```
 
-All steps execute automatically. See [recipes/README.md](recipes/README.md) for details on standalone and feature-bound recipes.
+All steps execute automatically. See [recipes/README.md](05_recipes/README.md) for details on standalone and feature-bound recipes.
 
 ---
 
 ## �📋 Rulepacks
 
-> **📖 [Detailed Guide](rulepacks/README.md)** - Complete documentation on how rulepacks work, composition patterns, and usage in different tools.
+> **📖 [Detailed Guide](01_rulepacks/README.md)** - Complete documentation on how rulepacks work, composition patterns, and usage in different tools.
 
 ### What Are Rulepacks?
 
@@ -454,7 +454,7 @@ npm run build     # Bundles into agents/configs
 
 ## 🛠️ Skills
 
-> **📖 [Detailed Guide](skills/README.md)** - Complete documentation on the hybrid architecture, how skills work in different tools, and creating custom skills.
+> **📖 [Detailed Guide](02_skills/README.md)** - Complete documentation on the hybrid architecture, how skills work in different tools, and creating custom skills.
 
 ### What Are Skills?
 
@@ -480,7 +480,7 @@ npm run build
 
 ## 🔌 MCP (Model Context Protocol)
 
-> **📖 [Detailed Guide](mcp/README.md)** - Complete documentation on MCP servers, presets, security considerations, and tool-specific configuration.
+> **📖 [Detailed Guide](07_mcp/README.md)** - Complete documentation on MCP servers, presets, security considerations, and tool-specific configuration.
 
 ### What Is MCP?
 
@@ -530,7 +530,7 @@ npm run eval -- --suite code-refactor
 
 ## 📦 Projects & Features
 
-> **📖 [Detailed Guide](projects/README.md)** - Complete documentation on project system, features, and external projects.
+> **📖 [Detailed Guide](06_projects/README.md)** - Complete documentation on project system, features, and external projects.
 
 ### What Are Projects?
 
@@ -618,7 +618,7 @@ ai-tools/
 
 ## 📁 Projects (NEW!)
 
-> **📖 [Complete Guide: projects/README.md](projects/README.md)**
+> **📖 [Complete Guide: projects/README.md](06_projects/README.md)**
 
 Generate and deploy project-specific AI tool configurations with your tech stack, conventions, and commands.
 
@@ -691,7 +691,7 @@ ai_tools:
 ✅ **Tool Agnostic** - Works with all supported AI coding tools  
 ✅ **Validation** - Schema validation ensures correctness
 
-**[→ Read the full guide](projects/README.md)** for detailed instructions, examples, and best practices.
+**[→ Read the full guide](06_projects/README.md)** for detailed instructions, examples, and best practices.
 
 ---
 
@@ -755,12 +755,12 @@ npm run clean            # Remove generated files
 ### Developer Resources
 
 - **[QUICKREF.md](QUICKREF.md)** - Quick reference guide
-- **[docs/TOOLS.md](docs/TOOLS.md)** - Tool integration reference (Windsurf, Cursor, Claude Code, Copilot)
-- **[recipes/README.md](recipes/README.md)** - Multi-agent workflow recipes (quick start)
-- **[recipes/GUIDE.md](recipes/GUIDE.md)** - Advanced recipe guide (complete reference)
-- **[docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md)** - Writing effective prompts
-- **[docs/AGENTS.md](docs/AGENTS.md)** - Agent documentation (generated)
-- **[docs/CHANGELOG.md](docs/CHANGELOG.md)** - Version history
+- **[docs/TOOLS.md](90_docs/TOOLS.md)** - Tool integration reference (Windsurf, Cursor, Claude Code, Copilot)
+- **[recipes/README.md](05_recipes/README.md)** - Multi-agent workflow recipes (quick start)
+- **[recipes/GUIDE.md](05_recipes/GUIDE.md)** - Advanced recipe guide (complete reference)
+- **[docs/STYLE_GUIDE.md](90_docs/STYLE_GUIDE.md)** - Writing effective prompts
+- **[docs/AGENTS.md](90_docs/AGENTS.md)** - Agent documentation (generated)
+- **[docs/CHANGELOG.md](90_docs/CHANGELOG.md)** - Version history
 - **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Implementation summary
 
 ---
@@ -787,7 +787,7 @@ providers:
 
 ### Budget Configuration
 
-Edit `config/budgets.yml` to control eval costs:
+Edit `15_config/budgets.yml` to control eval costs:
 
 ```yaml
 global:
@@ -899,7 +899,7 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 ## 🎯 Quick Tool Integration
 
-See **[docs/TOOLS.md](docs/TOOLS.md)** for complete tool-specific instructions.
+See **[docs/TOOLS.md](90_docs/TOOLS.md)** for complete tool-specific instructions.
 
 | Tool               | Format   | Location                   | Import Method                       | Usage                         |
 | ------------------ | -------- | -------------------------- | ----------------------------------- | ----------------------------- |

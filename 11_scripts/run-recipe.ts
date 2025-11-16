@@ -151,7 +151,7 @@ class RecipeRunner {
   }
 
   private async loadAgents(): Promise<void> {
-    const agentsDir = join(rootDir, 'agents');
+    const agentsDir = join(rootDir, '04_agents');
     const files = await readdir(agentsDir);
 
     for (const file of files) {
@@ -433,7 +433,7 @@ async function loadRecipe(recipePath: string): Promise<Recipe> {
 }
 
 async function listRecipes(): Promise<void> {
-  const recipesDir = join(rootDir, 'recipes');
+  const recipesDir = join(rootDir, '05_recipes');
   const files = await readdir(recipesDir);
 
   console.log(chalk.blue.bold('\n📋 Available Recipes:\n'));

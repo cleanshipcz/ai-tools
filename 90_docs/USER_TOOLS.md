@@ -236,7 +236,7 @@ git commit -m "Add prompt library"
 1. **Try the HTML browser** - Most user-friendly
 2. **Experiment with CLI** - Great for repeated use
 3. **Read the markdown** - Understand available prompts
-4. **Create your own** - Add custom prompts to `prompts/`
+4. **Create your own** - Add custom prompts to `03_prompts/`
 5. **Share with team** - Everyone uses the same high-quality prompts
 
 ---

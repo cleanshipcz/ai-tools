@@ -34,7 +34,7 @@ npm run use-prompt write-tests
 
 ### For Tool Users (Windsurf, Cursor, Claude Code)
 
-Prompts are bundled into agents and imported into your AI coding tool. See [Agents](../agents/README.md) for how to use them.
+Prompts are bundled into agents and imported into your AI coding tool. See [Agents](../04_agents/README.md) for how to use them.
 
 ## 🔧 How to Use in Different Tools
 
@@ -278,12 +278,12 @@ npm run use-prompt my-prompt
 
 ## 🔗 Related
 
-- [Agents](../agents/README.md) - Complete AI assistants that use prompts
-- [Rulepacks](../rulepacks/README.md) - Coding guidelines to combine with prompts
-- [Skills](../skills/README.md) - Executable commands agents can run
+- [Agents](../04_agents/README.md) - Complete AI assistants that use prompts
+- [Rulepacks](../01_rulepacks/README.md) - Coding guidelines to combine with prompts
+- [Skills](../02_skills/README.md) - Executable commands agents can run
 
 ## 📚 Further Reading
 
-- [STYLE_GUIDE.md](../docs/STYLE_GUIDE.md) - Writing effective prompts
-- [USER_TOOLS.md](../docs/USER_TOOLS.md) - User-friendly tools guide
+- [STYLE_GUIDE.md](../90_docs/STYLE_GUIDE.md) - Writing effective prompts
+- [USER_TOOLS.md](../90_docs/USER_TOOLS.md) - User-friendly tools guide
 - [Main README](../README.md) - Full project documentation

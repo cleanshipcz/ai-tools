@@ -412,10 +412,10 @@ rulepacks:
 
 ## 🔗 Related
 
-- [Rulepacks](../rulepacks/README.md) - Guidelines agents use
-- [Prompts](../prompts/README.md) - Atomic prompts (agents can reference these)
-- [MCP](../mcp/README.md) - Tools agents can access
-- [Skills](../skills/README.md) - Commands agents can execute
+- [Rulepacks](../01_rulepacks/README.md) - Guidelines agents use
+- [Prompts](../03_prompts/README.md) - Atomic prompts (agents can reference these)
+- [MCP](../07_mcp/README.md) - Tools agents can access
+- [Skills](../02_skills/README.md) - Commands agents can execute
 
 ## 💡 Tips
 
@@ -467,4 +467,4 @@ rulepacks:
 ## 📚 Further Reading
 
 - [Main README](../README.md) - Full project documentation
-- [STYLE_GUIDE.md](../docs/STYLE_GUIDE.md) - Writing effective agents
+- [STYLE_GUIDE.md](../90_docs/STYLE_GUIDE.md) - Writing effective agents

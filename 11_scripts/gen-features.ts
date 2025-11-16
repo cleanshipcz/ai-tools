@@ -318,7 +318,7 @@ export class FeatureGenerator {
 
     console.log(chalk.blue(`\n  Generating feature-bound recipes...`));
 
-    const recipesDir = join(rootDir, 'recipes');
+    const recipesDir = join(rootDir, '05_recipes');
 
     for (const feature of featuresWithRecipes) {
       const recipeId = feature.recipe!.id;

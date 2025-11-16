@@ -32,7 +32,7 @@ async function usePrompt() {
   }
 
   // Find the prompt
-  const promptFiles = await glob('prompts/**/*.yml', { ignore: 'prompts/shared/**' });
+  const promptFiles = await glob('03_prompts/**/*.yml', { ignore: '03_prompts/shared/**' });
   let targetFile: string | null = null;
 
   for (const file of promptFiles) {
@@ -133,7 +133,7 @@ async function usePrompt() {
 }
 
 async function listPrompts() {
-  const promptFiles = await glob('prompts/**/*.yml', { ignore: 'prompts/shared/**' });
+  const promptFiles = await glob('03_prompts/**/*.yml', { ignore: '03_prompts/shared/**' });
   const prompts: Array<{ id: string; category: string; description: string }> = [];
 
   for (const file of promptFiles) {

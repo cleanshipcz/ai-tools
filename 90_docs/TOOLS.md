@@ -399,7 +399,7 @@ adapters/anthropic/run-pytest/SKILL.md
 
 ## Further Reading
 
-- [agents/README.md](../agents/README.md) - Agent documentation with tool-specific sections
-- [prompts/README.md](../prompts/README.md) - Prompt documentation
-- [skills/README.md](../skills/README.md) - Skills documentation with MCP integration
-- [rulepacks/README.md](../rulepacks/README.md) - Rulepack composition
+- [agents/README.md](../04_agents/README.md) - Agent documentation with tool-specific sections
+- [prompts/README.md](../03_prompts/README.md) - Prompt documentation
+- [skills/README.md](../02_skills/README.md) - Skills documentation with MCP integration
+- [rulepacks/README.md](../01_rulepacks/README.md) - Rulepack composition

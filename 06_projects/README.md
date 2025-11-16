@@ -531,7 +531,7 @@ With blacklist, all agents, prompts, and rulepacks **except** the listed ones wi
 
 ##### Referencing Prompts
 
-Prompts are organized in subdirectories (e.g., `prompts/refactor/`, `prompts/docs/`, `prompts/planning/`, `prompts/qa/`). You can reference them in two ways:
+Prompts are organized in subdirectories (e.g., `03_prompts/refactor/`, `03_prompts/docs/`, `03_prompts/planning/`, `03_prompts/qa/`). You can reference them in two ways:
 
 1. **By ID only** (works if the ID is unique across all subdirectories):
 
@@ -870,7 +870,7 @@ The `recipe.context` field accepts any variables needed by the recipe:
 - `reproduction_steps` - For bug-fix-workflow recipe
 - Custom variables - Any variables defined in the recipe's `variables` section
 
-See [recipes/README.md](../recipes/README.md) for more information on recipe binding.
+See [recipes/README.md](../05_recipes/README.md) for more information on recipe binding.
 
 ---
 
@@ -1310,7 +1310,7 @@ jobs:
 - [PLAN.md](../PLAN.md) - Implementation plan
 - [README.md](../README.md) - Main repository README
 - [schemas/project.schema.json](../schemas/project.schema.json) - Schema reference
-- [projects/global/example-ecommerce/](../projects/global/example-ecommerce/) - Complete example
+- [projects/global/example-ecommerce/](../06_projects/global/example-ecommerce/) - Complete example
 
 ---
 

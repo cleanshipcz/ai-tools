@@ -78,7 +78,7 @@ class Validator {
   }
 
   private async loadSchemas(): Promise<Record<string, any>> {
-    const schemasDir = join(rootDir, 'schemas');
+    const schemasDir = join(rootDir, '10_schemas');
     const schemaFiles = {
       prompt: 'prompt.schema.json',
       agent: 'agent.schema.json',
@@ -110,9 +110,9 @@ class Validator {
       rulepacks: 'rulepack',
       skills: 'skill',
       recipes: 'recipe',
-      'evals/suites': 'eval',
-      'projects/global': 'project',
-      'projects/local': 'project',
+      '20_evals/suites': 'eval',
+      '06_projects/global': 'project',
+      '06_projects/local': 'project',
     };
 
     for (const [dir, type] of Object.entries(dirs)) {

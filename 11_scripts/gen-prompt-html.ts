@@ -30,7 +30,7 @@ async function generatePromptHTML() {
   console.log('🌐 Generating interactive HTML prompt browser...\n');
 
   // Find all prompt files
-  const promptFiles = await glob('prompts/**/*.yml', { ignore: 'prompts/shared/**' });
+  const promptFiles = await glob('03_prompts/**/*.yml', { ignore: '03_prompts/shared/**' });
 
   if (promptFiles.length === 0) {
     console.error('❌ No prompt files found');

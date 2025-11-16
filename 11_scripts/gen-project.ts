@@ -213,7 +213,7 @@ export class ProjectGenerator {
   }
 
   private async loadPromptsMap(): Promise<void> {
-    const promptsDir = join(rootDir, 'prompts');
+    const promptsDir = join(rootDir, '03_prompts');
     try {
       const files = await this.findYamlFilesRelative(promptsDir);
 
@@ -895,7 +895,7 @@ export class ProjectGenerator {
       return;
     }
 
-    const recipesDir = join(rootDir, 'recipes');
+    const recipesDir = join(rootDir, '05_recipes');
     let recipeFiles: string[];
     try {
       const entries = await readdir(recipesDir);

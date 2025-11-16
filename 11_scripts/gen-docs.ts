@@ -51,7 +51,7 @@ class DocsGenerator {
 
   private async loadManifests(): Promise<void> {
     // Load agents
-    const agentsDir = join(rootDir, 'agents');
+    const agentsDir = join(rootDir, '04_agents');
     try {
       const agentFiles = await this.findYamlFiles(agentsDir);
       for (const file of agentFiles) {
@@ -64,7 +64,7 @@ class DocsGenerator {
     }
 
     // Load prompts
-    const promptsDir = join(rootDir, 'prompts');
+    const promptsDir = join(rootDir, '03_prompts');
     try {
       const promptFiles = await this.findYamlFiles(promptsDir);
       for (const file of promptFiles) {
@@ -77,7 +77,7 @@ class DocsGenerator {
     }
 
     // Load skills
-    const skillsDir = join(rootDir, 'skills');
+    const skillsDir = join(rootDir, '02_skills');
     try {
       const skillFiles = await this.findYamlFiles(skillsDir);
       for (const file of skillFiles) {

@@ -83,7 +83,7 @@ class Builder {
   }
 
   private async loadRulepacks(): Promise<void> {
-    const dir = join(rootDir, 'rulepacks');
+    const dir = join(rootDir, '01_rulepacks');
     const files = await this.findYamlFiles(dir);
 
     for (const file of files) {
@@ -96,7 +96,7 @@ class Builder {
   }
 
   private async loadAgents(): Promise<void> {
-    const dir = join(rootDir, 'agents');
+    const dir = join(rootDir, '04_agents');
     try {
       const files = await this.findYamlFiles(dir);
 
@@ -113,7 +113,7 @@ class Builder {
   }
 
   private async loadPrompts(): Promise<void> {
-    const dir = join(rootDir, 'prompts');
+    const dir = join(rootDir, '03_prompts');
     try {
       const files = await this.findYamlFiles(dir);
 
@@ -137,7 +137,7 @@ class Builder {
   }
 
   private async loadSkills(): Promise<void> {
-    const dir = join(rootDir, 'skills');
+    const dir = join(rootDir, '02_skills');
     try {
       const files = await this.findYamlFiles(dir);
 

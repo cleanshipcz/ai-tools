@@ -281,7 +281,7 @@ async function generateSkills() {
   fs.mkdirSync(outputDir, { recursive: true });
 
   // Find all skill YAML files
-  const skillFiles = await glob('skills/**/*.yml', { ignore: 'skills/shared/**' });
+  const skillFiles = await glob('02_skills/**/*.yml', { ignore: '02_skills/shared/**' });
 
   if (skillFiles.length === 0) {
     console.error('❌ No skill files found');

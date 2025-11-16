@@ -328,9 +328,9 @@ Each rulepack should focus on ONE concern:
 
 ## 🔗 Related
 
-- [Agents](../agents/README.md) - Use rulepacks to configure agents
-- [Prompts](../prompts/README.md) - Combine with rules for better output
-- [Skills](../skills/README.md) - Actions agents can take
+- [Agents](../04_agents/README.md) - Use rulepacks to configure agents
+- [Prompts](../03_prompts/README.md) - Combine with rules for better output
+- [Skills](../02_skills/README.md) - Actions agents can take
 
 ## 💡 Tips
 
@@ -383,5 +383,5 @@ npm run build
 
 ## 📚 Further Reading
 
-- [STYLE_GUIDE.md](../docs/STYLE_GUIDE.md) - Writing effective rules
+- [STYLE_GUIDE.md](../90_docs/STYLE_GUIDE.md) - Writing effective rules
 - [Main README](../README.md) - Full project documentation
