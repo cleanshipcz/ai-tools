@@ -681,7 +681,7 @@ export class FeatureGenerator {
       }
 
       const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
-      script += `RESPONSE=$(echo "@${step.agent} ${task}" | copilot $MODEL_FLAG${flagsStr})\n`;
+      script += `RESPONSE=$(copilot -p "@${step.agent} ${task}" $MODEL_FLAG${flagsStr})\n`;
       script += `echo "$RESPONSE"\n`;
     } else if (tool === 'cursor') {
       script += `# Manual: Open Cursor Composer and execute:\n`;

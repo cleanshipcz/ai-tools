@@ -521,10 +521,11 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
         script += `CONVERSATION_ID=$(echo "$RESPONSE" | grep -oP 'Conversation ID: \\K[a-zA-Z0-9-]+')\n`;
       }
     } else if (tool === 'copilot-cli') {
-      script += `echo "@${step.agent} ${task}" | copilot\n`;
+      script += `RESPONSE=$(copilot -p "@${step.agent} ${task}" --allow-all-tools)\n`;
+      script += `echo "$RESPONSE"\n`;
       if (step.outputDocument) {
-        script += `echo "📝 Please save the response to: ${step.outputDocument}"\n`;
-        script += `read -p "Press Enter once saved..."\n`;
+        script += `echo "$RESPONSE" > "${step.outputDocument}"\n`;
+        script += `echo "✓ Document saved: ${step.outputDocument}"\n`;
       }
     } else if (tool === 'cursor') {
       script += `# Manual: Open Cursor Composer and execute:\n`;
