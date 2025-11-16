@@ -55,9 +55,11 @@ describe('ProjectGenerator - Recipe Script Generation', () => {
 
       const script = await (generator as any).buildRecipeScript(mockRecipe, 'claude-code', null);
 
-      // After fix: verify correct Claude CLI usage
-      expect(script).toContain('--system-prompt');
-      expect(script).toContain('You are an expert debugger'); // from bug-fixer agent
+      // Verify @agent syntax and permissions are used
+      expect(script).toContain('@bug-fixer');
+      expect(script).toContain('--append-system-prompt');
+      expect(script).toContain('--permission-mode acceptEdits');
+      expect(script).toContain('--allowedTools');
     });
 
     it('should support --model flag for model selection', async () => {

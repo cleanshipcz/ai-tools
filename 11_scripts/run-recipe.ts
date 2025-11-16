@@ -6,6 +6,7 @@ import { load as loadYaml } from 'js-yaml';
 import { spawn } from 'child_process';
 import chalk from 'chalk';
 import * as readline from 'readline';
+import { ProjectContextLoader } from './project-context.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -302,16 +303,12 @@ class RecipeRunner {
 
     console.log(chalk.gray(`\n${task}\n`));
 
-    // Execute based on tool and capture response
-    const response = await this.executeWithTool(
-      step.agent,
-      task,
-      step.continueConversation !== false
-    );
+    // Execute based on tool
+    await this.executeWithTool(step.agent, task, step.continueConversation !== false);
 
-    // If this step has an output document, save the response automatically
-    if (step.outputDocument && response) {
-      await this.saveDocumentContent(step.outputDocument, response);
+    // If this step has an output document, remind user to save it
+    if (step.outputDocument) {
+      await this.saveDocument(step.outputDocument);
     }
   }
 
@@ -498,6 +495,24 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
   script += `# Generated: ${new Date().toISOString()}\n\n`;
   script += 'set -e  # Exit on error\n\n';
 
+  // Add function to load project context from project.yml at runtime
+  script += '# Function to load project context from project.yml\n';
+  script += 'load_project_context() {\n';
+  script += '  if [ -f "project.yml" ]; then\n';
+  script += '    echo "📋 Loading project context from project.yml..."\n';
+  script += '    # Use the ai-tools project-context script to format the context\n';
+  script += '    if command -v npx &> /dev/null; then\n';
+  script += `      PROJECT_CONTEXT=$(npx tsx "${join(rootDir, '11_scripts', 'format-project-context.ts')}" 2>/dev/null || echo "")\n`;
+  script += '    else\n';
+  script += '      PROJECT_CONTEXT=""\n';
+  script += '    fi\n';
+  script += '  else\n';
+  script += '    PROJECT_CONTEXT=""\n';
+  script += '  fi\n';
+  script += '}\n\n';
+  script += '# Load project context once at the start\n';
+  script += 'load_project_context\n\n';
+
   // Setup document directory
   script += '# Setup recipe documents directory\n';
   script += 'RECIPE_DOCS_DIR=".recipe-docs"\n';
@@ -568,19 +583,34 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
 
     // Generate tool-specific command
     if (tool === 'claude-code') {
-      const continueFlag =
-        step.continueConversation !== false && i > 0 ? '-c $CONVERSATION_ID' : '';
+      // Escape task content for bash variable
+      // Don't escape $ in ${VAR} patterns (bash variables), only standalone $
+      const escapedTask = task
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$(?![{])/g, '\\$') // Escape $ only if not followed by {
+        .replace(/`/g, '\\`');
+
+      // Build system prompt with project context (loaded at runtime) and recipe context
+      script += `# Build system prompt with project context and recipe info\n`;
+      script += `SYSTEM_PROMPT=""\n`;
+      script += `if [ -n "$PROJECT_CONTEXT" ]; then\n`;
+      script += `  SYSTEM_PROMPT="$PROJECT_CONTEXT\\n\\n---\\n\\n"\n`;
+      script += `fi\n`;
+      script += `SYSTEM_PROMPT="${'$SYSTEM_PROMPT'}Recipe: ${recipe.id}\\nStep: ${i + 1}/${recipe.steps.length} (${step.id})"\n\n`;
+
       script += `echo "⚡ Executing with claude-code..."\n`;
-      script += `RESPONSE=$(claude ${continueFlag} --agent ${step.agent} "${task.replace(/"/g, '\\"')}")\n`;
+      script += `RESPONSE=$(claude @${step.agent} \\\n`;
+      script += `  --append-system-prompt "$SYSTEM_PROMPT" \\\n`;
+      script += `  --permission-mode acceptEdits \\\n`;
+      script += `  --allowedTools "Bash(git diff *),Read,Write,Edit" \\\n`;
+      script += `  -p "${escapedTask}")\n`;
       script += `echo "$RESPONSE"\n`;
       if (step.outputDocument) {
         const outputDocFileName = step.outputDocument.split('/').pop();
         script += `echo "Saving to: $RECIPE_DOCS_DIR/${outputDocFileName}"\n`;
         script += `echo "$RESPONSE" > "$RECIPE_DOCS_DIR/${outputDocFileName}"\n`;
         script += `echo "✓ Document saved: ${step.outputDocument}"\n`;
-      }
-      if (i === 0) {
-        script += `CONVERSATION_ID=$(echo "$RESPONSE" | grep -oP 'Conversation ID: \\K[a-zA-Z0-9-]+')\n`;
       }
     } else if (tool === 'copilot-cli') {
       // Escape task content for bash variable
@@ -590,9 +620,19 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
         .replace(/"/g, '\\"')
         .replace(/\$(?![{])/g, '\\$') // Escape $ only if not followed by {
         .replace(/`/g, '\\`');
+
+      // Build system prompt with project context (loaded at runtime) and recipe context
+      script += `# Build system prompt with project context and recipe info\n`;
+      script += `SYSTEM_PROMPT=""\n`;
+      script += `if [ -n "$PROJECT_CONTEXT" ]; then\n`;
+      script += `  SYSTEM_PROMPT="$PROJECT_CONTEXT\\n\\n---\\n\\n"\n`;
+      script += `fi\n`;
+      script += `SYSTEM_PROMPT="${'$SYSTEM_PROMPT'}Recipe: ${recipe.id}\\nStep: ${i + 1}/${recipe.steps.length} (${step.id})"\n\n`;
+
       script += `echo "⚡ Executing with copilot-cli..."\n`;
-      script += `TASK="@${step.agent} ${escapedTask}"\n`;
-      script += `RESPONSE=$(copilot -p "$TASK" --allow-all-tools)\n`;
+      script += `RESPONSE=$(copilot @${step.agent} \\\n`;
+      script += `  --append-system-prompt "$SYSTEM_PROMPT" \\\n`;
+      script += `  -p "${escapedTask}")\n`;
       script += `echo "$RESPONSE"\n`;
       if (step.outputDocument) {
         const outputDocFileName = step.outputDocument.split('/').pop();

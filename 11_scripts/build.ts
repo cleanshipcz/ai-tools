@@ -101,6 +101,7 @@ class Builder {
     // Generate adapters
     await this.generateWindsurfAdapters();
     await this.generateClaudeCodeAdapters();
+    await this.generateClaudeCodeAgents();
     await this.generateCursorAdapters();
     await this.generateGitHubCopilotAdapters();
     await this.generateCopilotCLIAdapters();
@@ -319,6 +320,78 @@ class Builder {
 
     console.log(chalk.gray(`    Generated ${this.skills.size} skills`));
     console.log(chalk.gray(`    Generated ${this.prompts.size} prompts`));
+  }
+
+  private async generateClaudeCodeAgents(): Promise<void> {
+    console.log(chalk.blue('  Generating Claude Code agents...'));
+
+    const outputDir = join(rootDir, 'adapters', 'claude-code', 'agents');
+    await mkdir(outputDir, { recursive: true });
+
+    let count = 0;
+    for (const [id, agent] of this.agents) {
+      // Get system prompt from agent definition
+      const systemPrompt = agent.prompt?.system || agent.purpose || '';
+
+      // Map semantic tool names to Claude Code predefined tools
+      // Claude Code supports: Read, Write, Edit, Grep, Glob, Bash
+      const toolMapping: Record<string, string[]> = {
+        'read-file': ['Read'],
+        'write-file': ['Write'],
+        'write-code': ['Write', 'Edit'],
+        'edit-file': ['Edit'],
+        refactor: ['Read', 'Edit'],
+        'search-code': ['Grep', 'Glob'],
+        'git-diff': ['Bash(git diff *)'],
+        git: ['Bash(git *)'],
+        filesystem: ['Read', 'Write', 'Edit', 'Glob'],
+        'run-tests': ['Bash'],
+        'run-pytest': ['Bash(pytest *)'],
+        'run-ktlint': ['Bash(ktlint *)'],
+        'run-detekt': ['Bash(detekt *)'],
+        'run-gradle-tests': ['Bash(gradle test *)'],
+        'setup-test-infrastructure': ['Read', 'Write', 'Bash'],
+        'validate-schema': ['Read', 'Bash'],
+      };
+
+      // Get tools from agent definition and map them
+      const tools = agent.tools || [];
+      const claudeTools = new Set<string>();
+
+      if (tools.length > 0) {
+        for (const tool of tools) {
+          const mapped = toolMapping[tool] || [tool]; // Use mapping or keep original
+          mapped.forEach((t) => claudeTools.add(t));
+        }
+      } else {
+        // Default tools for agents without specific tools defined
+        ['Read', 'Grep', 'Glob', 'Bash'].forEach((t) => claudeTools.add(t));
+      }
+
+      const toolsStr = Array.from(claudeTools).join(', ');
+
+      // Get model from agent defaults
+      const model = agent.defaults?.model || 'sonnet';
+      const modelAlias = model.includes('haiku')
+        ? 'haiku'
+        : model.includes('opus')
+          ? 'opus'
+          : 'sonnet';
+
+      // Build markdown file with YAML frontmatter
+      let content = '---\n';
+      content += `name: ${id}\n`;
+      content += `description: ${agent.purpose || agent.id}\n`;
+      content += `tools: ${toolsStr}\n`;
+      content += `model: ${modelAlias}\n`;
+      content += '---\n\n';
+      content += systemPrompt;
+
+      await writeFile(join(outputDir, `${id}.md`), content);
+      count++;
+    }
+
+    console.log(chalk.gray(`    Generated ${count} agents`));
   }
 
   private async generateCursorAdapters(): Promise<void> {

@@ -202,6 +202,37 @@ describe('build.ts', () => {
       expect(content).toContain('<prompt>');
       expect(content).toContain('</prompt>');
     });
+
+    it('should generate agents to adapters/claude-code/agents/', async () => {
+      // Verify agents are generated to the correct location (not root .claude/)
+      const { existsSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const agentsDir = join(rootDir, 'adapters', 'claude-code', 'agents');
+
+      expect(existsSync(agentsDir)).toBe(true);
+
+      // Check that at least some standard agents exist
+      expect(existsSync(join(agentsDir, 'code-reviewer.md'))).toBe(true);
+      expect(existsSync(join(agentsDir, 'feature-builder.md'))).toBe(true);
+    });
+
+    it('should format agents with YAML frontmatter', async () => {
+      const { readFile } = await import('fs/promises');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const agentFile = join(rootDir, 'adapters', 'claude-code', 'agents', 'code-reviewer.md');
+
+      const content = await readFile(agentFile, 'utf-8');
+
+      // Check for YAML frontmatter
+      expect(content).toMatch(/^---\n/);
+      expect(content).toContain('name:');
+      expect(content).toContain('description:');
+      expect(content).toContain('tools:');
+      expect(content).toContain('model:');
+      expect(content).toMatch(/\n---\n/);
+    });
   });
 
   describe('Adapter generation - Cursor', () => {

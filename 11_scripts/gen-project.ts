@@ -835,7 +835,16 @@ export class ProjectGenerator {
         // skills.json might not exist
       }
 
-      console.log(chalk.gray(`    Copied base prompts and skills`));
+      // Copy agents with filtering
+      const agentsDir = join(adapterSrcDir, 'agents');
+      try {
+        await access(agentsDir);
+        await this.copyClaudeAgentsWithFiltering(agentsDir, join(claudeDir, 'agents'));
+      } catch {
+        // Agents might not exist
+      }
+
+      console.log(chalk.gray(`    Copied base prompts, skills, and agents`));
     } catch {
       console.log(chalk.yellow(`    ! Base adapters not found. Run 'npm run build' first.`));
     }
@@ -1113,6 +1122,27 @@ export class ProjectGenerator {
     script += '# Redirect all output to both console and log file\n';
     script += 'exec > >(tee -a "$LOG_FILE") 2>&1\n\n';
 
+    // Add project context loading function
+    script += '# Function to load project context\n';
+    script += 'load_project_context() {\n';
+    script += '  if command -v npx &> /dev/null; then\n';
+    script +=
+      '    PROJECT_CONTEXT=$(npx tsx 11_scripts/format-project-context.ts 2>/dev/null || echo "")\n';
+    script += '  else\n';
+    script += '    PROJECT_CONTEXT=""\n';
+    script += '  fi\n';
+    script += '}\n\n';
+
+    script += '# Load project context for system prompts\n';
+    script += 'echo "📋 Loading project context..."\n';
+    script += 'load_project_context\n';
+    script += 'if [ -n "$PROJECT_CONTEXT" ]; then\n';
+    script += '  echo "✓ Project context loaded"\n';
+    script += 'else\n';
+    script += '  echo "⚠️  No project context found"\n';
+    script += 'fi\n';
+    script += 'echo ""\n\n';
+
     // Add feature context variables if provided
     if (featureContext) {
       script += '# Feature Context\n';
@@ -1315,14 +1345,8 @@ export class ProjectGenerator {
         flags.push(`--model "${model}"`);
       }
 
-      // Load agent definition to get system prompt
-      const loadAgent = loadAgentFn || ProjectGenerator.loadAgentStatic;
-      const agent = await loadAgent(step.agent);
-      if (agent?.prompt?.system) {
-        // Escape system prompt for bash
-        const systemPrompt = agent.prompt.system.replace(/"/g, '\\"').replace(/\n/g, '\\n');
-        flags.push(`--system-prompt "${systemPrompt}"`);
-      }
+      // Use @agent syntax instead of --system-prompt
+      // Agent system prompts are loaded from .claude/agents/ by claude CLI
 
       // Tool permissions from toolOptions
       if (toolOptions?.['claude-code']) {
@@ -1373,7 +1397,21 @@ export class ProjectGenerator {
 
       // Escape backticks in fullTask for bash execution (prevent command substitution)
       const escapedTask = fullTask.replace(/`/g, '\\`').replace(/"/g, '\\"');
-      script += `RESPONSE=$(claude${flagsStr} "${escapedTask}")\n`;
+
+      // Build system prompt with project context and recipe info
+      script += `# Build system prompt with project context and recipe info\n`;
+      script += `SYSTEM_PROMPT=""\n`;
+      script += `if [ -n "$PROJECT_CONTEXT" ]; then\n`;
+      script += `  SYSTEM_PROMPT="$PROJECT_CONTEXT\\n\\n---\\n\\n"\n`;
+      script += `fi\n`;
+      script += `SYSTEM_PROMPT="\${SYSTEM_PROMPT}Recipe: ${recipe?.id || 'unknown'}\\nStep: ${index + 1} (${step.id})"\n\n`;
+
+      script += `echo "⚡ Executing with claude-code..."\n`;
+      script += `RESPONSE=$(claude @${step.agent}${flagsStr} \\\n`;
+      script += `  --append-system-prompt "$SYSTEM_PROMPT" \\\n`;
+      script += `  --permission-mode acceptEdits \\\n`;
+      script += `  --allowedTools "Bash(git diff *),Read,Write,Edit" \\\n`;
+      script += `  -p "${escapedTask}")\n`;
       script += `echo "$RESPONSE"\n`;
     } else if (tool === 'copilot-cli') {
       const flags: string[] = [];
@@ -1488,6 +1526,31 @@ export class ProjectGenerator {
         const promptId = entry.name.replace(/\.json$/, '');
         if (!this.shouldIncludePrompt(promptId)) {
           continue; // Skip this prompt file
+        }
+        await copyFile(srcPath, destPath);
+      } else {
+        await copyFile(srcPath, destPath);
+      }
+    }
+  }
+
+  private async copyClaudeAgentsWithFiltering(src: string, dest: string): Promise<void> {
+    await mkdir(dest, { recursive: true });
+
+    const entries = await readdir(src, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = join(src, entry.name);
+      const destPath = join(dest, entry.name);
+
+      if (entry.isDirectory()) {
+        await this.copyClaudeAgentsWithFiltering(srcPath, destPath);
+      } else if (entry.name.endsWith('.md')) {
+        // Claude Code agents are .md files with YAML frontmatter
+        // Extract agent ID from filename (e.g., "code-reviewer.md" -> "code-reviewer")
+        const agentId = entry.name.replace(/\.md$/, '');
+        if (!this.shouldIncludeAgent(agentId)) {
+          continue; // Skip this agent file
         }
         await copyFile(srcPath, destPath);
       } else {
