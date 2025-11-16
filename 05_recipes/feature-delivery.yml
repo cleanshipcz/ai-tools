@@ -165,7 +165,7 @@ loop:
   steps:
     - review
     - refactor
-  maxIterations: 3
+  maxIterations: 5
 
 metadata:
   author: ai-tools
