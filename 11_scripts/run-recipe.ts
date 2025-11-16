@@ -70,11 +70,13 @@ class RecipeRunner {
   private outputFile: string;
   private rl: readline.Interface;
   private documents: Map<string, string> = new Map();
+  private recipeDocsDir: string;
 
   constructor(recipe: Recipe, tool: 'claude-code' | 'copilot-cli' | 'cursor') {
     this.recipe = recipe;
     this.tool = tool;
     this.outputFile = `/tmp/recipe-output-${Date.now()}.txt`;
+    this.recipeDocsDir = join(process.cwd(), '.recipe-docs');
     this.rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
@@ -85,6 +87,10 @@ class RecipeRunner {
     console.log(chalk.blue.bold(`\n🚀 Running recipe: ${this.recipe.id}\n`));
     console.log(chalk.gray(this.recipe.description));
     console.log(chalk.gray(`Tool: ${this.tool}\n`));
+
+    // Initialize recipe docs directory
+    await mkdir(this.recipeDocsDir, { recursive: true });
+    console.log(chalk.gray(`📁 Recipe documents directory: ${this.recipeDocsDir}\n`));
 
     // Load agents
     await this.loadAgents();
@@ -160,6 +166,22 @@ class RecipeRunner {
       const content = await readFile(join(agentsDir, file), 'utf-8');
       const agent = loadYaml(content) as Agent;
       this.agents.set(agent.id, agent);
+    }
+  }
+
+  private async loadDocuments(): Promise<void> {
+    try {
+      const files = await readdir(this.recipeDocsDir);
+      for (const file of files) {
+        if (!file.endsWith('.md')) continue;
+
+        const docPath = `.recipe-docs/${file}`;
+        const fullPath = join(this.recipeDocsDir, file);
+        const content = await readFile(fullPath, 'utf-8');
+        this.documents.set(docPath, content);
+      }
+    } catch (error) {
+      // Directory doesn't exist yet, that's fine
     }
   }
 
@@ -241,6 +263,9 @@ class RecipeRunner {
       return;
     }
 
+    // Load documents from disk before this step
+    await this.loadDocuments();
+
     // Interpolate variables in task
     let task = step.task;
     if (this.recipe.variables) {
@@ -256,31 +281,37 @@ class RecipeRunner {
 
     // Include documents in task context if specified
     if (step.includeDocuments && step.includeDocuments.length > 0) {
-      task += '\n\n--- Reference Documents ---\n';
+      task += '\n\n---\n\n## Reference Documents (Context)\n\n';
       for (const docPath of step.includeDocuments) {
         const docContent = this.documents.get(docPath);
         if (docContent) {
-          task += `\n\n**Document: ${docPath}**\n\n${docContent}\n`;
+          task += `### Document: \`${docPath}\`\n\n${docContent}\n\n---\n\n`;
+          console.log(chalk.green(`   ✓ Included: ${docPath}`));
         } else {
           console.log(chalk.yellow(`   ⚠️  Document not found: ${docPath}`));
         }
       }
+      task += '\n---\n\n**Please use the documents above as context for your work.**\n\n';
     }
 
     // Add output document instruction if specified
     if (step.outputDocument) {
-      task += `\n\n**IMPORTANT**: Save your complete response to the file: ${step.outputDocument}`;
+      task += `\n\n---\n\n**IMPORTANT**: Save your complete response to the file: \`${step.outputDocument}\`\n`;
       console.log(chalk.gray(`   📄 Output will be saved to: ${step.outputDocument}`));
     }
 
     console.log(chalk.gray(`\n${task}\n`));
 
-    // Execute based on tool
-    await this.executeWithTool(step.agent, task, step.continueConversation !== false);
+    // Execute based on tool and capture response
+    const response = await this.executeWithTool(
+      step.agent,
+      task,
+      step.continueConversation !== false
+    );
 
-    // If this step has an output document, ask user to save it
-    if (step.outputDocument) {
-      await this.saveDocument(step.outputDocument);
+    // If this step has an output document, save the response automatically
+    if (step.outputDocument && response) {
+      await this.saveDocumentContent(step.outputDocument, response);
     }
   }
 
@@ -404,24 +435,28 @@ class RecipeRunner {
 
   private async saveDocument(docPath: string): Promise<void> {
     console.log(chalk.yellow(`\n📝 Please save the AI's response to: ${docPath}`));
+    console.log(chalk.gray(`   Full path: ${join(process.cwd(), docPath)}`));
     console.log(
-      chalk.gray(
-        '   Ensure the document is created in your project directory with the full output.'
-      )
+      chalk.gray('   Ensure the document is created with the full output from the AI assistant.')
     );
 
     await this.askUser('Press Enter once the document has been saved...');
 
     // Try to read the document to cache it for future steps
     try {
-      const content = await readFile(join(process.cwd(), docPath), 'utf-8');
+      const fullPath = join(process.cwd(), docPath);
+      const content = await readFile(fullPath, 'utf-8');
       this.documents.set(docPath, content);
       console.log(chalk.green(`   ✓ Document loaded and cached: ${docPath}`));
+      console.log(chalk.gray(`   Size: ${content.length} bytes\n`));
     } catch (error) {
       console.log(
         chalk.yellow(
           `   ⚠️  Could not read document: ${docPath}. It will not be available for subsequent steps.`
         )
+      );
+      console.log(
+        chalk.gray(`   Error: ${error instanceof Error ? error.message : String(error)}\n`)
       );
     }
   }
@@ -463,12 +498,18 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
   script += `# Generated: ${new Date().toISOString()}\n\n`;
   script += 'set -e  # Exit on error\n\n';
 
+  // Setup document directory
+  script += '# Setup recipe documents directory\n';
+  script += 'RECIPE_DOCS_DIR=".recipe-docs"\n';
+  script += 'mkdir -p "$RECIPE_DOCS_DIR"\n\n';
+
   // Setup logging
   script += '# Setup logging\n';
   script += 'RECIPE_LOGS_DIR=".recipe-logs"\n';
   script += 'mkdir -p "$RECIPE_LOGS_DIR"\n';
   script += `LOG_FILE="$RECIPE_LOGS_DIR/${recipe.id}-$(date +%Y%m%d-%H%M%S).log"\n`;
   script += 'echo "📝 Logging to: $LOG_FILE"\n';
+  script += 'echo "📁 Documents: $RECIPE_DOCS_DIR"\n';
   script += 'echo ""\n\n';
 
   // Start logging with exec and tee
@@ -502,31 +543,40 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
 
     // Include documents in task if specified
     if (step.includeDocuments && step.includeDocuments.length > 0) {
-      script += `# Include reference documents\n`;
-      task += '\\n\\n--- Reference Documents ---\\n';
+      script += '# Include reference documents from previous steps\n';
+      task += '\\n\\n---\\n\\n## Reference Documents (Context)\\n\\n';
       for (const docPath of step.includeDocuments) {
-        script += `if [ -f "${docPath}" ]; then\n`;
-        script += `  DOC_CONTENT=$(cat "${docPath}")\n`;
-        task += `\\n\\n**Document: ${docPath}**\\n\\n\${DOC_CONTENT}\\n`;
+        const docFileName = docPath.split('/').pop();
+        script += `if [ -f "$RECIPE_DOCS_DIR/${docFileName}" ]; then\n`;
+        script += `  echo "✓ Including: ${docPath}"\n`;
+        script += `  DOC_CONTENT=$(cat "$RECIPE_DOCS_DIR/${docFileName}")\n`;
+        task += `### Document: \\\`${docPath}\\\`\\n\\n\${DOC_CONTENT}\\n\\n---\\n\\n`;
+        script += `else\n`;
+        script += `  echo "⚠️  Document not found: ${docPath}"\n`;
         script += `fi\n`;
       }
+      task += '**Please use the documents above as context for your work.**\\n\\n';
     }
 
     // Add output document instruction if specified
     if (step.outputDocument) {
-      task += `\\n\\n**IMPORTANT**: Save your complete response to the file: ${step.outputDocument}`;
+      task += `\\n\\n---\\n\\n**IMPORTANT**: Save your complete response to the file: \\\`${step.outputDocument}\\\`\\n`;
+      const docFileName = step.outputDocument.split('/').pop();
       script += `echo "📄 Output will be saved to: ${step.outputDocument}"\n`;
-      script += `mkdir -p $(dirname "${step.outputDocument}")\n`;
+      script += `mkdir -p "$RECIPE_DOCS_DIR"\n`;
     }
 
     // Generate tool-specific command
     if (tool === 'claude-code') {
       const continueFlag =
         step.continueConversation !== false && i > 0 ? '-c $CONVERSATION_ID' : '';
+      script += `echo "⚡ Executing with claude-code..."\n`;
       script += `RESPONSE=$(claude ${continueFlag} --agent ${step.agent} "${task.replace(/"/g, '\\"')}")\n`;
       script += `echo "$RESPONSE"\n`;
       if (step.outputDocument) {
-        script += `echo "$RESPONSE" > "${step.outputDocument}"\n`;
+        const outputDocFileName = step.outputDocument.split('/').pop();
+        script += `echo "Saving to: $RECIPE_DOCS_DIR/${outputDocFileName}"\n`;
+        script += `echo "$RESPONSE" > "$RECIPE_DOCS_DIR/${outputDocFileName}"\n`;
         script += `echo "✓ Document saved: ${step.outputDocument}"\n`;
       }
       if (i === 0) {
@@ -540,19 +590,23 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
         .replace(/"/g, '\\"')
         .replace(/\$(?![{])/g, '\\$') // Escape $ only if not followed by {
         .replace(/`/g, '\\`');
+      script += `echo "⚡ Executing with copilot-cli..."\n`;
       script += `TASK="@${step.agent} ${escapedTask}"\n`;
       script += `RESPONSE=$(copilot -p "$TASK" --allow-all-tools)\n`;
       script += `echo "$RESPONSE"\n`;
       if (step.outputDocument) {
-        script += `echo "$RESPONSE" > "${step.outputDocument}"\n`;
+        const outputDocFileName = step.outputDocument.split('/').pop();
+        script += `echo "Saving to: $RECIPE_DOCS_DIR/${outputDocFileName}"\n`;
+        script += `echo "$RESPONSE" > "$RECIPE_DOCS_DIR/${outputDocFileName}"\n`;
         script += `echo "✓ Document saved: ${step.outputDocument}"\n`;
       }
     } else if (tool === 'cursor') {
-      script += `# Manual: Open Cursor Composer and execute:\n`;
-      script += `# @${step.agent} ${task}\n`;
+      script += `echo "⚠️  Manual step: Open Cursor Composer and execute:"\n`;
+      script += `echo "@${step.agent} ..."\n`;
       script += `echo "⚠️  Please execute in Cursor Composer and press Enter"\n`;
       if (step.outputDocument) {
-        script += `echo "📝 Save the response to: ${step.outputDocument}"\n`;
+        const outputDocFileName = step.outputDocument.split('/').pop();
+        script += `echo "📝 Save the response to: $RECIPE_DOCS_DIR/${outputDocFileName}"\n`;
       }
       script += `read -p "Continue? "\n`;
     }
@@ -561,6 +615,7 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
   }
 
   script += 'echo "✅ Recipe completed!"\n';
+  script += 'echo "📁 All documents saved to: $RECIPE_DOCS_DIR"\n';
 
   await writeFile(scriptPath, script, { mode: 0o755 });
   console.log(chalk.green(`\n✅ Generated executable script: ${scriptPath}\n`));

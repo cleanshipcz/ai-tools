@@ -10,8 +10,8 @@ tools:
   - copilot-cli
 
 variables:
-  bug_description: '{{BUG_DESCRIPTION}}'
-  reproduction_steps: '{{REPRODUCTION_STEPS}}'
+  bug_description: "{{BUG_DESCRIPTION}}"
+  reproduction_steps: "{{REPRODUCTION_STEPS}}"
 
 steps:
   - id: analyze-bug
@@ -33,7 +33,7 @@ steps:
       6. Related bugs or edge cases that should be checked
 
       Output a detailed analysis document.
-    outputDocument: '.recipe-docs/bug-analysis.md'
+    outputDocument: ".recipe-docs/bug-analysis.md"
     continueConversation: false
     waitForConfirmation: false
 
@@ -51,9 +51,9 @@ steps:
       6. Documentation updates needed
 
       Output a structured fix plan document.
-    outputDocument: '.recipe-docs/fix-plan.md'
+    outputDocument: ".recipe-docs/fix-plan.md"
     includeDocuments:
-      - '.recipe-docs/bug-analysis.md'
+      - ".recipe-docs/bug-analysis.md"
     continueConversation: true
     waitForConfirmation: true
 
@@ -70,9 +70,10 @@ steps:
       3. No regressions will be introduced
 
       Provide confirmation or suggest adjustments to the plan.
+    outputDocument: ".recipe-docs/investigation.md"
     includeDocuments:
-      - '.recipe-docs/bug-analysis.md'
-      - '.recipe-docs/fix-plan.md'
+      - ".recipe-docs/bug-analysis.md"
+      - ".recipe-docs/fix-plan.md"
     continueConversation: true
     waitForConfirmation: true
 
@@ -87,9 +88,12 @@ steps:
       - Existing tests still pass
       - Add a test case that would have caught this bug
       - Follow the exact approach outlined in the fix plan
+
+      Update the investigation document with progress tracking.
     includeDocuments:
-      - '.recipe-docs/bug-analysis.md'
-      - '.recipe-docs/fix-plan.md'
+      - ".recipe-docs/bug-analysis.md"
+      - ".recipe-docs/fix-plan.md"
+      - ".recipe-docs/investigation.md"
     continueConversation: true
     waitForConfirmation: false
 
@@ -103,9 +107,11 @@ steps:
       4. Check for potential regressions
 
       Report test results and confirm the bug is fixed.
+      Update the investigation document with test results.
     includeDocuments:
-      - '.recipe-docs/bug-analysis.md'
-      - '.recipe-docs/fix-plan.md'
+      - ".recipe-docs/bug-analysis.md"
+      - ".recipe-docs/fix-plan.md"
+      - ".recipe-docs/investigation.md"
     continueConversation: true
     waitForConfirmation: true
 
@@ -122,9 +128,11 @@ steps:
       - Code quality is maintained
 
       Respond with "APPROVED" or provide feedback.
+    outputDocument: ".recipe-docs/review-feedback.md"
     includeDocuments:
-      - '.recipe-docs/bug-analysis.md'
-      - '.recipe-docs/fix-plan.md'
+      - ".recipe-docs/bug-analysis.md"
+      - ".recipe-docs/fix-plan.md"
+      - ".recipe-docs/investigation.md"
     continueConversation: true
     waitForConfirmation: false
 
@@ -135,14 +143,18 @@ steps:
       - Add entry to CHANGELOG.md
       - Update any affected documentation
       - Add comments for non-obvious fixes
+    includeDocuments:
+      - ".recipe-docs/bug-analysis.md"
+      - ".recipe-docs/fix-plan.md"
+      - ".recipe-docs/review-feedback.md"
     continueConversation: true
     waitForConfirmation: false
     condition:
       type: on-success
       check:
         type: contains
-        value: 'APPROVED'
+        value: "APPROVED"
 
 metadata:
   author: ai-tools
-  created: '2025-01-15'
+  created: "2025-01-15"

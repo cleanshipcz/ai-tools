@@ -58,6 +58,7 @@ Multi-agent recipes enable orchestrating multiple AI agents in sequence to accom
 
 - Recipe manifests define multi-step workflows with agents, tasks, and conditions
 - **Fully automated execution** - Generate and run scripts with single command
+- **Recipe output logging** (v1.1.0) - All executions automatically logged to timestamped files in `.recipe-logs/`
 - **Interactive mode** - Manual control with quality gates and loops
 - Tool integration with Claude Code, Copilot CLI, and Cursor
 - Built-in recipes: feature-delivery, code-review-cycle, bug-fix-workflow

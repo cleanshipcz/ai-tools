@@ -19,8 +19,8 @@ toolOptions:
     allowAllTools: true # Allow tools to run automatically without confirmation
 
 variables:
-  feature_description: '{{FEATURE_DESCRIPTION}}'
-  acceptance_criteria: '{{ACCEPTANCE_CRITERIA}}'
+  feature_description: "{{FEATURE_DESCRIPTION}}"
+  acceptance_criteria: "{{ACCEPTANCE_CRITERIA}}"
 
 steps:
   - id: analyze
@@ -42,7 +42,7 @@ steps:
       6. New files or modules that need to be created
 
       Output your analysis as a comprehensive document covering all these aspects.
-    outputDocument: '.recipe-docs/analysis.md'
+    outputDocument: ".recipe-docs/analysis.md"
     continueConversation: false
     waitForConfirmation: false
 
@@ -62,10 +62,10 @@ steps:
       6. Estimated complexity for each step
 
       Output your plan as a structured, actionable document that can guide implementation.
-    outputDocument: '.recipe-docs/plan.md'
+    outputDocument: ".recipe-docs/plan.md"
     includeDocuments:
-      - '.recipe-docs/analysis.md'
-    continueConversation: true
+      - ".recipe-docs/analysis.md"
+    continueConversation: false
     waitForConfirmation: true
 
   - id: implement
@@ -84,9 +84,11 @@ steps:
       - Proper error handling
       - Comprehensive tests
       - Documentation for public APIs
+
+      Update the plan document as you progress to track what's been completed.
     includeDocuments:
-      - '.recipe-docs/analysis.md'
-      - '.recipe-docs/plan.md'
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
     continueConversation: false
     waitForConfirmation: false
 
@@ -104,14 +106,15 @@ steps:
       - Documentation completeness
 
       Provide specific, actionable feedback.
+    outputDocument: ".recipe-docs/review.md"
     includeDocuments:
-      - '.recipe-docs/analysis.md'
-      - '.recipe-docs/plan.md'
-    continueConversation: true
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
+    continueConversation: false
     waitForConfirmation: false
 
   - id: refactor
-    agent: feature-builder
+    agent: refactoring-specialist
     task: |
       Address the review feedback from the previous step.
 
@@ -121,10 +124,13 @@ steps:
       - Add missing tests or documentation
       - Ensure all acceptance criteria are met
       - Stay aligned with the original plan
+
+      Update the review document with the changes made.
     includeDocuments:
-      - '.recipe-docs/analysis.md'
-      - '.recipe-docs/plan.md'
-    continueConversation: true
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
+      - ".recipe-docs/review.md"
+    continueConversation: false
     waitForConfirmation: false
 
   - id: quality-check
@@ -137,15 +143,20 @@ steps:
       - Tests pass and cover edge cases
       - Code follows project conventions
       - Documentation is complete
+      - Acceptance criteria are fully met
 
       Respond with "APPROVED" if quality standards are met, or provide remaining issues.
-    continueConversation: true
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
+      - ".recipe-docs/review.md"
+    continueConversation: false
     waitForConfirmation: true
     condition:
       type: always
 
   - id: document
-    agent: feature-builder
+    agent: documentation-writer
     task: |
       Update project documentation to reflect the new feature.
 
@@ -153,20 +164,26 @@ steps:
       - README.md with feature description
       - CHANGELOG.md with version entry
       - Any relevant architecture docs
-    continueConversation: true
+
+      Use all the analysis, plan, and review documents as context for what was implemented.
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
+      - ".recipe-docs/review.md"
+    continueConversation: false
     waitForConfirmation: false
     condition:
       type: on-success
       check:
         type: contains
-        value: 'APPROVED'
+        value: "APPROVED"
 
 loop:
   steps:
     - review
     - refactor
-  maxIterations: 5
+  maxIterations: 3
 
 metadata:
   author: ai-tools
-  created: '2025-01-15'
+  created: "2025-01-15"

@@ -1095,10 +1095,16 @@ export class ProjectGenerator {
     script += `# Generated: ${new Date().toISOString()}\n\n`;
     script += 'set -e  # Exit on error\n\n';
 
-    // Setup logging
-    script += '# Setup logging\n';
+    // Setup directories for logs and documents
+    script += '# Setup directories\n';
+    script += 'RECIPE_DOCS_DIR=".recipe-docs"\n';
+    script += 'mkdir -p "$RECIPE_DOCS_DIR"\n';
     script += 'RECIPE_LOGS_DIR=".recipe-logs"\n';
     script += 'mkdir -p "$RECIPE_LOGS_DIR"\n';
+    script += 'echo "📁 Documents: $RECIPE_DOCS_DIR"\n\n';
+
+    // Setup logging
+    script += '# Setup logging\n';
     script += `LOG_FILE="$RECIPE_LOGS_DIR/${recipe.id}-$(date +%Y%m%d-%H%M%S).log"\n`;
     script += 'echo "📝 Logging to: $LOG_FILE"\n';
     script += 'echo ""\n\n';
@@ -1274,6 +1280,22 @@ export class ProjectGenerator {
       }
     }
 
+    // Include reference documents from previous steps if specified
+    if (step.includeDocuments && step.includeDocuments.length > 0) {
+      task += '\n\n---\n\n## Reference Documents (Context)\n\n';
+      for (const docPath of step.includeDocuments) {
+        const docFileName = docPath.split('/').pop();
+        task += `### Document: \`${docPath}\`\n\n`;
+        task += `\${DOC_CONTENT_${docFileName?.toUpperCase().replace(/[^A-Z0-9]/g, '_')}}\n\n---\n\n`;
+      }
+      task += '\n**Please use the documents above as context for your work.**\n\n';
+    }
+
+    // Add output document instruction if specified
+    if (step.outputDocument) {
+      task += `\n\n---\n\n**IMPORTANT**: Save your complete response to the file: \`${step.outputDocument}\`\n`;
+    }
+
     // Determine if should continue conversation based on strategy
     const shouldContinue =
       conversationStrategy === 'continue' && step.continueConversation !== false && index > 0;
@@ -1326,7 +1348,32 @@ export class ProjectGenerator {
       flags.push('--print');
 
       const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
-      script += `RESPONSE=$(claude${flagsStr} "${task.replace(/"/g, '\\"')}")\n`;
+
+      // Build the complete task with document loading
+      let fullTask = task;
+      if (step.includeDocuments && step.includeDocuments.length > 0) {
+        script += `# Load documents for this step\n`;
+        for (const docPath of step.includeDocuments) {
+          const docFileName = docPath.split('/').pop();
+          const varName = `DOC_CONTENT_${docFileName?.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+          script += `if [ -f ".recipe-docs/${docFileName}" ]; then\n`;
+          script += `  ${varName}=$(cat ".recipe-docs/${docFileName}")\n`;
+          script += `else\n`;
+          script += `  ${varName}="[Document not found: ${docPath}]"\n`;
+          script += `fi\n`;
+        }
+        script += `\n`;
+        // Replace the placeholders in task with actual variables
+        for (const docPath of step.includeDocuments) {
+          const docFileName = docPath.split('/').pop();
+          const varName = `DOC_CONTENT_${docFileName?.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+          fullTask = fullTask.replace(`\${${varName}}`, `$${varName}`);
+        }
+      }
+
+      // Escape backticks in fullTask for bash execution (prevent command substitution)
+      const escapedTask = fullTask.replace(/`/g, '\\`').replace(/"/g, '\\"');
+      script += `RESPONSE=$(claude${flagsStr} "${escapedTask}")\n`;
       script += `echo "$RESPONSE"\n`;
     } else if (tool === 'copilot-cli') {
       const flags: string[] = [];
@@ -1353,14 +1400,58 @@ export class ProjectGenerator {
       }
 
       const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
-      script += `RESPONSE=$(echo "@${step.agent} ${task}" | copilot${flagsStr})\n`;
+
+      // Build the complete task with document loading
+      let fullTask = task;
+      if (step.includeDocuments && step.includeDocuments.length > 0) {
+        script += `# Load documents for this step\n`;
+        for (const docPath of step.includeDocuments) {
+          const docFileName = docPath.split('/').pop();
+          const varName = `DOC_CONTENT_${docFileName?.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+          script += `if [ -f ".recipe-docs/${docFileName}" ]; then\n`;
+          script += `  ${varName}=$(cat ".recipe-docs/${docFileName}")\n`;
+          script += `else\n`;
+          script += `  ${varName}="[Document not found: ${docPath}]"\n`;
+          script += `fi\n`;
+        }
+        script += `\n`;
+        // Replace the placeholders in task with actual variables
+        for (const docPath of step.includeDocuments) {
+          const docFileName = docPath.split('/').pop();
+          const varName = `DOC_CONTENT_${docFileName?.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+          fullTask = fullTask.replace(`\${${varName}}`, `$${varName}`);
+        }
+      }
+
+      // Escape backticks in fullTask for bash execution (prevent command substitution)
+      const escapedTask = fullTask.replace(/`/g, '\\`').replace(/"/g, '\\"');
+      script += `RESPONSE=$(echo "@${step.agent} ${escapedTask}" | copilot${flagsStr})\n`;
       script += `echo "$RESPONSE"\n`;
     } else if (tool === 'cursor') {
       script += `# Manual: Open Cursor Composer and execute:\n`;
-      script += `# @${step.agent} ${task}\n`;
+
+      // Build the complete task with document loading
+      let fullTask = task;
+      if (step.includeDocuments && step.includeDocuments.length > 0) {
+        script += `# Load documents for manual execution:\n`;
+        for (const docPath of step.includeDocuments) {
+          const docFileName = docPath.split('/').pop();
+          script += `# - .recipe-docs/${docFileName}\n`;
+        }
+      }
+
+      script += `# @${step.agent} ${fullTask}\n`;
       script += `echo "⚠️  Please execute in Cursor Composer and press Enter"\n`;
       script += `read -p "Continue? "\n`;
       script += `RESPONSE=""\n`;
+    }
+
+    // Save output document if specified
+    if (step.outputDocument) {
+      const docFileName = step.outputDocument.split('/').pop();
+      script += `# Save step output to document\n`;
+      script += `echo "$RESPONSE" > ".recipe-docs/${docFileName}"\n`;
+      script += `echo "✓ Document saved: ${step.outputDocument}"\n\n`;
     }
 
     // Handle conditional execution of next steps

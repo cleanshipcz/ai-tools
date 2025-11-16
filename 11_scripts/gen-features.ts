@@ -509,10 +509,16 @@ export class FeatureGenerator {
     script += `# Generated: ${new Date().toISOString()}\n\n`;
     script += 'set -e  # Exit on error\n\n';
 
-    // Setup logging
-    script += '# Setup logging\n';
+    // Setup directories for logs and documents
+    script += '# Setup directories\n';
+    script += 'RECIPE_DOCS_DIR=".recipe-docs"\n';
+    script += 'mkdir -p "$RECIPE_DOCS_DIR"\n';
     script += 'RECIPE_LOGS_DIR=".recipe-logs"\n';
     script += 'mkdir -p "$RECIPE_LOGS_DIR"\n';
+    script += 'echo "📁 Documents: $RECIPE_DOCS_DIR"\n\n';
+
+    // Setup logging
+    script += '# Setup logging\n';
     script += `LOG_FILE="$RECIPE_LOGS_DIR/feature-${feature.id}-$(date +%Y%m%d-%H%M%S).log"\n`;
     script += 'echo "📝 Logging to: $LOG_FILE"\n';
     script += 'echo ""\n\n';

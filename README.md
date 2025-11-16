@@ -387,6 +387,26 @@ npm run project:generate-features my-project
 
 **Benefits:** Requirements are defined once in `feature.yml` and automatically passed to the recipe. No manual variable passing needed!
 
+### Recipe Output Logging
+
+All recipe executions are automatically logged to timestamped files for debugging and audit trails:
+
+```bash
+# Run a recipe - output appears on console AND is saved
+./.cs.recipes/feature-delivery.sh
+# 📝 Logging to: .recipe-logs/feature-delivery-20251116-150530.log
+
+# Review the complete execution log later
+cat .recipe-logs/feature-delivery-20251116-150530.log
+```
+
+**Features:**
+- Real-time console output (using `tee`)
+- Complete execution logs with timestamps
+- Works for all tool types (copilot-cli, claude-code, cursor)
+- Automatic `.recipe-logs/` directory creation
+- No performance impact
+
 **Example workflow:**
 
 ```text
