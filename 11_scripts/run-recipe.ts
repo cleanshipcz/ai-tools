@@ -521,7 +521,10 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
         script += `CONVERSATION_ID=$(echo "$RESPONSE" | grep -oP 'Conversation ID: \\K[a-zA-Z0-9-]+')\n`;
       }
     } else if (tool === 'copilot-cli') {
-      script += `RESPONSE=$(copilot -p "@${step.agent} ${task}" --allow-all-tools)\n`;
+      // Escape task content for bash variable
+      const escapedTask = task.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+      script += `TASK="@${step.agent} ${escapedTask}"\n`;
+      script += `RESPONSE=$(copilot -p "$TASK" --allow-all-tools)\n`;
       script += `echo "$RESPONSE"\n`;
       if (step.outputDocument) {
         script += `echo "$RESPONSE" > "${step.outputDocument}"\n`;

@@ -681,7 +681,10 @@ export class FeatureGenerator {
       }
 
       const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
-      script += `RESPONSE=$(copilot -p "@${step.agent} ${task}" $MODEL_FLAG${flagsStr})\n`;
+      // Store task in variable to handle multi-line content properly
+      const escapedTask = task.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+      script += `TASK="@${step.agent} ${escapedTask}"\n`;
+      script += `RESPONSE=$(copilot -p "$TASK" $MODEL_FLAG${flagsStr})\n`;
       script += `echo "$RESPONSE"\n`;
     } else if (tool === 'cursor') {
       script += `# Manual: Open Cursor Composer and execute:\n`;
