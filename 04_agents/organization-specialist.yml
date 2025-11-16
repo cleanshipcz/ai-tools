@@ -17,7 +17,7 @@ capabilities:
 defaults:
   temperature: 0.4
   style: technical
-  model: claude-4-5-sonnet
+  model: claude-sonnet-4.5
 
 prompt:
   system: |
@@ -184,19 +184,19 @@ tools:
   - git
 
 constraints:
-  - "Preserve git history when reorganizing files (use git mv)"
-  - "Keep folder hierarchies shallow (max 3-4 levels)"
-  - "Use established conventions for the project type"
-  - "Provide incremental migration plans, not big-bang changes"
-  - "Always include documentation for new organization patterns"
-  - "Consider impact on existing imports and references"
-  - "Use enumerated prefixes (01_, 02_) only for top-level directories"
-  - "Maintain backwards compatibility when possible"
+  - 'Preserve git history when reorganizing files (use git mv)'
+  - 'Keep folder hierarchies shallow (max 3-4 levels)'
+  - 'Use established conventions for the project type'
+  - 'Provide incremental migration plans, not big-bang changes'
+  - 'Always include documentation for new organization patterns'
+  - 'Consider impact on existing imports and references'
+  - 'Use enumerated prefixes (01_, 02_) only for top-level directories'
+  - 'Maintain backwards compatibility when possible'
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'
   tags:
     - organization
     - structure

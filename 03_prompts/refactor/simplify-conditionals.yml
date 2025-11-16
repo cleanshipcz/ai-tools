@@ -8,18 +8,18 @@ tags:
 variables:
   - name: code
     required: true
-    description: "The code block containing complex conditionals"
+    description: 'The code block containing complex conditionals'
   - name: language
     required: true
-    description: "Programming language of the code"
+    description: 'Programming language of the code'
 includes:
   - ../shared/constraints.md
 rules:
-  - "Preserve behavior exactly."
-  - "Reduce nesting depth where possible."
-  - "Use early returns to reduce complexity."
-  - "Extract complex conditions into named boolean variables."
-  - "Consider guard clauses for error cases."
+  - 'Preserve behavior exactly.'
+  - 'Reduce nesting depth where possible.'
+  - 'Use early returns to reduce complexity.'
+  - 'Extract complex conditions into named boolean variables.'
+  - 'Consider guard clauses for error cases.'
 content: |
   Simplify the following {{language}} conditional logic:
 
@@ -43,5 +43,5 @@ content: |
 outputs:
   format: code
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

@@ -8,18 +8,18 @@ tags:
 variables:
   - name: feature
     required: true
-    description: "The feature or functionality to create a story for"
+    description: 'The feature or functionality to create a story for'
   - name: user_type
     required: false
-    description: "Type of user (e.g., admin, customer, developer)"
+    description: 'Type of user (e.g., admin, customer, developer)'
   - name: context
     required: false
-    description: "Additional context or requirements"
+    description: 'Additional context or requirements'
 rules:
   - 'Follow the "As a... I want... So that..." format.'
-  - "Make acceptance criteria specific and testable."
-  - "Keep stories small (1-3 days)."
-  - "Include technical notes for implementation."
+  - 'Make acceptance criteria specific and testable.'
+  - 'Keep stories small (1-3 days).'
+  - 'Include technical notes for implementation.'
 content: |
   Create a user story for:
 
@@ -94,5 +94,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

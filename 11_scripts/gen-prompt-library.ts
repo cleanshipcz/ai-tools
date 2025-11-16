@@ -9,10 +9,20 @@ import path from 'path';
 import yaml from 'js-yaml';
 import { glob } from 'glob';
 
+type AIModel =
+  | 'claude-sonnet-4.5'
+  | 'claude-sonnet-4'
+  | 'claude-haiku-4.5'
+  | 'gpt-5'
+  | 'gpt-5.1'
+  | 'gpt-5.1-codex-mini'
+  | 'gpt-5.1-codex';
+
 interface Prompt {
   id: string;
   version: string;
   description: string;
+  model?: AIModel;
   tags?: string[];
   variables?: Array<{
     name: string;

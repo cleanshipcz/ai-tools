@@ -75,16 +75,16 @@ tools:
   - search-code
   - setup-test-infrastructure
 constraints:
-  - "ALWAYS write a failing test that reproduces the bug BEFORE fixing it."
-  - "Tests must be automated and executable via test runner."
-  - "Propose minimal changes that fix the root cause."
-  - "Do not introduce new bugs or side effects."
-  - "Verify the fix by running the test and confirming it passes."
-  - "Add regression tests to prevent the bug from reoccurring."
+  - 'ALWAYS write a failing test that reproduces the bug BEFORE fixing it.'
+  - 'Tests must be automated and executable via test runner.'
+  - 'Propose minimal changes that fix the root cause.'
+  - 'Do not introduce new bugs or side effects.'
+  - 'Verify the fix by running the test and confirming it passes.'
+  - 'Add regression tests to prevent the bug from reoccurring.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-01-01"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-01-01'
+  updated: '2025-11-16'
   tags:
     - debugging
     - fixing

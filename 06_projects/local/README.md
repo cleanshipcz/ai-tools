@@ -22,6 +22,7 @@ npm run project:deploy my-project
 ## Template
 
 Use `projects/global/template/` as your starting point. It contains:
+
 - `project.yml` - Project configuration with helpful comments
 - `deploy.yml` - Example deployment configuration
 

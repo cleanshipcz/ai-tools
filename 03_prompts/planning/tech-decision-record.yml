@@ -8,18 +8,18 @@ tags:
 variables:
   - name: decision
     required: true
-    description: "The technical decision to document"
+    description: 'The technical decision to document'
   - name: context
     required: false
-    description: "Background and context for the decision"
+    description: 'Background and context for the decision'
   - name: alternatives
     required: false
-    description: "Alternative approaches considered"
+    description: 'Alternative approaches considered'
 rules:
-  - "Document the context and problem clearly."
-  - "List alternatives considered."
-  - "Explain the rationale for the chosen approach."
-  - "Document consequences (positive and negative)."
+  - 'Document the context and problem clearly.'
+  - 'List alternatives considered.'
+  - 'Explain the rationale for the chosen approach.'
+  - 'Document consequences (positive and negative).'
 content: |
   Create an Architecture Decision Record (ADR) for:
 
@@ -95,5 +95,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

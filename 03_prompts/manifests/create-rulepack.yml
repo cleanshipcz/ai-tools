@@ -11,7 +11,7 @@ tags:
 variables:
   - name: rulepack_id
     required: true
-    description: "Kebab-case unique identifier for the rulepack (e.g., coding-python, security)"
+    description: 'Kebab-case unique identifier for the rulepack (e.g., coding-python, security)'
 
   - name: description
     required: true
@@ -23,28 +23,28 @@ variables:
 
   - name: extends
     required: false
-    description: "Comma-separated list of parent rulepack IDs to extend (e.g., base)"
+    description: 'Comma-separated list of parent rulepack IDs to extend (e.g., base)'
 
   - name: category
     required: false
-    description: "Category: coding, security, testing, documentation, or general"
-    default: "coding"
+    description: 'Category: coding, security, testing, documentation, or general'
+    default: 'coding'
 
   - name: language
     required: false
-    description: "Programming language if applicable (python, typescript, java, kotlin)"
+    description: 'Programming language if applicable (python, typescript, java, kotlin)'
 
 rules:
-  - "ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
-  - "Version must start at 1.0.0 following semver"
-  - "Description should be clear and concise"
-  - "Rules must be 5-500 characters each"
-  - "Include at least 5 rules, preferably 10-20"
-  - "Make rules specific, actionable, and measurable"
-  - "Group related rules together logically"
-  - "Use consistent language and tone"
-  - "Add tags for discoverability"
-  - "Include metadata with author and creation date"
+  - 'ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
+  - 'Version must start at 1.0.0 following semver'
+  - 'Description should be clear and concise'
+  - 'Rules must be 5-500 characters each'
+  - 'Include at least 5 rules, preferably 10-20'
+  - 'Make rules specific, actionable, and measurable'
+  - 'Group related rules together logically'
+  - 'Use consistent language and tone'
+  - 'Add tags for discoverability'
+  - 'Include metadata with author and creation date'
 
 content: |
   Generate a rulepack.yml manifest for the following rulepack:
@@ -190,11 +190,11 @@ outputs:
 
 examples:
   - input:
-      rulepack_id: "coding-go"
-      description: "Go language coding standards and best practices"
-      rules: "Go idioms, error handling, goroutines, channels, naming conventions"
-      extends: "base"
-      language: "go"
+      rulepack_id: 'coding-go'
+      description: 'Go language coding standards and best practices'
+      rules: 'Go idioms, error handling, goroutines, channels, naming conventions'
+      extends: 'base'
+      language: 'go'
     output: |
       # Creates a complete rulepack.yml with:
       # - Go-specific coding standards
@@ -204,6 +204,6 @@ examples:
       # - Extends base rulepack
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

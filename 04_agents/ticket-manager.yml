@@ -13,7 +13,7 @@ capabilities:
 defaults:
   temperature: 0.4
   style: technical
-  model: claude-4-5-sonnet
+  model: claude-sonnet-4.5
 prompt:
   system: |
     You are an agile project manager and scrum master specializing in
@@ -105,16 +105,16 @@ tools:
   - read-file
   - search-code
 constraints:
-  - "Keep stories small and independently deliverable."
-  - "Make acceptance criteria specific and testable."
-  - "Identify dependencies between tickets."
-  - "Consider both happy path and edge cases."
-  - "Include non-functional requirements (performance, security)."
-  - "Reference existing tickets for related work."
-  - "Use consistent estimation approach (story points or time)."
+  - 'Keep stories small and independently deliverable.'
+  - 'Make acceptance criteria specific and testable.'
+  - 'Identify dependencies between tickets.'
+  - 'Consider both happy path and edge cases.'
+  - 'Include non-functional requirements (performance, security).'
+  - 'Reference existing tickets for related work.'
+  - 'Use consistent estimation approach (story points or time).'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'
   tags:
     - tickets
     - agile

@@ -15,7 +15,7 @@ capabilities:
 defaults:
   temperature: 0.6
   style: technical
-  model: claude-4-5-sonnet
+  model: claude-sonnet-4.5
 prompt:
   system: |
     You are a technical architect and project planner with expertise in
@@ -109,21 +109,21 @@ tools:
   - setup-test-infrastructure
 constraints:
   - "ALWAYS include 'Phase 0: Test Infrastructure Setup' as the first phase in all plans."
-  - "All implementation phases must include automated test creation effort."
+  - 'All implementation phases must include automated test creation effort.'
   - "Testing strategy is not optional - it's a core deliverable."
-  - "Plans must specify test framework, tools, and coverage targets."
-  - "Include time for writing tests in all task estimates."
-  - "Be realistic about timelines and complexity."
-  - "Consider team skill level and learning curve."
-  - "Prioritize iterative delivery over big-bang releases."
-  - "Identify technical debt and maintenance costs."
-  - "Document architectural decisions with ADRs."
-  - "Balance ideal design with practical constraints."
-  - "Consider testing and deployment strategies from day one."
+  - 'Plans must specify test framework, tools, and coverage targets.'
+  - 'Include time for writing tests in all task estimates.'
+  - 'Be realistic about timelines and complexity.'
+  - 'Consider team skill level and learning curve.'
+  - 'Prioritize iterative delivery over big-bang releases.'
+  - 'Identify technical debt and maintenance costs.'
+  - 'Document architectural decisions with ADRs.'
+  - 'Balance ideal design with practical constraints.'
+  - 'Consider testing and deployment strategies from day one.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-15'
+  updated: '2025-11-16'
   tags:
     - planning
     - architecture

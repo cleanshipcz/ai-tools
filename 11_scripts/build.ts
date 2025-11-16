@@ -9,6 +9,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
 
+type AIModel =
+  | 'claude-sonnet-4.5'
+  | 'claude-sonnet-4'
+  | 'claude-haiku-4.5'
+  | 'gpt-5'
+  | 'gpt-5.1'
+  | 'gpt-5.1-codex-mini'
+  | 'gpt-5.1-codex';
+
 interface Rulepack {
   id: string;
   version?: string;
@@ -23,7 +32,13 @@ interface Agent {
   purpose: string;
   rulepacks?: string[];
   prompt?: any;
-  defaults?: any;
+  defaults?: {
+    model?: AIModel;
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    style?: 'terse' | 'verbose' | 'conversational' | 'technical';
+  };
   capabilities?: string[];
   tools?: string[];
   constraints?: string[];
@@ -36,6 +51,7 @@ interface Prompt {
   content?: string;
   system?: string;
   user?: string;
+  model?: AIModel;
   includes?: string[];
   rules?: string[];
   variables?: any[];
@@ -59,6 +75,19 @@ class Builder {
   private agents = new Map<string, Agent>();
   private prompts = new Map<string, Prompt>();
   private skills = new Map<string, Skill>();
+
+  /**
+   * Resolve the effective model based on hierarchy:
+   * feature > project > agent > prompt (lowest priority)
+   */
+  private resolveModel(
+    prompt?: Prompt,
+    agent?: Agent,
+    project?: { ai_tools?: { model?: AIModel } },
+    feature?: { model?: AIModel }
+  ): AIModel | undefined {
+    return feature?.model || project?.ai_tools?.model || agent?.defaults?.model || prompt?.model;
+  }
 
   async build(): Promise<void> {
     console.log(chalk.blue('🔨 Starting build...\n'));
@@ -460,6 +489,12 @@ class Builder {
       promptContent.push(prompt.description);
       promptContent.push('');
 
+      // Add default model if configured
+      if (prompt.model) {
+        promptContent.push(`**Default Model:** ${prompt.model}`);
+        promptContent.push('');
+      }
+
       if (prompt.variables && prompt.variables.length > 0) {
         promptContent.push('## Variables');
         promptContent.push('');
@@ -500,6 +535,12 @@ class Builder {
       agentPrompt.push('');
       agentPrompt.push(`**Purpose:** ${agent.purpose}`);
       agentPrompt.push('');
+
+      // Add default model if configured
+      if (agent.defaults?.model) {
+        agentPrompt.push(`**Default Model:** ${agent.defaults.model}`);
+        agentPrompt.push('');
+      }
 
       // Include system prompt (the actual agent behavior)
       if (agent.prompt?.system) {
@@ -554,6 +595,27 @@ class Builder {
     agentsContent.push('---');
     agentsContent.push('');
 
+    // Add model selection info
+    agentsContent.push('## Model Selection');
+    agentsContent.push('');
+    agentsContent.push('Agents have default models configured. You can override them using:');
+    agentsContent.push('');
+    agentsContent.push('```bash');
+    agentsContent.push('# Use specific model for this session');
+    agentsContent.push('copilot --model claude-sonnet-4.5');
+    agentsContent.push('');
+    agentsContent.push('# Use specific model with a prompt');
+    agentsContent.push('copilot --model gpt-5.1 -p "Review this code"');
+    agentsContent.push('```');
+    agentsContent.push('');
+    agentsContent.push('**Available models:**');
+    agentsContent.push(
+      '`claude-sonnet-4.5`, `claude-sonnet-4`, `claude-haiku-4.5`, `gpt-5`, `gpt-5.1`, `gpt-5.1-codex-mini`, `gpt-5.1-codex`'
+    );
+    agentsContent.push('');
+    agentsContent.push('---');
+    agentsContent.push('');
+
     // Add available agents
     if (this.agents.size > 0) {
       agentsContent.push('## Available Agents');
@@ -568,6 +630,13 @@ class Builder {
         agentsContent.push('');
         agentsContent.push(`**Purpose:** ${agent.purpose}`);
         agentsContent.push('');
+
+        if (agent.defaults?.model) {
+          agentsContent.push(`**Default Model:** ${agent.defaults.model}`);
+          agentsContent.push('');
+          agentsContent.push('*Override with: `copilot --model <model-name>`*');
+          agentsContent.push('');
+        }
 
         if (agent.prompt?.system) {
           agentsContent.push('**Persona:**');

@@ -260,7 +260,7 @@ Generates `.cursor/project-rules.json` with project rules and context, plus:
 
 Generates `.claude/project-context.json` with project context, plus:
 
-- **Recipe Scripts:** Deployed to `.cs.recipes/` subdirectory  
+- **Recipe Scripts:** Deployed to `.cs.recipes/` subdirectory
 - Executable bash scripts for automated multi-agent workflows
 - All recipes that support claude-code tool
 
@@ -805,7 +805,7 @@ name: 'User Authentication'
 description: 'Implement JWT-based user authentication'
 
 recipe:
-  id: feature-delivery  # Which recipe to use
+  id: feature-delivery # Which recipe to use
   context:
     # Feature-specific context passed to the recipe
     feature_description: |
@@ -815,7 +815,7 @@ recipe:
       - JWT token generation and validation
       - Protected routes middleware
       - Password hashing with bcrypt
-    
+
     acceptance_criteria: |
       - Users can register with email/password
       - Passwords are hashed before storage
@@ -824,11 +824,10 @@ recipe:
       - Comprehensive input validation
       - Unit and integration tests included
       - API documentation updated
-  
+
   tools:
     - claude-code
     - copilot-cli
-
 # ... rest of feature manifest
 ```
 

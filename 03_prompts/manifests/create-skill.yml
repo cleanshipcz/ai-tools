@@ -11,15 +11,15 @@ tags:
 variables:
   - name: skill_id
     required: true
-    description: "Kebab-case unique identifier for the skill (e.g., run-tests, lint-code)"
+    description: 'Kebab-case unique identifier for the skill (e.g., run-tests, lint-code)'
 
   - name: description
     required: true
-    description: "Clear description of what the skill does (10-500 characters)"
+    description: 'Clear description of what the skill does (10-500 characters)'
 
   - name: command_program
     required: false
-    description: "The program/executable to run (e.g., pytest, npm, gradle)"
+    description: 'The program/executable to run (e.g., pytest, npm, gradle)'
 
   - name: command_args
     required: false
@@ -27,28 +27,28 @@ variables:
 
   - name: mcp_tool
     required: false
-    description: "MCP tool ID reference instead of command (e.g., git_operations)"
+    description: 'MCP tool ID reference instead of command (e.g., git_operations)'
 
   - name: timeout
     required: false
-    description: "Timeout in seconds"
-    default: "300"
+    description: 'Timeout in seconds'
+    default: '300'
 
   - name: working_dir
     required: false
-    description: "Working directory (default: current directory)"
+    description: 'Working directory (default: current directory)'
 
 rules:
-  - "ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
-  - "Version must start at 1.0.0 following semver"
-  - "Description must be 10-500 characters"
-  - "Either command OR mcp_tool must be specified, not both"
-  - "Command program should be executable (check if it needs installation)"
-  - "Include constraints for prerequisites"
-  - "Set reasonable timeout (default 300s, tests may need longer)"
-  - "Define inputs for parameterized skills"
-  - "Specify outputs to capture (stdout, stderr, exit_code)"
-  - "Add tags for categorization and tool discovery"
+  - 'ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
+  - 'Version must start at 1.0.0 following semver'
+  - 'Description must be 10-500 characters'
+  - 'Either command OR mcp_tool must be specified, not both'
+  - 'Command program should be executable (check if it needs installation)'
+  - 'Include constraints for prerequisites'
+  - 'Set reasonable timeout (default 300s, tests may need longer)'
+  - 'Define inputs for parameterized skills'
+  - 'Specify outputs to capture (stdout, stderr, exit_code)'
+  - 'Add tags for categorization and tool discovery'
 
 content: |
   Generate a skill.yml manifest for the following skill:
@@ -294,11 +294,11 @@ outputs:
 
 examples:
   - input:
-      skill_id: "run-gradle-tests"
-      description: "Run Gradle test suite with coverage reporting"
-      command_program: "gradle"
-      command_args: "test, jacocoTestReport"
-      timeout: "900"
+      skill_id: 'run-gradle-tests'
+      description: 'Run Gradle test suite with coverage reporting'
+      command_program: 'gradle'
+      command_args: 'test, jacocoTestReport'
+      timeout: '900'
     output: |
       # Creates a complete skill.yml with:
       # - Gradle test execution
@@ -308,6 +308,6 @@ examples:
       # - Proper constraints
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

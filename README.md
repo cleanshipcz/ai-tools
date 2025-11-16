@@ -767,6 +767,66 @@ npm run clean            # Remove generated files
 
 ## ⚙️ Configuration
 
+### Model Selection
+
+AI tools supports hierarchical model configuration with priority from highest to lowest:
+
+**Priority Hierarchy:** Feature > Project > Agent > Prompt
+
+**Supported Models:**
+
+- `claude-sonnet-4.5`
+- `claude-sonnet-4`
+- `claude-haiku-4.5`
+- `gpt-5`
+- `gpt-5.1`
+- `gpt-5.1-codex-mini`
+- `gpt-5.1-codex`
+
+**Configuration Examples:**
+
+```yaml
+# In a prompt (prompts/refactor/extract-method.yml)
+id: extract-method
+version: 1.0.0
+description: Extract a pure function from code
+model: claude-sonnet-4 # Default for this prompt
+content: |
+  Extract this code into a clean function...
+```
+
+```yaml
+# In an agent (agents/code-reviewer.yml)
+id: code-reviewer
+version: 1.0.0
+purpose: Review code for quality and security
+defaults:
+  model: claude-sonnet-4.5 # Overrides prompt defaults
+  temperature: 0.3
+```
+
+```yaml
+# In a project (projects/global/my-app/project.yml)
+id: my-app
+version: 1.0.0
+name: My Application
+ai_tools:
+  model: gpt-5.1 # Overrides agent defaults for this project
+  preferred_agents:
+    - code-reviewer
+```
+
+```yaml
+# In a feature (projects/global/my-app/features/auth/feature.yml)
+id: auth
+version: 1.0.0
+name: Authentication Feature
+model: gpt-5.1-codex # Highest priority - overrides everything
+description: User authentication system
+```
+
+When generating configurations, the effective model is determined by checking each level from highest to lowest priority until a model is found.
+
 ### Provider Setup (For Evals)
 
 ```bash
@@ -863,7 +923,7 @@ GitHub Actions workflow with 7 jobs:
 
 ## 📦 Architecture
 
-```
+```text
 ┌─────────────────┐
 │ YAML Manifests  │  (Source of Truth)
 └────────┬────────┘

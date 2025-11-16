@@ -79,24 +79,24 @@ tools:
   - claude-code
   - copilot-cli
 
-conversationStrategy: separate  # or 'continue'
+conversationStrategy: separate # or 'continue'
 
 toolOptions:
   copilot-cli:
-    allowAllTools: true  # Enable automated tool execution
+    allowAllTools: true # Enable automated tool execution
 
 variables:
-  feature_description: "{{FEATURE_DESCRIPTION}}"
-  acceptance_criteria: "{{ACCEPTANCE_CRITERIA}}"
+  feature_description: '{{FEATURE_DESCRIPTION}}'
+  acceptance_criteria: '{{ACCEPTANCE_CRITERIA}}'
 
 steps:
   - id: implement
     agent: feature-builder
     task: |
       Implement the following feature:
-      
+
       Feature: {{feature_description}}
-      
+
       Acceptance Criteria:
       {{acceptance_criteria}}
     continueConversation: false
@@ -119,7 +119,7 @@ loop:
 
 metadata:
   author: your-team
-  created: "2025-01-15"
+  created: '2025-01-15'
 ```
 
 ### Required Fields
@@ -153,12 +153,14 @@ conversationStrategy: continue
 ```
 
 **When to use `separate`:**
+
 - Avoid context window bloat
 - Each agent needs fresh perspective
 - Working with large codebases
 - **Recommended for most workflows**
 
 **When to use `continue`:**
+
 - Agents need to reference previous discussions
 - Building complex multi-step reasoning
 - Short, tightly coupled workflows
@@ -170,14 +172,15 @@ Execute steps repeatedly:
 ```yaml
 loop:
   steps:
-    - review      # Step IDs to repeat
+    - review # Step IDs to repeat
     - refactor
-  maxIterations: 3  # Max times to loop
+  maxIterations: 3 # Max times to loop
 ```
 
 **Important:** All iterations run automatically. No user prompts between iterations.
 
 **Example workflow:**
+
 ```
 Iteration 1: review → refactor
 Iteration 2: review → refactor
@@ -190,29 +193,32 @@ Done
 ```yaml
 steps:
   - id: step-name
-    agent: agent-id              # Which agent to use
-    task: Task description       # What the agent should do
-    outputDocument: ".recipe-docs/output.md"  # Save AI response to file
-    includeDocuments:            # Include these docs in context
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
-    continueConversation: true   # Continue from previous step
-    waitForConfirmation: false   # Wait for user (not implemented)
+    agent: agent-id # Which agent to use
+    task: Task description # What the agent should do
+    outputDocument: '.recipe-docs/output.md' # Save AI response to file
+    includeDocuments: # Include these docs in context
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
+    continueConversation: true # Continue from previous step
+    waitForConfirmation: false # Wait for user (not implemented)
 ```
 
 **`outputDocument`:**
+
 - Path where the AI's complete response should be saved
 - Typically in `.recipe-docs/` directory
 - Used for analysis, plans, checklists, etc.
 - Document is cached and available to subsequent steps
 
 **`includeDocuments`:**
+
 - Array of document paths to include in the step's context
 - Documents are appended to the task description
 - Ensures all agents work from the same analysis/plan
 - Essential for maintaining consistency across steps
 
 **`continueConversation`:**
+
 - Only matters when `conversationStrategy: continue`
 - `true` - Continue conversation from previous step
 - `false` - Start fresh conversation
@@ -224,15 +230,16 @@ Define reusable inputs:
 
 ```yaml
 variables:
-  feature_name: "{{FEATURE_NAME}}"
-  file_path: "{{FILE_PATH}}"
-  
+  feature_name: '{{FEATURE_NAME}}'
+  file_path: '{{FILE_PATH}}'
+
 steps:
   - id: implement
     task: Implement {{feature_name}} in {{file_path}}
 ```
 
 **Usage in scripts:**
+
 ```bash
 FEATURE_NAME="Authentication" \
 FILE_PATH="src/auth.ts" \
@@ -240,12 +247,13 @@ FILE_PATH="src/auth.ts" \
 ```
 
 **With feature binding:**
+
 ```yaml
 # features/auth/feature.yml
 recipe:
   context:
-    feature_name: "User Authentication"
-    file_path: "src/auth.ts"
+    feature_name: 'User Authentication'
+    file_path: 'src/auth.ts'
 ```
 
 Variables are automatically pre-filled in feature-bound scripts.
@@ -265,10 +273,11 @@ steps:
       type: on-success
       check:
         type: contains
-        value: "APPROVED"
+        value: 'APPROVED'
 ```
 
 Currently implemented:
+
 - Basic `contains` check on response output
 - Script exits with error if condition not met
 
@@ -281,22 +290,23 @@ Configure tool-specific command-line options for automated execution.
 ```yaml
 toolOptions:
   copilot-cli:
-    allowAllTools: true        # --allow-all-tools (recommended for automation)
-    allowAllPaths: true         # --allow-all-paths (careful with security)
-    disallowTempDir: false      # --disallow-temp-dir
-    addDirs:                    # --add-dir (multiple)
+    allowAllTools: true # --allow-all-tools (recommended for automation)
+    allowAllPaths: true # --allow-all-paths (careful with security)
+    disallowTempDir: false # --disallow-temp-dir
+    addDirs: # --add-dir (multiple)
       - /path/to/project
       - /path/to/workspace
-    allowTools:                 # --allow-tool (specific tools only)
-      - "write"
-      - "shell(git:*)"
-    denyTools:                  # --deny-tool (takes precedence)
-      - "shell(rm *)"
+    allowTools: # --allow-tool (specific tools only)
+      - 'write'
+      - 'shell(git:*)'
+    denyTools: # --deny-tool (takes precedence)
+      - 'shell(rm *)'
 ```
 
 **Common configurations:**
 
 Fully automated (no prompts):
+
 ```yaml
 toolOptions:
   copilot-cli:
@@ -304,15 +314,17 @@ toolOptions:
 ```
 
 Restricted automation (only file editing):
+
 ```yaml
 toolOptions:
   copilot-cli:
     allowTools:
-      - "write"
-      - "read"
+      - 'write'
+      - 'read'
 ```
 
 Project-specific paths:
+
 ```yaml
 toolOptions:
   copilot-cli:
@@ -379,18 +391,18 @@ steps:
     task: |
       Analyze the codebase to understand...
       Document all relevant areas, dependencies, and considerations.
-    outputDocument: ".recipe-docs/analysis.md"
-    
+    outputDocument: '.recipe-docs/analysis.md'
+
   # 2. Planning step - create detailed plan
   - id: plan
     agent: project-planner
     task: |
       Create a detailed action plan based on the analysis.
       Include step-by-step approach and expected outcomes.
-    outputDocument: ".recipe-docs/plan.md"
+    outputDocument: '.recipe-docs/plan.md'
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-  
+      - '.recipe-docs/analysis.md'
+
   # 3. Implementation - execute the plan
   - id: implement
     agent: feature-builder
@@ -398,9 +410,9 @@ steps:
       Implement according to the plan.
       Follow the analysis and plan documents carefully.
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
-      
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
+
   # 4. Review - verify against plan
   - id: review
     agent: code-reviewer
@@ -408,8 +420,8 @@ steps:
       Review the implementation.
       Verify it matches the plan and addresses the analysis.
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
 ```
 
 ### Step 2: Validate
@@ -419,6 +431,7 @@ npm run validate
 ```
 
 This checks:
+
 - Schema compliance
 - Agent references exist
 - Variable syntax is correct
@@ -479,6 +492,7 @@ set -e  # Already in generated scripts
 ### Common Issues
 
 **Script not found:**
+
 ```bash
 # Did you deploy?
 npm run project:deploy my-project
@@ -488,6 +502,7 @@ ls -la /path/to/your-project/.cs.recipes/
 ```
 
 **Variables not interpolating:**
+
 ```bash
 # Export variables before running
 export FEATURE_DESCRIPTION="My feature"
@@ -498,6 +513,7 @@ FEATURE_DESCRIPTION="My feature" ./.cs.recipes/feature-delivery.sh
 ```
 
 **Agent not found:**
+
 ```bash
 # Verify agent exists
 cat agents/my-agent.yml
@@ -550,31 +566,32 @@ steps:
   - id: analyze
     agent: project-planner
     task: Analyze the codebase for implementing {{feature_name}}
-    outputDocument: ".recipe-docs/analysis.md"
-    
+    outputDocument: '.recipe-docs/analysis.md'
+
   - id: plan
     agent: project-planner
     task: Create detailed implementation plan for {{feature_name}}
-    outputDocument: ".recipe-docs/plan.md"
+    outputDocument: '.recipe-docs/plan.md'
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-    
+      - '.recipe-docs/analysis.md'
+
   - id: implement
     agent: feature-builder
     task: Implement {{feature_name}} following the plan
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
-    
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
+
   - id: review
     agent: code-reviewer
     task: Review implementation against the plan
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
 ```
 
 **Benefits:**
+
 - **Consistency** - All agents reference the same source of truth
 - **Quality** - Better implementations from well-researched plans
 - **Traceability** - Clear record of what was analyzed vs. implemented
@@ -589,21 +606,23 @@ steps:
 ### Task Writing
 
 **Good tasks:**
+
 ```yaml
 task: |
   Review the authentication implementation in src/auth/.
-  
+
   Focus on:
   - Password hashing security
   - JWT token expiration
   - Input validation
-  
+
   Provide specific, actionable feedback.
 ```
 
 **Poor tasks:**
+
 ```yaml
-task: Review the code  # Too vague
+task: Review the code # Too vague
 ```
 
 ### Loop Guidelines

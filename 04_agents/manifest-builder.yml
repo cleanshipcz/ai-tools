@@ -138,8 +138,8 @@ constraints:
   - Suggest running validation after creation
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
   tags:
     - manifests
     - yaml

@@ -8,18 +8,18 @@ tags:
 variables:
   - name: code
     required: true
-    description: "The code needing error handling"
+    description: 'The code needing error handling'
   - name: language
     required: true
-    description: "Programming language of the code"
+    description: 'Programming language of the code'
 includes:
   - ../shared/constraints.md
 rules:
-  - "Handle expected error cases explicitly."
-  - "Use language-specific error handling patterns."
-  - "Validate inputs at boundaries."
-  - "Provide helpful error messages."
-  - "Clean up resources properly (try-finally, context managers)."
+  - 'Handle expected error cases explicitly.'
+  - 'Use language-specific error handling patterns.'
+  - 'Validate inputs at boundaries.'
+  - 'Provide helpful error messages.'
+  - 'Clean up resources properly (try-finally, context managers).'
 content: |
   Add proper error handling to this {{language}} code:
 
@@ -52,5 +52,5 @@ content: |
 outputs:
   format: code
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

@@ -9,6 +9,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
 
+type AIModel =
+  | 'claude-sonnet-4.5'
+  | 'claude-sonnet-4'
+  | 'claude-haiku-4.5'
+  | 'gpt-5'
+  | 'gpt-5.1'
+  | 'gpt-5.1-codex-mini'
+  | 'gpt-5.1-codex';
+
 interface Project {
   id: string;
   version: string;
@@ -36,6 +45,7 @@ interface Project {
     custom?: string[];
   };
   ai_tools?: {
+    model?: AIModel;
     preferred_agents?: string[];
     preferred_rulepacks?: string[];
     custom_rules?: string[];
@@ -422,6 +432,16 @@ export class ProjectGenerator {
     lines.push('');
     lines.push(this.project.description);
     lines.push('');
+
+    // Default Model Configuration
+    if (this.project.ai_tools?.model) {
+      lines.push(`**Default Model for this Project:** ${this.project.ai_tools.model}`);
+      lines.push('');
+      lines.push(
+        '*This overrides agent defaults but can be overridden by feature-specific model settings.*'
+      );
+      lines.push('');
+    }
 
     // Context
     if (this.project.context) {

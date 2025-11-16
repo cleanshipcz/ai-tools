@@ -10,8 +10,8 @@ tools:
   - copilot-cli
 
 variables:
-  bug_description: "{{BUG_DESCRIPTION}}"
-  reproduction_steps: "{{REPRODUCTION_STEPS}}"
+  bug_description: '{{BUG_DESCRIPTION}}'
+  reproduction_steps: '{{REPRODUCTION_STEPS}}'
 
 steps:
   - id: analyze-bug
@@ -33,7 +33,7 @@ steps:
       6. Related bugs or edge cases that should be checked
 
       Output a detailed analysis document.
-    outputDocument: ".recipe-docs/bug-analysis.md"
+    outputDocument: '.recipe-docs/bug-analysis.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -51,9 +51,9 @@ steps:
       6. Documentation updates needed
 
       Output a structured fix plan document.
-    outputDocument: ".recipe-docs/fix-plan.md"
+    outputDocument: '.recipe-docs/fix-plan.md'
     includeDocuments:
-      - ".recipe-docs/bug-analysis.md"
+      - '.recipe-docs/bug-analysis.md'
     continueConversation: true
     waitForConfirmation: true
 
@@ -71,8 +71,8 @@ steps:
 
       Provide confirmation or suggest adjustments to the plan.
     includeDocuments:
-      - ".recipe-docs/bug-analysis.md"
-      - ".recipe-docs/fix-plan.md"
+      - '.recipe-docs/bug-analysis.md'
+      - '.recipe-docs/fix-plan.md'
     continueConversation: true
     waitForConfirmation: true
 
@@ -88,8 +88,8 @@ steps:
       - Add a test case that would have caught this bug
       - Follow the exact approach outlined in the fix plan
     includeDocuments:
-      - ".recipe-docs/bug-analysis.md"
-      - ".recipe-docs/fix-plan.md"
+      - '.recipe-docs/bug-analysis.md'
+      - '.recipe-docs/fix-plan.md'
     continueConversation: true
     waitForConfirmation: false
 
@@ -104,8 +104,8 @@ steps:
 
       Report test results and confirm the bug is fixed.
     includeDocuments:
-      - ".recipe-docs/bug-analysis.md"
-      - ".recipe-docs/fix-plan.md"
+      - '.recipe-docs/bug-analysis.md'
+      - '.recipe-docs/fix-plan.md'
     continueConversation: true
     waitForConfirmation: true
 
@@ -123,8 +123,8 @@ steps:
 
       Respond with "APPROVED" or provide feedback.
     includeDocuments:
-      - ".recipe-docs/bug-analysis.md"
-      - ".recipe-docs/fix-plan.md"
+      - '.recipe-docs/bug-analysis.md'
+      - '.recipe-docs/fix-plan.md'
     continueConversation: true
     waitForConfirmation: false
 
@@ -141,8 +141,8 @@ steps:
       type: on-success
       check:
         type: contains
-        value: "APPROVED"
+        value: 'APPROVED'
 
 metadata:
   author: ai-tools
-  created: "2025-01-15"
+  created: '2025-01-15'

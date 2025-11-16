@@ -8,15 +8,15 @@ tags:
 variables:
   - name: system
     required: true
-    description: "The system or component to document"
+    description: 'The system or component to document'
   - name: context
     required: false
-    description: "Codebase or system context"
+    description: 'Codebase or system context'
 rules:
-  - "Use diagrams to illustrate structure."
-  - "Explain component responsibilities."
-  - "Document key design decisions."
-  - "Include interaction patterns."
+  - 'Use diagrams to illustrate structure.'
+  - 'Explain component responsibilities.'
+  - 'Document key design decisions.'
+  - 'Include interaction patterns.'
 content: |
   Document the architecture of: {{system}}
 
@@ -67,5 +67,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

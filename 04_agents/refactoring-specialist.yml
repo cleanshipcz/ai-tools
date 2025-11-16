@@ -18,7 +18,7 @@ capabilities:
 defaults:
   temperature: 0.3
   style: technical
-  model: claude-4-5-sonnet
+  model: claude-sonnet-4.5
 prompt:
   system: |
     You are an expert software engineer specializing in code refactoring.
@@ -86,16 +86,16 @@ tools:
   - git-diff
   - run-tests
 constraints:
-  - "Preserve existing behavior - no functional changes."
-  - "Make incremental changes that can be tested independently."
-  - "Maintain or improve test coverage."
-  - "Follow existing code style and conventions."
-  - "Document complex refactorings with comments."
-  - "Consider backwards compatibility and API stability."
-  - "Avoid premature optimization - profile first."
+  - 'Preserve existing behavior - no functional changes.'
+  - 'Make incremental changes that can be tested independently.'
+  - 'Maintain or improve test coverage.'
+  - 'Follow existing code style and conventions.'
+  - 'Document complex refactorings with comments.'
+  - 'Consider backwards compatibility and API stability.'
+  - 'Avoid premature optimization - profile first.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'
   tags:
     - refactoring
     - code-quality

@@ -123,15 +123,15 @@ steps:
     agent: project-planner
     task: |
       Analyze the codebase for the following feature...
-    outputDocument: ".recipe-docs/analysis.md"  # AI saves response here
-    
+    outputDocument: '.recipe-docs/analysis.md' # AI saves response here
+
   - id: implement
     agent: feature-builder
     task: |
       Implement the feature...
-    includeDocuments:  # These docs are included in the task context
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
+    includeDocuments: # These docs are included in the task context
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
 ```
 
 ### Document Directory
@@ -158,22 +158,23 @@ Configure tool-specific command-line options for fully automated execution:
 
 ```yaml
 id: my-recipe
-conversationStrategy: separate  # Each agent starts fresh (recommended)
+conversationStrategy: separate # Each agent starts fresh (recommended)
 # conversationStrategy: continue  # Maintain conversation context (uses more tokens)
 
 # Enable automated tool execution (no prompts)
 toolOptions:
   copilot-cli:
-    allowAllTools: true  # Required for non-interactive execution
+    allowAllTools: true # Required for non-interactive execution
 
 loop:
   steps:
     - review
     - refactor
-  maxIterations: 3  # Runs all 3 iterations automatically
+  maxIterations: 3 # Runs all 3 iterations automatically
 ```
 
 **For advanced topics**, see [GUIDE.md](GUIDE.md) for:
+
 - Detailed recipe structure
 - Workflow control patterns
 - Creating custom recipes

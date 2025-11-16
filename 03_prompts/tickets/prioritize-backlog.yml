@@ -8,18 +8,18 @@ tags:
 variables:
   - name: backlog_items
     required: true
-    description: "List of backlog items to prioritize"
+    description: 'List of backlog items to prioritize'
   - name: business_goals
     required: false
-    description: "Current business priorities"
+    description: 'Current business priorities'
   - name: team_capacity
     required: false
-    description: "Team size and velocity"
+    description: 'Team size and velocity'
 rules:
-  - "Balance business value with technical necessity."
-  - "Consider dependencies and risks."
-  - "Account for technical debt."
-  - "Be transparent about trade-offs."
+  - 'Balance business value with technical necessity.'
+  - 'Consider dependencies and risks.'
+  - 'Account for technical debt.'
+  - 'Be transparent about trade-offs.'
 content: |
   Prioritize the following backlog:
 
@@ -92,5 +92,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

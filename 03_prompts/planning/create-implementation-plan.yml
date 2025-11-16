@@ -8,21 +8,21 @@ tags:
 variables:
   - name: project
     required: true
-    description: "Project description"
+    description: 'Project description'
   - name: team_size
     required: false
-    description: "Number of developers"
+    description: 'Number of developers'
   - name: timeline
     required: false
-    description: "Desired completion timeline"
+    description: 'Desired completion timeline'
   - name: priorities
     required: false
-    description: "Must-have vs nice-to-have features"
+    description: 'Must-have vs nice-to-have features'
 rules:
-  - "Break work into manageable phases."
-  - "Identify dependencies between tasks."
-  - "Be realistic about estimates."
-  - "Plan for testing and iteration."
+  - 'Break work into manageable phases.'
+  - 'Identify dependencies between tasks.'
+  - 'Be realistic about estimates.'
+  - 'Plan for testing and iteration.'
 content: |
   Create implementation plan for:
 
@@ -76,5 +76,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

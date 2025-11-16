@@ -8,19 +8,19 @@ tags:
 variables:
   - name: code
     required: true
-    description: "The API code to document"
+    description: 'The API code to document'
   - name: language
     required: true
-    description: "Programming language"
+    description: 'Programming language'
   - name: doc_style
     required: false
-    description: "Documentation style (javadoc, sphinx, jsdoc, etc.)"
+    description: 'Documentation style (javadoc, sphinx, jsdoc, etc.)'
 rules:
-  - "Document all public APIs."
-  - "Include parameter types and return values."
-  - "Provide usage examples."
-  - "Document exceptions and error cases."
-  - "Use consistent formatting."
+  - 'Document all public APIs.'
+  - 'Include parameter types and return values.'
+  - 'Provide usage examples.'
+  - 'Document exceptions and error cases.'
+  - 'Use consistent formatting.'
 content: |
   Generate API documentation for this {{language}} code:
 
@@ -50,5 +50,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

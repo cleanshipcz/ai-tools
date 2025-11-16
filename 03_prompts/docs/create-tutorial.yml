@@ -8,19 +8,19 @@ tags:
 variables:
   - name: task
     required: true
-    description: "The task to create a tutorial for"
+    description: 'The task to create a tutorial for'
   - name: audience
     required: false
-    description: "Target audience (beginner, intermediate, advanced)"
+    description: 'Target audience (beginner, intermediate, advanced)'
   - name: context
     required: false
-    description: "Additional context or requirements"
+    description: 'Additional context or requirements'
 rules:
-  - "Break down into clear, sequential steps."
-  - "Include prerequisites and setup."
-  - "Provide complete, runnable examples."
-  - "Explain WHY, not just HOW."
-  - "Add troubleshooting section."
+  - 'Break down into clear, sequential steps.'
+  - 'Include prerequisites and setup.'
+  - 'Provide complete, runnable examples.'
+  - 'Explain WHY, not just HOW.'
+  - 'Add troubleshooting section.'
 content: |
   Create a tutorial for: {{task}}
 
@@ -56,5 +56,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

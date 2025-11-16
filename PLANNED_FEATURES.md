@@ -97,12 +97,46 @@ See [`05_recipes/README.md`](../05_recipes/README.md) for complete documentation
 - [x] Organization agent -> good in organizing files, folders, documents, topics, etc.
 - [x] Organize this repository -> add enumerated prefix for folders (e.g. 01_rulepacks, 02_skills, ..., 90_docs)
 
-## Model selection
+### Model selection (v1.3.0)
 
-- prompts can have default model defined
-- agents can have default model defined
-- project can define model (optional, if defined overrides agent default)
-- feature can define model (optional, if defined overrides agent and project default)
+✅ **Fully Implemented**
+
+Hierarchical model configuration with priority-based resolution.
+
+**Key features:**
+
+- Prompts can define default model
+- Agents can override prompt defaults
+- Projects can override agent defaults
+- Features have highest priority (override everything)
+- Supported models: claude-sonnet-4.5, claude-sonnet-4, claude-haiku-4.5, gpt-5, gpt-5.1, gpt-5.1-codex-mini, gpt-5.1-codex
+
+**Priority Hierarchy (highest to lowest):**
+
+1. Feature model (feature.yml)
+2. Project model (project.yml → ai_tools.model)
+3. Agent model (agent.yml → defaults.model)
+4. Prompt model (prompt.yml → model)
+
+**Usage:**
+
+```yaml
+# In a prompt
+model: claude-sonnet-4
+
+# In an agent
+defaults:
+  model: claude-sonnet-4.5
+
+# In a project
+ai_tools:
+  model: gpt-5.1
+
+# In a feature (highest priority)
+model: gpt-5.1-codex
+```
+
+The effective model is displayed in generated outputs for all tools (GitHub Copilot, Windsurf, Claude Code, Cursor).
 
 ## Fully automated tests
 

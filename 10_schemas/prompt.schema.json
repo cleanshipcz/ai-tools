@@ -87,6 +87,19 @@
       "type": "string",
       "description": "User-level prompt template"
     },
+    "model": {
+      "type": "string",
+      "enum": [
+        "claude-sonnet-4.5",
+        "claude-sonnet-4",
+        "claude-haiku-4.5",
+        "gpt-5",
+        "gpt-5.1",
+        "gpt-5.1-codex-mini",
+        "gpt-5.1-codex"
+      ],
+      "description": "Default model for this prompt (can be overridden by agent, project, or feature)"
+    },
     "outputs": {
       "type": "object",
       "properties": {

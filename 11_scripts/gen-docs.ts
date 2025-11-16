@@ -9,6 +9,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
 
+type AIModel =
+  | 'claude-sonnet-4.5'
+  | 'claude-sonnet-4'
+  | 'claude-haiku-4.5'
+  | 'gpt-5'
+  | 'gpt-5.1'
+  | 'gpt-5.1-codex-mini'
+  | 'gpt-5.1-codex';
+
 interface Agent {
   id: string;
   version?: string;
@@ -17,13 +26,20 @@ interface Agent {
   rulepacks?: string[];
   capabilities?: string[];
   tools?: string[];
-  defaults?: any;
+  defaults?: {
+    model?: AIModel;
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    style?: 'terse' | 'verbose' | 'conversational' | 'technical';
+  };
 }
 
 interface Prompt {
   id: string;
   version?: string;
   description: string;
+  model?: AIModel;
   tags?: string[];
   variables?: any[];
 }

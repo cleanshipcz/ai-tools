@@ -47,7 +47,7 @@ documentation:
   development:
     style_guide: "docs/STYLE_GUIDE.md"
     changelog: "docs/CHANGELOG.md"
-    planned_features: "docs/PLANNED_FEATURES.md"
+    planned_features: "PLANNED_FEATURES.md"
   schemas:
     prompt: "schemas/prompt.schema.json"
     agent: "schemas/agent.schema.json"
@@ -129,6 +129,7 @@ conventions:
     - "Add helpful comments in YAML manifests"
 
 ai_tools:
+  model: "claude-sonnet-4.5"
   preferred_agents:
     - code-reviewer
     - feature-builder

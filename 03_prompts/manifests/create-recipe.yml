@@ -12,49 +12,49 @@ tags:
 variables:
   - name: recipe_id
     required: true
-    description: "Kebab-case unique identifier for the recipe (e.g., feature-delivery, bug-fix-workflow)"
+    description: 'Kebab-case unique identifier for the recipe (e.g., feature-delivery, bug-fix-workflow)'
 
   - name: description
     required: true
-    description: "Clear description of what the recipe accomplishes (10-500 characters)"
+    description: 'Clear description of what the recipe accomplishes (10-500 characters)'
 
   - name: workflow_type
     required: false
-    description: "Type of workflow (feature, bugfix, refactor, review, testing)"
-    default: "feature"
+    description: 'Type of workflow (feature, bugfix, refactor, review, testing)'
+    default: 'feature'
 
   - name: tools
     required: false
-    description: "Comma-separated list of supported tools (claude-code, copilot-cli, cursor)"
-    default: "claude-code, copilot-cli"
+    description: 'Comma-separated list of supported tools (claude-code, copilot-cli, cursor)'
+    default: 'claude-code, copilot-cli'
 
   - name: agents
     required: false
-    description: "Comma-separated list of agents to use (e.g., project-planner, feature-builder, code-reviewer)"
+    description: 'Comma-separated list of agents to use (e.g., project-planner, feature-builder, code-reviewer)'
 
   - name: variables_needed
     required: false
-    description: "Variables the recipe needs from users (e.g., feature_description, bug_description)"
+    description: 'Variables the recipe needs from users (e.g., feature_description, bug_description)'
 
   - name: max_iterations
     required: false
-    description: "Maximum loop iterations for review cycles"
-    default: "3"
+    description: 'Maximum loop iterations for review cycles'
+    default: '3'
 
 rules:
-  - "CRITICAL: Every recipe MUST follow the document-first workflow pattern"
-  - "Start with analysis step outputting to .recipe-docs/analysis.md"
-  - "Follow with planning step outputting to .recipe-docs/plan.md (includes analysis)"
-  - "All implementation steps must include both analysis.md and plan.md documents"
-  - "All review/verification steps must include both analysis.md and plan.md documents"
-  - "Use separate conversation strategy by default (conversationStrategy: separate)"
-  - "Enable tool automation for copilot-cli (allowAllTools: true)"
-  - "Keep steps atomic with clear, single-purpose tasks"
-  - "Use loops only for review/refinement cycles, not general iteration"
-  - "Include waitForConfirmation: true for key decision points"
-  - "Validate recipe IDs are kebab-case"
-  - "Use snake_case for variable names"
-  - "Include comprehensive metadata (author, created date, tags)"
+  - 'CRITICAL: Every recipe MUST follow the document-first workflow pattern'
+  - 'Start with analysis step outputting to .recipe-docs/analysis.md'
+  - 'Follow with planning step outputting to .recipe-docs/plan.md (includes analysis)'
+  - 'All implementation steps must include both analysis.md and plan.md documents'
+  - 'All review/verification steps must include both analysis.md and plan.md documents'
+  - 'Use separate conversation strategy by default (conversationStrategy: separate)'
+  - 'Enable tool automation for copilot-cli (allowAllTools: true)'
+  - 'Keep steps atomic with clear, single-purpose tasks'
+  - 'Use loops only for review/refinement cycles, not general iteration'
+  - 'Include waitForConfirmation: true for key decision points'
+  - 'Validate recipe IDs are kebab-case'
+  - 'Use snake_case for variable names'
+  - 'Include comprehensive metadata (author, created date, tags)'
 
 content: |
   Generate a recipe.yml manifest for the following workflow:
@@ -279,12 +279,12 @@ content: |
 
 examples:
   - input:
-      recipe_id: "api-endpoint-delivery"
-      description: "Complete workflow for implementing a new REST API endpoint with validation and tests"
-      workflow_type: "feature"
-      tools: "claude-code, copilot-cli"
-      agents: "project-planner, feature-builder, code-reviewer, tdd-navigator"
-      variables_needed: "endpoint_name, http_method, request_schema, response_schema"
+      recipe_id: 'api-endpoint-delivery'
+      description: 'Complete workflow for implementing a new REST API endpoint with validation and tests'
+      workflow_type: 'feature'
+      tools: 'claude-code, copilot-cli'
+      agents: 'project-planner, feature-builder, code-reviewer, tdd-navigator'
+      variables_needed: 'endpoint_name, http_method, request_schema, response_schema'
     output: |
       Recipe with:
       - Analysis step (analyze codebase for API endpoint patterns)
@@ -294,11 +294,11 @@ examples:
       - All steps include analysis.md and plan.md documents
 
   - input:
-      recipe_id: "performance-optimization"
-      description: "Systematic workflow for identifying and fixing performance bottlenecks"
-      workflow_type: "refactor"
-      tools: "claude-code, copilot-cli"
-      variables_needed: "target_area, performance_goal"
+      recipe_id: 'performance-optimization'
+      description: 'Systematic workflow for identifying and fixing performance bottlenecks'
+      workflow_type: 'refactor'
+      tools: 'claude-code, copilot-cli'
+      variables_needed: 'target_area, performance_goal'
     output: |
       Recipe with:
       - Analysis step (profile and identify bottlenecks)
@@ -308,6 +308,6 @@ examples:
       - All steps reference analysis and plan documents
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

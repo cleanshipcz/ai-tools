@@ -184,6 +184,19 @@
     "ai_tools": {
       "type": "object",
       "properties": {
+        "model": {
+          "type": "string",
+          "enum": [
+            "claude-sonnet-4.5",
+            "claude-sonnet-4",
+            "claude-haiku-4.5",
+            "gpt-5",
+            "gpt-5.1",
+            "gpt-5.1-codex-mini",
+            "gpt-5.1-codex"
+          ],
+          "description": "Default model for this project (overrides agent default, can be overridden by feature)"
+        },
         "preferred_agents": {
           "type": "array",
           "items": {

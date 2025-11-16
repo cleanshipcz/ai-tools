@@ -11,20 +11,20 @@ tags:
 variables:
   - name: prompt_id
     required: true
-    description: "Kebab-case unique identifier for the prompt (e.g., analyze-performance)"
+    description: 'Kebab-case unique identifier for the prompt (e.g., analyze-performance)'
 
   - name: description
     required: true
-    description: "Clear description of what the prompt does (10-500 characters)"
+    description: 'Clear description of what the prompt does (10-500 characters)'
 
   - name: category
     required: false
-    description: "Prompt category (refactor, qa, docs, planning, tickets, manifests)"
-    default: "refactor"
+    description: 'Prompt category (refactor, qa, docs, planning, tickets, manifests)'
+    default: 'refactor'
 
   - name: tags
     required: false
-    description: "Comma-separated list of tags for categorization (e.g., performance, optimization)"
+    description: 'Comma-separated list of tags for categorization (e.g., performance, optimization)'
 
   - name: variables
     required: false
@@ -32,21 +32,21 @@ variables:
 
   - name: output_format
     required: false
-    description: "Expected output format (markdown, json, yaml, code, text)"
-    default: "markdown"
+    description: 'Expected output format (markdown, json, yaml, code, text)'
+    default: 'markdown'
 
 rules:
-  - "ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
-  - "Version must start at 1.0.0 following semver"
-  - "Description must be 10-500 characters, clear and specific"
-  - "Keep prompts atomic - one clear purpose per prompt"
-  - "Use Mustache syntax for variables: {{variable}}"
-  - "Variable names must be snake_case: ^[a-z_][a-z0-9_]*$"
-  - "Include practical rules and constraints"
-  - "Reference shared includes from prompts/shared/ for common components"
-  - "Specify output format clearly"
-  - "Add examples showing input/output"
-  - "Organize by category in appropriate directory"
+  - 'ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
+  - 'Version must start at 1.0.0 following semver'
+  - 'Description must be 10-500 characters, clear and specific'
+  - 'Keep prompts atomic - one clear purpose per prompt'
+  - 'Use Mustache syntax for variables: {{variable}}'
+  - 'Variable names must be snake_case: ^[a-z_][a-z0-9_]*$'
+  - 'Include practical rules and constraints'
+  - 'Reference shared includes from prompts/shared/ for common components'
+  - 'Specify output format clearly'
+  - 'Add examples showing input/output'
+  - 'Organize by category in appropriate directory'
 
 content: |
   Generate a prompt.yml manifest for the following prompt:
@@ -189,12 +189,12 @@ outputs:
 
 examples:
   - input:
-      prompt_id: "optimize-query"
-      description: "Analyze and optimize database queries for better performance"
-      category: "refactor"
-      tags: "database, performance, sql"
-      variables: "query: SQL query to optimize (required), database: database type (required)"
-      output_format: "markdown"
+      prompt_id: 'optimize-query'
+      description: 'Analyze and optimize database queries for better performance'
+      category: 'refactor'
+      tags: 'database, performance, sql'
+      variables: 'query: SQL query to optimize (required), database: database type (required)'
+      output_format: 'markdown'
     output: |
       # Creates a complete prompt.yml with:
       # - Query optimization focus
@@ -204,6 +204,6 @@ examples:
       # - Practical optimization guidelines
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

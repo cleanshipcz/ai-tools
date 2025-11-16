@@ -9,11 +9,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const rootDir = join(__dirname, '..');
 
+type AIModel =
+  | 'claude-sonnet-4.5'
+  | 'claude-sonnet-4'
+  | 'claude-haiku-4.5'
+  | 'gpt-5'
+  | 'gpt-5.1'
+  | 'gpt-5.1-codex-mini'
+  | 'gpt-5.1-codex';
+
 interface Feature {
   id: string;
   version: string;
   name: string;
   description: string;
+  model?: AIModel;
   context?: {
     overview?: string;
     architecture?: string;
@@ -46,7 +56,18 @@ interface Feature {
   };
 }
 
+interface Project {
+  id: string;
+  name: string;
+  ai_tools?: {
+    model?: AIModel;
+  };
+}
+
 export class FeatureGenerator {
+  private project?: Project;
+  private agentsMap: Map<string, any> = new Map();
+
   async generateFeatures(projectId: string): Promise<void> {
     console.log(chalk.blue(`\n🎯 Generating features for project: ${projectId}\n`));
 
@@ -55,6 +76,12 @@ export class FeatureGenerator {
     if (!projectDir) {
       throw new Error(`Project not found: ${projectId}`);
     }
+
+    // Load project configuration
+    await this.loadProject(projectDir);
+
+    // Load all agents for model resolution
+    await this.loadAgents();
 
     // Find features directory
     const featuresDir = join(projectDir, 'features');
@@ -108,6 +135,56 @@ export class FeatureGenerator {
     }
   }
 
+  private async loadProject(projectDir: string): Promise<void> {
+    const projectPath = join(projectDir, 'project.yml');
+    try {
+      const content = await readFile(projectPath, 'utf-8');
+      this.project = loadYaml(content) as Project;
+    } catch (error) {
+      console.log(chalk.yellow(`  Warning: Could not load project.yml`));
+    }
+  }
+
+  private async loadAgents(): Promise<void> {
+    const agentsDir = join(rootDir, '04_agents');
+    const entries = await readdir(agentsDir);
+
+    for (const entry of entries) {
+      if (entry.endsWith('.yml')) {
+        const agentPath = join(agentsDir, entry);
+        const content = await readFile(agentPath, 'utf-8');
+        const agent = loadYaml(content) as any;
+        this.agentsMap.set(agent.id, agent);
+      }
+    }
+  }
+
+  private resolveModel(feature: Feature, recipeStepAgent?: string): AIModel | undefined {
+    // Priority: Feature > Project > Agent > Prompt
+    // For recipes, we consider the agent mentioned in the recipe step
+
+    // 1. Feature-level (highest priority)
+    if (feature.model) {
+      return feature.model;
+    }
+
+    // 2. Project-level
+    if (this.project?.ai_tools?.model) {
+      return this.project.ai_tools.model;
+    }
+
+    // 3. Agent-level (from recipe step agent)
+    if (recipeStepAgent) {
+      const agent = this.agentsMap.get(recipeStepAgent);
+      if (agent?.defaults?.model) {
+        return agent.defaults.model;
+      }
+    }
+
+    // No model configured in hierarchy
+    return undefined;
+  }
+
   private async loadFeatures(featuresDir: string): Promise<Feature[]> {
     const features: Feature[] = [];
     const entries = await readdir(featuresDir, { withFileTypes: true });
@@ -144,6 +221,16 @@ export class FeatureGenerator {
       content.push('');
       content.push(feature.description);
       content.push('');
+
+      // Add default model if configured
+      if (feature.model) {
+        content.push(`**Default Model for this Feature:** ${feature.model}`);
+        content.push('');
+        content.push(
+          '*This is the highest priority model setting, overriding project and agent defaults.*'
+        );
+        content.push('');
+      }
 
       if (feature.context?.overview) {
         content.push('## Overview');
@@ -218,6 +305,7 @@ export class FeatureGenerator {
       const config = {
         name: feature.name,
         description: feature.description,
+        model: feature.model,
         context: feature.context || {},
         files: feature.files || {},
         conventions: feature.conventions || [],
@@ -245,6 +333,12 @@ export class FeatureGenerator {
       content.push('');
       content.push(feature.description);
       content.push('');
+
+      // Add default model if configured
+      if (feature.model) {
+        content.push(`**Default Model:** ${feature.model}`);
+        content.push('');
+      }
 
       if (feature.context) {
         if (feature.context.overview) {
@@ -289,6 +383,7 @@ export class FeatureGenerator {
       id: feature.id,
       name: feature.name,
       description: feature.description,
+      model: feature.model,
       context: feature.context || {},
       files: feature.files || {},
       conventions: feature.conventions || [],
@@ -387,13 +482,33 @@ export class FeatureGenerator {
   }
 
   private buildFeatureRecipeScript(feature: Feature, recipe: any, tool: string): string {
+    // Resolve model from hierarchy (feature > project > agent)
+    const resolvedModel = this.resolveModel(feature);
+
     let script = '#!/bin/bash\n';
     script += `# Feature-bound recipe script\n`;
     script += `# Feature: ${feature.name}\n`;
     script += `# Recipe: ${recipe.id}\n`;
     script += `# Tool: ${tool}\n`;
+
+    // Add model information with hierarchy explanation
+    if (resolvedModel) {
+      const source = feature.model
+        ? 'feature-level (highest priority)'
+        : this.project?.ai_tools?.model
+          ? 'project-level'
+          : 'agent-level (default)';
+      script += `# Model: ${resolvedModel} (${source})\n`;
+    }
+
     script += `# Generated: ${new Date().toISOString()}\n\n`;
     script += 'set -e  # Exit on error\n\n';
+
+    // Add model variable if configured
+    if (resolvedModel) {
+      script += '# Model Configuration (resolved from hierarchy)\n';
+      script += `MODEL="${resolvedModel}"\n\n`;
+    }
 
     // Add feature context as variables
     script += '# Feature Context\n';
@@ -540,6 +655,14 @@ export class FeatureGenerator {
         flags.push('--continue');
       }
 
+      // Add model flag if MODEL variable is set
+      script += `      # Use feature-configured model if available\n`;
+      script += `      if [ -n "$MODEL" ]; then\n`;
+      script += `        MODEL_FLAG="--model $MODEL"\n`;
+      script += `      else\n`;
+      script += `        MODEL_FLAG=""\n`;
+      script += `      fi\n`;
+
       // Add tool-specific options
       if (toolOptions?.['copilot-cli']) {
         const opts = toolOptions['copilot-cli'];
@@ -558,7 +681,7 @@ export class FeatureGenerator {
       }
 
       const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
-      script += `RESPONSE=$(echo "@${step.agent} ${task}" | copilot${flagsStr})\n`;
+      script += `RESPONSE=$(echo "@${step.agent} ${task}" | copilot $MODEL_FLAG${flagsStr})\n`;
       script += `echo "$RESPONSE"\n`;
     } else if (tool === 'cursor') {
       script += `# Manual: Open Cursor Composer and execute:\n`;

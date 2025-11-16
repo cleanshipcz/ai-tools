@@ -8,15 +8,15 @@ tags:
 variables:
   - name: epic
     required: true
-    description: "The epic to break down"
+    description: 'The epic to break down'
   - name: constraints
     required: false
-    description: "Team size, timeline, or other constraints"
+    description: 'Team size, timeline, or other constraints'
 rules:
-  - "Create vertical slices that deliver value independently."
-  - "Keep stories small and of similar size."
-  - "Identify dependencies between stories."
-  - "Prioritize by value and risk."
+  - 'Create vertical slices that deliver value independently.'
+  - 'Keep stories small and of similar size.'
+  - 'Identify dependencies between stories.'
+  - 'Prioritize by value and risk.'
 content: |
   Break down this epic into user stories:
 
@@ -76,5 +76,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

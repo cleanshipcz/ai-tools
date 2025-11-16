@@ -11,7 +11,7 @@ tags:
 variables:
   - name: agent_id
     required: true
-    description: "Kebab-case unique identifier for the agent (e.g., security-auditor)"
+    description: 'Kebab-case unique identifier for the agent (e.g., security-auditor)'
 
   - name: purpose
     required: true
@@ -23,33 +23,33 @@ variables:
 
   - name: rulepacks
     required: false
-    description: "Comma-separated list of rulepack IDs to include (e.g., base, coding-python, security)"
-    default: "base"
+    description: 'Comma-separated list of rulepack IDs to include (e.g., base, coding-python, security)'
+    default: 'base'
 
   - name: capabilities
     required: false
-    description: "Comma-separated list of required capabilities (e.g., mcp:git, mcp:filesystem)"
+    description: 'Comma-separated list of required capabilities (e.g., mcp:git, mcp:filesystem)'
 
   - name: temperature
     required: false
-    description: "Temperature setting (0.0-2.0, lower = more focused)"
-    default: "0.7"
+    description: 'Temperature setting (0.0-2.0, lower = more focused)'
+    default: '0.7'
 
   - name: tools
     required: false
-    description: "Comma-separated list of tool/skill IDs the agent can use"
+    description: 'Comma-separated list of tool/skill IDs the agent can use'
 
 rules:
-  - "ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
-  - "Version must start at 1.0.0 following semver"
-  - "Purpose must be 10-500 characters, clear and specific"
-  - "Include detailed persona that guides agent behavior"
+  - 'ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
+  - 'Version must start at 1.0.0 following semver'
+  - 'Purpose must be 10-500 characters, clear and specific'
+  - 'Include detailed persona that guides agent behavior'
   - "Select rulepacks that match agent's domain (coding languages, security, etc.)"
-  - "Define capabilities for MCP tools the agent needs"
-  - "Set appropriate temperature (lower for precise tasks, higher for creative)"
-  - "Create clear system prompt that establishes agent identity"
-  - "Include constraints that define agent boundaries"
-  - "Add comprehensive metadata with author and tags"
+  - 'Define capabilities for MCP tools the agent needs'
+  - 'Set appropriate temperature (lower for precise tasks, higher for creative)'
+  - 'Create clear system prompt that establishes agent identity'
+  - 'Include constraints that define agent boundaries'
+  - 'Add comprehensive metadata with author and tags'
 
 content: |
   Generate an agent.yml manifest for the following agent:
@@ -173,10 +173,10 @@ outputs:
 
 examples:
   - input:
-      agent_id: "api-designer"
-      purpose: "Design RESTful API endpoints with best practices and OpenAPI documentation"
-      rulepacks: "base, coding-typescript"
-      temperature: "0.5"
+      agent_id: 'api-designer'
+      purpose: 'Design RESTful API endpoints with best practices and OpenAPI documentation'
+      rulepacks: 'base, coding-typescript'
+      temperature: '0.5'
     output: |
       # Creates a complete agent.yml with:
       # - API design expertise persona
@@ -186,6 +186,6 @@ examples:
       # - Balanced temperature for design work
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

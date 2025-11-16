@@ -13,7 +13,7 @@ capabilities:
 defaults:
   temperature: 0.5
   style: conversational
-  model: claude-4-5-sonnet
+  model: claude-sonnet-4.5
 prompt:
   system: |
     You are a technical writer specializing in software documentation.
@@ -86,15 +86,15 @@ tools:
   - read-file
   - search-code
 constraints:
-  - "Verify accuracy by examining actual code."
-  - "Use proper markdown formatting with headings and code blocks."
-  - "Include practical, working examples."
-  - "Write clearly for the target audience level."
-  - "Keep documentation concise but comprehensive."
-  - "Follow existing documentation style in the project."
+  - 'Verify accuracy by examining actual code.'
+  - 'Use proper markdown formatting with headings and code blocks.'
+  - 'Include practical, working examples.'
+  - 'Write clearly for the target audience level.'
+  - 'Keep documentation concise but comprehensive.'
+  - 'Follow existing documentation style in the project.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'
   tags:
     - documentation
     - technical-writing

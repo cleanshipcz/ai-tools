@@ -23,9 +23,9 @@ toolOptions:
     allowAllTools: true
 
 variables:
-  target_code: "{{TARGET_CODE}}"
-  quality_threshold: "9"
-  max_iterations: "5"
+  target_code: '{{TARGET_CODE}}'
+  quality_threshold: '9'
+  max_iterations: '5'
 
 steps:
   # STEP 1: Analysis - Identify improvement points
@@ -77,7 +77,7 @@ steps:
       Prioritize issues by value/risk and create a quality baseline (rate current quality 1-10).
 
       Output a structured analysis document.
-    outputDocument: ".recipe-docs/refactoring-analysis.md"
+    outputDocument: '.recipe-docs/refactoring-analysis.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -118,9 +118,9 @@ steps:
          - Safe checkpoints
 
       Output an actionable, step-by-step plan that can be executed incrementally.
-    outputDocument: ".recipe-docs/refactoring-plan.md"
+    outputDocument: '.recipe-docs/refactoring-plan.md'
     includeDocuments:
-      - ".recipe-docs/refactoring-analysis.md"
+      - '.recipe-docs/refactoring-analysis.md'
     continueConversation: true
     waitForConfirmation: true
 
@@ -161,8 +161,8 @@ steps:
 
       DO NOT refactor yet - only add tests!
     includeDocuments:
-      - ".recipe-docs/refactoring-analysis.md"
-      - ".recipe-docs/refactoring-plan.md"
+      - '.recipe-docs/refactoring-analysis.md'
+      - '.recipe-docs/refactoring-plan.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -208,8 +208,8 @@ steps:
 
       Work incrementally - commit after each successful refactoring step.
     includeDocuments:
-      - ".recipe-docs/refactoring-analysis.md"
-      - ".recipe-docs/refactoring-plan.md"
+      - '.recipe-docs/refactoring-analysis.md'
+      - '.recipe-docs/refactoring-plan.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -258,10 +258,10 @@ steps:
       - Overall quality score
       - APPROVE or specific action items for next iteration
       - Progress toward quality threshold
-    outputDocument: ".recipe-docs/review-results.md"
+    outputDocument: '.recipe-docs/review-results.md'
     includeDocuments:
-      - ".recipe-docs/refactoring-analysis.md"
-      - ".recipe-docs/refactoring-plan.md"
+      - '.recipe-docs/refactoring-analysis.md'
+      - '.recipe-docs/refactoring-plan.md'
     continueConversation: true
     waitForConfirmation: true
 
@@ -290,9 +290,9 @@ steps:
       This is an incremental improvement - not a complete refactoring.
       Focus on moving closer to {{quality_threshold}}/10 threshold.
     includeDocuments:
-      - ".recipe-docs/refactoring-analysis.md"
-      - ".recipe-docs/refactoring-plan.md"
-      - ".recipe-docs/review-results.md"
+      - '.recipe-docs/refactoring-analysis.md'
+      - '.recipe-docs/refactoring-plan.md'
+      - '.recipe-docs/review-results.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -301,12 +301,12 @@ loop:
   steps:
     - review-refactoring
     - address-review-feedback
-  maxIterations: 5
-  continueUntil: "Quality score >= {{quality_threshold}}/10 or max iterations reached"
+  maxIterations: 10
+  continueUntil: 'Quality score >= {{quality_threshold}}/10 or max iterations reached'
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
   tags:
     - refactoring
     - quality

@@ -14,7 +14,7 @@ capabilities:
 defaults:
   temperature: 0.2
   style: terse
-  model: claude-4-5-sonnet
+  model: claude-sonnet-4.5
 prompt:
   system: |
     You are a senior software engineer conducting a thorough code review.

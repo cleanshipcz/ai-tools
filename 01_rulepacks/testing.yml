@@ -4,57 +4,57 @@ description: Automated testing standards and best practices for test-driven deve
 
 rules:
   # Core Testing Principles
-  - "All new features MUST include automated tests before implementation is considered complete."
-  - "Tests must be executable via CI/CD pipeline without manual intervention."
-  - "Manual testing is for exploration only; regression prevention requires automated tests."
-  - "Code without automated tests is considered incomplete and should not be merged."
+  - 'All new features MUST include automated tests before implementation is considered complete.'
+  - 'Tests must be executable via CI/CD pipeline without manual intervention.'
+  - 'Manual testing is for exploration only; regression prevention requires automated tests.'
+  - 'Code without automated tests is considered incomplete and should not be merged.'
 
   # Test Infrastructure
-  - "Establish test framework (Jest, Vitest, pytest, JUnit, etc.) if not already present."
-  - "Configure test runner in package.json/build system before writing production code."
-  - "Create test files alongside implementation files (e.g., foo.ts → foo.test.ts)."
-  - "Test infrastructure setup is Phase 0 of any project - it comes BEFORE feature work."
+  - 'Establish test framework (Jest, Vitest, pytest, JUnit, etc.) if not already present.'
+  - 'Configure test runner in package.json/build system before writing production code.'
+  - 'Create test files alongside implementation files (e.g., foo.ts → foo.test.ts).'
+  - 'Test infrastructure setup is Phase 0 of any project - it comes BEFORE feature work.'
 
   # Test Coverage Requirements
-  - "Unit tests MUST cover: happy path, edge cases, error conditions, boundary values."
-  - "Integration tests MUST cover: component interactions, external dependencies, data flow."
-  - "Every public function/method MUST have at least one test case."
-  - "Aim for 80%+ code coverage on new code; never decrease existing coverage."
-  - "Test files should mirror the structure of source files for easy navigation."
+  - 'Unit tests MUST cover: happy path, edge cases, error conditions, boundary values.'
+  - 'Integration tests MUST cover: component interactions, external dependencies, data flow.'
+  - 'Every public function/method MUST have at least one test case.'
+  - 'Aim for 80%+ code coverage on new code; never decrease existing coverage.'
+  - 'Test files should mirror the structure of source files for easy navigation.'
 
   # Test Quality Standards
   - 'Use descriptive test names: "should [expected behavior] when [condition]".'
-  - "Follow AAA pattern: Arrange (setup), Act (execute), Assert (verify)."
-  - "Tests must be deterministic - no flaky tests allowed."
-  - "Mock external dependencies; tests should not require network/database/filesystem access."
-  - "Each test should test one thing; avoid multiple assertions on unrelated behavior."
-  - "Tests should be fast - unit tests under 100ms, integration tests under 1s."
+  - 'Follow AAA pattern: Arrange (setup), Act (execute), Assert (verify).'
+  - 'Tests must be deterministic - no flaky tests allowed.'
+  - 'Mock external dependencies; tests should not require network/database/filesystem access.'
+  - 'Each test should test one thing; avoid multiple assertions on unrelated behavior.'
+  - 'Tests should be fast - unit tests under 100ms, integration tests under 1s.'
 
   # Test-First Workflow (TDD)
-  - "When fixing bugs: write failing test first, then fix the bug, verify test passes."
-  - "When adding features: write tests defining behavior first, then implement (Red-Green-Refactor)."
-  - "When refactoring: ensure tests pass before AND after refactoring."
-  - "Tests serve as living documentation of expected behavior."
+  - 'When fixing bugs: write failing test first, then fix the bug, verify test passes.'
+  - 'When adding features: write tests defining behavior first, then implement (Red-Green-Refactor).'
+  - 'When refactoring: ensure tests pass before AND after refactoring.'
+  - 'Tests serve as living documentation of expected behavior.'
 
   # Documentation via Tests
-  - "Tests serve as executable documentation; make them readable by humans."
-  - "Include example usage in test names and setup code."
-  - "Comment complex test setup to explain what is being tested and why."
-  - "Organize tests by feature/scenario using describe/context blocks."
+  - 'Tests serve as executable documentation; make them readable by humans.'
+  - 'Include example usage in test names and setup code.'
+  - 'Comment complex test setup to explain what is being tested and why.'
+  - 'Organize tests by feature/scenario using describe/context blocks.'
 
   # CI/CD Integration
-  - "All tests must be runnable via a single command (npm test, pytest, gradle test)."
-  - "Tests must run automatically on every commit via CI/CD pipeline."
-  - "Pull requests cannot be merged until all tests pass."
-  - "Include test results and coverage reports in CI/CD output."
+  - 'All tests must be runnable via a single command (npm test, pytest, gradle test).'
+  - 'Tests must run automatically on every commit via CI/CD pipeline.'
+  - 'Pull requests cannot be merged until all tests pass.'
+  - 'Include test results and coverage reports in CI/CD output.'
 
   # Anti-Patterns to Avoid
   - 'Never say "tests will be added later" - add them NOW or mark work as incomplete.'
-  - "Never suggest manual testing as a substitute for automated tests."
-  - "Never skip tests due to time pressure - this creates technical debt."
-  - "Never rely on console.log or manual inspection for verification."
-  - "Never commit code that breaks existing tests without fixing them."
-  - "Never write tests that depend on execution order or external state."
+  - 'Never suggest manual testing as a substitute for automated tests.'
+  - 'Never skip tests due to time pressure - this creates technical debt.'
+  - 'Never rely on console.log or manual inspection for verification.'
+  - 'Never commit code that breaks existing tests without fixing them.'
+  - 'Never write tests that depend on execution order or external state.'
 
 tags:
   - testing
@@ -64,6 +64,6 @@ tags:
   - best-practices
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

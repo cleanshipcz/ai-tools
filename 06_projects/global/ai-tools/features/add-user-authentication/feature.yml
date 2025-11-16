@@ -2,6 +2,7 @@ id: add-user-authentication
 version: 1.0.0
 name: Add User Authentication
 description: Implement user authentication system with JWT tokens and password hashing
+model: gpt-5.1-codex # Feature-level override (highest priority in hierarchy)
 
 context:
   overview: |

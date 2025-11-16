@@ -8,18 +8,18 @@ tags:
 variables:
   - name: requirements
     required: true
-    description: "Feature or project requirements"
+    description: 'Feature or project requirements'
   - name: constraints
     required: false
-    description: "Technical or business constraints"
+    description: 'Technical or business constraints'
   - name: existing_system
     required: false
-    description: "Description of existing system to integrate with"
+    description: 'Description of existing system to integrate with'
 rules:
-  - "Consider scalability and maintainability."
-  - "Evaluate multiple alternatives."
-  - "Document trade-offs."
-  - "Use standard design patterns where appropriate."
+  - 'Consider scalability and maintainability.'
+  - 'Evaluate multiple alternatives.'
+  - 'Document trade-offs.'
+  - 'Use standard design patterns where appropriate.'
 content: |
   Design architecture for:
 
@@ -74,5 +74,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

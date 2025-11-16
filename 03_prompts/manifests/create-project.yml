@@ -11,46 +11,46 @@ tags:
 variables:
   - name: project_id
     required: true
-    description: "Kebab-case unique identifier for the project (e.g., my-web-app)"
+    description: 'Kebab-case unique identifier for the project (e.g., my-web-app)'
 
   - name: project_name
     required: true
-    description: "Human-readable project name (e.g., My Web Application)"
+    description: 'Human-readable project name (e.g., My Web Application)'
 
   - name: description
     required: true
-    description: "Brief project description (10-500 characters)"
+    description: 'Brief project description (10-500 characters)'
 
   - name: overview
     required: false
-    description: "Detailed project overview and background"
+    description: 'Detailed project overview and background'
 
   - name: purpose
     required: false
-    description: "Primary purpose or goal of the project"
+    description: 'Primary purpose or goal of the project'
 
   - name: languages
     required: false
-    description: "Comma-separated list of programming languages (e.g., typescript, python)"
+    description: 'Comma-separated list of programming languages (e.g., typescript, python)'
 
   - name: tech_stack
     required: false
-    description: "Technology stack details (frontend, backend, database, infrastructure)"
+    description: 'Technology stack details (frontend, backend, database, infrastructure)'
 
   - name: preferred_agents
     required: false
-    description: "Comma-separated list of preferred agent IDs (e.g., code-reviewer, feature-builder)"
-    default: "code-reviewer,feature-builder,bug-fixer"
+    description: 'Comma-separated list of preferred agent IDs (e.g., code-reviewer, feature-builder)'
+    default: 'code-reviewer,feature-builder,bug-fixer'
 
 rules:
-  - "ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$"
-  - "Version must start at 1.0.0 following semver"
-  - "Description must be 10-500 characters"
-  - "Include metadata with repository, maintainers, created date"
-  - "Organize commands by logical categories (dev, build, test, etc.)"
-  - "Include comprehensive conventions (naming, patterns, testing)"
-  - "Configure ai_tools section with preferred agents and rulepacks"
-  - "Reference documentation files that exist in the project"
+  - 'ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
+  - 'Version must start at 1.0.0 following semver'
+  - 'Description must be 10-500 characters'
+  - 'Include metadata with repository, maintainers, created date'
+  - 'Organize commands by logical categories (dev, build, test, etc.)'
+  - 'Include comprehensive conventions (naming, patterns, testing)'
+  - 'Configure ai_tools section with preferred agents and rulepacks'
+  - 'Reference documentation files that exist in the project'
 
 content: |
   Generate a project.yml manifest for the following project:
@@ -156,11 +156,11 @@ outputs:
 
 examples:
   - input:
-      project_id: "my-api"
-      project_name: "My REST API"
-      description: "A RESTful API service built with Node.js and Express"
-      languages: "typescript, javascript"
-      preferred_agents: "code-reviewer, feature-builder, bug-fixer"
+      project_id: 'my-api'
+      project_name: 'My REST API'
+      description: 'A RESTful API service built with Node.js and Express'
+      languages: 'typescript, javascript'
+      preferred_agents: 'code-reviewer, feature-builder, bug-fixer'
     output: |
       # Creates a complete project.yml with:
       # - Proper structure for REST API project
@@ -169,6 +169,6 @@ examples:
       # - Relevant agents and rulepacks
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

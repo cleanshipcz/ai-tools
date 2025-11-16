@@ -8,18 +8,18 @@ tags:
 variables:
   - name: feature
     required: true
-    description: "Feature or task to estimate"
+    description: 'Feature or task to estimate'
   - name: context
     required: false
-    description: "Codebase or team context"
+    description: 'Codebase or team context'
   - name: team_experience
     required: false
-    description: "Team familiarity with required tech"
+    description: 'Team familiarity with required tech'
 rules:
-  - "Break down into estimatable tasks."
-  - "Include time for testing and polish."
-  - "Account for unknowns with buffer."
-  - "Consider team velocity and experience."
+  - 'Break down into estimatable tasks.'
+  - 'Include time for testing and polish.'
+  - 'Account for unknowns with buffer.'
+  - 'Consider team velocity and experience.'
 content: |
   Estimate effort for:
 
@@ -73,5 +73,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'

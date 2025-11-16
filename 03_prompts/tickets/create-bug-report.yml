@@ -8,21 +8,21 @@ tags:
 variables:
   - name: bug_description
     required: true
-    description: "Description of the bug"
+    description: 'Description of the bug'
   - name: steps_to_reproduce
     required: false
-    description: "How to reproduce the bug"
+    description: 'How to reproduce the bug'
   - name: expected_behavior
     required: false
-    description: "What should happen"
+    description: 'What should happen'
   - name: actual_behavior
     required: false
-    description: "What actually happens"
+    description: 'What actually happens'
 rules:
-  - "Include clear reproduction steps."
-  - "Specify environment and version."
-  - "Assess severity and priority."
-  - "Include logs or screenshots if available."
+  - 'Include clear reproduction steps.'
+  - 'Specify environment and version.'
+  - 'Assess severity and priority.'
+  - 'Include logs or screenshots if available.'
 content: |
   Create a bug report for:
 
@@ -105,5 +105,5 @@ content: |
 outputs:
   format: markdown
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'
