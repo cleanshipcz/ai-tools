@@ -1,12 +1,13 @@
 id: bug-fixer
-version: 1.0.0
-purpose: Diagnose and fix bugs in code
+version: 1.1.0
+purpose: Diagnose and fix bugs in code with automated regression tests
 description: |
   An agent specialized in debugging and fixing issues in code.
-  Analyzes error messages, traces, and code to identify root causes
-  and propose fixes.
+  Analyzes error messages, traces, and code to identify root causes,
+  proposes fixes, and creates automated tests to prevent regression.
 rulepacks:
   - base
+  - testing
   - coding-python
   - coding-kotlin
 capabilities:
@@ -19,14 +20,22 @@ defaults:
 prompt:
   system: |
     You are an expert debugger. Your goal is to identify the root cause
-    of bugs and propose minimal, correct fixes.
+    of bugs and propose minimal, correct fixes with automated tests.
+
+    **Test-Driven Bug Fixing**:
+    1. Write a failing test that reproduces the bug (TDD Red)
+    2. Fix the code to make the test pass (TDD Green)
+    3. Refactor if needed while keeping tests green (TDD Refactor)
+    4. This ensures the bug won't regress
 
     Process:
     1. Analyze the error message and stack trace
     2. Examine the relevant code
     3. Identify the root cause
-    4. Propose a minimal fix
-    5. Suggest tests to prevent regression
+    4. **Write a failing test that reproduces the bug**
+    5. Propose a minimal fix
+    6. **Verify the test now passes**
+    7. Add additional tests for edge cases
   user_template: |
     Bug report:
     {{bug_description}}
@@ -54,21 +63,30 @@ prompt:
 
     Diagnose the issue and provide:
     1. Root cause analysis
-    2. Proposed fix with code
-    3. Test cases to verify the fix
-    4. Prevention strategies
+    2. **Failing test that reproduces the bug** (automated, executable)
+    3. Proposed fix with code
+    4. **Verification that test now passes**
+    5. Additional test cases for edge cases
+    6. Prevention strategies
 
 tools:
   - read-file
   - run-tests
   - search-code
+  - setup-test-infrastructure
 constraints:
-  - 'Propose minimal changes that fix the root cause.'
-  - 'Do not introduce new bugs or side effects.'
-  - 'Always suggest tests for the fix.'
+  - "ALWAYS write a failing test that reproduces the bug BEFORE fixing it."
+  - "Tests must be automated and executable via test runner."
+  - "Propose minimal changes that fix the root cause."
+  - "Do not introduce new bugs or side effects."
+  - "Verify the fix by running the test and confirming it passes."
+  - "Add regression tests to prevent the bug from reoccurring."
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-01-01'
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  updated: "2025-11-16"
   tags:
     - debugging
     - fixing
+    - testing
+    - tdd

@@ -1,0 +1,129 @@
+id: setup-test-infrastructure
+version: 1.0.0
+description: Set up automated testing infrastructure for a project with test framework, configuration, and examples
+
+category: qa
+
+variables:
+  - name: language
+    description: Programming language (typescript, python, java, kotlin, javascript)
+    required: true
+  - name: framework
+    description: Preferred test framework (optional, will suggest if not provided)
+    required: false
+  - name: project_type
+    description: Project type (library, web-app, cli, api, monorepo)
+    required: false
+
+template: |
+  Set up automated testing infrastructure for a {{language}} project.
+
+  {{#framework}}
+  Use **{{framework}}** as the test framework.
+  {{/framework}}
+  {{^framework}}
+  Recommend and install an appropriate test framework based on the project.
+  {{/framework}}
+
+  {{#project_type}}
+  Project type: **{{project_type}}**
+  {{/project_type}}
+
+  ## Deliverables Required
+
+  ### 1. Test Framework Installation
+  - Install test framework and all necessary dependencies
+  - Configure test runner in package.json/build.gradle/setup.py
+  - Set up test directory structure following conventions
+  - Document installation steps in README
+
+  ### 2. Configuration Files
+  Create complete configuration files:
+  - Test framework config (jest.config.js, vitest.config.ts, pytest.ini, etc.)
+  - TypeScript config for tests (tsconfig.test.json if applicable)
+  - Code coverage configuration (thresholds, reporters)
+  - ESLint/linting rules for test files
+
+  ### 3. Example Test Suite
+  Create comprehensive example tests demonstrating:
+  - **Unit test**: Testing a single function/class in isolation
+  - **Integration test**: Testing multiple components together
+  - **Mocking example**: How to mock dependencies (network, filesystem, database)
+  - **Async test**: Testing promises/async operations
+  - **Error handling test**: Testing error conditions and edge cases
+  - Use descriptive test names following "should [behavior] when [condition]" pattern
+  - Follow AAA pattern: Arrange, Act, Assert
+
+  ### 4. Test Utilities Setup
+  - Create test helpers/utilities directory
+  - Add common test fixtures and factories
+  - Set up test data builders if needed
+  - Add custom matchers/assertions if beneficial
+
+  ### 5. CI/CD Integration
+  - Add test command to npm scripts / gradle tasks / make targets
+  - Provide GitHub Actions workflow example
+  - Provide GitLab CI config example (if applicable)
+  - Configure coverage reporting (upload to Codecov/Coveralls if applicable)
+  - Set up pre-commit hooks to run tests locally
+
+  ### 6. Documentation
+  Create comprehensive testing documentation:
+  - **README section**: How to run tests, watch mode, coverage
+  - **TESTING.md**: Testing conventions and best practices
+  - **Test structure**: Where to add new tests
+  - **Writing tests guide**: Examples and patterns to follow
+  - **Debugging tests**: How to debug failing tests
+  - **CI/CD**: How tests run in pipeline
+
+  ## Test Framework Recommendations
+
+  ### TypeScript/JavaScript
+  - **Vitest** (recommended): Fast, modern, Vite-native, great DX
+  - **Jest**: Mature, popular, extensive ecosystem
+  - **Mocha + Chai**: Flexible, good for custom setups
+
+  ### Python
+  - **pytest** (recommended): Flexible, powerful, pythonic
+  - **unittest**: Built-in, good for simple projects
+  - **nose2**: Extension of unittest
+
+  ### Java
+  - **JUnit 5** (recommended) + **AssertJ** + **Mockito**
+  - **TestNG**: Alternative with advanced features
+
+  ### Kotlin
+  - **JUnit 5** (recommended) + **MockK** + **AssertJ**
+  - **Kotest**: Kotlin-first testing framework
+
+  ## Requirements
+
+  All configuration must:
+  - Be runnable via single command (npm test, pytest, gradle test)
+  - Run in watch mode for development (npm run test:watch)
+  - Generate coverage reports (npm run test:coverage)
+  - Work in CI/CD environments without manual setup
+  - Use appropriate reporters (verbose for CI, concise for local)
+
+  ## Output Format
+
+  Provide:
+  1. **Complete configuration files** with full content (not snippets)
+  2. **Install commands** with exact versions
+  3. **Example test files** with real, working tests
+  4. **Documentation** ready to commit
+  5. **CI/CD config** ready to use
+
+  Make it production-ready, not a proof-of-concept.
+
+tags:
+  - testing
+  - setup
+  - infrastructure
+  - automation
+  - tdd
+
+metadata:
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

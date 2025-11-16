@@ -111,6 +111,11 @@ conventions:
     - "adapters/ - Generated tool-specific outputs (gitignored)"
 
   testing:
+    - "Use Vitest as the test framework for TypeScript code"
+    - "Test files mirror source structure: 11_scripts/foo.ts → 11_scripts/foo.test.ts"
+    - "Run tests via: npm test (will run vitest when implemented)"
+    - "All TypeScript scripts in 11_scripts/ should have corresponding .test.ts files"
+    - "Test coverage target: 80% for new code"
     - "Run npm run validate before committing"
     - "Ensure all schemas pass validation"
     - "Test generated outputs with npm run build"
@@ -160,6 +165,7 @@ ai_tools:
     - planning/tech-decision-record
     # QA prompts
     - qa/write-tests
+    - qa/setup-test-infrastructure
     # Manifest prompts
     - manifests/create-prompt
     - manifests/create-agent
@@ -171,10 +177,12 @@ ai_tools:
 
   preferred_rulepacks:
     - base
+    - testing
     - coding-typescript
 
   whitelist_rulepacks:
     - base
+    - testing
     - coding-typescript
 
   whitelist_recipes:
@@ -192,13 +200,16 @@ ai_tools:
     - "Use TypeScript strict mode with ES modules"
     - "Prefer async/await over callbacks"
     - "Use js-yaml for YAML parsing and dumping"
+    - "All new features must include automated tests before being considered complete"
+    - "Test infrastructure setup (Vitest) is a prerequisite for any feature work"
+    - "No feature PRs without automated tests"
 
 metadata:
   repository: "https://github.com/cleanshipcz/ai-tools"
   maintainers:
     - "cleanshipcz"
   created: "2025-11-15"
-  updated: "2025-11-15"
+  updated: "2025-11-16"
   tags:
     - ai
     - tooling
