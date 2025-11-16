@@ -59,7 +59,7 @@ class ProjectDeployer {
     const projectIds: string[] = [];
 
     // Check global projects
-    const globalDir = join(rootDir, 'projects', 'global');
+    const globalDir = join(rootDir, '06_projects', 'global');
     try {
       const globalEntries = await readdir(globalDir, { withFileTypes: true });
       for (const entry of globalEntries) {
@@ -78,7 +78,7 @@ class ProjectDeployer {
     }
 
     // Check local projects
-    const localDir = join(rootDir, 'projects', 'local');
+    const localDir = join(rootDir, '06_projects', 'local');
     try {
       const localEntries = await readdir(localDir, { withFileTypes: true });
       for (const entry of localEntries) {
@@ -172,8 +172,8 @@ class ProjectDeployer {
     // Find project directory (check global first, then local, then external)
     let projectDir: string | null = null;
 
-    const globalProjectDir = join(rootDir, 'projects', 'global', projectId);
-    const localProjectDir = join(rootDir, 'projects', 'local', projectId);
+    const globalProjectDir = join(rootDir, '06_projects', 'global', projectId);
+    const localProjectDir = join(rootDir, '06_projects', 'local', projectId);
 
     try {
       await access(globalProjectDir);

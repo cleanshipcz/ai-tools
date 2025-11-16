@@ -19,8 +19,8 @@ interface ProjectRegistry {
 }
 
 export class ExternalProjectManager {
-  private globalRegistryPath = join(rootDir, 'projects', 'projects.global.yml');
-  private localRegistryPath = join(rootDir, 'projects', 'projects.local.yml');
+  private globalRegistryPath = join(rootDir, '06_projects', 'projects.global.yml');
+  private localRegistryPath = join(rootDir, '06_projects', 'projects.local.yml');
 
   async list(): Promise<void> {
     console.log(chalk.blue('\n📋 External Projects:\n'));

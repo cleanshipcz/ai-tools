@@ -29,7 +29,7 @@ class ProjectCreator {
     }
 
     // Check if project already exists
-    const projectDir = join(rootDir, 'projects', scope, projectId);
+    const projectDir = join(rootDir, '06_projects', scope, projectId);
     try {
       await readdir(projectDir);
       throw new Error(`Project already exists: ${projectId} in ${scope}`);

@@ -114,12 +114,12 @@ export class ProjectGenerator {
 
   private async loadProject(projectId: string): Promise<void> {
     // Check global projects first
-    let projectPath = join(rootDir, 'projects', 'global', projectId, 'project.yml');
+    let projectPath = join(rootDir, '06_projects', 'global', projectId, 'project.yml');
     let exists = await this.fileExists(projectPath);
 
     if (!exists) {
       // Check local projects
-      projectPath = join(rootDir, 'projects', 'local', projectId, 'project.yml');
+      projectPath = join(rootDir, '06_projects', 'local', projectId, 'project.yml');
       exists = await this.fileExists(projectPath);
     }
 
@@ -1227,11 +1227,11 @@ export class ProjectGenerator {
     console.log(chalk.blue('\n📋 Available Projects:\n'));
 
     console.log(chalk.bold('Global Projects:'));
-    await this.listProjectsInDir(join(rootDir, 'projects', 'global'));
+    await this.listProjectsInDir(join(rootDir, '06_projects', 'global'));
 
     console.log('');
     console.log(chalk.bold('Local Projects:'));
-    await this.listProjectsInDir(join(rootDir, 'projects', 'local'));
+    await this.listProjectsInDir(join(rootDir, '06_projects', 'local'));
 
     console.log('');
     console.log(chalk.bold('External Projects:'));
