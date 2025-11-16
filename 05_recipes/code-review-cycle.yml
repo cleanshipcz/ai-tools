@@ -25,7 +25,7 @@ steps:
       6. Testing requirements
 
       Output a comprehensive analysis of the changes.
-    outputDocument: ".recipe-docs/changes-analysis.md"
+    outputDocument: '.recipe-docs/changes-analysis.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -43,9 +43,9 @@ steps:
       6. Integration points to verify
 
       Output a structured review checklist document.
-    outputDocument: ".recipe-docs/review-checklist.md"
+    outputDocument: '.recipe-docs/review-checklist.md'
     includeDocuments:
-      - ".recipe-docs/changes-analysis.md"
+      - '.recipe-docs/changes-analysis.md'
     continueConversation: true
     waitForConfirmation: false
 
@@ -66,10 +66,10 @@ steps:
 
       Provide specific, actionable feedback organized by priority (Critical, High, Medium, Low).
       Rate overall quality on a scale of 1-10.
-    outputDocument: ".recipe-docs/review-findings.md"
+    outputDocument: '.recipe-docs/review-findings.md'
     includeDocuments:
-      - ".recipe-docs/changes-analysis.md"
-      - ".recipe-docs/review-checklist.md"
+      - '.recipe-docs/changes-analysis.md'
+      - '.recipe-docs/review-checklist.md'
     continueConversation: true
     waitForConfirmation: false
 
@@ -86,9 +86,9 @@ steps:
       Reference the analysis and checklist to ensure thorough fixes.
       Summarize the changes made and update the findings document with progress.
     includeDocuments:
-      - ".recipe-docs/changes-analysis.md"
-      - ".recipe-docs/review-checklist.md"
-      - ".recipe-docs/review-findings.md"
+      - '.recipe-docs/changes-analysis.md'
+      - '.recipe-docs/review-checklist.md'
+      - '.recipe-docs/review-findings.md'
     continueConversation: true
     waitForConfirmation: false
 
@@ -108,9 +108,9 @@ steps:
       - "PASS" if all issues are resolved and quality is acceptable (8+/10)
       - "CONTINUE" with remaining issues if more work is needed
     includeDocuments:
-      - ".recipe-docs/changes-analysis.md"
-      - ".recipe-docs/review-checklist.md"
-      - ".recipe-docs/review-findings.md"
+      - '.recipe-docs/changes-analysis.md'
+      - '.recipe-docs/review-checklist.md'
+      - '.recipe-docs/review-findings.md'
     continueConversation: true
     waitForConfirmation: true
 
@@ -131,4 +131,4 @@ loop:
 
 metadata:
   author: ai-tools
-  created: "2025-01-15"
+  created: '2025-01-15'

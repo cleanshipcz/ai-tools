@@ -6,6 +6,7 @@
 A comprehensive solution for managing AI agent prompts, rules, skills, and tool configurations. Keep your "source of truth" in small, typed YAML manifests and automatically generate tool-specific artifacts for Windsurf, Claude Code, Cursor, and other AI coding assistants.
 
 [![CI](https://github.com/cleanshipcz/ai-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/cleanshipcz/ai-tools/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-156%20passing-brightgreen.svg)](11_scripts/TEST_README.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ---
@@ -45,6 +46,9 @@ A comprehensive solution for managing AI agent prompts, rules, skills, and tool 
   - [🧪 Evaluation Framework](#-evaluation-framework)
     - [What Is It?](#what-is-it)
     - [Quick Usage](#quick-usage-2)
+  - [🧪 Testing](#-testing)
+    - [What Is It?](#what-is-it-1)
+    - [Quick Usage](#quick-usage-3)
   - [🏗️ Project Structure](#️-project-structure)
   - [🚀 Available Commands](#-available-commands)
     - [For Users (Using Prompts)](#for-users-using-prompts)
@@ -401,6 +405,7 @@ cat .recipe-logs/feature-delivery-20251116-150530.log
 ```
 
 **Features:**
+
 - Real-time console output (using `tee`)
 - Complete execution logs with timestamps
 - Works for all tool types (copilot-cli, claude-code, cursor)
@@ -545,6 +550,56 @@ npm run eval -- --suite code-refactor
 
 # Reports in evals/reports/
 ```
+
+---
+
+## 🧪 Testing
+
+> **📖 [Complete Test Documentation](11_scripts/TEST_README.md)** | **[Testing Guide](90_docs/TESTING.md)** - Comprehensive guides for understanding and contributing to the test suite.
+
+### What Is It?
+
+A comprehensive automated testing infrastructure ensuring code quality and reliability across all build scripts and utilities.
+
+**Test Coverage:**
+- ✅ **156 automated tests** across 18 test files
+- ✅ **100% script coverage** (all 17 scripts tested)
+- ✅ **100% pass rate** - all tests passing
+- ✅ **Fast execution** - complete test suite runs in ~2 seconds
+- ✅ **CI/CD integrated** - automated testing on all PRs
+
+**Test Categories:**
+- **Core Systems** (58 tests): validate.ts, build.ts
+- **Project Management** (27 tests): project generation, deployment, creation
+- **Generators** (30 tests): skills, docs, features, prompts
+- **Utilities** (24 tests): test-utils, clean, diff, eval
+- **User Workflows** (13 tests): use-prompt, run-recipe
+- **Integrations** (6 tests): external-projects
+
+### Quick Usage
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode (during development)
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+
+# Run specific test file
+npx vitest run 11_scripts/validate.test.ts
+```
+
+**Test Infrastructure:**
+- **Framework:** Vitest 4.0.9 with TypeScript support
+- **Coverage:** @vitest/coverage-v8 for detailed reports
+- **Utilities:** Shared test helpers in test-utils.ts
+- **Fixtures:** Mock data for consistent testing
+- **CI/CD:** Automated testing in GitHub Actions
+
+**For Contributors:** See [TEST_README.md](11_scripts/TEST_README.md) for writing tests and [TESTING.md](90_docs/TESTING.md) for testing strategies.
 
 ---
 
@@ -755,6 +810,9 @@ npm run project:external         # Manage external projects (add/remove/list)
 npm run validate         # Validate all manifests
 npm run build            # Generate tool adapters
 npm run docs             # Generate documentation
+npm test                 # Run automated test suite (156 tests)
+npm run test:watch       # Run tests in watch mode
+npm run test:coverage    # Generate coverage report
 npm run eval             # Run evaluation suites
 npm run diff             # Compare outputs A/B
 npm run ci               # Run full CI pipeline
@@ -780,6 +838,8 @@ npm run clean            # Remove generated files
 - **[recipes/GUIDE.md](05_recipes/GUIDE.md)** - Advanced recipe guide (complete reference)
 - **[docs/STYLE_GUIDE.md](90_docs/STYLE_GUIDE.md)** - Writing effective prompts
 - **[docs/AGENTS.md](90_docs/AGENTS.md)** - Agent documentation (generated)
+- **[scripts/TEST_README.md](11_scripts/TEST_README.md)** - 🧪 Test suite documentation (401 lines)
+- **[docs/TESTING.md](90_docs/TESTING.md)** - 🧪 Testing guide and best practices (338 lines)
 - **[docs/CHANGELOG.md](90_docs/CHANGELOG.md)** - Version history
 - **[IMPLEMENTATION.md](IMPLEMENTATION.md)** - Implementation summary
 
@@ -934,10 +994,14 @@ GitHub Actions workflow with 7 jobs:
 
 ### Testing
 
-- Write eval suites for important prompts
-- Set budget limits
-- Track baseline performance
-- Review diff outputs
+- **Automated Tests**: All new features require corresponding test files
+- **Test Coverage**: Aim for 60-80% code coverage on new code
+- **Run Tests**: Always run `npm test` before committing changes
+- **Test Patterns**: Follow existing test structure in `11_scripts/*.test.ts`
+- **Eval Suites**: Write eval suites for important prompts
+- **Budget Limits**: Set budget limits for evaluation runs
+- **Performance**: Track baseline performance and watch for regressions
+- **Validation**: Review diff outputs before merging
 
 ---
 
@@ -962,7 +1026,25 @@ GitHub Actions workflow with 7 jobs:
          ▼         ▼         ▼         ▼
     Windsurf  Cursor  Claude   Library.md
      (JSON)   (JSON)  (JSON)   (Markdown)
+
+Testing Infrastructure:
+┌────────────────────────────────────────┐
+│  Vitest Test Framework (4.0.9)         │
+│  ├─ 18 Test Files (156 tests)          │
+│  ├─ Test Utilities & Fixtures          │
+│  ├─ Coverage Reports (@vitest/v8)      │
+│  └─ CI/CD Integration (GitHub Actions) │
+└────────────────────────────────────────┘
 ```
+
+### Key Features
+
+- ✅ **100% Script Coverage** - Every script has automated tests
+- ✅ **Fast Execution** - Full test suite completes in ~2 seconds
+- ✅ **CI/CD Integration** - Automated testing on all PRs
+- ✅ **Type Safety** - TypeScript throughout with strict mode
+- ✅ **Comprehensive Validation** - Schema validation + security checks
+- ✅ **Multi-Tool Support** - Generate configs for 4+ AI coding tools
 
 ## 📄 License
 

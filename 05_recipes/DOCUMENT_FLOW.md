@@ -63,19 +63,19 @@ Each recipe step can now use these properties:
 steps:
   - id: step-id
     agent: agent-name
-    task: "Task description..."
-    
+    task: 'Task description...'
+
     # Output document: step creates this file
-    outputDocument: ".recipe-docs/analysis.md"
-    
+    outputDocument: '.recipe-docs/analysis.md'
+
     # Include documents: step reads these as context
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
-    
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
+
     # Wait for confirmation before proceeding
     waitForConfirmation: true
-    
+
     # Continue in same conversation (true) or start fresh (false)
     continueConversation: false
 ```
@@ -117,27 +117,27 @@ Injected task becomes:
 feature-delivery:
   1. analyze
      → Creates: analysis.md
-     
+
   2. plan
      → Reads: analysis.md
      → Creates: plan.md
-     
+
   3. implement
      → Reads: analysis.md, plan.md
      → Updates: plan.md with progress
-     
+
   4. review
      → Reads: analysis.md, plan.md
      → Creates: review.md
-     
+
   5. refactor
      → Reads: analysis.md, plan.md, review.md
      → Updates: review.md with fixes
-     
+
   6. quality-check
      → Reads: all three documents
      → Approves if ready, or loops back
-     
+
   7. document
      → Reads: all documents
      → Updates: project documentation
@@ -149,27 +149,27 @@ feature-delivery:
 bug-fix-workflow:
   1. analyze-bug
      → Creates: bug-analysis.md
-     
+
   2. plan-fix
      → Reads: bug-analysis.md
      → Creates: fix-plan.md
-     
+
   3. investigate
      → Reads: bug-analysis.md, fix-plan.md
      → Creates: investigation.md
-     
+
   4. implement-fix
      → Reads: all three
      → Updates: investigation.md with progress
-     
+
   5. test-verification
      → Reads: all documents
      → Updates: investigation.md with test results
-     
+
   6. review-fix
      → Reads: all documents
      → Creates: review-feedback.md
-     
+
   7. update-docs
      → Reads: all documents (conditional on APPROVED)
 ```
@@ -180,19 +180,19 @@ bug-fix-workflow:
 code-review-cycle:
   1. analyze-changes
      → Creates: changes-analysis.md
-     
+
   2. create-review-checklist
      → Reads: changes-analysis.md
      → Creates: review-checklist.md
-     
+
   3. initial-review
      → Reads: both above
      → Creates: review-findings.md
-     
+
   4. apply-fixes (LOOP)
      → Reads: all three
      → Updates: review-findings.md with progress
-     
+
   5. verify-fixes (LOOP)
      → Reads: all documents
      → PASS/CONTINUE decision
@@ -203,6 +203,7 @@ code-review-cycle:
 ### Document Loading (`loadDocuments()`)
 
 Before each step executes, the runner:
+
 1. Reads all `.md` files from `.recipe-docs/` directory
 2. Caches them in memory with path as key
 3. Checks for missing documents and warns user
@@ -210,6 +211,7 @@ Before each step executes, the runner:
 ### Document Injection (`executeStep()`)
 
 For each step:
+
 1. Loads documents from disk
 2. Interpolates variables in task
 3. Appends reference documents section to task
@@ -220,6 +222,7 @@ For each step:
 ### Document Saving (`saveDocument()`)
 
 After tool execution:
+
 1. Prompts user to save output document
 2. Reads document from disk
 3. Caches in memory for subsequent steps
@@ -256,8 +259,8 @@ Document inclusion in tasks is clearly marked with "Reference Documents" section
    ```yaml
    - id: analyze
      agent: specialist
-     task: "Analyze the problem..."
-     outputDocument: ".recipe-docs/analysis.md"
+     task: 'Analyze the problem...'
+     outputDocument: '.recipe-docs/analysis.md'
    ```
 
 2. **Build on Previous Steps**
@@ -265,8 +268,8 @@ Document inclusion in tasks is clearly marked with "Reference Documents" section
    ```yaml
    - id: plan
      includeDocuments:
-       - ".recipe-docs/analysis.md"
-     outputDocument: ".recipe-docs/plan.md"
+       - '.recipe-docs/analysis.md'
+     outputDocument: '.recipe-docs/plan.md'
    ```
 
 3. **Update Documents with Progress**
@@ -274,9 +277,9 @@ Document inclusion in tasks is clearly marked with "Reference Documents" section
    ```yaml
    - id: implement
      includeDocuments:
-       - ".recipe-docs/analysis.md"
-       - ".recipe-docs/plan.md"
-     task: "Implement according to plan. Update plan.md with what you complete."
+       - '.recipe-docs/analysis.md'
+       - '.recipe-docs/plan.md'
+     task: 'Implement according to plan. Update plan.md with what you complete.'
    ```
 
 4. **Loop Until Complete**
@@ -289,7 +292,7 @@ Document inclusion in tasks is clearly marked with "Reference Documents" section
      maxIterations: 5
      condition:
        type: user-decision
-       prompt: "Continue loop? (y/n): "
+       prompt: 'Continue loop? (y/n): '
    ```
 
 ### For Users

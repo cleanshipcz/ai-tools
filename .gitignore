@@ -50,6 +50,7 @@ yarn-error.log*
 # Test coverage
 coverage/
 .nyc_output/
+.output-test/
 
 # Temporary files
 tmp/
@@ -65,3 +66,5 @@ temp/
 .windsurf
 .cs.recipes
 AGENTS.md
+.recipe-docs/
+.recipe-logs/

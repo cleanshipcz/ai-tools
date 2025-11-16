@@ -19,8 +19,8 @@ toolOptions:
     allowAllTools: true # Allow tools to run automatically without confirmation
 
 variables:
-  feature_description: "{{FEATURE_DESCRIPTION}}"
-  acceptance_criteria: "{{ACCEPTANCE_CRITERIA}}"
+  feature_description: '{{FEATURE_DESCRIPTION}}'
+  acceptance_criteria: '{{ACCEPTANCE_CRITERIA}}'
 
 steps:
   - id: analyze
@@ -42,7 +42,7 @@ steps:
       6. New files or modules that need to be created
 
       Output your analysis as a comprehensive document covering all these aspects.
-    outputDocument: ".recipe-docs/analysis.md"
+    outputDocument: '.recipe-docs/analysis.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -62,9 +62,9 @@ steps:
       6. Estimated complexity for each step
 
       Output your plan as a structured, actionable document that can guide implementation.
-    outputDocument: ".recipe-docs/plan.md"
+    outputDocument: '.recipe-docs/plan.md'
     includeDocuments:
-      - ".recipe-docs/analysis.md"
+      - '.recipe-docs/analysis.md'
     continueConversation: false
     waitForConfirmation: true
 
@@ -87,8 +87,8 @@ steps:
 
       Update the plan document as you progress to track what's been completed.
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -106,10 +106,10 @@ steps:
       - Documentation completeness
 
       Provide specific, actionable feedback.
-    outputDocument: ".recipe-docs/review.md"
+    outputDocument: '.recipe-docs/review.md'
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -127,9 +127,9 @@ steps:
 
       Update the review document with the changes made.
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
-      - ".recipe-docs/review.md"
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
+      - '.recipe-docs/review.md'
     continueConversation: false
     waitForConfirmation: false
 
@@ -147,9 +147,9 @@ steps:
 
       Respond with "APPROVED" if quality standards are met, or provide remaining issues.
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
-      - ".recipe-docs/review.md"
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
+      - '.recipe-docs/review.md'
     continueConversation: false
     waitForConfirmation: true
     condition:
@@ -167,16 +167,16 @@ steps:
 
       Use all the analysis, plan, and review documents as context for what was implemented.
     includeDocuments:
-      - ".recipe-docs/analysis.md"
-      - ".recipe-docs/plan.md"
-      - ".recipe-docs/review.md"
+      - '.recipe-docs/analysis.md'
+      - '.recipe-docs/plan.md'
+      - '.recipe-docs/review.md'
     continueConversation: false
     waitForConfirmation: false
     condition:
       type: on-success
       check:
         type: contains
-        value: "APPROVED"
+        value: 'APPROVED'
 
 loop:
   steps:
@@ -186,4 +186,4 @@ loop:
 
 metadata:
   author: ai-tools
-  created: "2025-01-15"
+  created: '2025-01-15'
