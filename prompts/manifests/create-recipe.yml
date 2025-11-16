@@ -13,29 +13,29 @@ variables:
   - name: recipe_id
     required: true
     description: "Kebab-case unique identifier for the recipe (e.g., feature-delivery, bug-fix-workflow)"
-  
+
   - name: description
     required: true
     description: "Clear description of what the recipe accomplishes (10-500 characters)"
-  
+
   - name: workflow_type
     required: false
     description: "Type of workflow (feature, bugfix, refactor, review, testing)"
     default: "feature"
-  
+
   - name: tools
     required: false
     description: "Comma-separated list of supported tools (claude-code, copilot-cli, cursor)"
     default: "claude-code, copilot-cli"
-  
+
   - name: agents
     required: false
     description: "Comma-separated list of agents to use (e.g., project-planner, feature-builder, code-reviewer)"
-  
+
   - name: variables_needed
     required: false
     description: "Variables the recipe needs from users (e.g., feature_description, bug_description)"
-  
+
   - name: max_iterations
     required: false
     description: "Maximum loop iterations for review cycles"
@@ -72,15 +72,15 @@ content: |
   {{/variables_needed}}
 
   **Document-First Pattern (MANDATORY):**
-  
+
   Every recipe MUST follow this structure:
-  
+
   1. **Analysis Step** (step 1):
      - Agent: Usually project-planner, bug-fixer, or code-reviewer
      - Task: Comprehensive analysis of the problem/codebase
      - outputDocument: ".recipe-docs/analysis.md" (or variant like bug-analysis.md)
      - Purpose: Deep understanding before taking action
-  
+
   2. **Planning Step** (step 2):
      - Agent: Usually project-planner, bug-fixer, or code-reviewer
      - Task: Create detailed, actionable plan
@@ -88,13 +88,13 @@ content: |
      - includeDocuments: [".recipe-docs/analysis.md"]
      - waitForConfirmation: true (allow review before proceeding)
      - Purpose: Structured approach with clear steps
-  
+
   3. **Implementation Steps** (step 3+):
      - Agent: Usually feature-builder, refactoring-specialist, bug-fixer
      - Task: Execute according to the plan
      - includeDocuments: [".recipe-docs/analysis.md", ".recipe-docs/plan.md"]
      - Purpose: Implement with full context
-  
+
   4. **Review/Verification Steps**:
      - Agent: Usually code-reviewer, tdd-navigator
      - Task: Verify against plan and requirements
@@ -111,7 +111,7 @@ content: |
     - workflow
     - {{workflow_type}}
     # Add 2-3 more relevant tags
-  
+
   tools:
     {{#tools}}
     - {{.}}  # Parse from comma-separated list
@@ -120,22 +120,22 @@ content: |
     - claude-code
     - copilot-cli
     {{/tools}}
-  
+
   # Separate conversations prevent context bloat (recommended)
   conversationStrategy: separate
-  
+
   # Enable automation for copilot-cli
   toolOptions:
     copilot-cli:
       allowAllTools: true  # Required for non-interactive execution
-  
+
   {{#variables_needed}}
   variables:
     # Parse {{variables_needed}} and create entries like:
     # feature_description: "{{FEATURE_DESCRIPTION}}"
     # acceptance_criteria: "{{ACCEPTANCE_CRITERIA}}"
   {{/variables_needed}}
-  
+
   steps:
     # STEP 1: Analysis (REQUIRED)
     - id: analyze
@@ -213,7 +213,7 @@ content: |
     # - Refactor/fix based on review
     # - Final verification
     # - Documentation updates
-  
+
   {{#max_iterations}}
   # Optional: Loop for iterative refinement
   loop:
@@ -222,14 +222,14 @@ content: |
       - refactor  # Or appropriate fix step
     maxIterations: {{max_iterations}}
   {{/max_iterations}}
-  
+
   metadata:
     author: "AI Tools Team"
     created: "2025-11-16"
   ```
 
   **Agent Selection by Workflow Type:**
-  
+
   - **feature**: project-planner (analysis/plan), feature-builder (implement), code-reviewer (review)
   - **bugfix**: bug-fixer (all steps), code-reviewer (review)
   - **refactor**: project-planner (analysis), refactoring-specialist (implement), code-reviewer (review)
@@ -237,14 +237,14 @@ content: |
   - **testing**: tdd-navigator (analysis/plan), feature-builder (implement)
 
   **Document Naming Conventions:**
-  
+
   Use descriptive document names based on workflow type:
   - Feature: `.recipe-docs/analysis.md` + `.recipe-docs/plan.md`
   - Bug Fix: `.recipe-docs/bug-analysis.md` + `.recipe-docs/fix-plan.md`
   - Code Review: `.recipe-docs/changes-analysis.md` + `.recipe-docs/review-checklist.md`
 
   **Best Practices:**
-  
+
   1. **Keep steps atomic** - One clear purpose per step
   2. **Use descriptive task descriptions** - Be specific about what each agent should do
   3. **Include context in tasks** - Explain why, not just what

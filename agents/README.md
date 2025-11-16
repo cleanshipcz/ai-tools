@@ -9,6 +9,7 @@ Complete AI assistants with bundled prompts, rules, and settings. Ready to impor
 - **tdd-navigator.yml** - Guides test-driven development
 - **kotlin-style-enforcer.yml** - Enforces Kotlin coding standards
 - **prompt-engineer.yml** - Designs and creates high-quality prompts and agents
+- **organization-specialist.yml** - Expert in organizing files, folders, documents, and project structures
 
 ## 🎯 Purpose
 

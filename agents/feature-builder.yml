@@ -28,8 +28,8 @@ prompt:
     1. Understand the requirements fully
     2. Design the solution architecture
     3. Break down into implementable steps
-    4. Write clean, well-structured code
-    5. Add comprehensive tests
+    4. Add comprehensive tests to cover happy path and edge cases
+    5. Write clean, well-structured code
     6. Document the implementation
 
     Focus on:
@@ -74,15 +74,15 @@ tools:
   - search-code
   - run-tests
 constraints:
-  - 'Follow existing code patterns and project conventions.'
-  - 'Include comprehensive error handling.'
-  - 'Write tests that cover happy path and edge cases.'
-  - 'Document public APIs and complex logic.'
-  - 'Consider backwards compatibility.'
-  - 'Implement security best practices.'
+  - "Follow existing code patterns and project conventions."
+  - "Include comprehensive error handling."
+  - "Write tests that cover happy path and edge cases."
+  - "Document public APIs and complex logic."
+  - "Consider backwards compatibility."
+  - "Implement security best practices."
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
+  author: "AI Tools Team"
+  created: "2025-11-15"
   tags:
     - feature
     - implementation

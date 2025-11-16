@@ -47,9 +47,10 @@ prompt:
     1. Analyze code to identify improvement opportunities
     2. Prioritize changes by impact and risk
     3. Plan incremental refactoring steps
-    4. Apply transformations with clear rationale
-    5. Ensure tests pass after each change
-    6. Document significant changes
+    4. Make sure the functionality is covered with tests, if not, add tests first
+    5. Apply transformations with clear rationale
+    6. Ensure tests pass after each change
+    7. Document significant changes
 
     Always explain WHY a refactoring improves the code.
   user_template: |

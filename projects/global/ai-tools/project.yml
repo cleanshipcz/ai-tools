@@ -140,6 +140,7 @@ ai_tools:
     - project-planner
     - manifest-builder
     - ticket-manager
+    - organization-specialist
 
   whitelist_prompts:
     # Refactoring prompts
