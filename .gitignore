@@ -62,5 +62,5 @@ temp/
 .github/prompts
 .github/copilot-instructions.md
 .windsurf
-cleanship-recipes
+.cs.recipes
 AGENTS.md

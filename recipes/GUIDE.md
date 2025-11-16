@@ -44,7 +44,7 @@ Recipes are YAML manifests that define multi-agent workflows. They get compiled 
 ┌─────────────────────────────────────────────────────────┐
 │  3. Run in Your Project                                 │
 │     cd /path/to/your-app                                │
-│     ./cleanship-recipes/my-workflow.sh                  │
+│     ./.cs.recipes/my-workflow.sh                  │
 │     → Executes agents on YOUR code                      │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -220,7 +220,7 @@ steps:
 ```bash
 FEATURE_NAME="Authentication" \
 FILE_PATH="src/auth.ts" \
-./cleanship-recipes/my-recipe.sh
+./.cs.recipes/my-recipe.sh
 ```
 
 **With feature binding:**
@@ -381,7 +381,7 @@ npm run recipe:run my-workflow copilot-cli
 # Real usage: deploy to project
 npm run project:deploy my-project
 cd /path/to/my-project
-./cleanship-recipes/my-workflow.sh
+./.cs.recipes/my-workflow.sh
 ```
 
 ### Step 4: Deploy
@@ -392,7 +392,7 @@ Add to your project configuration and deploy:
 npm run project:deploy my-project
 ```
 
-Scripts are generated in your project's `cleanship-recipes/` directory.
+Scripts are generated in your project's `.cs.recipes/` directory.
 
 ## Testing and Debugging
 
@@ -415,10 +415,10 @@ npm run recipe:run feature-delivery copilot-cli
 
 ```bash
 # View generated script
-cat /path/to/your-project/cleanship-recipes/my-recipe.sh
+cat /path/to/your-project/.cs.recipes/my-recipe.sh
 
 # Run with bash tracing
-bash -x ./cleanship-recipes/my-recipe.sh
+bash -x ./.cs.recipes/my-recipe.sh
 
 # Check for errors
 set -e  # Already in generated scripts
@@ -431,18 +431,18 @@ set -e  # Already in generated scripts
 # Did you deploy?
 npm run project:deploy my-project
 
-# Check project's cleanship-recipes/ directory
-ls -la /path/to/your-project/cleanship-recipes/
+# Check project's .cs.recipes/ directory
+ls -la /path/to/your-project/.cs.recipes/
 ```
 
 **Variables not interpolating:**
 ```bash
 # Export variables before running
 export FEATURE_DESCRIPTION="My feature"
-./cleanship-recipes/feature-delivery.sh
+./.cs.recipes/feature-delivery.sh
 
 # Or inline
-FEATURE_DESCRIPTION="My feature" ./cleanship-recipes/feature-delivery.sh
+FEATURE_DESCRIPTION="My feature" ./.cs.recipes/feature-delivery.sh
 ```
 
 **Agent not found:**

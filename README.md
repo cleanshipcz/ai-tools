@@ -105,7 +105,7 @@ npm run project:deploy my-app
 
 # 4. Use recipes in your app
 cd /path/to/your-actual-app
-./cleanship-recipes/feature-delivery.sh
+./.cs.recipes/feature-delivery.sh
 ```
 
 **📖 [Recipe Guide](recipes/README.md)** - How to use multi-agent workflow recipes
@@ -727,7 +727,7 @@ npm run project:rollback         # Rollback deployment
 npm run project:external         # Manage external projects (add/remove/list)
 ```
 
-**Note:** Project generation automatically deploys recipe scripts to `cleanship-recipes/` subdirectories for supported tools (claude-code, copilot-cli, cursor).
+**Note:** Project generation automatically deploys recipe scripts to `.cs.recipes/` subdirectories for supported tools (claude-code, copilot-cli, cursor).
 
 ### For Developers (Managing Manifests)
 

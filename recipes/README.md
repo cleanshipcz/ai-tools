@@ -15,7 +15,7 @@ Multi-agent workflow recipes for orchestrating complex tasks.
 
 1. Deploy recipes to your project: `npm run project:deploy my-project`
 2. Go to your project: `cd /path/to/your-actual-app`
-3. Run the recipe: `./cleanship-recipes/feature-delivery.sh`
+3. Run the recipe: `./.cs.recipes/feature-delivery.sh`
 
 The script runs multi-agent workflows on YOUR code, completely unattended.
 
@@ -45,12 +45,12 @@ npm run project:deploy my-app
 cd /path/to/your-actual-app
 
 # Run recipes - they'll modify YOUR code automatically
-./cleanship-recipes/feature-delivery.sh
-./cleanship-recipes/bug-fix-workflow.sh
-./cleanship-recipes/code-review-cycle.sh
+./.cs.recipes/feature-delivery.sh
+./.cs.recipes/bug-fix-workflow.sh
+./.cs.recipes/code-review-cycle.sh
 
 # Or for Claude Code:
-./.claude/cleanship-recipes/feature-delivery.sh
+./.claude/.cs.recipes/feature-delivery.sh
 ```
 
 **Note:** Recipes run completely unattended. No prompts, no user interaction. Just set it and walk away.
@@ -89,11 +89,11 @@ npm run project:deploy my-app
 
 # In YOUR project
 cd /path/to/your-actual-app
-ls -la cleanship-recipes/
+ls -la .cs.recipes/
 # feature-user-auth.sh ← Generated with context pre-filled!
 
 # Run it (fully automated, no interaction needed)
-./cleanship-recipes/feature-user-auth.sh
+./.cs.recipes/feature-user-auth.sh
 # All variables from feature.yml are already set
 ```
 

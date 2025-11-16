@@ -252,7 +252,7 @@ Generates `.windsurf/rules/project-rules.json` with project-specific rules.
 
 Generates `.cursor/project-rules.json` with project rules and context, plus:
 
-- **Recipe Scripts:** Deployed to `cleanship-recipes/` subdirectory
+- **Recipe Scripts:** Deployed to `.cs.recipes/` subdirectory
 - Tool-specific executable bash scripts for each recipe
 - Recipes that specify cursor support in their manifests
 
@@ -260,7 +260,7 @@ Generates `.cursor/project-rules.json` with project rules and context, plus:
 
 Generates `.claude/project-context.json` with project context, plus:
 
-- **Recipe Scripts:** Deployed to `cleanship-recipes/` subdirectory  
+- **Recipe Scripts:** Deployed to `.cs.recipes/` subdirectory  
 - Executable bash scripts for automated multi-agent workflows
 - All recipes that support claude-code tool
 
@@ -268,7 +268,7 @@ Generates `.claude/project-context.json` with project context, plus:
 
 Generates `AGENTS.md` with agent definitions and project context, plus:
 
-- **Recipe Scripts:** Deployed to `cleanship-recipes/` subdirectory
+- **Recipe Scripts:** Deployed to `.cs.recipes/` subdirectory
 - Scripts designed for GitHub Copilot CLI tool
 - All recipes that support copilot-cli tool
 

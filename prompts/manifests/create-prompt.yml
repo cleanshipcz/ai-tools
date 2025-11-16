@@ -12,24 +12,24 @@ variables:
   - name: prompt_id
     required: true
     description: "Kebab-case unique identifier for the prompt (e.g., analyze-performance)"
-  
+
   - name: description
     required: true
     description: "Clear description of what the prompt does (10-500 characters)"
-  
+
   - name: category
     required: false
     description: "Prompt category (refactor, qa, docs, planning, tickets, manifests)"
     default: "refactor"
-  
+
   - name: tags
     required: false
     description: "Comma-separated list of tags for categorization (e.g., performance, optimization)"
-  
+
   - name: variables
     required: false
     description: "Description of variables this prompt needs (e.g., 'code: the code to analyze (required), language: programming language (required)')"
-  
+
   - name: output_format
     required: false
     description: "Expected output format (markdown, json, yaml, code, text)"
@@ -50,29 +50,29 @@ rules:
 
 content: |
   Generate a prompt.yml manifest for the following prompt:
-  
+
   **Prompt Details:**
   - ID: {{prompt_id}}
   - Description: {{description}}
   - Category: {{category}}
-  
+
   {{#tags}}
   **Tags:**
   {{tags}}
   {{/tags}}
-  
+
   {{#variables}}
   **Variables:**
   {{variables}}
   {{/variables}}
-  
+
   **Requirements:**
-  
+
   1. **Required Fields:**
      - id: {{prompt_id}} (validate kebab-case)
      - version: 1.0.0 (semver)
      - description: "{{description}}" (10-500 chars)
-  
+
   2. **Tags Section:**
      Array of relevant tags for categorization:
      {{#tags}}
@@ -81,7 +81,7 @@ content: |
      {{^tags}}
      - Suggest 3-5 appropriate tags based on prompt purpose
      {{/tags}}
-  
+
   3. **Variables Section:**
      Array of variable definitions, each with:
      - name: snake_case identifier (e.g., code_block, file_path)
@@ -100,14 +100,14 @@ content: |
      - target_name: Desired name for output
      - requirements: Specific requirements
      - context: Additional context
-  
+
   4. **Includes Section (optional):**
      Reference shared components from prompts/shared/:
      - ../shared/constraints.md: Common constraints
      - ../shared/acceptance_criteria.md: Acceptance criteria template
      - ../shared/best_practices.md: Best practices
      - Create custom shared files as needed
-  
+
   5. **Rules Section:**
      Array of specific rules or constraints (3-10 items):
      - What the prompt should always do
@@ -119,7 +119,7 @@ content: |
        - "Include error handling"
        - "Add unit tests for new functionality"
        - "Use meaningful variable names"
-  
+
   6. **Content Section:**
      The actual prompt template using Mustache syntax:
      
@@ -138,23 +138,23 @@ content: |
      - Provide structure (numbered lists, bullet points)
      - Include context about why
      - Specify format and quality expectations
-  
+
   7. **Outputs Section:**
      - format: {{output_format}} (markdown, json, yaml, code, text)
      - schema: (optional) JSON schema for structured outputs
-  
+
   8. **Examples Section (optional but recommended):**
      Array of example inputs and expected outputs:
      - input: Object with variable values
      - output: Expected result (can be abbreviated)
      
      Include 1-3 practical examples
-  
+
   9. **Metadata Section:**
      - author: "AI Tools Team"
      - created: "2025-11-16"
      - updated: "2025-11-16"
-  
+
   **Mustache Syntax Reference:**
   ```
   {{variable}}                 - Variable interpolation
@@ -162,20 +162,20 @@ content: |
   {{^variable}}...{{/variable}} - Negative conditional (if not exists/false)
   {{> partial}}                - Include partial/shared file
   ```
-  
+
   **Output Format:**
   - Valid YAML with proper indentation (2 spaces)
   - Use block scalars (|) for multi-line content
   - Include helpful inline comments
   - Follow the schema exactly
   - Save to: prompts/{{category}}/{{prompt_id}}.yml
-  
+
   **Atomic Prompt Principle:**
   Each prompt should have ONE clear purpose. If a prompt tries to do multiple things:
   - Split into multiple prompts
   - Use includes for shared components
   - Compose prompts rather than combining them
-  
+
   **Validation:**
   After creating the file, remind user to run:
   ```bash

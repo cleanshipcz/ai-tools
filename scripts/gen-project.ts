@@ -909,25 +909,25 @@ export class ProjectGenerator {
       return;
     }
 
-    // Create cleanship-recipes inside the tool's config directory
+    // Create .cs.recipes inside the tool's config directory
     const toolOutputDir = join(outputDir, tool);
     let recipesOutputDir: string;
 
     // Tool-specific paths to keep recipes with their tool configs
     if (tool === 'claude-code') {
-      recipesOutputDir = join(toolOutputDir, '.claude', 'cleanship-recipes');
+      recipesOutputDir = join(toolOutputDir, '.claude', '.cs.recipes');
     } else if (tool === 'copilot-cli') {
       // copilot-cli generates AGENTS.md at root, so put recipes alongside
-      recipesOutputDir = join(toolOutputDir, 'cleanship-recipes');
+      recipesOutputDir = join(toolOutputDir, '.cs.recipes');
     } else if (tool === 'cursor') {
-      recipesOutputDir = join(toolOutputDir, '.cursor', 'cleanship-recipes');
+      recipesOutputDir = join(toolOutputDir, '.cursor', '.cs.recipes');
     } else if (tool === 'github-copilot') {
-      recipesOutputDir = join(toolOutputDir, '.github', 'cleanship-recipes');
+      recipesOutputDir = join(toolOutputDir, '.github', '.cs.recipes');
     } else if (tool === 'windsurf') {
-      recipesOutputDir = join(toolOutputDir, '.windsurf', 'cleanship-recipes');
+      recipesOutputDir = join(toolOutputDir, '.windsurf', '.cs.recipes');
     } else {
       // Fallback for unknown tools
-      recipesOutputDir = join(toolOutputDir, 'cleanship-recipes');
+      recipesOutputDir = join(toolOutputDir, '.cs.recipes');
     }
 
     await mkdir(recipesOutputDir, { recursive: true });
@@ -957,17 +957,17 @@ export class ProjectGenerator {
       // Construct readable path based on tool
       let pathDisplay: string;
       if (tool === 'claude-code') {
-        pathDisplay = '.claude/cleanship-recipes/';
+        pathDisplay = '.claude/.cs.recipes/';
       } else if (tool === 'copilot-cli') {
-        pathDisplay = 'cleanship-recipes/ (alongside AGENTS.md)';
+        pathDisplay = '.cs.recipes/ (alongside AGENTS.md)';
       } else if (tool === 'cursor') {
-        pathDisplay = '.cursor/cleanship-recipes/';
+        pathDisplay = '.cursor/.cs.recipes/';
       } else if (tool === 'github-copilot') {
-        pathDisplay = '.github/cleanship-recipes/';
+        pathDisplay = '.github/.cs.recipes/';
       } else if (tool === 'windsurf') {
-        pathDisplay = '.windsurf/cleanship-recipes/';
+        pathDisplay = '.windsurf/.cs.recipes/';
       } else {
-        pathDisplay = 'cleanship-recipes/';
+        pathDisplay = '.cs.recipes/';
       }
       console.log(chalk.gray(`    Generated ${generatedCount} recipe script(s) in ${pathDisplay}`));
     }

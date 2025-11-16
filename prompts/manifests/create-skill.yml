@@ -12,28 +12,28 @@ variables:
   - name: skill_id
     required: true
     description: "Kebab-case unique identifier for the skill (e.g., run-tests, lint-code)"
-  
+
   - name: description
     required: true
     description: "Clear description of what the skill does (10-500 characters)"
-  
+
   - name: command_program
     required: false
     description: "The program/executable to run (e.g., pytest, npm, gradle)"
-  
+
   - name: command_args
     required: false
     description: "Command-line arguments (e.g., 'test --verbose, --coverage')"
-  
+
   - name: mcp_tool
     required: false
     description: "MCP tool ID reference instead of command (e.g., git_operations)"
-  
+
   - name: timeout
     required: false
     description: "Timeout in seconds"
     default: "300"
-  
+
   - name: working_dir
     required: false
     description: "Working directory (default: current directory)"
@@ -52,11 +52,11 @@ rules:
 
 content: |
   Generate a skill.yml manifest for the following skill:
-  
+
   **Skill Details:**
   - ID: {{skill_id}}
   - Description: {{description}}
-  
+
   {{#command_program}}
   **Command:**
   - Program: {{command_program}}
@@ -64,18 +64,18 @@ content: |
   - Arguments: {{command_args}}
   {{/command_args}}
   {{/command_program}}
-  
+
   {{#mcp_tool}}
   **MCP Tool:**
   {{mcp_tool}}
   {{/mcp_tool}}
-  
+
   **Requirements:**
-  
+
   1. **Required Fields:**
      - id: {{skill_id}} (validate kebab-case)
      - description: "{{description}}" (10-500 chars)
-  
+
   2. **Command Section OR MCP Tool (mutually exclusive):**
      
      **Option A - Command Execution:**
@@ -119,7 +119,7 @@ content: |
      mcp_tool: "tool-id"  # Reference to MCP tool (e.g., git_operations)
      ```
      {{/mcp_tool}}
-  
+
   3. **Constraints Section:**
      Array of prerequisites and requirements (2-5 items):
      - Installation requirements (e.g., "Requires pytest to be installed")
@@ -131,7 +131,7 @@ content: |
      - "Requires pytest to be installed."
      - "Requires package.json in working directory."
      - "Java 17 or higher must be installed."
-  
+
   4. **Timeout Section:**
      ```yaml
      timeout_sec: {{timeout}}
@@ -142,7 +142,7 @@ content: |
      - Unit tests: 300 seconds (5 minutes)
      - Integration tests: 600-1800 seconds (10-30 minutes)
      - Build processes: 1800+ seconds (30+ minutes)
-  
+
   5. **Retry Section (optional):**
      For flaky operations (network calls, external services):
      ```yaml
@@ -150,7 +150,7 @@ content: |
        max_attempts: 3
        backoff_ms: 1000  # Milliseconds between retries
      ```
-  
+
   6. **Inputs Section (optional):**
      Array of input parameters for parameterized skills:
      ```yaml
@@ -164,7 +164,7 @@ content: |
          required: false
          description: "Enable verbose output"
      ```
-  
+
   7. **Outputs Section:**
      Specify what to capture:
      ```yaml
@@ -176,46 +176,46 @@ content: |
          - "coverage.xml"
          - "test-results.json"
      ```
-  
+
   8. **Tags Section:**
      Array of relevant tags (3-7 tags):
      - Tool tags: pytest, eslint, gradle, npm, docker
      - Language tags: python, typescript, java, kotlin
      - Category tags: testing, linting, building, formatting
      - Domain tags: unit-test, integration-test, e2e-test
-  
+
   9. **Metadata Section:**
      - author: "AI Tools Team"
      - created: "2025-11-16"
      - updated: "2025-11-16"
-  
+
   **Skill Naming Conventions:**
   - Action-based: `{verb}-{target}` (e.g., run-tests, lint-code, build-project)
   - Tool-based: `run-{tool}` (e.g., run-pytest, run-eslint, run-gradle)
   - Be specific: `run-unit-tests` not just `test`
-  
+
   **Common Skill Patterns:**
-  
+
   **Testing Skills:**
   - Unit tests: `run-pytest`, `run-jest`, `run-junit`
   - Integration tests: `run-integration-tests`
   - E2E tests: `run-e2e-tests`
-  
+
   **Linting/Formatting Skills:**
   - Linters: `run-eslint`, `run-pylint`, `run-ktlint`
   - Formatters: `run-prettier`, `run-black`, `format-code`
-  
+
   **Build Skills:**
   - Compilation: `build-project`, `compile-code`
   - Packaging: `package-app`, `create-bundle`
-  
+
   **Analysis Skills:**
   - Static analysis: `run-sonar`, `analyze-code`
   - Security: `run-security-scan`, `check-vulnerabilities`
-  
+
   **Version Control Skills:**
   - Git operations: `git-status`, `git-diff`, `git-commit`
-  
+
   **Output Format:**
   - Valid YAML with proper indentation (2 spaces)
   - Use array format for args (each arg on its own line with '- ')
@@ -223,7 +223,7 @@ content: |
   - Include helpful inline comments
   - Follow the schema exactly
   - Save to: skills/{{skill_id}}.yml
-  
+
   **Quality Checklist:**
   - [ ] ID is kebab-case and descriptive
   - [ ] Description clearly states what the skill does
@@ -233,9 +233,9 @@ content: |
   - [ ] Outputs section specifies what to capture
   - [ ] Tags accurately describe the skill
   - [ ] Metadata is complete
-  
+
   **Examples:**
-  
+
   **Python Testing Skill:**
   ```yaml
   id: run-pytest
@@ -258,7 +258,7 @@ content: |
     - python
     - testing
   ```
-  
+
   **JavaScript Linting Skill:**
   ```yaml
   id: run-eslint
@@ -280,7 +280,7 @@ content: |
     - javascript
     - linting
   ```
-  
+
   **Validation:**
   After creating the file, remind user to run:
   ```bash

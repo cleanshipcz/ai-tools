@@ -12,35 +12,35 @@ variables:
   - name: feature_id
     required: true
     description: "Kebab-case unique identifier for the feature (e.g., user-authentication)"
-  
+
   - name: feature_name
     required: true
     description: "Human-readable feature name (e.g., User Authentication System)"
-  
+
   - name: description
     required: true
     description: "Brief feature description (10-500 characters)"
-  
+
   - name: overview
     required: false
     description: "Detailed feature overview and purpose"
-  
+
   - name: architecture
     required: false
     description: "Architecture and design notes for the feature"
-  
+
   - name: entry_points
     required: false
     description: "Comma-separated list of main entry point files (e.g., src/auth/index.ts)"
-  
+
   - name: key_files
     required: false
     description: "Comma-separated list of important files (e.g., src/auth/service.ts, src/auth/middleware.ts)"
-  
+
   - name: recipe_id
     required: false
     description: "Recipe ID to bind (e.g., feature-delivery, bug-fix-workflow)"
-  
+
   - name: acceptance_criteria
     required: false
     description: "Specific acceptance criteria for the feature"
@@ -58,50 +58,50 @@ rules:
 
 content: |
   Generate a feature.yml manifest for the following feature:
-  
+
   **Feature Details:**
   - ID: {{feature_id}}
   - Name: {{feature_name}}
   - Description: {{description}}
-  
+
   {{#overview}}
   **Overview:**
   {{overview}}
   {{/overview}}
-  
+
   {{#architecture}}
   **Architecture:**
   {{architecture}}
   {{/architecture}}
-  
+
   {{#entry_points}}
   **Entry Points:**
   {{entry_points}}
   {{/entry_points}}
-  
+
   {{#key_files}}
   **Key Files:**
   {{key_files}}
   {{/key_files}}
-  
+
   **Requirements:**
-  
+
   1. **Required Fields:**
      - id: {{feature_id}} (validate kebab-case)
      - version: 1.0.0 (semver)
      - name: "{{feature_name}}"
      - description: "{{description}}" (10-500 chars)
-  
+
   2. **Context Section:**
      - overview: Detailed feature overview and purpose
      - architecture: Architecture and design approach
      - dependencies: Array of feature dependencies (other features, libraries)
-  
+
   3. **Files Section:**
      - entry_points: Array of main entry point files
      - key_files: Array of important related files
      - patterns: Array of glob patterns to include (e.g., src/auth/**)
-  
+
   4. **Snippets Section:**
      Array of code snippets, each with:
      - id: Kebab-case snippet identifier
@@ -115,7 +115,7 @@ content: |
      - Common usage patterns
      - Integration examples
      - Test examples (if applicable)
-  
+
   5. **Conventions Section:**
      Array of feature-specific conventions (3-8 items):
      - Code patterns to follow
@@ -123,7 +123,7 @@ content: |
      - Error handling approaches
      - Testing strategies
      - Documentation requirements
-  
+
   6. **Recipe Section (if applicable):**
      {{#recipe_id}}
      - id: {{recipe_id}}
@@ -136,21 +136,21 @@ content: |
      {{^recipe_id}}
      (Optional: Bind to feature-delivery, bug-fix-workflow, or custom recipe)
      {{/recipe_id}}
-  
+
   7. **Metadata Section:**
      - status: "draft" (or active, deprecated, archived)
      - owner: Feature owner or team name
      - created: "2025-11-16"
      - updated: "2025-11-16"
      - tags: Relevant tags (e.g., authentication, security, backend)
-  
+
   **Output Format:**
   - Valid YAML with proper indentation (2 spaces)
   - Include helpful inline comments
   - Use string quotes where needed
   - Follow the schema exactly
   - Save to: projects/*/features/{{feature_id}}/feature.yml
-  
+
   **Code Snippet Guidelines:**
   - Keep snippets focused and practical
   - Include enough context to be useful
@@ -158,7 +158,7 @@ content: |
   - Use realistic variable names
   - Show error handling where relevant
   - Demonstrate best practices
-  
+
   **Validation:**
   After creating the file, remind user to run:
   ```bash

@@ -340,23 +340,23 @@ export class FeatureGenerator {
             continue;
           }
 
-          // Put feature scripts in the tool's cleanship-recipes directory
+          // Put feature scripts in the tool's .cs.recipes directory
           // so they're deployed alongside generic recipes
           const toolOutputDir = join(rootDir, '.output', projectId, tool);
 
           let recipesDir: string;
           if (tool === 'claude-code') {
-            recipesDir = join(toolOutputDir, '.claude', 'cleanship-recipes');
+            recipesDir = join(toolOutputDir, '.claude', '.cs.recipes');
           } else if (tool === 'copilot-cli') {
-            recipesDir = join(toolOutputDir, 'cleanship-recipes');
+            recipesDir = join(toolOutputDir, '.cs.recipes');
           } else if (tool === 'cursor') {
-            recipesDir = join(toolOutputDir, '.cursor', 'cleanship-recipes');
+            recipesDir = join(toolOutputDir, '.cursor', '.cs.recipes');
           } else if (tool === 'github-copilot') {
-            recipesDir = join(toolOutputDir, '.github', 'cleanship-recipes');
+            recipesDir = join(toolOutputDir, '.github', '.cs.recipes');
           } else if (tool === 'windsurf') {
-            recipesDir = join(toolOutputDir, '.windsurf', 'cleanship-recipes');
+            recipesDir = join(toolOutputDir, '.windsurf', '.cs.recipes');
           } else {
-            recipesDir = join(toolOutputDir, 'cleanship-recipes');
+            recipesDir = join(toolOutputDir, '.cs.recipes');
           }
 
           await mkdir(recipesDir, { recursive: true });
