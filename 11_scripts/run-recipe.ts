@@ -450,7 +450,7 @@ async function listRecipes(): Promise<void> {
 }
 
 async function generateScript(recipeId: string, tool: string, outputPath?: string): Promise<void> {
-  const recipePath = join(rootDir, 'recipes', `${recipeId}.yml`);
+  const recipePath = join(rootDir, '05_recipes', `${recipeId}.yml`);
   const recipe = await loadRecipe(recipePath);
 
   const scriptPath = outputPath || join(rootDir, '.output', 'scripts', `${recipeId}-${tool}.sh`);
@@ -462,6 +462,18 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
   script += `# Tool: ${tool}\n`;
   script += `# Generated: ${new Date().toISOString()}\n\n`;
   script += 'set -e  # Exit on error\n\n';
+
+  // Setup logging
+  script += '# Setup logging\n';
+  script += 'RECIPE_LOGS_DIR=".recipe-logs"\n';
+  script += 'mkdir -p "$RECIPE_LOGS_DIR"\n';
+  script += `LOG_FILE="$RECIPE_LOGS_DIR/${recipe.id}-$(date +%Y%m%d-%H%M%S).log"\n`;
+  script += 'echo "📝 Logging to: $LOG_FILE"\n';
+  script += 'echo ""\n\n';
+
+  // Start logging with exec and tee
+  script += '# Redirect all output to both console and log file\n';
+  script += 'exec > >(tee -a "$LOG_FILE") 2>&1\n\n';
 
   // Add variables
   if (recipe.variables) {
@@ -592,7 +604,7 @@ async function main() {
       process.exit(1);
     }
 
-    const recipePath = join(rootDir, 'recipes', `${recipeId}.yml`);
+    const recipePath = join(rootDir, '05_recipes', `${recipeId}.yml`);
     const recipe = await loadRecipe(recipePath);
     const runner = new RecipeRunner(recipe, tool);
     await runner.run();

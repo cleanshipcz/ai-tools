@@ -1,7 +1,7 @@
 id: test-infrastructure
 version: 1.0.0
-name: "Automated Test Infrastructure"
-description: "Automated testing system for validating internal functionality and generated outputs with regression test coverage"
+name: 'Automated Test Infrastructure'
+description: 'Automated testing system for validating internal functionality and generated outputs with regression test coverage'
 
 # What this feature is about
 context:
@@ -13,23 +13,23 @@ context:
     This serves as both feature validation and regression test suite for future changes.
 
   dependencies:
-    - "Test framework (agent will select best practice)"
-    - "Existing build system (11_scripts/)"
+    - 'Test framework (agent will select best practice)'
+    - 'Existing build system (11_scripts/)'
 
 # Key files for this feature
 files:
   patterns:
-    - "11_scripts/**/*.test.ts"
-    - "11_scripts/__tests__/**/*"
-    - ".output-test/**/*"
+    - '11_scripts/**/*.test.ts'
+    - '11_scripts/__tests__/**/*'
+    - '.output-test/**/*'
 
 # What success looks like
 conventions:
-  - "Test files mirror source structure: 11_scripts/foo.ts → 11_scripts/foo.test.ts"
-  - "Use .output-test/ directory for generated test outputs (gitignored)"
-  - "Clean up test artifacts after test runs"
-  - "Tests should be fast and deterministic (no flaky tests)"
-  - "Avoid manual testing - automate everything"
+  - 'Test files mirror source structure: 11_scripts/foo.ts → 11_scripts/foo.test.ts'
+  - 'Use .output-test/ directory for generated test outputs (gitignored)'
+  - 'Clean up test artifacts after test runs'
+  - 'Tests should be fast and deterministic (no flaky tests)'
+  - 'Avoid manual testing - automate everything'
 
 # Bind to feature-delivery recipe
 recipe:

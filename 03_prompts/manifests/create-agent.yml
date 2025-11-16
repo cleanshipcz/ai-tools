@@ -11,14 +11,14 @@ tags:
 variables:
   - name: user_description
     required: true
-    description: "Brief description of what the agent should do"
+    description: 'Brief description of what the agent should do'
 
 rules:
-  - "Ask clarifying questions BEFORE generating the manifest"
-  - "Recommend simple, focused definitions; allow complexity when justified"
-  - "Suggest appropriate rulepacks based on domain"
-  - "Use conversational tone to understand intent"
-  - "Recommend concise system prompts (3-5 sentences); allow detail for specialized agents"
+  - 'Ask clarifying questions BEFORE generating the manifest'
+  - 'Recommend simple, focused definitions; allow complexity when justified'
+  - 'Suggest appropriate rulepacks based on domain'
+  - 'Use conversational tone to understand intent'
+  - 'Recommend concise system prompts (3-5 sentences); allow detail for specialized agents'
 
 content: |
   The user wants to create an agent based on this description:
@@ -79,6 +79,6 @@ content: |
   You: [Creates simple ~60 line agent.yml]
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

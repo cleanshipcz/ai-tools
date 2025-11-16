@@ -38,12 +38,12 @@ files:
     - src/middleware/auth/**
 
 conventions:
-  - "Use async/await for all async operations"
-  - "Hash passwords with bcrypt (salt rounds: 10)"
-  - "JWT tokens expire after 24 hours"
-  - "Refresh tokens expire after 7 days"
-  - "Use HTTP-only cookies for refresh tokens"
-  - "Validate all inputs with express-validator"
+  - 'Use async/await for all async operations'
+  - 'Hash passwords with bcrypt (salt rounds: 10)'
+  - 'JWT tokens expire after 24 hours'
+  - 'Refresh tokens expire after 7 days'
+  - 'Use HTTP-only cookies for refresh tokens'
+  - 'Validate all inputs with express-validator'
 
 recipe:
   id: feature-delivery
@@ -173,7 +173,7 @@ snippets:
 metadata:
   status: draft
   owner: ai-tools-team
-  created: "2025-11-15"
+  created: '2025-11-15'
   tags:
     - authentication
     - security

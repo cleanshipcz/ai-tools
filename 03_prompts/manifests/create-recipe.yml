@@ -11,13 +11,13 @@ tags:
 variables:
   - name: user_description
     required: true
-    description: "Brief description of the workflow or process"
+    description: 'Brief description of the workflow or process'
 
 rules:
-  - "Ask clarifying questions BEFORE generating the manifest"
-  - "Recommend keeping workflows simple (3-7 steps) but allow complexity when justified"
-  - "Each step should have one clear purpose"
-  - "Recommend document-first pattern (analysis → plan → implement) for multi-step workflows"
+  - 'Ask clarifying questions BEFORE generating the manifest'
+  - 'Recommend keeping workflows simple (3-7 steps) but allow complexity when justified'
+  - 'Each step should have one clear purpose'
+  - 'Recommend document-first pattern (analysis → plan → implement) for multi-step workflows'
 
 content: |
   The user wants to create a recipe based on this description:

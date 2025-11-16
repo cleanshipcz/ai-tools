@@ -97,6 +97,38 @@ ls -la .cs.recipes/
 # All variables from feature.yml are already set
 ```
 
+## Recipe Execution Logging
+
+All generated recipe scripts automatically log their execution to timestamped files in `.recipe-logs/`:
+
+```bash
+# Run a recipe - output appears on console AND is saved to log
+./.cs.recipes/feature-delivery.sh
+# 📝 Logging to: .recipe-logs/feature-delivery-20251116-150530.log
+
+# View the log later for debugging or audit trail
+cat .recipe-logs/feature-delivery-20251116-150530.log
+```
+
+### How It Works
+
+- **Console Output**: All output appears on console in real-time (using `tee`)
+- **Log Files**: Complete execution log saved to `.recipe-logs/<recipe-id>-<timestamp>.log`
+- **Directory Creation**: `.recipe-logs/` directory is created automatically if it doesn't exist
+- **No Performance Impact**: `tee` efficiently handles both console and file output
+- **Debugging**: Full execution history captured including all agent responses
+
+### Log File Management
+
+The `.recipe-logs/` directory is automatically added to `.gitignore`. You can:
+
+- Keep logs locally for debugging
+- Review past executions
+- Share logs for troubleshooting
+- Delete old logs manually when needed
+
+**Tip:** Keep the last few logs for quick reference when debugging issues.
+
 ## Document Output & Context Maintenance
 
 All recipes now follow a **Document-First Workflow**: analysis and planning steps create documents that are maintained throughout the workflow.

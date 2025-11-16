@@ -1,7 +1,7 @@
 id: claude-code-recipe-fixes
 version: 1.0.0
-name: "Claude Code Recipe Script Generation"
-description: "Fix generated Claude Code recipe scripts to support non-interactive execution, model selection, and tool permissions"
+name: 'Claude Code Recipe Script Generation'
+description: 'Fix generated Claude Code recipe scripts to support non-interactive execution, model selection, and tool permissions'
 
 # What this feature is about
 context:
@@ -18,24 +18,24 @@ context:
     This feature ensures all generated Claude Code recipe scripts include these capabilities.
 
   dependencies:
-    - "11_scripts/gen-features.ts (or similar recipe generation scripts)"
-    - "Claude Code CLI installed"
+    - '11_scripts/gen-features.ts (or similar recipe generation scripts)'
+    - 'Claude Code CLI installed'
 
 # Key files for this feature
 files:
   patterns:
-    - "11_scripts/gen-features.ts"
-    - "11_scripts/run-recipe.ts"
-    - ".claude/.cs.recipes/*.sh"
-    - ".output/*/claude-code/*.sh"
+    - '11_scripts/gen-features.ts'
+    - '11_scripts/run-recipe.ts'
+    - '.claude/.cs.recipes/*.sh'
+    - '.output/*/claude-code/*.sh'
 
 # What success looks like
 conventions:
-  - "Generated scripts should use --print for non-interactive execution"
-  - "Pass --model flag when model is specified in recipe/feature"
-  - "Include --allowed-tools or --tools based on recipe configuration"
-  - "Scripts should run without requiring user interaction"
-  - "Match functionality that Copilot CLI recipes already provide"
+  - 'Generated scripts should use --print for non-interactive execution'
+  - 'Pass --model flag when model is specified in recipe/feature'
+  - 'Include --allowed-tools or --tools based on recipe configuration'
+  - 'Scripts should run without requiring user interaction'
+  - 'Match functionality that Copilot CLI recipes already provide'
 
 # Bind to bug-fix-workflow recipe
 recipe:

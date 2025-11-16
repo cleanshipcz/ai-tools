@@ -11,14 +11,14 @@ tags:
 variables:
   - name: user_description
     required: true
-    description: "Brief description of what the prompt should do"
+    description: 'Brief description of what the prompt should do'
 
 rules:
-  - "Ask clarifying questions BEFORE generating the manifest"
-  - "Keep prompts atomic - one clear purpose only"
-  - "Variable names must be snake_case"
-  - "Use Mustache syntax for variables: {{variable}}"
-  - "Keep the prompt content concise and actionable"
+  - 'Ask clarifying questions BEFORE generating the manifest'
+  - 'Keep prompts atomic - one clear purpose only'
+  - 'Variable names must be snake_case'
+  - 'Use Mustache syntax for variables: {{variable}}'
+  - 'Keep the prompt content concise and actionable'
 
 content: |
   The user wants to create a prompt based on this description:
@@ -86,6 +86,6 @@ outputs:
   format: yaml
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

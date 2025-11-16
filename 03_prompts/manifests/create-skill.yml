@@ -11,13 +11,13 @@ tags:
 variables:
   - name: user_description
     required: true
-    description: "Brief description of the tool or command to integrate"
+    description: 'Brief description of the tool or command to integrate'
 
 rules:
-  - "Ask clarifying questions BEFORE generating the manifest"
-  - "Keep skill definitions simple and focused"
-  - "One command or tool per skill"
-  - "Focus on WHAT the tool does, not HOW to implement it"
+  - 'Ask clarifying questions BEFORE generating the manifest'
+  - 'Keep skill definitions simple and focused'
+  - 'One command or tool per skill'
+  - 'Focus on WHAT the tool does, not HOW to implement it'
 
 content: |
   The user wants to create a skill based on this description:
@@ -72,6 +72,6 @@ outputs:
   format: yaml
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

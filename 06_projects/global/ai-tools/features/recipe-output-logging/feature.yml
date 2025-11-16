@@ -1,0 +1,87 @@
+id: recipe-output-logging
+version: 1.0.0
+name: 'Recipe Output Logging to File and Console'
+description: 'Capture recipe execution output to both stdout and log files for debugging and audit purposes'
+
+# What this feature is about
+context:
+  overview: |
+    Currently, recipe scripts only output to stdout, making it difficult to:
+    - Debug failed recipe runs after the fact
+    - Audit what changes were made during execution
+    - Review long multi-step recipe outputs
+
+    This feature modifies generated recipe scripts to use the 'tee' command for dual output:
+    - Console output remains visible in real-time
+    - Full execution log saved to file for later review
+    - Logs organized by recipe name and timestamp
+
+  dependencies:
+    - '11_scripts/gen-project.ts (recipe script generation)'
+    - '11_scripts/gen-features.ts (feature recipe generation)'
+    - 'Standard Unix tee command (available on Linux/macOS)'
+
+# Key files for this feature
+files:
+  patterns:
+    - '11_scripts/gen-project.ts'
+    - '11_scripts/gen-features.ts'
+    - '.recipe-logs/*.log'
+    - '.gitignore'
+
+# What success looks like
+conventions:
+  - 'Generated scripts pipe output through tee command'
+  - 'Logs stored in .recipe-logs/<recipe-name>-<timestamp>.log'
+  - 'Console output remains visible during execution'
+  - '.recipe-logs/ directory is gitignored'
+  - 'Log files include full output with timestamps'
+  - 'Works for all tool types (copilot-cli, claude-code, cursor)'
+
+# Bind to feature-delivery recipe
+recipe:
+  id: feature-delivery
+  context:
+    feature_description: |
+      Modify recipe script generation to capture output to both console and log file.
+
+      Current behavior:
+      - Recipe scripts output only to stdout
+      - No persistent log of recipe execution
+      - Difficult to debug issues after completion
+
+      Expected behavior:
+      - Recipe scripts create .recipe-logs/ directory if not exists
+      - Generate log filename: .recipe-logs/<recipe-id>-<timestamp>.log
+      - Use tee to duplicate output: command | tee -a logfile
+      - Console remains interactive and responsive
+      - Full execution captured including all agent responses
+
+      Implementation approach:
+      - Add header to generated scripts that sets up logging
+      - Wrap main script execution with tee redirection: command | tee -a logfile
+      - Add .recipe-logs/ to .gitignore
+      - Optionally add log cleanup strategy (keep last N logs)
+
+    acceptance_criteria: |
+      - Generated recipe scripts create .recipe-logs/ directory
+      - Each execution generates timestamped log file
+      - Console output remains visible in real-time
+      - Log files contain complete execution output
+      - .recipe-logs/ added to .gitignore
+      - Works for both global and feature-bound recipes
+      - Works for all tool types (copilot-cli, claude-code, cursor)
+      - Existing recipes regenerated with logging support
+      - No performance degradation (tee is efficient)
+
+# Metadata
+metadata:
+  status: draft
+  owner: ai-tools-core
+  created: 2025-11-16
+  updated: 2025-11-16
+  tags:
+    - recipes
+    - logging
+    - debugging
+    - developer-experience

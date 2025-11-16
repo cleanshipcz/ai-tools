@@ -11,13 +11,13 @@ tags:
 variables:
   - name: user_description
     required: true
-    description: "Brief description of the coding standards or rules needed"
+    description: 'Brief description of the coding standards or rules needed'
 
 rules:
-  - "Ask clarifying questions BEFORE generating the manifest"
-  - "Keep rules specific and actionable"
-  - "Group rules by category for clarity"
-  - "Focus on WHAT to do, not extensive HOW"
+  - 'Ask clarifying questions BEFORE generating the manifest'
+  - 'Keep rules specific and actionable'
+  - 'Group rules by category for clarity'
+  - 'Focus on WHAT to do, not extensive HOW'
 
 content: |
   The user wants to create a rulepack based on this description:
@@ -72,6 +72,6 @@ outputs:
   format: yaml
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

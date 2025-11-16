@@ -189,6 +189,137 @@ describe('ProjectGenerator - Recipe Script Generation', () => {
       expect(script).not.toContain('--agent');
     });
   });
+
+  describe('Recipe logging feature', () => {
+    it('should include logging setup in generated scripts', async () => {
+      const generator = new ProjectGenerator();
+      const mockRecipe = {
+        id: 'test-recipe',
+        description: 'Test recipe',
+        steps: [
+          {
+            id: 'test-step',
+            agent: 'bug-fixer',
+            task: 'Fix the bug',
+          },
+        ],
+      };
+
+      const script = await (generator as any).buildRecipeScript(mockRecipe, 'copilot-cli', null);
+
+      // Should create .recipe-logs directory
+      expect(script).toContain('RECIPE_LOGS_DIR=".recipe-logs"');
+      expect(script).toContain('mkdir -p "$RECIPE_LOGS_DIR"');
+
+      // Should generate timestamped log filename
+      expect(script).toContain(
+        'LOG_FILE="$RECIPE_LOGS_DIR/test-recipe-$(date +%Y%m%d-%H%M%S).log"'
+      );
+
+      // Should show log file location
+      expect(script).toContain('echo "📝 Logging to: $LOG_FILE"');
+
+      // Should use exec with tee for logging
+      expect(script).toContain('exec > >(tee -a "$LOG_FILE") 2>&1');
+    });
+
+    it('should include logging setup in feature-bound recipe scripts', async () => {
+      const { FeatureGenerator } = await import('./gen-features.js');
+      const generator = new FeatureGenerator();
+
+      const mockFeature = {
+        id: 'test-feature',
+        name: 'Test Feature',
+        version: '1.0.0',
+        description: 'Test',
+        recipe: {
+          id: 'test-recipe',
+          context: {},
+        },
+      };
+
+      const mockRecipe = {
+        id: 'test-recipe',
+        description: 'Test recipe',
+        steps: [
+          {
+            id: 'test-step',
+            agent: 'bug-fixer',
+            task: 'Fix the bug',
+          },
+        ],
+      };
+
+      const script = await (generator as any).buildFeatureRecipeScript(
+        mockFeature,
+        mockRecipe,
+        'copilot-cli'
+      );
+
+      // Should create .recipe-logs directory
+      expect(script).toContain('RECIPE_LOGS_DIR=".recipe-logs"');
+      expect(script).toContain('mkdir -p "$RECIPE_LOGS_DIR"');
+
+      // Should generate timestamped log filename with feature prefix
+      expect(script).toContain(
+        'LOG_FILE="$RECIPE_LOGS_DIR/feature-test-feature-$(date +%Y%m%d-%H%M%S).log"'
+      );
+
+      // Should use exec with tee for logging
+      expect(script).toContain('exec > >(tee -a "$LOG_FILE") 2>&1');
+    });
+
+    it('should work for all tool types', async () => {
+      const generator = new ProjectGenerator();
+      const mockRecipe = {
+        id: 'test-recipe',
+        description: 'Test recipe',
+        steps: [
+          {
+            id: 'test-step',
+            agent: 'bug-fixer',
+            task: 'Fix the bug',
+          },
+        ],
+      };
+
+      const tools = ['claude-code', 'copilot-cli', 'cursor'];
+
+      for (const tool of tools) {
+        const script = await (generator as any).buildRecipeScript(mockRecipe, tool, null);
+        expect(script).toContain('RECIPE_LOGS_DIR=".recipe-logs"');
+        expect(script).toContain('exec > >(tee -a "$LOG_FILE") 2>&1');
+      }
+    });
+
+    it('should place logging setup before variable declarations', async () => {
+      const generator = new ProjectGenerator();
+      const mockRecipe = {
+        id: 'test-recipe',
+        description: 'Test recipe',
+        variables: {
+          test_var: 'test_value',
+        },
+        steps: [
+          {
+            id: 'test-step',
+            agent: 'bug-fixer',
+            task: 'Fix the bug',
+          },
+        ],
+      };
+
+      const script = await (generator as any).buildRecipeScript(mockRecipe, 'copilot-cli', null);
+
+      // Logging should come before variables
+      const loggingPos = script.indexOf('RECIPE_LOGS_DIR');
+      const variablesPos = script.indexOf('# Variables');
+
+      expect(loggingPos).toBeGreaterThan(0);
+      expect(variablesPos).toBeGreaterThan(0);
+      expect(loggingPos).toBeLessThan(variablesPos);
+    });
+  });
 });
 
 /**

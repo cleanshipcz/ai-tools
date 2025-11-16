@@ -1095,6 +1095,18 @@ export class ProjectGenerator {
     script += `# Generated: ${new Date().toISOString()}\n\n`;
     script += 'set -e  # Exit on error\n\n';
 
+    // Setup logging
+    script += '# Setup logging\n';
+    script += 'RECIPE_LOGS_DIR=".recipe-logs"\n';
+    script += 'mkdir -p "$RECIPE_LOGS_DIR"\n';
+    script += `LOG_FILE="$RECIPE_LOGS_DIR/${recipe.id}-$(date +%Y%m%d-%H%M%S).log"\n`;
+    script += 'echo "📝 Logging to: $LOG_FILE"\n';
+    script += 'echo ""\n\n';
+
+    // Start logging with exec and tee
+    script += '# Redirect all output to both console and log file\n';
+    script += 'exec > >(tee -a "$LOG_FILE") 2>&1\n\n';
+
     // Add feature context variables if provided
     if (featureContext) {
       script += '# Feature Context\n';

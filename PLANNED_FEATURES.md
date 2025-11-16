@@ -161,7 +161,6 @@ The effective model is displayed in generated outputs for all tools (GitHub Copi
   - is the folder not present or empty? continue:
     - is the folder mentioned in .gitignore or .git/info/exclude? yes -> continue, no -> add it to .git/info/exclude and continue
 
-
 ## Other features NOT NOW
 
 - [ ] More tool adapters (Cody, Neovim, JetBrains AI)
