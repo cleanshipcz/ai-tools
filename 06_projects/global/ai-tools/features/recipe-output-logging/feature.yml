@@ -76,7 +76,7 @@ recipe:
 
 # Metadata
 metadata:
-  status: draft
+  status: active
   owner: ai-tools-core
   created: 2025-11-16
   updated: 2025-11-16
