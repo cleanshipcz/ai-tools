@@ -14,7 +14,7 @@ capabilities:
 defaults:
   temperature: 0.6
   style: technical
-  model: claude-3-5-sonnet
+  model: claude-4-5-sonnet
 prompt:
   system: |
     You are an expert prompt engineer and AI system designer specializing in the ai-tools

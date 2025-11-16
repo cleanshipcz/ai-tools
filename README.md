@@ -331,7 +331,7 @@ capabilities:
   - mcp:filesystem
 defaults:
   temperature: 0.3
-  model: claude-3-5-sonnet
+  model: claude-4-5-sonnet
 prompt:
   system: |
     You are a specialized assistant for...
@@ -782,7 +782,7 @@ providers:
     default_model: gpt-4-turbo-preview
   anthropic:
     api_key: ${ANTHROPIC_API_KEY}
-    default_model: claude-3-5-sonnet-20241022
+    default_model: claude-4-5-sonnet-20241022
 ```
 
 ### Budget Configuration

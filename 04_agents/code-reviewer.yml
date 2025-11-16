@@ -14,7 +14,7 @@ capabilities:
 defaults:
   temperature: 0.2
   style: terse
-  model: claude-3-5-sonnet
+  model: claude-4-5-sonnet
 prompt:
   system: |
     You are a senior software engineer conducting a thorough code review.
@@ -56,12 +56,12 @@ tools:
   - read-file
   - search-code
 constraints:
-  - 'Do not approve code with security vulnerabilities.'
-  - 'Flag missing test coverage for new functionality.'
-  - 'Suggest specific improvements, not just criticism.'
+  - "Do not approve code with security vulnerabilities."
+  - "Flag missing test coverage for new functionality."
+  - "Suggest specific improvements, not just criticism."
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-01-01'
+  author: "AI Tools Team"
+  created: "2025-01-01"
   tags:
     - review
     - quality

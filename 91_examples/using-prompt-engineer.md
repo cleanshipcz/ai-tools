@@ -114,7 +114,7 @@ capabilities:
 defaults:
   temperature: 0.5
   style: conversational
-  model: claude-3-5-sonnet
+  model: claude-4-5-sonnet
 prompt:
   system: |
     You are a technical documentation specialist focused on creating clear,

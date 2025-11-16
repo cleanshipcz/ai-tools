@@ -177,6 +177,10 @@ ai_tools:
     - base
     - coding-typescript
 
+  whitelist_recipes:
+    - feature-delivery
+    - major-refactoring-cycle
+
   custom_rules:
     - "Always use chalk for colored terminal output"
     - "Use Ajv with ajv-formats for JSON Schema validation"

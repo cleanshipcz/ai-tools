@@ -59,7 +59,7 @@ capabilities:
   - mcp:git
 defaults:
   temperature: 0.7
-  model: claude-3-5-sonnet
+  model: claude-4-5-sonnet
 prompt:
   system: |
     System instructions

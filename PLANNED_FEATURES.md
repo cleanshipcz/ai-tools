@@ -97,6 +97,19 @@ See [`05_recipes/README.md`](../05_recipes/README.md) for complete documentation
 - [x] Organization agent -> good in organizing files, folders, documents, topics, etc.
 - [x] Organize this repository -> add enumerated prefix for folders (e.g. 01_rulepacks, 02_skills, ..., 90_docs)
 
+## Model selection
+
+- prompts can have default model defined
+- agents can have default model defined
+- project can define model (optional, if defined overrides agent default)
+- feature can define model (optional, if defined overrides agent and project default)
+
+## Fully automated tests
+
+- unit tests
+- integration tests
+- end-to-end (deployment) tests
+
 ## Other features NOT NOW
 
 - [ ] More tool adapters (Cody, Neovim, JetBrains AI)
