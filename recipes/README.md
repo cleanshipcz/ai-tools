@@ -97,13 +97,56 @@ ls -la .cs.recipes/
 # All variables from feature.yml are already set
 ```
 
+## Document Output & Context Maintenance
+
+All recipes now follow a **Document-First Workflow**: analysis and planning steps create documents that are maintained throughout the workflow.
+
+### How It Works
+
+1. **Analysis Step**: First step analyzes the codebase/changes and outputs to a document (e.g., `.recipe-docs/analysis.md`)
+2. **Planning Step**: Creates a detailed plan based on analysis, outputs to document (e.g., `.recipe-docs/plan.md`)
+3. **Context Maintenance**: All subsequent steps include these documents in their context automatically
+4. **Persistent Reference**: Documents serve as the "source of truth" throughout the workflow
+
+### Benefits
+
+- **Consistency**: All agents work from the same analysis and plan
+- **Traceability**: Documents provide an audit trail of decisions
+- **Quality**: Better implementation by following well-thought-out plans
+- **Debugging**: Easy to review what was analyzed and planned vs. what was implemented
+
+### Example Step with Document Output
+
+```yaml
+steps:
+  - id: analyze
+    agent: project-planner
+    task: |
+      Analyze the codebase for the following feature...
+    outputDocument: ".recipe-docs/analysis.md"  # AI saves response here
+    
+  - id: implement
+    agent: feature-builder
+    task: |
+      Implement the feature...
+    includeDocuments:  # These docs are included in the task context
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
+```
+
+### Document Directory
+
+All recipe documents are saved to `.recipe-docs/` in your project root. This directory is typically gitignored but can be committed if you want to track analysis/planning decisions.
+
 ## Creating Custom Recipes
 
 1. Create `recipes/my-recipe.yml`
 2. Define workflow steps with agents and tasks
-3. Add loops as needed (all iterations run automatically)
-4. Validate: `npm run validate`
-5. Test: `npm run recipe:run my-recipe`
+3. **Add analysis and planning steps first** with `outputDocument`
+4. Include documents in subsequent steps with `includeDocuments`
+5. Add loops as needed (all iterations run automatically)
+6. Validate: `npm run validate`
+7. Test: `npm run recipe:run my-recipe`
 
 **Conversation Strategy:**
 
@@ -155,9 +198,16 @@ npm run recipe:run feature-delivery copilot-cli
 
 Complete feature implementation workflow with iterative review cycles.
 
-**Flow:** Implement → Review → Refactor (3x) → Verify → Document
+**Flow:** Analyze → Plan → Implement → Review → Refactor (3x) → Verify → Document
+
+**Key Features:**
+
+- **Analysis Step**: Analyzes codebase and documents affected areas (saved to `.recipe-docs/analysis.md`)
+- **Planning Step**: Creates detailed implementation plan (saved to `.recipe-docs/plan.md`)
+- **Context Maintenance**: Analysis and plan documents are included in all subsequent steps
 
 **Variables:**
+
 - `FEATURE_DESCRIPTION` - Feature requirements
 - `ACCEPTANCE_CRITERIA` - Success criteria
 
@@ -167,15 +217,31 @@ Complete feature implementation workflow with iterative review cycles.
 
 **Conversation:** Separate (each agent starts fresh)
 
+**Documents Generated:**
+
+- `.recipe-docs/analysis.md` - Comprehensive codebase analysis
+- `.recipe-docs/plan.md` - Detailed implementation plan
+
 ---
 
 ### code-review-cycle.yml
 
 Iterative code review and improvement until quality standards are met.
 
-**Flow:** Review → Fix → Verify → Loop until quality threshold (8+/10)
+**Flow:** Analyze Changes → Create Checklist → Review → Fix → Verify → Loop until quality threshold (8+/10)
+
+**Key Features:**
+
+- **Analysis Step**: Analyzes all changes and their impact (saved to `.recipe-docs/changes-analysis.md`)
+- **Checklist Step**: Creates custom review checklist based on changes (saved to `.recipe-docs/review-checklist.md`)
+- **Context Maintenance**: Analysis and checklist guide all review and fix iterations
 
 **Tools:** claude-code, copilot-cli, cursor
+
+**Documents Generated:**
+
+- `.recipe-docs/changes-analysis.md` - Comprehensive change analysis
+- `.recipe-docs/review-checklist.md` - Custom review checklist
 
 ---
 
@@ -183,27 +249,51 @@ Iterative code review and improvement until quality standards are met.
 
 Systematic bug fixing with investigation, testing, and verification.
 
-**Flow:** Investigate → Fix → Test → Review → Document
+**Flow:** Analyze Bug → Plan Fix → Investigate → Implement → Test → Review → Document
+
+**Key Features:**
+
+- **Analysis Step**: Comprehensive bug analysis with root cause investigation (saved to `.recipe-docs/bug-analysis.md`)
+- **Planning Step**: Detailed fix plan with test cases (saved to `.recipe-docs/fix-plan.md`)
+- **Context Maintenance**: Analysis and plan documents guide all fix implementation steps
 
 **Variables:**
+
 - `BUG_DESCRIPTION` - Bug details
 - `REPRODUCTION_STEPS` - How to reproduce
 
 **Tools:** claude-code, copilot-cli
 
+**Documents Generated:**
+
+- `.recipe-docs/bug-analysis.md` - Comprehensive bug analysis
+- `.recipe-docs/fix-plan.md` - Detailed fix plan with tests
+
 ## Schema Reference
 
 All recipes must conform to [`schemas/recipe.schema.json`](../schemas/recipe.schema.json).
 
-Required fields:
+**Required fields:**
+
 - `id` - Unique kebab-case identifier
 - `version` - Semantic version
 - `description` - What the recipe accomplishes
 - `steps` - Array of workflow steps with agents and tasks
 
-Optional fields:
+**Optional recipe-level fields:**
 
 - `conversationStrategy` - `'separate'` (default) or `'continue'`
 - `toolOptions` - Tool-specific command-line options (e.g., `allowAllTools` for copilot-cli)
 - `loop` - Define iterative workflows with `steps` and `maxIterations`
 - `variables` - Define inputs for the recipe
+
+**Step fields:**
+
+- `id` - Unique step identifier (required)
+- `agent` - Agent ID to use (required)
+- `task` - Task description or prompt (required)
+- `outputDocument` - Path where AI response should be saved (e.g., `.recipe-docs/analysis.md`)
+- `includeDocuments` - Array of document paths to include in step context
+- `continueConversation` - Whether to continue same conversation (default: true)
+- `waitForConfirmation` - Wait for user confirmation before continuing (default: false)
+- `condition` - Conditional execution logic

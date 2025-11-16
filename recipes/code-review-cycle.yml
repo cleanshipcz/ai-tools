@@ -11,12 +11,50 @@ tools:
   - cursor
 
 steps:
+  - id: analyze-changes
+    agent: code-reviewer
+    task: |
+      Analyze all current changes in detail.
+
+      Document:
+      1. All files that have been modified
+      2. The purpose and scope of each change
+      3. Dependencies and integrations affected
+      4. Potential impact on existing functionality
+      5. Areas of complexity or risk
+      6. Testing requirements
+
+      Output a comprehensive analysis of the changes.
+    outputDocument: ".recipe-docs/changes-analysis.md"
+    continueConversation: false
+    waitForConfirmation: false
+
+  - id: create-review-checklist
+    agent: code-reviewer
+    task: |
+      Based on the changes analysis, create a detailed review checklist.
+
+      Include specific checks for:
+      1. Code quality issues to look for
+      2. Edge cases that must be tested
+      3. Security considerations specific to these changes
+      4. Performance implications
+      5. Documentation requirements
+      6. Integration points to verify
+
+      Output a structured review checklist document.
+    outputDocument: ".recipe-docs/review-checklist.md"
+    includeDocuments:
+      - ".recipe-docs/changes-analysis.md"
+    continueConversation: true
+    waitForConfirmation: false
+
   - id: initial-review
     agent: code-reviewer
     task: |
-      Perform a comprehensive code review of the current changes.
+      Perform a comprehensive code review using the review checklist.
 
-      Review checklist:
+      Review against checklist:
       - Code quality and maintainability
       - Design patterns and architecture
       - Error handling and edge cases
@@ -28,7 +66,10 @@ steps:
 
       Provide specific, actionable feedback organized by priority (Critical, High, Medium, Low).
       Rate overall quality on a scale of 1-10.
-    continueConversation: false
+    includeDocuments:
+      - ".recipe-docs/changes-analysis.md"
+      - ".recipe-docs/review-checklist.md"
+    continueConversation: true
     waitForConfirmation: false
 
   - id: apply-fixes
@@ -41,24 +82,32 @@ steps:
       - Add tests if applicable
       - Update documentation if needed
 
+      Reference the analysis and checklist to ensure thorough fixes.
       Summarize the changes made.
+    includeDocuments:
+      - ".recipe-docs/changes-analysis.md"
+      - ".recipe-docs/review-checklist.md"
     continueConversation: true
     waitForConfirmation: false
 
   - id: verify-fixes
     agent: code-reviewer
     task: |
-      Verify that the issues have been properly addressed.
+      Verify that the issues have been properly addressed against the checklist.
 
       Check:
       - All Critical issues are resolved
       - All High priority issues are resolved
       - New code follows best practices
       - Tests are adequate
+      - All checklist items are satisfied
 
       Respond with:
       - "PASS" if all issues are resolved and quality is acceptable (8+/10)
       - "CONTINUE" with remaining issues if more work is needed
+    includeDocuments:
+      - ".recipe-docs/changes-analysis.md"
+      - ".recipe-docs/review-checklist.md"
     continueConversation: true
     waitForConfirmation: true
 

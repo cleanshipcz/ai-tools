@@ -69,6 +69,17 @@
             "type": "object",
             "description": "Input variables for the task/prompt template"
           },
+          "outputDocument": {
+            "type": "string",
+            "description": "Path where the output of this step should be saved as a document (relative to project root)"
+          },
+          "includeDocuments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of document paths to include in this step's context"
+          },
           "continueConversation": {
             "type": "boolean",
             "default": true,

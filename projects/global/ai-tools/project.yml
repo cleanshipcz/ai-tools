@@ -160,10 +160,13 @@ ai_tools:
     # QA prompts
     - qa/write-tests
     # Manifest prompts
-    - manifest/create-prompt
-    - manifest/create-agent
-    - manifest/create-project
-    - manifest/create-feature
+    - manifests/create-prompt
+    - manifests/create-agent
+    - manifests/create-project
+    - manifests/create-feature
+    - manifests/create-rulepack
+    - manifests/create-skill
+    - manifests/create-recipe
 
   preferred_rulepacks:
     - base

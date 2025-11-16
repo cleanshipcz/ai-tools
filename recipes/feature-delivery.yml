@@ -23,30 +23,80 @@ variables:
   acceptance_criteria: "{{ACCEPTANCE_CRITERIA}}"
 
 steps:
-  - id: implement
-    agent: feature-builder
+  - id: analyze
+    agent: project-planner
     task: |
-      Implement the following feature:
+      Analyze the following feature request in detail:
 
       Feature: {{feature_description}}
 
       Acceptance Criteria:
       {{acceptance_criteria}}
 
-      Please implement this feature following best practices, including:
+      Please analyze:
+      1. The relevant parts of the codebase that will be affected
+      2. Dependencies and integrations involved
+      3. Potential challenges and risks
+      4. Technical considerations (architecture, patterns, security, performance)
+      5. Required changes to existing code
+      6. New files or modules that need to be created
+
+      Output your analysis as a comprehensive document covering all these aspects.
+    outputDocument: ".recipe-docs/analysis.md"
+    continueConversation: false
+    waitForConfirmation: false
+
+  - id: plan
+    agent: project-planner
+    task: |
+      Based on the analysis, create a detailed implementation plan for:
+
+      Feature: {{feature_description}}
+
+      Create a step-by-step plan that includes:
+      1. Order of implementation (which files/modules to create/modify first)
+      2. Specific code changes needed in each file
+      3. Test cases to be written
+      4. Edge cases to handle
+      5. Documentation updates needed
+      6. Estimated complexity for each step
+
+      Output your plan as a structured, actionable document that can guide implementation.
+    outputDocument: ".recipe-docs/plan.md"
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+    continueConversation: true
+    waitForConfirmation: true
+
+  - id: implement
+    agent: feature-builder
+    task: |
+      Implement the following feature according to the analysis and plan:
+
+      Feature: {{feature_description}}
+
+      Acceptance Criteria:
+      {{acceptance_criteria}}
+
+      Follow the implementation plan and analysis documents carefully.
+      Implement the feature with:
       - Clean, maintainable code
       - Proper error handling
       - Comprehensive tests
       - Documentation for public APIs
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
     continueConversation: false
     waitForConfirmation: false
 
   - id: review
     agent: code-reviewer
     task: |
-      Review the changes made in the previous step.
+      Review the changes made in the previous step against the plan and acceptance criteria.
 
       Focus on:
+      - Adherence to the implementation plan
       - Code quality and maintainability
       - Test coverage and quality
       - Security concerns
@@ -54,6 +104,9 @@ steps:
       - Documentation completeness
 
       Provide specific, actionable feedback.
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
     continueConversation: true
     waitForConfirmation: false
 
@@ -67,6 +120,10 @@ steps:
       - Improve code quality as suggested
       - Add missing tests or documentation
       - Ensure all acceptance criteria are met
+      - Stay aligned with the original plan
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
     continueConversation: true
     waitForConfirmation: false
 

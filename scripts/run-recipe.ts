@@ -17,6 +17,8 @@ interface RecipeStep {
   task: string;
   prompt?: string;
   inputs?: Record<string, string>;
+  outputDocument?: string;
+  includeDocuments?: string[];
   continueConversation?: boolean;
   waitForConfirmation?: boolean;
   condition?: {
@@ -67,6 +69,7 @@ class RecipeRunner {
   private conversationId?: string;
   private outputFile: string;
   private rl: readline.Interface;
+  private documents: Map<string, string> = new Map();
 
   constructor(recipe: Recipe, tool: 'claude-code' | 'copilot-cli' | 'cursor') {
     this.recipe = recipe;
@@ -251,10 +254,34 @@ class RecipeRunner {
       }
     }
 
+    // Include documents in task context if specified
+    if (step.includeDocuments && step.includeDocuments.length > 0) {
+      task += '\n\n--- Reference Documents ---\n';
+      for (const docPath of step.includeDocuments) {
+        const docContent = this.documents.get(docPath);
+        if (docContent) {
+          task += `\n\n**Document: ${docPath}**\n\n${docContent}\n`;
+        } else {
+          console.log(chalk.yellow(`   ⚠️  Document not found: ${docPath}`));
+        }
+      }
+    }
+
+    // Add output document instruction if specified
+    if (step.outputDocument) {
+      task += `\n\n**IMPORTANT**: Save your complete response to the file: ${step.outputDocument}`;
+      console.log(chalk.gray(`   📄 Output will be saved to: ${step.outputDocument}`));
+    }
+
     console.log(chalk.gray(`\n${task}\n`));
 
     // Execute based on tool
     await this.executeWithTool(step.agent, task, step.continueConversation !== false);
+
+    // If this step has an output document, ask user to save it
+    if (step.outputDocument) {
+      await this.saveDocument(step.outputDocument);
+    }
   }
 
   private async executeWithTool(
@@ -374,6 +401,30 @@ class RecipeRunner {
       });
     });
   }
+
+  private async saveDocument(docPath: string): Promise<void> {
+    console.log(chalk.yellow(`\n📝 Please save the AI's response to: ${docPath}`));
+    console.log(
+      chalk.gray(
+        '   Ensure the document is created in your project directory with the full output.'
+      )
+    );
+
+    await this.askUser('Press Enter once the document has been saved...');
+
+    // Try to read the document to cache it for future steps
+    try {
+      const content = await readFile(join(process.cwd(), docPath), 'utf-8');
+      this.documents.set(docPath, content);
+      console.log(chalk.green(`   ✓ Document loaded and cached: ${docPath}`));
+    } catch (error) {
+      console.log(
+        chalk.yellow(
+          `   ⚠️  Could not read document: ${docPath}. It will not be available for subsequent steps.`
+        )
+      );
+    }
+  }
 }
 
 async function loadRecipe(recipePath: string): Promise<Recipe> {
@@ -437,21 +488,51 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
       }
     }
 
+    // Include documents in task if specified
+    if (step.includeDocuments && step.includeDocuments.length > 0) {
+      script += `# Include reference documents\n`;
+      task += '\\n\\n--- Reference Documents ---\\n';
+      for (const docPath of step.includeDocuments) {
+        script += `if [ -f "${docPath}" ]; then\n`;
+        script += `  DOC_CONTENT=$(cat "${docPath}")\n`;
+        task += `\\n\\n**Document: ${docPath}**\\n\\n\${DOC_CONTENT}\\n`;
+        script += `fi\n`;
+      }
+    }
+
+    // Add output document instruction if specified
+    if (step.outputDocument) {
+      task += `\\n\\n**IMPORTANT**: Save your complete response to the file: ${step.outputDocument}`;
+      script += `echo "📄 Output will be saved to: ${step.outputDocument}"\n`;
+      script += `mkdir -p $(dirname "${step.outputDocument}")\n`;
+    }
+
     // Generate tool-specific command
     if (tool === 'claude-code') {
       const continueFlag =
         step.continueConversation !== false && i > 0 ? '-c $CONVERSATION_ID' : '';
       script += `RESPONSE=$(claude ${continueFlag} --agent ${step.agent} "${task.replace(/"/g, '\\"')}")\n`;
       script += `echo "$RESPONSE"\n`;
+      if (step.outputDocument) {
+        script += `echo "$RESPONSE" > "${step.outputDocument}"\n`;
+        script += `echo "✓ Document saved: ${step.outputDocument}"\n`;
+      }
       if (i === 0) {
         script += `CONVERSATION_ID=$(echo "$RESPONSE" | grep -oP 'Conversation ID: \\K[a-zA-Z0-9-]+')\n`;
       }
     } else if (tool === 'copilot-cli') {
       script += `echo "@${step.agent} ${task}" | copilot\n`;
+      if (step.outputDocument) {
+        script += `echo "📝 Please save the response to: ${step.outputDocument}"\n`;
+        script += `read -p "Press Enter once saved..."\n`;
+      }
     } else if (tool === 'cursor') {
       script += `# Manual: Open Cursor Composer and execute:\n`;
       script += `# @${step.agent} ${task}\n`;
       script += `echo "⚠️  Please execute in Cursor Composer and press Enter"\n`;
+      if (step.outputDocument) {
+        script += `echo "📝 Save the response to: ${step.outputDocument}"\n`;
+      }
       script += `read -p "Continue? "\n`;
     }
 

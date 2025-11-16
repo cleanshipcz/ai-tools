@@ -14,61 +14,117 @@ variables:
   reproduction_steps: "{{REPRODUCTION_STEPS}}"
 
 steps:
-  - id: investigate
+  - id: analyze-bug
     agent: bug-fixer
     task: |
-      Investigate the following bug:
+      Perform a comprehensive analysis of the following bug:
 
       Bug: {{bug_description}}
 
       Reproduction Steps:
       {{reproduction_steps}}
 
-      Please:
-      1. Analyze the codebase to locate the root cause
-      2. Explain why the bug occurs
-      3. Propose a fix strategy
+      Analyze and document:
+      1. All relevant code sections that could be related to the bug
+      2. Data flow and execution paths leading to the issue
+      3. State and variable values at the point of failure
+      4. Potential root causes (list all possibilities)
+      5. Impact assessment (what else might be affected)
+      6. Related bugs or edge cases that should be checked
+
+      Output a detailed analysis document.
+    outputDocument: ".recipe-docs/bug-analysis.md"
     continueConversation: false
+    waitForConfirmation: false
+
+  - id: plan-fix
+    agent: bug-fixer
+    task: |
+      Based on the bug analysis, create a detailed fix plan:
+
+      Create a plan that includes:
+      1. Confirmed root cause
+      2. Specific code changes required
+      3. Test cases to verify the fix
+      4. Regression tests to ensure no side effects
+      5. Edge cases to handle
+      6. Documentation updates needed
+
+      Output a structured fix plan document.
+    outputDocument: ".recipe-docs/fix-plan.md"
+    includeDocuments:
+      - ".recipe-docs/bug-analysis.md"
+    continueConversation: true
+    waitForConfirmation: true
+
+  - id: investigate
+    agent: bug-fixer
+    task: |
+      Review the analysis and fix plan to confirm the approach:
+
+      Bug: {{bug_description}}
+
+      Verify:
+      1. The root cause has been correctly identified
+      2. The fix strategy is sound and minimal
+      3. No regressions will be introduced
+
+      Provide confirmation or suggest adjustments to the plan.
+    includeDocuments:
+      - ".recipe-docs/bug-analysis.md"
+      - ".recipe-docs/fix-plan.md"
+    continueConversation: true
     waitForConfirmation: true
 
   - id: implement-fix
     agent: bug-fixer
     task: |
-      Implement the fix for the bug based on the investigation.
+      Implement the fix for the bug following the fix plan.
 
       Ensure:
-      - The root cause is addressed, not just symptoms
+      - The root cause is addressed per the plan, not just symptoms
       - No regressions are introduced
       - Existing tests still pass
       - Add a test case that would have caught this bug
+      - Follow the exact approach outlined in the fix plan
+    includeDocuments:
+      - ".recipe-docs/bug-analysis.md"
+      - ".recipe-docs/fix-plan.md"
     continueConversation: true
     waitForConfirmation: false
 
   - id: test-verification
     agent: bug-fixer
     task: |
-      Verify the bug fix by:
-      1. Running all existing tests
-      2. Testing the reproduction steps
-      3. Testing edge cases
-      4. Checking for potential regressions
+      Verify the bug fix according to the test plan:
+      1. Run all existing tests
+      2. Test the reproduction steps from the original bug report
+      3. Test all edge cases identified in the analysis
+      4. Check for potential regressions
 
       Report test results and confirm the bug is fixed.
+    includeDocuments:
+      - ".recipe-docs/bug-analysis.md"
+      - ".recipe-docs/fix-plan.md"
     continueConversation: true
     waitForConfirmation: true
 
   - id: review-fix
     agent: code-reviewer
     task: |
-      Review the bug fix implementation.
+      Review the bug fix implementation against the plan and analysis.
 
       Check:
-      - Fix addresses root cause
+      - Fix addresses root cause identified in analysis
+      - Implementation follows the fix plan
       - No regressions introduced
-      - Test coverage is adequate
+      - Test coverage is adequate per the plan
       - Code quality is maintained
 
       Respond with "APPROVED" or provide feedback.
+    includeDocuments:
+      - ".recipe-docs/bug-analysis.md"
+      - ".recipe-docs/fix-plan.md"
     continueConversation: true
     waitForConfirmation: false
 

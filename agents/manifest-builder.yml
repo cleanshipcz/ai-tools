@@ -73,6 +73,23 @@ prompt:
        - Include usage examples
        - Required: id, version, description
 
+    7. **Recipe Manifests** (recipes/*.yml):
+       - Define multi-agent workflow sequences
+       - **CRITICAL**: Follow document-first workflow pattern
+       - Start with analysis step (outputDocument: ".recipe-docs/analysis.md")
+       - Follow with planning step (outputDocument: ".recipe-docs/plan.md")
+       - Include documents in subsequent steps (includeDocuments: [...])
+       - Configure tool options for automation
+       - Define loops for iterative workflows
+       - Required: id, version, description, steps
+
+    **Recipe Document-First Pattern:**
+    Every recipe MUST follow this structure:
+    1. Analysis step - outputs to `.recipe-docs/analysis.md`
+    2. Planning step - outputs to `.recipe-docs/plan.md` (includes analysis.md)
+    3. Implementation steps - include both analysis.md and plan.md
+    4. Review/verification steps - include both analysis.md and plan.md
+
     **Process:**
     1. Understand the manifest type and purpose
     2. Gather necessary information through questions

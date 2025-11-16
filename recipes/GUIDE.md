@@ -190,11 +190,27 @@ Done
 ```yaml
 steps:
   - id: step-name
-    agent: agent-id           # Which agent to use
-    task: Task description    # What the agent should do
+    agent: agent-id              # Which agent to use
+    task: Task description       # What the agent should do
+    outputDocument: ".recipe-docs/output.md"  # Save AI response to file
+    includeDocuments:            # Include these docs in context
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
     continueConversation: true   # Continue from previous step
     waitForConfirmation: false   # Wait for user (not implemented)
 ```
+
+**`outputDocument`:**
+- Path where the AI's complete response should be saved
+- Typically in `.recipe-docs/` directory
+- Used for analysis, plans, checklists, etc.
+- Document is cached and available to subsequent steps
+
+**`includeDocuments`:**
+- Array of document paths to include in the step's context
+- Documents are appended to the task description
+- Ensures all agents work from the same analysis/plan
+- Essential for maintaining consistency across steps
 
 **`continueConversation`:**
 - Only matters when `conversationStrategy: continue`
@@ -347,6 +363,8 @@ claude -c $CONVERSATION_ID --agent agent-name "task"
 vim recipes/my-workflow.yml
 ```
 
+**Follow the document-first pattern:**
+
 ```yaml
 id: my-workflow
 version: 1.0.0
@@ -355,9 +373,43 @@ tools:
   - copilot-cli
 
 steps:
-  - id: step-1
-    agent: agent-name
-    task: What the agent should do
+  # 1. Analysis step - understand the problem
+  - id: analyze
+    agent: project-planner
+    task: |
+      Analyze the codebase to understand...
+      Document all relevant areas, dependencies, and considerations.
+    outputDocument: ".recipe-docs/analysis.md"
+    
+  # 2. Planning step - create detailed plan
+  - id: plan
+    agent: project-planner
+    task: |
+      Create a detailed action plan based on the analysis.
+      Include step-by-step approach and expected outcomes.
+    outputDocument: ".recipe-docs/plan.md"
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+  
+  # 3. Implementation - execute the plan
+  - id: implement
+    agent: feature-builder
+    task: |
+      Implement according to the plan.
+      Follow the analysis and plan documents carefully.
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
+      
+  # 4. Review - verify against plan
+  - id: review
+    agent: code-reviewer
+    task: |
+      Review the implementation.
+      Verify it matches the plan and addresses the analysis.
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
 ```
 
 ### Step 2: Validate
@@ -458,11 +510,75 @@ grep "agent:" recipes/my-recipe.yml
 
 ### Recipe Design
 
-1. **Single Responsibility** - Each recipe should accomplish one clear goal
-2. **Atomic Steps** - Break work into discrete, verifiable steps
-3. **Clear Tasks** - Be specific about what each agent should do
-4. **Appropriate Loops** - Use loops for review cycles, not general iteration
-5. **Separate Conversations** - Default to `conversationStrategy: separate`
+1. **Document-First Workflow** - Start with analysis and planning steps that output to documents
+2. **Single Responsibility** - Each recipe should accomplish one clear goal
+3. **Atomic Steps** - Break work into discrete, verifiable steps
+4. **Clear Tasks** - Be specific about what each agent should do
+5. **Appropriate Loops** - Use loops for review cycles, not general iteration
+6. **Separate Conversations** - Default to `conversationStrategy: separate`
+7. **Context Maintenance** - Include analysis/plan documents in all subsequent steps
+
+### Document-First Workflow Pattern
+
+**Every recipe should follow this pattern:**
+
+1. **Analysis Step** - Understand the problem/codebase
+   - Agent: Usually `project-planner`, `bug-fixer`, or `code-reviewer`
+   - Output: `.recipe-docs/analysis.md` or `.recipe-docs/changes-analysis.md`
+   - Purpose: Comprehensive understanding before action
+
+2. **Planning Step** - Create detailed action plan
+   - Agent: Usually `project-planner`, `bug-fixer`, or `code-reviewer`
+   - Output: `.recipe-docs/plan.md` or `.recipe-docs/fix-plan.md`
+   - Input: Include the analysis document
+   - Purpose: Structured approach before implementation
+
+3. **Implementation Steps** - Execute the plan
+   - Agent: Usually `feature-builder`, `refactoring-specialist`, etc.
+   - Input: Include both analysis and plan documents
+   - Purpose: Implement according to well-thought-out plan
+
+4. **Review/Verification Steps** - Ensure quality
+   - Agent: Usually `code-reviewer`, `tdd-navigator`, etc.
+   - Input: Include analysis and plan documents
+   - Purpose: Verify implementation matches plan and requirements
+
+**Example Pattern:**
+
+```yaml
+steps:
+  - id: analyze
+    agent: project-planner
+    task: Analyze the codebase for implementing {{feature_name}}
+    outputDocument: ".recipe-docs/analysis.md"
+    
+  - id: plan
+    agent: project-planner
+    task: Create detailed implementation plan for {{feature_name}}
+    outputDocument: ".recipe-docs/plan.md"
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+    
+  - id: implement
+    agent: feature-builder
+    task: Implement {{feature_name}} following the plan
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
+    
+  - id: review
+    agent: code-reviewer
+    task: Review implementation against the plan
+    includeDocuments:
+      - ".recipe-docs/analysis.md"
+      - ".recipe-docs/plan.md"
+```
+
+**Benefits:**
+- **Consistency** - All agents reference the same source of truth
+- **Quality** - Better implementations from well-researched plans
+- **Traceability** - Clear record of what was analyzed vs. implemented
+- **Debugging** - Easy to see where implementation deviated from plan
 
 ### Naming Conventions
 
@@ -543,6 +659,8 @@ Full schema: [`../schemas/recipe.schema.json`](../schemas/recipe.schema.json)
   id: string                     // Required: kebab-case
   agent: string                  // Required: agent ID
   task: string                   // Required: task description
+  outputDocument?: string        // Save AI response to this file path
+  includeDocuments?: string[]    // Include these docs in step context
   continueConversation?: boolean // Default: true
   waitForConfirmation?: boolean  // Not fully implemented
   condition?: Condition          // Basic support
