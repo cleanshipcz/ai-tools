@@ -126,6 +126,19 @@
               }
             },
             "description": "Condition for executing this step"
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "claude-sonnet-4.5",
+              "claude-sonnet-4",
+              "claude-haiku-4.5",
+              "gpt-5",
+              "gpt-5.1",
+              "gpt-5.1-codex-mini",
+              "gpt-5.1-codex"
+            ],
+            "description": "AI model to use for this specific step (overrides recipe-level model)"
           }
         }
       },
@@ -229,8 +242,49 @@
         },
         "claude-code": {
           "type": "object",
-          "properties": {},
-          "description": "Options for Claude Code CLI (reserved for future use)"
+          "properties": {
+            "allowedTools": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ],
+              "description": "Allowed tools (comma-separated string or array, --allowed-tools)"
+            },
+            "disallowedTools": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ],
+              "description": "Disallowed tools (comma-separated string or array, --disallowed-tools)"
+            },
+            "allowAllTools": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allow all tools without confirmation"
+            },
+            "addDirs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Additional directories to allow tool access to (--add-dir)"
+            }
+          },
+          "description": "Options for Claude Code CLI"
         }
       },
       "description": "Tool-specific command-line options"
@@ -257,6 +311,19 @@
       "enum": ["separate", "continue"],
       "default": "separate",
       "description": "How to handle conversation context between steps"
+    },
+    "model": {
+      "type": "string",
+      "enum": [
+        "claude-sonnet-4.5",
+        "claude-sonnet-4",
+        "claude-haiku-4.5",
+        "gpt-5",
+        "gpt-5.1",
+        "gpt-5.1-codex-mini",
+        "gpt-5.1-codex"
+      ],
+      "description": "Default AI model to use for all steps in this recipe (can be overridden per step)"
     }
   }
 }

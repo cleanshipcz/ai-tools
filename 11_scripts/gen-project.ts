@@ -70,10 +70,80 @@ interface PromptInfo {
   path: string; // e.g., "refactor/extract-method"
 }
 
+interface Agent {
+  id: string;
+  version: string;
+  purpose: string;
+  description?: string;
+  rulepacks?: string[];
+  defaults?: {
+    temperature?: number;
+    model?: AIModel;
+    style?: string;
+  };
+  prompt?: {
+    system?: string;
+    user_template?: string;
+  };
+  tools?: string[];
+  constraints?: string[];
+  metadata?: {
+    author?: string;
+    created?: string;
+    updated?: string;
+    tags?: string[];
+  };
+}
+
+interface Recipe {
+  id: string;
+  version: string;
+  description: string;
+  tags?: string[];
+  tools?: string[];
+  conversationStrategy?: string;
+  toolOptions?: Record<string, any>;
+  variables?: Record<string, string>;
+  model?: AIModel;
+  steps: RecipeStep[];
+  loop?: {
+    steps: string[];
+    maxIterations?: number;
+  };
+  metadata?: {
+    author?: string;
+    created?: string;
+  };
+}
+
+interface RecipeStep {
+  id: string;
+  agent: string;
+  task: string;
+  model?: AIModel;
+  outputDocument?: string;
+  includeDocuments?: string[];
+  continueConversation?: boolean;
+  waitForConfirmation?: boolean;
+  condition?: {
+    type: string;
+    check?: {
+      type: string;
+      value?: string;
+    };
+  };
+}
+
 export class ProjectGenerator {
   private project: Project | null = null;
   private projectDir: string = '';
   private promptsMap = new Map<string, string>(); // Maps prompt ID to its path
+  private agentsCache = new Map<string, Agent>(); // Cache loaded agents
+
+  // Public method to allow sharing agent loading logic
+  public async loadAgentById(agentId: string): Promise<Agent | null> {
+    return this.loadAgent(agentId);
+  }
 
   async generate(projectId: string, tools: string[] = ['all']): Promise<void> {
     console.log(chalk.blue(`\n🔨 Generating project configurations for: ${projectId}\n`));
@@ -240,6 +310,25 @@ export class ProjectGenerator {
       }
     } catch (error) {
       // Prompts directory might not exist
+    }
+  }
+
+  private async loadAgent(agentId: string): Promise<Agent | null> {
+    // Check cache first
+    if (this.agentsCache.has(agentId)) {
+      return this.agentsCache.get(agentId)!;
+    }
+
+    // Load from file
+    const agentPath = join(rootDir, '04_agents', `${agentId}.yml`);
+    try {
+      const content = await readFile(agentPath, 'utf-8');
+      const agent = loadYaml(content) as Agent;
+      this.agentsCache.set(agentId, agent);
+      return agent;
+    } catch (error) {
+      console.warn(chalk.yellow(`    ! Warning: Agent ${agentId} not found`));
+      return null;
     }
   }
 
@@ -994,11 +1083,11 @@ export class ProjectGenerator {
   }
 
   private async generateRecipeScript(recipe: any, tool: string, scriptPath: string): Promise<void> {
-    const script = this.buildRecipeScript(recipe, tool, null);
+    const script = await this.buildRecipeScript(recipe, tool, null);
     await writeFile(scriptPath, script, { mode: 0o755 });
   }
 
-  private buildRecipeScript(recipe: any, tool: string, featureContext: any): string {
+  private async buildRecipeScript(recipe: any, tool: string, featureContext: any): Promise<string> {
     let script = '#!/bin/bash\n';
     script += `# Auto-generated recipe script: ${recipe.id}\n`;
     script += `# Description: ${recipe.description}\n`;
@@ -1056,13 +1145,14 @@ export class ProjectGenerator {
 
     // Generate pre-loop steps
     for (let i = 0; i < preLoopSteps.length; i++) {
-      script += this.generateStepScript(
+      script += await this.generateStepScript(
         preLoopSteps[i],
         i,
         tool,
         recipe.variables,
         conversationStrategy,
-        toolOptions
+        toolOptions,
+        recipe
       );
     }
 
@@ -1076,18 +1166,19 @@ export class ProjectGenerator {
       script += `  \n`;
 
       for (let i = 0; i < loopSteps.length; i++) {
-        const stepScript = this.generateStepScript(
+        const stepScript = await this.generateStepScript(
           loopSteps[i],
           i,
           tool,
           recipe.variables,
           conversationStrategy,
-          toolOptions
+          toolOptions,
+          recipe
         );
         // Indent loop content
         script += stepScript
           .split('\n')
-          .map((line) => (line ? `  ${line}` : line))
+          .map((line: string) => (line ? `  ${line}` : line))
           .join('\n');
       }
 
@@ -1097,13 +1188,14 @@ export class ProjectGenerator {
     // Generate post-loop steps
     const baseStepNum = preLoopSteps.length + (recipe.loop ? 1 : 0);
     for (let i = 0; i < postLoopSteps.length; i++) {
-      script += this.generateStepScript(
+      script += await this.generateStepScript(
         postLoopSteps[i],
         baseStepNum + i,
         tool,
         recipe.variables,
         conversationStrategy,
-        toolOptions
+        toolOptions,
+        recipe
       );
     }
 
@@ -1111,14 +1203,52 @@ export class ProjectGenerator {
     return script;
   }
 
-  private generateStepScript(
+  // Static helper for agent loading (can be used by other generators)
+  public static async loadAgentStatic(agentId: string): Promise<Agent | null> {
+    const agentPath = join(rootDir, '04_agents', `${agentId}.yml`);
+    try {
+      const content = await readFile(agentPath, 'utf-8');
+      const agent = loadYaml(content) as Agent;
+      return agent;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  private async generateStepScript(
     step: any,
     index: number,
     tool: string,
     variables: any,
     conversationStrategy: string = 'separate',
-    toolOptions?: any
-  ): string {
+    toolOptions?: any,
+    recipe?: any
+  ): Promise<string> {
+    // Use shared static method
+    return ProjectGenerator.generateStepScriptStatic(
+      step,
+      index,
+      tool,
+      variables,
+      conversationStrategy,
+      toolOptions,
+      recipe,
+      (agentId) => this.loadAgent(agentId)
+    );
+  }
+
+  // Shared static method for generating step scripts
+  // Can be used by both ProjectGenerator and FeatureGenerator
+  public static async generateStepScriptStatic(
+    step: any,
+    index: number,
+    tool: string,
+    variables: any,
+    conversationStrategy: string = 'separate',
+    toolOptions?: any,
+    recipe?: any,
+    loadAgentFn?: (agentId: string) => Promise<Agent | null>
+  ): Promise<string> {
     let script = '';
 
     script += `# Step: ${step.id}\n`;
@@ -1138,12 +1268,54 @@ export class ProjectGenerator {
 
     // Generate tool-specific command with response capture
     if (tool === 'claude-code') {
-      const continueFlag = shouldContinue ? '-c $CONVERSATION_ID' : '';
-      script += `RESPONSE=$(claude ${continueFlag} --agent ${step.agent} "${task.replace(/"/g, '\\"')}")\n`;
-      script += `echo "$RESPONSE"\n`;
-      if (index === 0 && conversationStrategy === 'continue') {
-        script += `CONVERSATION_ID=$(echo "$RESPONSE" | grep -oP 'Conversation ID: \\K[a-zA-Z0-9-]+')\n`;
+      const flags: string[] = [];
+
+      // Continuation
+      if (shouldContinue) {
+        flags.push('--continue');
       }
+
+      // Model selection (step-level > recipe-level > agent default)
+      const model = step.model || recipe?.model;
+      if (model) {
+        flags.push(`--model "${model}"`);
+      }
+
+      // Load agent definition to get system prompt
+      const loadAgent = loadAgentFn || ProjectGenerator.loadAgentStatic;
+      const agent = await loadAgent(step.agent);
+      if (agent?.prompt?.system) {
+        // Escape system prompt for bash
+        const systemPrompt = agent.prompt.system.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+        flags.push(`--system-prompt "${systemPrompt}"`);
+      }
+
+      // Tool permissions from toolOptions
+      if (toolOptions?.['claude-code']) {
+        const opts = toolOptions['claude-code'];
+        if (opts.allowedTools) {
+          const tools = Array.isArray(opts.allowedTools)
+            ? opts.allowedTools.join(',')
+            : opts.allowedTools;
+          flags.push(`--allowed-tools "${tools}"`);
+        }
+        if (opts.disallowedTools) {
+          const tools = Array.isArray(opts.disallowedTools)
+            ? opts.disallowedTools.join(',')
+            : opts.disallowedTools;
+          flags.push(`--disallowed-tools "${tools}"`);
+        }
+        if (opts.allowAllTools) {
+          flags.push('--allow-all-tools');
+        }
+      }
+
+      // Non-interactive mode (use --print for scripting)
+      flags.push('--print');
+
+      const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
+      script += `RESPONSE=$(claude${flagsStr} "${task.replace(/"/g, '\\"')}")\n`;
+      script += `echo "$RESPONSE"\n`;
     } else if (tool === 'copilot-cli') {
       const flags: string[] = [];
 

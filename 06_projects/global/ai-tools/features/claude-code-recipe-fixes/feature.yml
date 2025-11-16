@@ -1,0 +1,83 @@
+id: claude-code-recipe-fixes
+version: 1.0.0
+name: "Claude Code Recipe Script Generation"
+description: "Fix generated Claude Code recipe scripts to support non-interactive execution, model selection, and tool permissions"
+
+# What this feature is about
+context:
+  overview: |
+    Generated recipe scripts for Claude Code are missing critical CLI flags that Copilot CLI recipes already have.
+    Scripts need to run non-interactively with proper model selection and tool permissions.
+
+    Claude Code supports:
+    - --print flag for non-interactive output
+    - --model <model> for model selection
+    - --allowed-tools or --tools for tool permissions
+    - --output-format for structured output
+
+    This feature ensures all generated Claude Code recipe scripts include these capabilities.
+
+  dependencies:
+    - "11_scripts/gen-features.ts (or similar recipe generation scripts)"
+    - "Claude Code CLI installed"
+
+# Key files for this feature
+files:
+  patterns:
+    - "11_scripts/gen-features.ts"
+    - "11_scripts/run-recipe.ts"
+    - ".claude/.cs.recipes/*.sh"
+    - ".output/*/claude-code/*.sh"
+
+# What success looks like
+conventions:
+  - "Generated scripts should use --print for non-interactive execution"
+  - "Pass --model flag when model is specified in recipe/feature"
+  - "Include --allowed-tools or --tools based on recipe configuration"
+  - "Scripts should run without requiring user interaction"
+  - "Match functionality that Copilot CLI recipes already provide"
+
+# Bind to bug-fix-workflow recipe
+recipe:
+  id: bug-fix-workflow
+  context:
+    feature_description: |
+      Fix the Claude Code recipe script generation to include proper CLI flags.
+
+      Current behavior:
+      - Generated scripts are missing --print flag (interactive mode)
+      - Model selection not passed through
+      - Tool permissions not configured
+
+      Expected behavior:
+      - Scripts include --print for non-interactive execution
+      - When model specified: add --model <model> flag
+      - When tools configured: add --allowed-tools or --tools flag
+      - Scripts should match Copilot CLI recipe capabilities
+
+      Implementation:
+      - Locate the script generation code for Claude Code (likely in gen-features.ts or run-recipe.ts)
+      - Add --print flag to all generated claude commands
+      - Add conditional --model flag when model is present
+      - Add conditional tool flags when tools are configured
+      - Test with existing recipe scripts to ensure they run non-interactively
+
+    acceptance_criteria: |
+      - All generated Claude Code recipe scripts include --print flag
+      - Model selection passed via --model when specified
+      - Tool permissions configured via --allowed-tools or --tools
+      - Scripts run non-interactively without user prompts
+      - Existing recipes regenerated and tested
+      - Scripts match functionality of Copilot CLI recipes
+
+# Metadata
+metadata:
+  status: draft
+  owner: ai-tools-core
+  created: 2025-11-16
+  updated: 2025-11-16
+  tags:
+    - bug-fix
+    - claude-code
+    - recipes
+    - automation

@@ -4,6 +4,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { load as loadYaml } from 'js-yaml';
 import chalk from 'chalk';
+import { ProjectGenerator } from './gen-project.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -477,11 +478,15 @@ export class FeatureGenerator {
     tool: string,
     scriptPath: string
   ): Promise<void> {
-    const script = this.buildFeatureRecipeScript(feature, recipe, tool);
+    const script = await this.buildFeatureRecipeScript(feature, recipe, tool);
     await writeFile(scriptPath, script, { mode: 0o755 });
   }
 
-  private buildFeatureRecipeScript(feature: Feature, recipe: any, tool: string): string {
+  private async buildFeatureRecipeScript(
+    feature: Feature,
+    recipe: any,
+    tool: string
+  ): Promise<string> {
     // Resolve model from hierarchy (feature > project > agent)
     const resolvedModel = this.resolveModel(feature);
 
@@ -560,13 +565,14 @@ export class FeatureGenerator {
 
     // Generate pre-loop steps
     for (let i = 0; i < preLoopSteps.length; i++) {
-      script += this.generateStepScript(
+      script += await ProjectGenerator.generateStepScriptStatic(
         preLoopSteps[i],
         i,
         tool,
         recipe.variables,
         conversationStrategy,
-        toolOptions
+        toolOptions,
+        recipe
       );
     }
 
@@ -580,18 +586,19 @@ export class FeatureGenerator {
       script += `  \n`;
 
       for (let i = 0; i < loopSteps.length; i++) {
-        const stepScript = this.generateStepScript(
+        const stepScript = await ProjectGenerator.generateStepScriptStatic(
           loopSteps[i],
           i,
           tool,
           recipe.variables,
           conversationStrategy,
-          toolOptions
+          toolOptions,
+          recipe
         );
         // Indent loop content
         script += stepScript
           .split('\n')
-          .map((line) => (line ? `  ${line}` : line))
+          .map((line: string) => (line ? `  ${line}` : line))
           .join('\n');
       }
 
@@ -601,119 +608,18 @@ export class FeatureGenerator {
     // Generate post-loop steps
     const baseStepNum = preLoopSteps.length + (recipe.loop ? 1 : 0);
     for (let i = 0; i < postLoopSteps.length; i++) {
-      script += this.generateStepScript(
+      script += await ProjectGenerator.generateStepScriptStatic(
         postLoopSteps[i],
         baseStepNum + i,
         tool,
         recipe.variables,
         conversationStrategy,
-        toolOptions
+        toolOptions,
+        recipe
       );
     }
 
     script += `echo "✅ Feature '${feature.name}' workflow completed!"\n`;
-    return script;
-  }
-
-  private generateStepScript(
-    step: any,
-    index: number,
-    tool: string,
-    variables: any,
-    conversationStrategy: string = 'separate',
-    toolOptions?: any
-  ): string {
-    let script = '';
-
-    script += `# Step: ${step.id}\n`;
-    script += `echo "▶️  ${step.id} (${step.agent})"\n`;
-
-    // Interpolate variables in task
-    let task = step.task;
-    if (variables) {
-      for (const key of Object.keys(variables)) {
-        task = task.replace(new RegExp(`{{${key}}}`, 'g'), `\${${key.toUpperCase()}}`);
-      }
-    }
-
-    // Determine if should continue conversation based on strategy
-    const shouldContinue =
-      conversationStrategy === 'continue' && step.continueConversation !== false && index > 0;
-
-    // Generate tool-specific command with response capture
-    if (tool === 'claude-code') {
-      const continueFlag = shouldContinue ? '-c $CONVERSATION_ID' : '';
-      script += `RESPONSE=$(claude ${continueFlag} --agent ${step.agent} "${task.replace(/"/g, '\\"')}")\n`;
-      script += `echo "$RESPONSE"\n`;
-      if (index === 0 && conversationStrategy === 'continue') {
-        script += `CONVERSATION_ID=$(echo "$RESPONSE" | grep -oP 'Conversation ID: \\K[a-zA-Z0-9-]+')\n`;
-      }
-    } else if (tool === 'copilot-cli') {
-      const flags: string[] = [];
-
-      if (shouldContinue) {
-        flags.push('--continue');
-      }
-
-      // Add model flag if MODEL variable is set
-      script += `      # Use feature-configured model if available\n`;
-      script += `      if [ -n "$MODEL" ]; then\n`;
-      script += `        MODEL_FLAG="--model $MODEL"\n`;
-      script += `      else\n`;
-      script += `        MODEL_FLAG=""\n`;
-      script += `      fi\n`;
-
-      // Add tool-specific options
-      if (toolOptions?.['copilot-cli']) {
-        const opts = toolOptions['copilot-cli'];
-        if (opts.allowAllTools) flags.push('--allow-all-tools');
-        if (opts.allowAllPaths) flags.push('--allow-all-paths');
-        if (opts.disallowTempDir) flags.push('--disallow-temp-dir');
-        if (opts.addDirs) {
-          opts.addDirs.forEach((dir: string) => flags.push(`--add-dir "${dir}"`));
-        }
-        if (opts.allowTools) {
-          opts.allowTools.forEach((tool: string) => flags.push(`--allow-tool "${tool}"`));
-        }
-        if (opts.denyTools) {
-          opts.denyTools.forEach((tool: string) => flags.push(`--deny-tool "${tool}"`));
-        }
-      }
-
-      const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
-      // Store task in variable to handle multi-line content properly
-      // Don't escape $ in ${VAR} patterns (bash variables), only standalone $
-      const escapedTask = task
-        .replace(/\\/g, '\\\\')
-        .replace(/"/g, '\\"')
-        .replace(/\$(?![{])/g, '\\$') // Escape $ only if not followed by {
-        .replace(/`/g, '\\`');
-      script += `TASK="@${step.agent} ${escapedTask}"\n`;
-      script += `RESPONSE=$(copilot -p "$TASK" $MODEL_FLAG${flagsStr})\n`;
-      script += `echo "$RESPONSE"\n`;
-    } else if (tool === 'cursor') {
-      script += `# Manual: Open Cursor Composer and execute:\n`;
-      script += `# @${step.agent} ${task}\n`;
-      script += `echo "⚠️  Please execute in Cursor Composer and press Enter"\n`;
-      script += `read -p "Continue? "\n`;
-      script += `RESPONSE=""\n`;
-    }
-
-    // Handle conditional execution
-    if (step.condition) {
-      if (step.condition.type === 'on-success' && step.condition.check) {
-        const check = step.condition.check;
-        if (check.type === 'contains' && check.value) {
-          script += `\n# Check condition\n`;
-          script += `if [[ ! "$RESPONSE" == *"${check.value}"* ]]; then\n`;
-          script += `  echo "⚠️  Condition not met (expected: ${check.value})"\n`;
-          script += `  exit 1\n`;
-          script += `fi\n`;
-        }
-      }
-    }
-
-    script += '\n';
     return script;
   }
 }
