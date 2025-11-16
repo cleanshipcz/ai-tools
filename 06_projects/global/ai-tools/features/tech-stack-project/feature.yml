@@ -1,0 +1,63 @@
+id: tech-stack-project
+version: 1.0.0
+name: "Tech-Stack Project Filtering"
+description: "Filter rulepacks by project tech-stack to reduce noise - TypeScript projects see only TypeScript rules, not Python or Kotlin"
+
+context:
+  overview: |
+    Currently all agents contain all rulepacks. A TypeScript project gets Python, Kotlin, Java rules mixed in.
+    This clogs the context window unnecessarily.
+
+    Solution: Projects declare their tech-stack (typescript, python, kotlin, etc).
+    When generating agents/prompts for that project, include only rulepacks tagged for those technologies.
+
+    Example:
+    - Project with tech_stack: [typescript] → feature-builder only includes coding-typescript rules
+    - Project with tech_stack: [typescript, python] → feature-builder includes coding-typescript and coding-python
+    - Project with tech_stack: [kotlin] → feature-builder only includes coding-kotlin rules
+
+files:
+  patterns:
+    - "10_schemas/rulepack.schema.json"
+    - "10_schemas/project.schema.json"
+    - "11_scripts/gen-project.ts"
+    - "01_rulepacks/*.yml"
+
+conventions:
+  - "Each rulepack must declare which tech-stacks it applies to via tags field"
+  - "Projects declare their tech-stack as array of language/tech names"
+  - "When generating adapters, filter rulepacks by matching tech-stack"
+  - "Backward compatible: projects without tech_stack declaration get all rulepacks"
+
+recipe:
+  id: feature-delivery
+  context:
+    feature_description: |
+      Filter generated agents/prompts to only include rulepacks matching the project tech-stack.
+
+      Current: feature-builder for any project includes coding-python, coding-typescript, coding-kotlin, coding-java
+      Desired: feature-builder for typescript project only includes coding-typescript
+
+      Changes needed:
+      1. Rulepack schema: Add tech_stacks array field listing which languages/techs this rulepack applies to
+      2. Project schema: Confirm tech_stack field exists for declaring project technologies
+      3. gen-project.ts: Modify shouldIncludeRulepack() to filter by tech-stack match
+      4. Update all rulepacks with appropriate tech_stacks tags
+      5. Update ai-tools project.yml tech_stack field
+
+    acceptance_criteria: |
+      - Rulepack schema supports tech_stacks array field
+      - gen-project.ts filters rulepacks when project has tech_stack declared
+      - All rulepacks tagged with tech_stacks (python, typescript, kotlin, java, etc)
+      - Generated agents contain only matching rulepacks
+      - Backward compatible: projects without tech_stack still work
+      - All tests pass
+
+metadata:
+  status: draft
+  owner: ai-tools-core
+  created: 2025-11-16
+  tags:
+    - filtering
+    - rulepacks
+    - tech-stack
