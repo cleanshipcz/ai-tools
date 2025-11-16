@@ -92,13 +92,13 @@ export class FeatureGenerator {
 
   private async findProjectDir(projectId: string): Promise<string | null> {
     // Check global
-    let projectDir = join(rootDir, 'projects', 'global', projectId);
+    let projectDir = join(rootDir, '06_projects', 'global', projectId);
     try {
       await access(projectDir);
       return projectDir;
     } catch {
       // Try local
-      projectDir = join(rootDir, 'projects', 'local', projectId);
+      projectDir = join(rootDir, '06_projects', 'local', projectId);
       try {
         await access(projectDir);
         return projectDir;
