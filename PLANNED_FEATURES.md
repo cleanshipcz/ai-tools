@@ -138,11 +138,29 @@ model: gpt-5.1-codex
 
 The effective model is displayed in generated outputs for all tools (GitHub Copilot, Windsurf, Claude Code, Cursor).
 
-## Fully automated tests
+## Test infrastructure
 
-- unit tests
-- integration tests
-- end-to-end (deployment) tests
+- the project needs to be testable in an automated way
+  - test internal functionality with unit tests
+  - test output generation in a .gitignored test folder (cleanup after test run)
+    - generate outputs for all the tools and features (prompts, agents, recipes) and validate the results
+  - avoid manual testing (whatever you think you would execute as a manual test, automate it instead)
+  - should also serve as regression test suite for future changes
+
+## Tech-stack project
+
+- project defines a tech stack
+- prompts & agents for that project are generated with rulepacks relevant only for that tech stack
+  - currently e.g. the feature-builder has all python, typescript, kotlin and java rules
+- project can have multiple tech stacks (e.g. backend, frontend, infra, mobile, etc)
+
+## Deployment ignored
+
+- when deploying to an external project, for each deployed folder check:
+  - is the folder present? yes -> throw error
+  - is the folder not present or empty? continue:
+    - is the folder mentioned in .gitignore or .git/info/exclude? yes -> continue, no -> add it to .git/info/exclude and continue
+
 
 ## Other features NOT NOW
 
