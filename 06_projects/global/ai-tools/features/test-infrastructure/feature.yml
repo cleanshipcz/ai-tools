@@ -426,9 +426,9 @@ recipe:
       **Requirements:**
 
       1. **Install Test Framework Dependencies**:
-         ```bash
+         bash
          npm install --save-dev vitest @vitest/coverage-v8 @vitest/ui
-         ```
+         
 
       2. **Create vitest.config.ts**:
          - Set up TypeScript/Node environment
@@ -438,11 +438,11 @@ recipe:
          - Include only 11_scripts/**/*.test.ts files
 
       3. **Update package.json Scripts**:
-         - `test`: Run tests once (vitest run)
-         - `test:watch`: Run tests in watch mode (vitest)
-         - `test:coverage`: Run tests with coverage report (vitest run --coverage)
-         - `test:ui`: Run tests with UI (vitest --ui)
-         - Update `ci` script to include test:coverage
+         - test: Run tests once (vitest run)
+         - test:watch: Run tests in watch mode (vitest)
+         - test:coverage: Run tests with coverage report (vitest run --coverage)
+         - test:ui: Run tests with UI (vitest --ui)
+         - Update ci script to include test:coverage
 
       4. **Create Test Utilities Module** (11_scripts/test-utils.ts):
          - createTestDir() - Create temporary test directories
@@ -473,10 +473,10 @@ recipe:
          - Verify Cursor format
 
       6. **Add .test-output/ to .gitignore**:
-         ```
+         
          # Test output directory
          .test-output/
-         ```
+         
 
       7. **Create GitHub Actions Workflow** (.github/workflows/test.yml):
          - Run on push to main/develop
@@ -502,13 +502,13 @@ recipe:
          - Other scripts in 11_scripts/
 
       10. **Validate Everything Works**:
-          ```bash
+          bash
           npm run validate        # Schemas and manifests validate
           npm test                # All tests pass
           npm run test:coverage   # Coverage meets 80% threshold
           npm run build           # Build succeeds
           npm run ci              # Full CI pipeline passes
-          ```
+          
 
     acceptance_criteria: |
       **Setup & Configuration:**

@@ -1,190 +1,93 @@
 id: create-feature
-version: 1.0.0
-description: Generate a feature.yml manifest for documenting project features with context, files, and snippets
+version: 2.0.0
+description: Capture and clarify feature requirements, then create a simple feature.yml manifest
 
 tags:
   - manifests
   - features
-  - documentation
+  - requirements
   - yaml
 
 variables:
-  - name: feature_id
+  - name: user_description
     required: true
-    description: 'Kebab-case unique identifier for the feature (e.g., user-authentication)'
+    description: "Brief user description of what the feature should do"
 
-  - name: feature_name
-    required: true
-    description: 'Human-readable feature name (e.g., User Authentication System)'
-
-  - name: description
-    required: true
-    description: 'Brief feature description (10-500 characters)'
-
-  - name: overview
+  - name: project_id
     required: false
-    description: 'Detailed feature overview and purpose'
-
-  - name: architecture
-    required: false
-    description: 'Architecture and design notes for the feature'
-
-  - name: entry_points
-    required: false
-    description: 'Comma-separated list of main entry point files (e.g., src/auth/index.ts)'
-
-  - name: key_files
-    required: false
-    description: 'Comma-separated list of important files (e.g., src/auth/service.ts, src/auth/middleware.ts)'
-
-  - name: recipe_id
-    required: false
-    description: 'Recipe ID to bind (e.g., feature-delivery, bug-fix-workflow)'
-
-  - name: acceptance_criteria
-    required: false
-    description: 'Specific acceptance criteria for the feature'
+    description: "Project ID where the feature belongs (e.g., ai-tools)"
 
 rules:
-  - 'ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
-  - 'Version must start at 1.0.0 following semver'
-  - 'Description must be 10-500 characters'
-  - 'Include context section with overview and architecture'
-  - 'Define file patterns to scope the feature'
-  - 'Add practical code snippets with examples'
-  - 'Bind to a recipe for automated workflow support'
-  - 'Include feature-specific conventions'
-  - 'Set appropriate status (draft, active, deprecated, archived)'
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Recommend concise descriptions, but allow detail when needed"
+  - "Do NOT draft the full solution - just capture requirements"
+  - "Focus on WHAT needs to be done, not HOW to do it"
+  - "Use conversational tone to understand user intent"
+  - "Suggest a kebab-case feature ID based on description"
 
 content: |
-  Generate a feature.yml manifest for the following feature:
+  The user wants to create a new feature based on this description:
 
-  **Feature Details:**
-  - ID: {{feature_id}}
-  - Name: {{feature_name}}
-  - Description: {{description}}
+  {{user_description}}
 
-  {{#overview}}
-  **Overview:**
-  {{overview}}
-  {{/overview}}
+  **Your job is to:**
 
-  {{#architecture}}
-  **Architecture:**
-  {{architecture}}
-  {{/architecture}}
+  1. **Understand the requirement** - Ask clarifying questions to ensure mutual understanding:
+     - What is the main goal or purpose of this feature?
+     - Are there any specific constraints or dependencies?
+     - What does success look like? (acceptance criteria in simple terms)
+     - Should this be automated with a recipe? (feature-delivery, bug-fix-workflow, etc.)
+     - Which tools should support this? (copilot-cli, claude-code, cursor, windsurf)
 
-  {{#entry_points}}
-  **Entry Points:**
-  {{entry_points}}
-  {{/entry_points}}
+  2. **Suggest a feature structure:**
+     - Propose a kebab-case ID (e.g., "automated-testing")
+     - Propose a clear, concise name
+     - Draft a brief description (1-2 sentences, max 200 chars)
 
-  {{#key_files}}
-  **Key Files:**
-  {{key_files}}
-  {{/key_files}}
+  3. **Create a simple feature.yml** with:
+     - Basic required fields (id, version, name, description)
+     - Simple overview explaining WHAT the feature does
+     - Key files/patterns if known
+     - Basic acceptance criteria (simple bullet points)
+     - Recipe binding if requested
+     - Status: draft, owner, dates, tags
 
-  **Requirements:**
+  **What NOT to do:**
+  - Do NOT write detailed implementation plans
+  - Do NOT create elaborate architecture diagrams
+  - Do NOT write extensive code snippets
+  - Do NOT prescribe HOW things should be built
+  - Do NOT make the manifest huge and overwhelming
 
-  1. **Required Fields:**
-     - id: {{feature_id}} (validate kebab-case)
-     - version: 1.0.0 (semver)
-     - name: "{{feature_name}}"
-     - description: "{{description}}" (10-500 chars)
+  **Start simple, allow detail:**
+  - The feature.yml is for CAPTURING requirements, not SOLVING them
+  - Implementation agents will use this as INPUT, not as a blueprint
+  - Think of it as a "feature brief" not a "detailed specification"
+  - Recommend 50-100 lines for simple features; allow more for complex ones
 
-  2. **Context Section:**
-     - overview: Detailed feature overview and purpose
-     - architecture: Architecture and design approach
-     - dependencies: Array of feature dependencies (other features, libraries)
+  **Example conversation flow:**
 
-  3. **Files Section:**
-     - entry_points: Array of main entry point files
-     - key_files: Array of important related files
-     - patterns: Array of glob patterns to include (e.g., src/auth/**)
+  User: "I need automated testing"
 
-  4. **Snippets Section:**
-     Array of code snippets, each with:
-     - id: Kebab-case snippet identifier
-     - title: Clear snippet title
-     - description: What the snippet demonstrates
-     - content: The actual code
-     - language: Programming language for syntax highlighting
-     
-     Create 2-5 practical snippets that demonstrate:
-     - Core functionality
-     - Common usage patterns
-     - Integration examples
-     - Test examples (if applicable)
+  You: "Great! Let me clarify:
+  - What should be tested? (unit tests, integration tests, e2e?)
+  - What framework do you prefer?
+  - Should tests run automatically in CI/CD?
+  - Any specific coverage requirements?"
 
-  5. **Conventions Section:**
-     Array of feature-specific conventions (3-8 items):
-     - Code patterns to follow
-     - Naming conventions
-     - Error handling approaches
-     - Testing strategies
-     - Documentation requirements
+  User: "Unit and integration tests with Vitest, run in CI, 80% coverage"
 
-  6. **Recipe Section (if applicable):**
-     {{#recipe_id}}
-     - id: {{recipe_id}}
-     - context:
-       - feature_description: Detailed implementation requirements
-       - acceptance_criteria: Specific criteria for completion
-       - (Additional context based on recipe type)
-     - tools: [claude-code, copilot-cli, cursor]
-     {{/recipe_id}}
-     {{^recipe_id}}
-     (Optional: Bind to feature-delivery, bug-fix-workflow, or custom recipe)
-     {{/recipe_id}}
+  You: "Perfect! I'll create a feature called 'automated-testing' with:
+  - Overview: Set up Vitest for unit and integration testing
+  - Acceptance: Tests run via npm test, 80% coverage, CI integration
+  - Recipe: feature-delivery
+  Sound good?"
 
-  7. **Metadata Section:**
-     - status: "draft" (or active, deprecated, archived)
-     - owner: Feature owner or team name
-     - created: "2025-11-16"
-     - updated: "2025-11-16"
-     - tags: Relevant tags (e.g., authentication, security, backend)
+  User: "Yes"
 
-  **Output Format:**
-  - Valid YAML with proper indentation (2 spaces)
-  - Include helpful inline comments
-  - Use string quotes where needed
-  - Follow the schema exactly
-  - Save to: projects/*/features/{{feature_id}}/feature.yml
-
-  **Code Snippet Guidelines:**
-  - Keep snippets focused and practical
-  - Include enough context to be useful
-  - Add comments explaining key parts
-  - Use realistic variable names
-  - Show error handling where relevant
-  - Demonstrate best practices
-
-  **Validation:**
-  After creating the file, remind user to run:
-  ```bash
-  npm run validate
-  npm run project:generate <project-id>
-  ```
-
-outputs:
-  format: yaml
-
-examples:
-  - input:
-      feature_id: 'user-profile'
-      feature_name: 'User Profile Management'
-      description: 'Allow users to view and edit their profile information'
-      overview: 'Complete user profile system with CRUD operations'
-      entry_points: 'src/profile/index.ts'
-    output: |
-      # Creates a complete feature.yml with:
-      # - Profile management context
-      # - File patterns for profile-related code
-      # - CRUD operation snippets
-      # - Profile-specific conventions
-      # - Recipe binding for implementation
+  You: [Creates simple ~80 line feature.yml]
 
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

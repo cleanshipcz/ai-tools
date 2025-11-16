@@ -13,7 +13,7 @@ const rootDir = join(__dirname, '..');
 
 interface ManifestFile {
   path: string;
-  type: 'prompt' | 'agent' | 'rulepack' | 'skill' | 'eval' | 'project' | 'recipe';
+  type: 'prompt' | 'agent' | 'rulepack' | 'skill' | 'eval' | 'project' | 'recipe' | 'feature';
   id: string;
   version?: string;
   content: any;
@@ -70,6 +70,7 @@ class Validator {
     this.validateReferences(manifests);
     await this.validateSecurity(manifests);
     await this.validateIncludes(manifests);
+    this.validateFeatureContent(manifests);
 
     // Report results
     this.printResults();
@@ -87,6 +88,7 @@ class Validator {
       eval: 'eval.schema.json',
       project: 'project.schema.json',
       recipe: 'recipe.schema.json',
+      feature: 'feature.schema.json',
     };
 
     const schemas: Record<string, any> = {};
@@ -123,8 +125,8 @@ class Validator {
           // Skip template files and deployment configs
           if (file.includes('/template/')) continue;
           if (file.endsWith('deploy.yml') || file.endsWith('deploy.local.yml')) continue;
-          // Skip feature manifests (validated separately)
-          if (file.includes('/features/') && file.endsWith('/feature.yml')) continue;
+          // Skip feature manifests (will be collected separately)
+          if (file.includes('/features/') && file.endsWith('feature.yml')) continue;
 
           try {
             const content = await readFile(file, 'utf-8');
@@ -149,6 +151,40 @@ class Validator {
       } catch (error) {
         // Directory might not exist yet
         this.warnings.push(`Directory ${dir} not found, skipping`);
+      }
+    }
+
+    // Collect feature manifests separately
+    const projectDirs = ['06_projects/global', '06_projects/local'];
+    for (const projectDir of projectDirs) {
+      const fullPath = join(rootDir, projectDir);
+      try {
+        const files = await this.findYamlFiles(fullPath);
+        for (const file of files) {
+          if (file.includes('/features/') && file.endsWith('feature.yml')) {
+            try {
+              const content = await readFile(file, 'utf-8');
+              const parsed = loadYaml(content) as any;
+
+              if (!parsed || typeof parsed !== 'object') {
+                this.errors.push(`${relative(rootDir, file)}: Invalid YAML content`);
+                continue;
+              }
+
+              manifests.push({
+                path: file,
+                type: 'feature',
+                id: parsed.id || 'unknown',
+                version: parsed.version,
+                content: parsed,
+              });
+            } catch (error) {
+              this.errors.push(`${relative(rootDir, file)}: Failed to parse YAML - ${error}`);
+            }
+          }
+        }
+      } catch (error) {
+        // Directory might not exist yet
       }
     }
 
@@ -308,6 +344,37 @@ class Validator {
           }
         }
       }
+    }
+  }
+
+  private validateFeatureContent(manifests: ManifestFile[]): void {
+    // Only validate feature.yml files
+    const featureManifests = manifests.filter((m) => m.type === 'feature');
+
+    console.log(
+      chalk.gray(`  Checking ${featureManifests.length} feature manifest(s) for backticks...`)
+    );
+
+    for (const manifest of featureManifests) {
+      const checkForBackticks = (value: any, fieldPath: string) => {
+        if (typeof value === 'string' && value.includes('`')) {
+          this.errors.push(
+            `${relative(rootDir, manifest.path)}: Backticks (\`) found in ${fieldPath}. ` +
+              `Backticks cause bash command substitution errors in generated scripts. ` +
+              `Use alternative formatting (indented code blocks, quotes, etc.)`
+          );
+        } else if (Array.isArray(value)) {
+          value.forEach((item, index) => checkForBackticks(item, `${fieldPath}[${index}]`));
+        } else if (value && typeof value === 'object') {
+          for (const [key, val] of Object.entries(value)) {
+            checkForBackticks(val, `${fieldPath}.${key}`);
+          }
+        }
+      };
+
+      // Check all fields recursively in feature manifests
+      const content = manifest.content;
+      checkForBackticks(content, 'root');
     }
   }
 

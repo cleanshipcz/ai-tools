@@ -1,6 +1,6 @@
 id: create-skill
-version: 1.0.0
-description: Generate a skill.yml manifest defining an executable command or MCP tool integration
+version: 2.0.0
+description: Clarify tool/command requirements and create a simple skill.yml manifest
 
 tags:
   - manifests
@@ -9,305 +9,69 @@ tags:
   - yaml
 
 variables:
-  - name: skill_id
+  - name: user_description
     required: true
-    description: 'Kebab-case unique identifier for the skill (e.g., run-tests, lint-code)'
-
-  - name: description
-    required: true
-    description: 'Clear description of what the skill does (10-500 characters)'
-
-  - name: command_program
-    required: false
-    description: 'The program/executable to run (e.g., pytest, npm, gradle)'
-
-  - name: command_args
-    required: false
-    description: "Command-line arguments (e.g., 'test --verbose, --coverage')"
-
-  - name: mcp_tool
-    required: false
-    description: 'MCP tool ID reference instead of command (e.g., git_operations)'
-
-  - name: timeout
-    required: false
-    description: 'Timeout in seconds'
-    default: '300'
-
-  - name: working_dir
-    required: false
-    description: 'Working directory (default: current directory)'
+    description: "Brief description of the tool or command to integrate"
 
 rules:
-  - 'ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
-  - 'Version must start at 1.0.0 following semver'
-  - 'Description must be 10-500 characters'
-  - 'Either command OR mcp_tool must be specified, not both'
-  - 'Command program should be executable (check if it needs installation)'
-  - 'Include constraints for prerequisites'
-  - 'Set reasonable timeout (default 300s, tests may need longer)'
-  - 'Define inputs for parameterized skills'
-  - 'Specify outputs to capture (stdout, stderr, exit_code)'
-  - 'Add tags for categorization and tool discovery'
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Keep skill definitions simple and focused"
+  - "One command or tool per skill"
+  - "Focus on WHAT the tool does, not HOW to implement it"
 
 content: |
-  Generate a skill.yml manifest for the following skill:
+  The user wants to create a skill based on this description:
 
-  **Skill Details:**
-  - ID: {{skill_id}}
-  - Description: {{description}}
+  {{user_description}}
 
-  {{#command_program}}
-  **Command:**
-  - Program: {{command_program}}
-  {{#command_args}}
-  - Arguments: {{command_args}}
-  {{/command_args}}
-  {{/command_program}}
+  **Your job is to clarify and translate:**
 
-  {{#mcp_tool}}
-  **MCP Tool:**
-  {{mcp_tool}}
-  {{/mcp_tool}}
+  1. **Ask clarifying questions:**
+     - What command or tool does this integrate? (pytest, eslint, docker, etc.)
+     - What does it do in one sentence?
+     - What are the key parameters/flags?
+     - Any environment requirements? (Python installed, Docker running, etc.)
+     - Is this an MCP tool or shell command?
 
-  **Requirements:**
+  2. **Suggest structure:**
+     - Propose a kebab-case ID (e.g., run-pytest, lint-typescript)
+     - Identify command pattern
+     - Note any required tools/dependencies
 
-  1. **Required Fields:**
-     - id: {{skill_id}} (validate kebab-case)
-     - description: "{{description}}" (10-500 chars)
+  3. **Create simple skill.yml with:**
+     - id, version (1.0.0), description (1 sentence)
+     - tags: [tool name, category]
+     - command: The actual command to run
+     - environment: [required tools/env vars if any]
+     - usage: Brief usage example
+     - metadata: author, dates
 
-  2. **Command Section OR MCP Tool (mutually exclusive):**
-     
-     **Option A - Command Execution:**
-     {{#command_program}}
-     ```yaml
-     command:
-       program: "{{command_program}}"
-       {{#command_args}}
-       args:
-         {{command_args}}
-       {{/command_args}}
-       {{#working_dir}}
-       cwd: "{{working_dir}}"
-       {{/working_dir}}
-       env:
-         # Optional environment variables
-         # KEY: "value"
-     ```
-     {{/command_program}}
-     {{^command_program}}
-     ```yaml
-     command:
-       program: "<executable>"  # e.g., pytest, npm, gradle, mvn
-       args:
-         - "<arg1>"            # e.g., test, --verbose
-         - "<arg2>"
-       cwd: "."                # Working directory (optional)
-       env:                     # Environment variables (optional)
-         VAR_NAME: "value"
-     ```
-     {{/command_program}}
-     
-     **Option B - MCP Tool Reference:**
-     {{#mcp_tool}}
-     ```yaml
-     mcp_tool: "{{mcp_tool}}"
-     ```
-     {{/mcp_tool}}
-     {{^mcp_tool}}
-     ```yaml
-     mcp_tool: "tool-id"  # Reference to MCP tool (e.g., git_operations)
-     ```
-     {{/mcp_tool}}
+  **Keep focused:**
+  - One command per skill (primary focus)
+  - Simple parameter documentation
+  - Simple skills: ~30-50 lines; Complex integrations: as needed
 
-  3. **Constraints Section:**
-     Array of prerequisites and requirements (2-5 items):
-     - Installation requirements (e.g., "Requires pytest to be installed")
-     - Configuration needs (e.g., "Requires .eslintrc config file")
-     - Environment requirements (e.g., "Requires Node.js 18+")
-     - File requirements (e.g., "Must be run from project root")
-     
-     Examples:
-     - "Requires pytest to be installed."
-     - "Requires package.json in working directory."
-     - "Java 17 or higher must be installed."
+  **Example:**
 
-  4. **Timeout Section:**
-     ```yaml
-     timeout_sec: {{timeout}}
-     ```
-     
-     Recommended timeouts:
-     - Quick checks (lint, format): 30-60 seconds
-     - Unit tests: 300 seconds (5 minutes)
-     - Integration tests: 600-1800 seconds (10-30 minutes)
-     - Build processes: 1800+ seconds (30+ minutes)
+  User: "Run pytest with coverage"
 
-  5. **Retry Section (optional):**
-     For flaky operations (network calls, external services):
-     ```yaml
-     retry:
-       max_attempts: 3
-       backoff_ms: 1000  # Milliseconds between retries
-     ```
+  You: "Questions:
+  - Should it always generate coverage or be optional?
+  - Any specific pytest flags needed?
+  - Where should reports go?"
 
-  6. **Inputs Section (optional):**
-     Array of input parameters for parameterized skills:
-     ```yaml
-     inputs:
-       - name: "test_path"
-         type: "string"      # string, number, boolean, file, directory
-         required: true
-         description: "Path to test file or directory"
-       - name: "verbose"
-         type: "boolean"
-         required: false
-         description: "Enable verbose output"
-     ```
+  User: "Always with coverage, HTML report in .coverage/"
 
-  7. **Outputs Section:**
-     Specify what to capture:
-     ```yaml
-     outputs:
-       stdout: true          # Capture standard output
-       stderr: true          # Capture standard error
-       exit_code: true       # Capture exit code
-       files:                # Optional: Files to capture
-         - "coverage.xml"
-         - "test-results.json"
-     ```
-
-  8. **Tags Section:**
-     Array of relevant tags (3-7 tags):
-     - Tool tags: pytest, eslint, gradle, npm, docker
-     - Language tags: python, typescript, java, kotlin
-     - Category tags: testing, linting, building, formatting
-     - Domain tags: unit-test, integration-test, e2e-test
-
-  9. **Metadata Section:**
-     - author: "AI Tools Team"
-     - created: "2025-11-16"
-     - updated: "2025-11-16"
-
-  **Skill Naming Conventions:**
-  - Action-based: `{verb}-{target}` (e.g., run-tests, lint-code, build-project)
-  - Tool-based: `run-{tool}` (e.g., run-pytest, run-eslint, run-gradle)
-  - Be specific: `run-unit-tests` not just `test`
-
-  **Common Skill Patterns:**
-
-  **Testing Skills:**
-  - Unit tests: `run-pytest`, `run-jest`, `run-junit`
-  - Integration tests: `run-integration-tests`
-  - E2E tests: `run-e2e-tests`
-
-  **Linting/Formatting Skills:**
-  - Linters: `run-eslint`, `run-pylint`, `run-ktlint`
-  - Formatters: `run-prettier`, `run-black`, `format-code`
-
-  **Build Skills:**
-  - Compilation: `build-project`, `compile-code`
-  - Packaging: `package-app`, `create-bundle`
-
-  **Analysis Skills:**
-  - Static analysis: `run-sonar`, `analyze-code`
-  - Security: `run-security-scan`, `check-vulnerabilities`
-
-  **Version Control Skills:**
-  - Git operations: `git-status`, `git-diff`, `git-commit`
-
-  **Output Format:**
-  - Valid YAML with proper indentation (2 spaces)
-  - Use array format for args (each arg on its own line with '- ')
-  - Use proper YAML syntax for objects (command, env, retry)
-  - Include helpful inline comments
-  - Follow the schema exactly
-  - Save to: skills/{{skill_id}}.yml
-
-  **Quality Checklist:**
-  - [ ] ID is kebab-case and descriptive
-  - [ ] Description clearly states what the skill does
-  - [ ] Either command or mcp_tool is specified (not both)
-  - [ ] Constraints list all prerequisites
-  - [ ] Timeout is appropriate for the operation
-  - [ ] Outputs section specifies what to capture
-  - [ ] Tags accurately describe the skill
-  - [ ] Metadata is complete
-
-  **Examples:**
-
-  **Python Testing Skill:**
-  ```yaml
-  id: run-pytest
-  description: Run Python tests with pytest
-  command:
-    program: "pytest"
-    args:
-      - "-v"
-      - "--tb=short"
-    cwd: "."
-  constraints:
-    - "Requires pytest to be installed."
-  timeout_sec: 1800
-  outputs:
-    stdout: true
-    stderr: true
-    exit_code: true
-  tags:
-    - pytest
-    - python
-    - testing
-  ```
-
-  **JavaScript Linting Skill:**
-  ```yaml
-  id: run-eslint
-  description: Run ESLint to check code quality
-  command:
-    program: "npm"
-    args:
-      - "run"
-      - "lint"
-  constraints:
-    - "Requires package.json with lint script."
-  timeout_sec: 60
-  outputs:
-    stdout: true
-    stderr: true
-    exit_code: true
-  tags:
-    - eslint
-    - javascript
-    - linting
-  ```
-
-  **Validation:**
-  After creating the file, remind user to run:
-  ```bash
-  npm run validate
-  npm run build
-  npm run skills
-  ```
+  You: "Perfect! I'll create 'run-pytest' with:
+  - Command: pytest --cov --cov-report=html:.coverage/
+  - Environment: Python + pytest installed
+  - Usage example included
+  Sound good?"
 
 outputs:
   format: yaml
 
-examples:
-  - input:
-      skill_id: 'run-gradle-tests'
-      description: 'Run Gradle test suite with coverage reporting'
-      command_program: 'gradle'
-      command_args: 'test, jacocoTestReport'
-      timeout: '900'
-    output: |
-      # Creates a complete skill.yml with:
-      # - Gradle test execution
-      # - JaCoCo coverage reporting
-      # - Appropriate timeout for Java tests
-      # - Test output capture
-      # - Proper constraints
-
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

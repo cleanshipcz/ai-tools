@@ -1,313 +1,79 @@
 id: create-recipe
-version: 1.0.0
-description: Generate a recipe.yml manifest defining a multi-agent workflow with document-first pattern
+version: 2.0.0
+description: Clarify workflow steps and create a simple recipe.yml manifest
 
 tags:
-  - recipe
-  - workflow
-  - multi-agent
-  - automation
-  - manifest
+  - manifests
+  - recipes
+  - workflows
+  - yaml
 
 variables:
-  - name: recipe_id
+  - name: user_description
     required: true
-    description: 'Kebab-case unique identifier for the recipe (e.g., feature-delivery, bug-fix-workflow)'
-
-  - name: description
-    required: true
-    description: 'Clear description of what the recipe accomplishes (10-500 characters)'
-
-  - name: workflow_type
-    required: false
-    description: 'Type of workflow (feature, bugfix, refactor, review, testing)'
-    default: 'feature'
-
-  - name: tools
-    required: false
-    description: 'Comma-separated list of supported tools (claude-code, copilot-cli, cursor)'
-    default: 'claude-code, copilot-cli'
-
-  - name: agents
-    required: false
-    description: 'Comma-separated list of agents to use (e.g., project-planner, feature-builder, code-reviewer)'
-
-  - name: variables_needed
-    required: false
-    description: 'Variables the recipe needs from users (e.g., feature_description, bug_description)'
-
-  - name: max_iterations
-    required: false
-    description: 'Maximum loop iterations for review cycles'
-    default: '3'
+    description: "Brief description of the workflow or process"
 
 rules:
-  - 'CRITICAL: Every recipe MUST follow the document-first workflow pattern'
-  - 'Start with analysis step outputting to .recipe-docs/analysis.md'
-  - 'Follow with planning step outputting to .recipe-docs/plan.md (includes analysis)'
-  - 'All implementation steps must include both analysis.md and plan.md documents'
-  - 'All review/verification steps must include both analysis.md and plan.md documents'
-  - 'Use separate conversation strategy by default (conversationStrategy: separate)'
-  - 'Enable tool automation for copilot-cli (allowAllTools: true)'
-  - 'Keep steps atomic with clear, single-purpose tasks'
-  - 'Use loops only for review/refinement cycles, not general iteration'
-  - 'Include waitForConfirmation: true for key decision points'
-  - 'Validate recipe IDs are kebab-case'
-  - 'Use snake_case for variable names'
-  - 'Include comprehensive metadata (author, created date, tags)'
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Recommend keeping workflows simple (3-7 steps) but allow complexity when justified"
+  - "Each step should have one clear purpose"
+  - "Recommend document-first pattern (analysis → plan → implement) for multi-step workflows"
 
 content: |
-  Generate a recipe.yml manifest for the following workflow:
+  The user wants to create a recipe based on this description:
 
-  **Recipe Details:**
-  - ID: {{recipe_id}}
-  - Description: {{description}}
-  - Workflow Type: {{workflow_type}}
-  - Tools: {{tools}}
-  {{#agents}}
-  - Agents: {{agents}}
-  {{/agents}}
-  {{#variables_needed}}
-  - Variables: {{variables_needed}}
-  {{/variables_needed}}
+  {{user_description}}
 
-  **Document-First Pattern (MANDATORY):**
+  **Your job is to clarify and translate:**
 
-  Every recipe MUST follow this structure:
+  1. **Ask clarifying questions:**
+     - What is the overall goal of this workflow?
+     - What are the main steps? (keep it high-level, 3-7 steps)
+     - Which agents should perform each step?
+     - Should steps produce documents for later steps to reference?
+     - Which tools should run this? (copilot-cli, claude-code, cursor)
 
-  1. **Analysis Step** (step 1):
-     - Agent: Usually project-planner, bug-fixer, or code-reviewer
-     - Task: Comprehensive analysis of the problem/codebase
-     - outputDocument: ".recipe-docs/analysis.md" (or variant like bug-analysis.md)
-     - Purpose: Deep understanding before taking action
+  2. **Suggest structure:**
+     - Propose a kebab-case ID (e.g., feature-delivery, code-review-cycle)
+     - Identify main steps (recommend starting with 3-7, can be more if needed)
+     - Assign appropriate agents to steps
+     - Apply document-first pattern if multi-step
 
-  2. **Planning Step** (step 2):
-     - Agent: Usually project-planner, bug-fixer, or code-reviewer
-     - Task: Create detailed, actionable plan
-     - outputDocument: ".recipe-docs/plan.md" (or variant like fix-plan.md)
-     - includeDocuments: [".recipe-docs/analysis.md"]
-     - waitForConfirmation: true (allow review before proceeding)
-     - Purpose: Structured approach with clear steps
+  3. **Create recipe.yml with:**
+     - id, version (1.0.0), description
+     - tags: [workflow type]
+     - steps: Array of steps, each with agent, prompt, outputDocument
+     - Recommend pattern: analysis.md → plan.md → implementation (include prior docs)
+     - tools: [copilot-cli, claude-code, cursor]
+     - metadata: author, dates
 
-  3. **Implementation Steps** (step 3+):
-     - Agent: Usually feature-builder, refactoring-specialist, bug-fixer
-     - Task: Execute according to the plan
-     - includeDocuments: [".recipe-docs/analysis.md", ".recipe-docs/plan.md"]
-     - Purpose: Implement with full context
+  **Document-first pattern (recommended for multi-step workflows):**
+  - Step 1: Analysis (outputDocument: .recipe-docs/analysis.md)
+  - Step 2: Planning (outputDocument: .recipe-docs/plan.md, includeDocuments: [analysis.md])
+  - Step 3+: Implementation (includeDocuments: [analysis.md, plan.md])
 
-  4. **Review/Verification Steps**:
-     - Agent: Usually code-reviewer, tdd-navigator
-     - Task: Verify against plan and requirements
-     - includeDocuments: [".recipe-docs/analysis.md", ".recipe-docs/plan.md"]
-     - Purpose: Ensure quality and alignment with plan
+  **Start simple, allow complexity:**
+  - Recommend 3-7 steps for clarity, but allow more if workflow requires it
+  - Each step: agent, prompt/task, output
+  - Simple workflows: ~60-100 lines; Complex workflows: as needed
 
-  **Required Manifest Structure:**
+  **Example:**
 
-  ```yaml
-  id: {{recipe_id}}
-  version: 1.0.0
-  description: {{description}}
-  tags:
-    - workflow
-    - {{workflow_type}}
-    # Add 2-3 more relevant tags
+  User: "Workflow for delivering a new feature"
 
-  tools:
-    {{#tools}}
-    - {{.}}  # Parse from comma-separated list
-    {{/tools}}
-    {{^tools}}
-    - claude-code
-    - copilot-cli
-    {{/tools}}
+  You: "Questions:
+  - Should it start with analysis/planning?
+  - Need code review step?
+  - Which agents? (feature-builder, code-reviewer, etc.)"
 
-  # Separate conversations prevent context bloat (recommended)
-  conversationStrategy: separate
+  User: "Yes analysis first, then implement, then review"
 
-  # Enable automation for copilot-cli
-  toolOptions:
-    copilot-cli:
-      allowAllTools: true  # Required for non-interactive execution
+  You: "Perfect! I'll create 'feature-delivery' with:
+  1. Analyze requirements (project-planner → analysis.md)
+  2. Create plan (project-planner → plan.md, includes analysis)
+  3. Implement (feature-builder → code, includes analysis + plan)
+  4. Review (code-reviewer → review, includes all docs)
+  Sound good?"
 
-  {{#variables_needed}}
-  variables:
-    # Parse {{variables_needed}} and create entries like:
-    # feature_description: "{{FEATURE_DESCRIPTION}}"
-    # acceptance_criteria: "{{ACCEPTANCE_CRITERIA}}"
-  {{/variables_needed}}
-
-  steps:
-    # STEP 1: Analysis (REQUIRED)
-    - id: analyze
-      agent: project-planner  # or bug-fixer, code-reviewer based on workflow_type
-      task: |
-        [Analysis task specific to workflow_type]
-        
-        Analyze and document:
-        1. Relevant codebase sections
-        2. Dependencies and integrations
-        3. Potential challenges and risks
-        4. Technical considerations
-        5. Required changes
-        
-        {{#variables_needed}}
-        [Include variable interpolation where needed]
-        {{/variables_needed}}
-      outputDocument: ".recipe-docs/analysis.md"
-      continueConversation: false
-      waitForConfirmation: false
-    
-    # STEP 2: Planning (REQUIRED)
-    - id: plan
-      agent: project-planner  # or bug-fixer, code-reviewer based on workflow_type
-      task: |
-        Based on the analysis, create a detailed action plan:
-        
-        1. Step-by-step implementation approach
-        2. Specific code changes needed
-        3. Test cases to write
-        4. Edge cases to handle
-        5. Documentation updates
-        
-        Output a structured, actionable plan.
-      outputDocument: ".recipe-docs/plan.md"
-      includeDocuments:
-        - ".recipe-docs/analysis.md"
-      continueConversation: true
-      waitForConfirmation: true  # Allow review of plan before proceeding
-    
-    # STEP 3+: Implementation
-    - id: implement
-      agent: feature-builder  # or appropriate agent for workflow_type
-      task: |
-        [Implementation task specific to workflow_type]
-        
-        Follow the analysis and plan documents carefully.
-        [Additional task-specific instructions]
-      includeDocuments:
-        - ".recipe-docs/analysis.md"
-        - ".recipe-docs/plan.md"
-      continueConversation: false
-      waitForConfirmation: false
-    
-    # STEP 4+: Review
-    - id: review
-      agent: code-reviewer
-      task: |
-        Review the implementation against the plan and requirements.
-        
-        Verify:
-        - Implementation follows the plan
-        - All requirements are met
-        - Code quality is maintained
-        - Tests are adequate
-        
-        Provide specific, actionable feedback.
-      includeDocuments:
-        - ".recipe-docs/analysis.md"
-        - ".recipe-docs/plan.md"
-      continueConversation: true
-      waitForConfirmation: false
-    
-    # Additional steps as needed...
-    # - Refactor/fix based on review
-    # - Final verification
-    # - Documentation updates
-
-  {{#max_iterations}}
-  # Optional: Loop for iterative refinement
-  loop:
-    steps:
-      - review
-      - refactor  # Or appropriate fix step
-    maxIterations: {{max_iterations}}
-  {{/max_iterations}}
-
-  metadata:
-    author: "AI Tools Team"
-    created: "2025-11-16"
-  ```
-
-  **Agent Selection by Workflow Type:**
-
-  - **feature**: project-planner (analysis/plan), feature-builder (implement), code-reviewer (review)
-  - **bugfix**: bug-fixer (all steps), code-reviewer (review)
-  - **refactor**: project-planner (analysis), refactoring-specialist (implement), code-reviewer (review)
-  - **review**: code-reviewer (analysis/review), feature-builder (fixes)
-  - **testing**: tdd-navigator (analysis/plan), feature-builder (implement)
-
-  **Document Naming Conventions:**
-
-  Use descriptive document names based on workflow type:
-  - Feature: `.recipe-docs/analysis.md` + `.recipe-docs/plan.md`
-  - Bug Fix: `.recipe-docs/bug-analysis.md` + `.recipe-docs/fix-plan.md`
-  - Code Review: `.recipe-docs/changes-analysis.md` + `.recipe-docs/review-checklist.md`
-
-  **Best Practices:**
-
-  1. **Keep steps atomic** - One clear purpose per step
-  2. **Use descriptive task descriptions** - Be specific about what each agent should do
-  3. **Include context in tasks** - Explain why, not just what
-  4. **Leverage document context** - Always include analysis/plan in implementation steps
-  5. **Set confirmation points** - Use waitForConfirmation for key decisions
-  6. **Use loops sparingly** - Only for review/refinement cycles (max 3-5 iterations)
-  7. **Enable automation** - Set allowAllTools: true for copilot-cli
-  8. **Document variables clearly** - Use descriptive names and provide defaults
-
-  **Output Format:**
-  - Valid YAML with proper indentation (2 spaces)
-  - Use block scalars (|) for multi-line content
-  - Include helpful inline comments
-  - Follow the schema at schemas/recipe.schema.json exactly
-  - Save to: recipes/{{recipe_id}}.yml
-
-  **Validation:**
-  After creating the file, remind user to run:
-  ```bash
-  npm run validate
-  npm run build
-  npm run recipe:list  # Verify recipe appears
-  npm run recipe:run {{recipe_id}} copilot-cli  # Test interactively
-  ```
-
-  **Critical Reminders:**
-  - ✅ Analysis step with outputDocument MUST be first
-  - ✅ Planning step with outputDocument and includeDocuments MUST be second
-  - ✅ All subsequent steps MUST include both analysis and plan documents
-  - ✅ Use separate conversationStrategy for better performance
-  - ✅ Enable allowAllTools for automated execution
-
-examples:
-  - input:
-      recipe_id: 'api-endpoint-delivery'
-      description: 'Complete workflow for implementing a new REST API endpoint with validation and tests'
-      workflow_type: 'feature'
-      tools: 'claude-code, copilot-cli'
-      agents: 'project-planner, feature-builder, code-reviewer, tdd-navigator'
-      variables_needed: 'endpoint_name, http_method, request_schema, response_schema'
-    output: |
-      Recipe with:
-      - Analysis step (analyze codebase for API endpoint patterns)
-      - Planning step (detailed implementation plan for endpoint)
-      - Implementation steps (create route, controller, validation, tests)
-      - Review cycle (review implementation against plan)
-      - All steps include analysis.md and plan.md documents
-
-  - input:
-      recipe_id: 'performance-optimization'
-      description: 'Systematic workflow for identifying and fixing performance bottlenecks'
-      workflow_type: 'refactor'
-      tools: 'claude-code, copilot-cli'
-      variables_needed: 'target_area, performance_goal'
-    output: |
-      Recipe with:
-      - Analysis step (profile and identify bottlenecks)
-      - Planning step (optimization strategy with trade-offs)
-      - Implementation steps (apply optimizations)
-      - Verification step (benchmark and validate improvements)
-      - All steps reference analysis and plan documents
-
-metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+outputs:
+  format: yaml

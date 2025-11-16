@@ -185,13 +185,27 @@
           "description": "Feature owner or team"
         },
         "created": {
-          "type": "string",
-          "format": "date",
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date"
+            },
+            {
+              "type": "object"
+            }
+          ],
           "description": "Creation date"
         },
         "updated": {
-          "type": "string",
-          "format": "date",
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date"
+            },
+            {
+              "type": "object"
+            }
+          ],
           "description": "Last update date"
         },
         "tags": {

@@ -1,209 +1,91 @@
 id: create-prompt
-version: 1.0.0
-description: Generate a prompt.yml manifest defining an atomic, reusable prompt with variables and templates
+version: 2.0.0
+description: Clarify prompt requirements and create a simple prompt.yml manifest
 
 tags:
   - manifests
   - prompts
-  - templates
+  - requirements
   - yaml
 
 variables:
-  - name: prompt_id
+  - name: user_description
     required: true
-    description: 'Kebab-case unique identifier for the prompt (e.g., analyze-performance)'
-
-  - name: description
-    required: true
-    description: 'Clear description of what the prompt does (10-500 characters)'
-
-  - name: category
-    required: false
-    description: 'Prompt category (refactor, qa, docs, planning, tickets, manifests)'
-    default: 'refactor'
-
-  - name: tags
-    required: false
-    description: 'Comma-separated list of tags for categorization (e.g., performance, optimization)'
-
-  - name: variables
-    required: false
-    description: "Description of variables this prompt needs (e.g., 'code: the code to analyze (required), language: programming language (required)')"
-
-  - name: output_format
-    required: false
-    description: 'Expected output format (markdown, json, yaml, code, text)'
-    default: 'markdown'
+    description: "Brief description of what the prompt should do"
 
 rules:
-  - 'ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
-  - 'Version must start at 1.0.0 following semver'
-  - 'Description must be 10-500 characters, clear and specific'
-  - 'Keep prompts atomic - one clear purpose per prompt'
-  - 'Use Mustache syntax for variables: {{variable}}'
-  - 'Variable names must be snake_case: ^[a-z_][a-z0-9_]*$'
-  - 'Include practical rules and constraints'
-  - 'Reference shared includes from prompts/shared/ for common components'
-  - 'Specify output format clearly'
-  - 'Add examples showing input/output'
-  - 'Organize by category in appropriate directory'
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Keep prompts atomic - one clear purpose only"
+  - "Variable names must be snake_case"
+  - "Use Mustache syntax for variables: {{variable}}"
+  - "Keep the prompt content concise and actionable"
 
 content: |
-  Generate a prompt.yml manifest for the following prompt:
+  The user wants to create a prompt based on this description:
 
-  **Prompt Details:**
-  - ID: {{prompt_id}}
-  - Description: {{description}}
-  - Category: {{category}}
+  {{user_description}}
 
-  {{#tags}}
-  **Tags:**
-  {{tags}}
-  {{/tags}}
+  **Your job is to clarify and translate:**
 
-  {{#variables}}
-  **Variables:**
-  {{variables}}
-  {{/variables}}
+  1. **Ask clarifying questions:**
+     - What is the single, specific task this prompt performs?
+     - What inputs does it need? (these become variables)
+     - Are the inputs required or optional?
+     - What should the output look like? (markdown, code, json, yaml, text)
+     - What category? (refactor, qa, docs, planning, tickets, manifests)
+     - Any specific constraints or rules it should follow?
 
-  **Requirements:**
+  2. **Suggest structure:**
+     - Propose a kebab-case ID
+     - Identify 2-3 key variables with snake_case names
+     - Recommend appropriate category
 
-  1. **Required Fields:**
-     - id: {{prompt_id}} (validate kebab-case)
-     - version: 1.0.0 (semver)
-     - description: "{{description}}" (10-500 chars)
+  3. **Create simple prompt.yml with:**
+     - id, version (1.0.0), description (1 sentence)
+     - tags: [3-5 relevant tags]
+     - variables: [list with name, required, description]
+     - rules: [3-5 key constraints]
+     - content: "Clear, actionable prompt template with {{variables}}"
+     - outputs: { format: X }
+     - metadata: author, dates
 
-  2. **Tags Section:**
-     Array of relevant tags for categorization:
-     {{#tags}}
-     - Parse and include: {{tags}}
-     {{/tags}}
-     {{^tags}}
-     - Suggest 3-5 appropriate tags based on prompt purpose
-     {{/tags}}
+  **Keep it atomic, allow complexity:**
+  - ONE clear purpose per prompt
+  - Content: Recommend 5-15 lines; allow more for complex prompts
+  - Rules: Recommend 3-5 bullet points; allow more if needed
+  - Simple prompts: ~40-60 lines; Complex prompts: as needed
 
-  3. **Variables Section:**
-     Array of variable definitions, each with:
-     - name: snake_case identifier (e.g., code_block, file_path)
-     - required: true | false
-     - description: What the variable represents
-     - default: (optional) Default value if not provided
-     
-     {{#variables}}
-     Based on: {{variables}}
-     {{/variables}}
-     
-     Common variable patterns:
-     - code, code_block: Code to process
-     - language: Programming language
-     - file_path: Path to a file
-     - target_name: Desired name for output
-     - requirements: Specific requirements
-     - context: Additional context
+  **Example conversation:**
 
-  4. **Includes Section (optional):**
-     Reference shared components from prompts/shared/:
-     - ../shared/constraints.md: Common constraints
-     - ../shared/acceptance_criteria.md: Acceptance criteria template
-     - ../shared/best_practices.md: Best practices
-     - Create custom shared files as needed
+  User: "Extract a method from selected code"
 
-  5. **Rules Section:**
-     Array of specific rules or constraints (3-10 items):
-     - What the prompt should always do
-     - What it should never do
-     - Quality requirements
-     - Output requirements
-     - Examples:
-       - "Preserve existing behavior exactly"
-       - "Include error handling"
-       - "Add unit tests for new functionality"
-       - "Use meaningful variable names"
+  You: "Got it! Questions:
+  - What input do we need? (the code block, the language?)
+  - Should it auto-name the method or let user specify?
+  - Any rules? (preserve behavior, add docstring, etc.)"
 
-  6. **Content Section:**
-     The actual prompt template using Mustache syntax:
-     
-     Structure:
-     - Clear introduction of the task
-     - Variable interpolation: {{variable_name}}
-     - Conditional sections: {{#variable}}...{{/variable}}
-     - Negative conditionals: {{^variable}}...{{/variable}}
-     - Partial includes: {{> partial_name}}
-     - Numbered requirements or steps
-     - Expected output specification
-     
-     Best practices:
-     - Be specific and actionable
-     - Use clear, imperative language
-     - Provide structure (numbered lists, bullet points)
-     - Include context about why
-     - Specify format and quality expectations
+  User: "Code block and language as input, user specifies method name, preserve behavior exactly"
 
-  7. **Outputs Section:**
-     - format: {{output_format}} (markdown, json, yaml, code, text)
-     - schema: (optional) JSON schema for structured outputs
+  You: "Perfect! I'll create 'extract-method' with:
+  - Variables: code_block (required), language (required), method_name (required)
+  - Rules: Preserve behavior, extract to pure function, add type hints
+  - Output: code
+  Sound good?"
 
-  8. **Examples Section (optional but recommended):**
-     Array of example inputs and expected outputs:
-     - input: Object with variable values
-     - output: Expected result (can be abbreviated)
-     
-     Include 1-3 practical examples
+  User: "Yes"
 
-  9. **Metadata Section:**
-     - author: "AI Tools Team"
-     - created: "2025-11-16"
-     - updated: "2025-11-16"
+  You: [Creates simple ~50 line prompt.yml]
 
-  **Mustache Syntax Reference:**
-  ```
-  {{variable}}                 - Variable interpolation
-  {{#variable}}...{{/variable}} - Conditional (if variable exists/true)
-  {{^variable}}...{{/variable}} - Negative conditional (if not exists/false)
-  {{> partial}}                - Include partial/shared file
-  ```
-
-  **Output Format:**
-  - Valid YAML with proper indentation (2 spaces)
-  - Use block scalars (|) for multi-line content
-  - Include helpful inline comments
-  - Follow the schema exactly
-  - Save to: prompts/{{category}}/{{prompt_id}}.yml
-
-  **Atomic Prompt Principle:**
-  Each prompt should have ONE clear purpose. If a prompt tries to do multiple things:
-  - Split into multiple prompts
-  - Use includes for shared components
-  - Compose prompts rather than combining them
-
-  **Validation:**
-  After creating the file, remind user to run:
-  ```bash
-  npm run validate
-  npm run build
-  npm run prompt-library
-  ```
+  **DO NOT:**
+  - Write elaborate multi-paragraph prompts
+  - Include extensive examples in the content
+  - Create complex conditional logic
+  - Try to solve the problem - just define the task
 
 outputs:
   format: yaml
 
-examples:
-  - input:
-      prompt_id: 'optimize-query'
-      description: 'Analyze and optimize database queries for better performance'
-      category: 'refactor'
-      tags: 'database, performance, sql'
-      variables: 'query: SQL query to optimize (required), database: database type (required)'
-      output_format: 'markdown'
-    output: |
-      # Creates a complete prompt.yml with:
-      # - Query optimization focus
-      # - SQL-specific variables
-      # - Performance analysis rules
-      # - Structured markdown output
-      # - Practical optimization guidelines
-
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

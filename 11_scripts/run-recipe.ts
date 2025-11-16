@@ -522,7 +522,12 @@ async function generateScript(recipeId: string, tool: string, outputPath?: strin
       }
     } else if (tool === 'copilot-cli') {
       // Escape task content for bash variable
-      const escapedTask = task.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+      // Don't escape $ in ${VAR} patterns (bash variables), only standalone $
+      const escapedTask = task
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$(?![{])/g, '\\$') // Escape $ only if not followed by {
+        .replace(/`/g, '\\`');
       script += `TASK="@${step.agent} ${escapedTask}"\n`;
       script += `RESPONSE=$(copilot -p "$TASK" --allow-all-tools)\n`;
       script += `echo "$RESPONSE"\n`;

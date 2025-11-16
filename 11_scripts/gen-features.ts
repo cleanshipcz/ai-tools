@@ -682,7 +682,12 @@ export class FeatureGenerator {
 
       const flagsStr = flags.length > 0 ? ' ' + flags.join(' ') : '';
       // Store task in variable to handle multi-line content properly
-      const escapedTask = task.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+      // Don't escape $ in ${VAR} patterns (bash variables), only standalone $
+      const escapedTask = task
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\$(?![{])/g, '\\$') // Escape $ only if not followed by {
+        .replace(/`/g, '\\`');
       script += `TASK="@${step.agent} ${escapedTask}"\n`;
       script += `RESPONSE=$(copilot -p "$TASK" $MODEL_FLAG${flagsStr})\n`;
       script += `echo "$RESPONSE"\n`;

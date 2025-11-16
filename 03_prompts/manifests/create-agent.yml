@@ -1,191 +1,84 @@
 id: create-agent
-version: 1.0.0
-description: Generate an agent.yml manifest defining an AI agent with purpose, rulepacks, and capabilities
+version: 2.0.0
+description: Clarify agent requirements and create a simple agent.yml manifest
 
 tags:
   - manifests
   - agents
-  - ai
+  - requirements
   - yaml
 
 variables:
-  - name: agent_id
+  - name: user_description
     required: true
-    description: 'Kebab-case unique identifier for the agent (e.g., security-auditor)'
-
-  - name: purpose
-    required: true
-    description: "Clear statement of the agent's purpose (10-500 characters)"
-
-  - name: persona
-    required: false
-    description: "Detailed persona describing the agent's role, expertise, and approach"
-
-  - name: rulepacks
-    required: false
-    description: 'Comma-separated list of rulepack IDs to include (e.g., base, coding-python, security)'
-    default: 'base'
-
-  - name: capabilities
-    required: false
-    description: 'Comma-separated list of required capabilities (e.g., mcp:git, mcp:filesystem)'
-
-  - name: temperature
-    required: false
-    description: 'Temperature setting (0.0-2.0, lower = more focused)'
-    default: '0.7'
-
-  - name: tools
-    required: false
-    description: 'Comma-separated list of tool/skill IDs the agent can use'
+    description: "Brief description of what the agent should do"
 
 rules:
-  - 'ID must be kebab-case matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$'
-  - 'Version must start at 1.0.0 following semver'
-  - 'Purpose must be 10-500 characters, clear and specific'
-  - 'Include detailed persona that guides agent behavior'
-  - "Select rulepacks that match agent's domain (coding languages, security, etc.)"
-  - 'Define capabilities for MCP tools the agent needs'
-  - 'Set appropriate temperature (lower for precise tasks, higher for creative)'
-  - 'Create clear system prompt that establishes agent identity'
-  - 'Include constraints that define agent boundaries'
-  - 'Add comprehensive metadata with author and tags'
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Recommend simple, focused definitions; allow complexity when justified"
+  - "Suggest appropriate rulepacks based on domain"
+  - "Use conversational tone to understand intent"
+  - "Recommend concise system prompts (3-5 sentences); allow detail for specialized agents"
 
 content: |
-  Generate an agent.yml manifest for the following agent:
+  The user wants to create an agent based on this description:
 
-  **Agent Details:**
-  - ID: {{agent_id}}
-  - Purpose: {{purpose}}
+  {{user_description}}
 
-  {{#persona}}
-  **Persona:**
-  {{persona}}
-  {{/persona}}
+  **Your job is to clarify and translate:**
 
-  {{#rulepacks}}
-  **Rulepacks:**
-  {{rulepacks}}
-  {{/rulepacks}}
+  1. **Ask clarifying questions:**
+     - What is this agent's main purpose? (in 1-2 sentences)
+     - What domain does it work in? (coding, docs, security, planning, etc.)
+     - What programming languages apply? (if coding-related)
+     - Does it need any special capabilities? (git, filesystem, docker, etc.)
+     - Should it be precise or creative? (helps set temperature)
+     - Any specific tools/skills it needs? (search-repo, run-tests, etc.)
+     - What should it NOT do? (constraints)
 
-  {{#capabilities}}
-  **Capabilities:**
-  {{capabilities}}
-  {{/capabilities}}
+  2. **Suggest structure:**
+     - Propose a kebab-case ID
+     - Suggest relevant rulepacks (base, coding-*, security, reviewer, etc.)
+     - Recommend temperature (0.3 for precise, 0.7 for balanced, 1.0 for creative)
 
-  **Requirements:**
+  3. **Create simple agent.yml with:**
+     - id, version (1.0.0), purpose (clear 1-2 sentence statement)
+     - rulepacks: [base, ...relevant ones]
+     - capabilities: [...if needed]
+     - defaults: { temperature: X }
+     - prompt: { system: "Brief persona describing role and approach" }
+     - constraints: [3-5 key boundaries]
+     - metadata: author, dates, tags
 
-  1. **Required Fields:**
-     - id: {{agent_id}} (validate kebab-case)
-     - version: 1.0.0 (semver)
-     - purpose: "{{purpose}}" (10-500 chars, clear and specific)
+  **Start simple, allow detail:**
+  - System prompt: Recommend 3-5 sentences; allow more for specialized agents
+  - Constraints: Recommend 3-5 bullet points; add more if domain requires it
+  - Simple agents: ~50-80 lines; Complex agents: as needed
 
-  2. **Description (optional but recommended):**
-     - Expanded description of the agent's role and capabilities
+  **Example conversation:**
 
-  3. **Rulepacks Section:**
-     - Array of rulepack IDs to include
-     - Choose based on agent's domain:
-       - base: General coding rules (always include)
-       - coding-python, coding-typescript, coding-java, coding-kotlin: Language-specific
-       - security: For security-focused agents
-       - reviewer: For code review agents
-     - Example: [base, {{rulepacks}}]
+  User: "I need an agent that reviews security issues"
 
-  4. **Capabilities Section:**
-     - Array of required MCP capabilities
-     - Common capabilities:
-       - mcp:git: Git operations
-       - mcp:filesystem: File system access
-       - mcp:docker: Container operations
-       - mcp:database: Database access
-     {{#capabilities}}
-     - Include: [{{capabilities}}]
-     {{/capabilities}}
+  You: "Got it! A few questions:
+  - Should it focus on code vulnerabilities, or also infrastructure/config?
+  - Any specific languages? (Python, TypeScript, etc.)
+  - Should it be strict (flag everything) or balanced?
+  - Does it need git access to check commit history?"
 
-  5. **Defaults Section:**
-     - temperature: {{temperature}} (0.0-2.0)
-       - 0.0-0.3: Precise, deterministic tasks (code review, testing)
-       - 0.4-0.7: Balanced (feature building, refactoring)
-       - 0.8-1.0: Creative tasks (design, brainstorming)
-       - 1.1-2.0: Highly creative (rarely used)
-     - max_tokens: (optional, e.g., 4096)
-     - style: "terse" | "verbose" | "conversational" | "technical"
-     - model: (optional, e.g., "gpt-4")
+  User: "Code vulns in TypeScript, strict approach, no git needed"
 
-  6. **Prompt Section:**
-     - system: Comprehensive system prompt that:
-       - Establishes agent identity and expertise
-       - Defines the agent's approach and methodology
-       - Lists what the agent focuses on
-       - Explains the agent's process or workflow
-       - Sets tone and communication style
-     - user_template: (optional) Template for user messages
-     - includes: (optional) Array of files to include in prompt
+  You: "Perfect! I'll create 'security-reviewer' with:
+  - Purpose: Review TypeScript code for security vulnerabilities
+  - Rulepacks: base, coding-typescript, security
+  - Temperature: 0.2 (very precise)
+  - Constraints: Never approve code with known CVEs, etc.
+  Sound good?"
 
-  7. **Tools Section (optional):**
-     {{#tools}}
-     - Array of tool/skill IDs: [{{tools}}]
-     {{/tools}}
-     - Examples: search-repo, run-tests, run-linter
+  User: "Yes"
 
-  8. **Constraints Section:**
-     - Array of constraints or limitations (3-10 items)
-     - What the agent should NOT do
-     - Boundaries and safety guidelines
-     - Quality requirements
-     - Examples:
-       - "Never approve code with security vulnerabilities"
-       - "Always include test coverage for new features"
-       - "Follow existing code style and conventions"
-
-  9. **Metadata Section:**
-     - author: "AI Tools Team"
-     - created: "2025-11-16"
-     - updated: "2025-11-16"
-     - tags: Array of relevant tags (e.g., coding, security, documentation)
-
-  **System Prompt Guidelines:**
-  Create a persona-driven system prompt that includes:
-  - "You are [role/expertise]..."
-  - "Your goal is to..."
-  - "Process:" or "Approach:" with numbered steps
-  - "Focus on:" with bullet points
-  - Specific techniques or methodologies
-  - Expected output format or structure
-
-  **Output Format:**
-  - Valid YAML with proper indentation (2 spaces)
-  - Use block scalars (|) for multi-line content
-  - Include helpful inline comments
-  - Follow the schema exactly
-  - Save to: agents/{{agent_id}}.yml
-
-  **Validation:**
-  After creating the file, remind user to run:
-  ```bash
-  npm run validate
-  npm run build
-  ```
-
-outputs:
-  format: yaml
-
-examples:
-  - input:
-      agent_id: 'api-designer'
-      purpose: 'Design RESTful API endpoints with best practices and OpenAPI documentation'
-      rulepacks: 'base, coding-typescript'
-      temperature: '0.5'
-    output: |
-      # Creates a complete agent.yml with:
-      # - API design expertise persona
-      # - RESTful best practices focus
-      # - OpenAPI documentation generation
-      # - Appropriate rulepacks and constraints
-      # - Balanced temperature for design work
+  You: [Creates simple ~60 line agent.yml]
 
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"
