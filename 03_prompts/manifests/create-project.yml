@@ -1,6 +1,6 @@
 id: create-project
-version: 2.0.0
-description: Clarify project context and create a project.yml manifest
+version: 2.1.0
+description: Clarify project context and create project.yml and deploy.yml manifests
 
 tags:
   - manifests
@@ -14,11 +14,13 @@ variables:
     description: "Brief description of the project"
 
 rules:
-  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Ask clarifying questions BEFORE generating the manifests"
+  - "ALWAYS create BOTH project.yml AND deploy.yml files"
+  - "Follow the project schema (10_schemas/project.schema.json)"
+  - "Follow the deploy schema (10_schemas/deploy.schema.json)"
   - "Keep project manifests focused on essential context"
   - "Do NOT try to document the entire codebase"
   - "Focus on what AI agents & local tools generating files need to know"
-  - "Follow the project schema (10_schemas/project.schema.json)"
 
 content: |
   The user wants to create a project manifest based on this description:
@@ -40,19 +42,31 @@ content: |
      - List 5-10 essential commands
      - Recommend relevant agents
 
-  3. **Create simple project.yml with:**
+  3. **Create BOTH files:**
+
+     **project.yml** (follows 10_schemas/project.schema.json):
      - id, version (1.0.0), name, description
-     - tech_stack: { languages, backend, frontend, infrastructure }
+     - context: { overview, purpose }
+     - tech_stack: { languages, backend, frontend, infrastructure, tools }
      - commands: { test, build, run, deploy, etc. }
-     - conventions: [5-10 project-specific rules]
-     - preferences: { agents: [...], prompts: [...] }
-     - metadata: author, dates
+     - conventions: { naming, patterns, testing, structure, custom }
+     - ai_tools: { whitelist_agents, whitelist_prompts, whitelist_rulepacks }
+     - documentation: { readme, architecture, api, changelog, custom }
+     - metadata: { author, created, updated, tags }
+
+     **deploy.yml** (follows 10_schemas/deploy.schema.json):
+     - target: '/absolute/path/to/project' or './' for self-deployment
+     - tools: ['github-copilot', 'windsurf', 'cursor', 'claude-code']
+     - mode: 'local' (auto-deploy) or 'manual' (show instructions)
+     - backup: true (backup existing files before deploying)
+     - auto_commit: false (optional git auto-commit)
 
   **Start focused, allow detail:**
   - Essential context first
   - Recommend 5-10 key commands; add more if project is complex
   - Recommend 5-10 conventions; add more for specific domains
   - Simple projects: ~80-120 lines; Complex projects: as needed
+  - Always ask for project location to populate deploy.yml target
 
   **Example:**
 
@@ -62,15 +76,27 @@ content: |
   - Built with? (Node, Deno, Bun?)
   - Test framework?
   - Key commands? (test, build, run?)
+  - Project location? (absolute path for deploy.yml target)
+  - Which AI tools? (github-copilot, windsurf, cursor, claude-code?)
   - Preferred agents? (feature-builder, code-reviewer?)"
 
-  User: "Node + TypeScript, Vitest for tests, npm test/build/start"
+  User: "Node + TypeScript, Vitest for tests, npm test/build/start, /home/user/projects/my-cli"
 
-  You: "Perfect! I'll create project manifest with:
+  You: "Perfect! I'll create:
+  
+  **project.yml:**
+  - id: my-cli
   - Tech: typescript, node.js
   - Commands: test, build, start, lint
   - Conventions: TypeScript strict mode, test coverage 80%
   - Agents: feature-builder, code-reviewer, bug-fixer
+  
+  **deploy.yml:**
+  - target: /home/user/projects/my-cli
+  - tools: [github-copilot, windsurf, cursor, claude-code]
+  - mode: local
+  - backup: true
+  
   Sound good?"
 
 outputs:

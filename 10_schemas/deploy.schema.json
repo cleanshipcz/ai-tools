@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/cleanshipcz/ai-tools/schemas/deploy.schema.json",
+  "title": "Deploy Configuration",
+  "description": "Schema for project deployment configuration",
+  "type": "object",
+  "required": ["target", "tools", "mode"],
+  "properties": {
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Target directory path (relative or absolute) where AI tool configs will be deployed"
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "github-copilot",
+          "windsurf",
+          "cursor",
+          "claude-code",
+          "copilot-cli"
+        ]
+      },
+      "description": "List of AI coding tools to generate configurations for"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["local", "manual"],
+      "description": "Deployment mode: 'local' for automatic deployment, 'manual' for instructions only"
+    },
+    "backup": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to backup existing files before deploying"
+    },
+    "auto_commit": {
+      "type": "boolean",
+      "default": false,
+      "description": "Automatically commit changes to git (requires mode: local and git repository)"
+    },
+    "git_branch": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9/_-]+$",
+      "description": "Git branch name to use for auto-commit (optional)"
+    }
+  },
+  "additionalProperties": false
+}
