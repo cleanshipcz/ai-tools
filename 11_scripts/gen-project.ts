@@ -4,6 +4,14 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { load as loadYaml } from 'js-yaml';
 import chalk from 'chalk';
+import {
+  PROJECTS_DIR,
+  AGENTS_DIR,
+  RULEPACKS_DIR,
+  PROMPTS_DIR,
+  RECIPES_DIR,
+  PROJECT_MANIFEST_FILE,
+} from './constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -238,12 +246,12 @@ export class ProjectGenerator {
 
   private async loadProject(projectId: string): Promise<void> {
     // Check global projects first
-    let projectPath = join(rootDir, '06_projects', 'global', projectId, 'project.yml');
+    let projectPath = join(rootDir, PROJECTS_DIR, 'global', projectId, PROJECT_MANIFEST_FILE);
     let exists = await this.fileExists(projectPath);
 
     if (!exists) {
       // Check local projects
-      projectPath = join(rootDir, '06_projects', 'local', projectId, 'project.yml');
+      projectPath = join(rootDir, PROJECTS_DIR, 'local', projectId, PROJECT_MANIFEST_FILE);
       exists = await this.fileExists(projectPath);
     }
 
@@ -251,7 +259,7 @@ export class ProjectGenerator {
       // Check external projects
       const externalPath = await this.findExternalProject(projectId);
       if (externalPath) {
-        projectPath = join(externalPath, 'project.yml');
+        projectPath = join(externalPath, PROJECT_MANIFEST_FILE);
         exists = await this.fileExists(projectPath);
       }
     }
@@ -337,7 +345,7 @@ export class ProjectGenerator {
   }
 
   private async loadPromptsMap(): Promise<void> {
-    const promptsDir = join(rootDir, '03_prompts');
+    const promptsDir = join(rootDir, PROMPTS_DIR);
     try {
       const files = await this.findYamlFilesRelative(promptsDir);
 
@@ -364,7 +372,7 @@ export class ProjectGenerator {
     }
 
     // Load from file
-    const agentPath = join(rootDir, '04_agents', `${agentId}.yml`);
+    const agentPath = join(rootDir, AGENTS_DIR, `${agentId}.yml`);
     try {
       const content = await readFile(agentPath, 'utf-8');
       const agent = loadYaml(content) as Agent;
@@ -464,7 +472,7 @@ export class ProjectGenerator {
     }
 
     try {
-      const rulepackPath = join(rootDir, '01_rulepacks', `${rulepackId}.yml`);
+      const rulepackPath = join(rootDir, RULEPACKS_DIR, `${rulepackId}.yml`);
       const content = await readFile(rulepackPath, 'utf-8');
       const rulepack = loadYaml(content) as Rulepack;
       this.rulepacksCache.set(rulepackId, rulepack);
@@ -1583,7 +1591,7 @@ export class ProjectGenerator {
 
   // Static helper for agent loading (can be used by other generators)
   public static async loadAgentStatic(agentId: string): Promise<Agent | null> {
-    const agentPath = join(rootDir, '04_agents', `${agentId}.yml`);
+    const agentPath = join(rootDir, AGENTS_DIR, `${agentId}.yml`);
     try {
       const content = await readFile(agentPath, 'utf-8');
       const agent = loadYaml(content) as Agent;
@@ -1915,11 +1923,11 @@ export class ProjectGenerator {
     console.log(chalk.blue('\n📋 Available Projects:\n'));
 
     console.log(chalk.bold('Global Projects:'));
-    await this.listProjectsInDir(join(rootDir, '06_projects', 'global'));
+    await this.listProjectsInDir(join(rootDir, PROJECTS_DIR, 'global'));
 
     console.log('');
     console.log(chalk.bold('Local Projects:'));
-    await this.listProjectsInDir(join(rootDir, '06_projects', 'local'));
+    await this.listProjectsInDir(join(rootDir, PROJECTS_DIR, 'local'));
 
     console.log('');
     console.log(chalk.bold('External Projects:'));
@@ -1940,7 +1948,7 @@ export class ProjectGenerator {
       }
 
       for (const project of projects) {
-        const projectPath = join(project.path, 'project.yml');
+        const projectPath = join(project.path, PROJECT_MANIFEST_FILE);
         if (await this.fileExists(projectPath)) {
           const content = await readFile(projectPath, 'utf-8');
           const projectData = loadYaml(content) as Project;
@@ -1953,7 +1961,7 @@ export class ProjectGenerator {
         } else {
           console.log(
             chalk.yellow(`  • ${project.alias}`) +
-              chalk.gray(` - No project.yml found`) +
+              chalk.gray(` - No ${PROJECT_MANIFEST_FILE} found`) +
               chalk.dim(` [${project.scope}]`)
           );
         }
@@ -1969,7 +1977,7 @@ export class ProjectGenerator {
 
       for (const entry of entries) {
         if (entry.isDirectory() && entry.name !== '.template') {
-          const projectPath = join(dir, entry.name, 'project.yml');
+          const projectPath = join(dir, entry.name, PROJECT_MANIFEST_FILE);
           if (await this.fileExists(projectPath)) {
             const content = await readFile(projectPath, 'utf-8');
             const project = loadYaml(content) as Project;

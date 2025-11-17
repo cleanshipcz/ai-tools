@@ -4,6 +4,13 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { load as loadYaml, dump as dumpYaml } from 'js-yaml';
 import chalk from 'chalk';
+import {
+  PROJECTS_DIR,
+  PROJECT_SCOPE_GLOBAL,
+  PROJECT_SCOPE_LOCAL,
+  PROJECT_MANIFEST_FILE,
+  DEPLOY_CONFIG_FILE,
+} from './constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,7 +36,7 @@ class ProjectCreator {
     }
 
     // Check if project already exists
-    const projectDir = join(rootDir, '06_projects', scope, projectId);
+    const projectDir = join(rootDir, PROJECTS_DIR, scope, projectId);
     try {
       await readdir(projectDir);
       throw new Error(`Project already exists: ${projectId} in ${scope}`);
@@ -39,10 +46,10 @@ class ProjectCreator {
 
     // Create project directory
     await mkdir(projectDir, { recursive: true });
-    console.log(chalk.gray(`  Created directory: projects/${scope}/${projectId}/`));
+    console.log(chalk.gray(`  Created directory: ${PROJECTS_DIR}/${scope}/${projectId}/`));
 
     // Copy and customize template files
-    const templateDir = join(rootDir, 'projects', 'global', 'template');
+    const templateDir = join(rootDir, PROJECTS_DIR, PROJECT_SCOPE_GLOBAL, 'template');
 
     // Copy project.yml
     const projectYmlPath = join(templateDir, 'project.yml');
@@ -82,15 +89,19 @@ class ProjectCreator {
     console.log(chalk.green(`\n✅ Project created successfully!\n`));
     console.log(chalk.bold('Next steps:'));
     console.log(
-      chalk.gray(`  1. Edit projects/${scope}/${projectId}/project.yml with your project details`)
+      chalk.gray(
+        `  1. Edit ${PROJECTS_DIR}/${scope}/${projectId}/${PROJECT_MANIFEST_FILE} with your project details`
+      )
     );
     console.log(
-      chalk.gray(`  2. Edit projects/${scope}/${projectId}/deploy.yml with deployment settings`)
+      chalk.gray(
+        `  2. Edit ${PROJECTS_DIR}/${scope}/${projectId}/${DEPLOY_CONFIG_FILE} with deployment settings`
+      )
     );
     if (scope === 'global') {
       console.log(
         chalk.gray(
-          `  3. Create projects/${scope}/${projectId}/deploy.local.yml for local overrides`
+          `  3. Create ${PROJECTS_DIR}/${scope}/${projectId}/deploy.local.yml for local overrides`
         )
       );
     }
@@ -140,8 +151,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error(chalk.red('Error: Project name required'));
     console.log('\nUsage: npm run project:create <name> [--global] [--description "..."]');
     console.log('\nOptions:');
-    console.log('  --global          Create in projects/global/ (default: local)');
-    console.log('  --local           Create in projects/local/ (default)');
+    console.log(
+      `  --global          Create in ${PROJECTS_DIR}/${PROJECT_SCOPE_GLOBAL}/ (default: local)`
+    );
+    console.log(`  --local           Create in ${PROJECTS_DIR}/${PROJECT_SCOPE_LOCAL}/ (default)`);
     console.log('  --description, -d Project description');
     console.log('\nExamples:');
     console.log('  npm run project:create my-web-app');

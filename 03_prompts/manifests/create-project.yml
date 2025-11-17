@@ -1,6 +1,6 @@
 id: create-project
 version: 2.0.0
-description: Clarify project context and create a simple project.yml manifest
+description: Clarify project context and create a project.yml manifest
 
 tags:
   - manifests
@@ -11,13 +11,14 @@ tags:
 variables:
   - name: user_description
     required: true
-    description: 'Brief description of the project'
+    description: "Brief description of the project"
 
 rules:
-  - 'Ask clarifying questions BEFORE generating the manifest'
-  - 'Keep project manifests focused on essential context'
-  - 'Do NOT try to document the entire codebase'
-  - 'Focus on what AI agents need to know'
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Keep project manifests focused on essential context"
+  - "Do NOT try to document the entire codebase"
+  - "Focus on what AI agents & local tools generating files need to know"
+  - "Follow the project schema (10_schemas/project.schema.json)"
 
 content: |
   The user wants to create a project manifest based on this description:
@@ -76,6 +77,6 @@ outputs:
   format: yaml
 
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

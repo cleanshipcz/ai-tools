@@ -15,8 +15,8 @@ PROMPT_LIBRARY.html
 docs/AGENTS.md
 
 # Projects
-projects/local/
-projects/projects.local.yml
+06_projects/local/
+06_projects/projects.local.yml
 .output/
 
 # Eval reports

@@ -6,6 +6,13 @@ import { load as loadYaml } from 'js-yaml';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { ProjectGenerator } from './gen-project.js';
+import {
+  PROJECTS_DIR,
+  DEPLOY_CONFIG_FILE,
+  DEPLOY_LOCAL_CONFIG_FILE,
+  OUTPUT_DIR,
+  BACKUPS_DIR,
+} from './constants.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,7 +31,7 @@ class ProjectDeployer {
   private dryRun: boolean = false;
   private force: boolean = false;
   private confirm: boolean = true;
-  private backupDir: string = '.backups';
+  private backupDir: string = BACKUPS_DIR;
 
   async deploy(
     projectId: string,
@@ -59,12 +66,12 @@ class ProjectDeployer {
     const projectIds: string[] = [];
 
     // Check global projects
-    const globalDir = join(rootDir, '06_projects', 'global');
+    const globalDir = join(rootDir, PROJECTS_DIR, 'global');
     try {
       const globalEntries = await readdir(globalDir, { withFileTypes: true });
       for (const entry of globalEntries) {
         if (entry.isDirectory() && entry.name !== 'template') {
-          const deployPath = join(globalDir, entry.name, 'deploy.yml');
+          const deployPath = join(globalDir, entry.name, DEPLOY_CONFIG_FILE);
           try {
             await access(deployPath);
             projectIds.push(entry.name);
@@ -78,12 +85,12 @@ class ProjectDeployer {
     }
 
     // Check local projects
-    const localDir = join(rootDir, '06_projects', 'local');
+    const localDir = join(rootDir, PROJECTS_DIR, 'local');
     try {
       const localEntries = await readdir(localDir, { withFileTypes: true });
       for (const entry of localEntries) {
         if (entry.isDirectory() && entry.name !== 'README.md' && !entry.name.startsWith('.')) {
-          const deployPath = join(localDir, entry.name, 'deploy.yml');
+          const deployPath = join(localDir, entry.name, DEPLOY_CONFIG_FILE);
           try {
             await access(deployPath);
             projectIds.push(entry.name);
@@ -102,7 +109,7 @@ class ProjectDeployer {
       const manager = new ExternalProjectManager();
       const externalProjects = await manager.getAllProjects();
       for (const project of externalProjects) {
-        const deployPath = join(project.path, 'deploy.yml');
+        const deployPath = join(project.path, DEPLOY_CONFIG_FILE);
         try {
           await access(deployPath);
           projectIds.push(project.alias);
@@ -172,8 +179,8 @@ class ProjectDeployer {
     // Find project directory (check global first, then local, then external)
     let projectDir: string | null = null;
 
-    const globalProjectDir = join(rootDir, '06_projects', 'global', projectId);
-    const localProjectDir = join(rootDir, '06_projects', 'local', projectId);
+    const globalProjectDir = join(rootDir, PROJECTS_DIR, 'global', projectId);
+    const localProjectDir = join(rootDir, PROJECTS_DIR, 'local', projectId);
 
     try {
       await access(globalProjectDir);
@@ -203,7 +210,7 @@ class ProjectDeployer {
     }
 
     // Load deploy.yml
-    const deployPath = join(projectDir, 'deploy.yml');
+    const deployPath = join(projectDir, DEPLOY_CONFIG_FILE);
     let config: DeploymentConfig;
 
     try {
@@ -212,12 +219,12 @@ class ProjectDeployer {
       console.log(chalk.gray('  Loaded deployment configuration'));
     } catch {
       throw new Error(
-        `No deploy.yml found in project: ${projectId}\nCreate ${deployPath} with deployment configuration.`
+        `No ${DEPLOY_CONFIG_FILE} found in project: ${projectId}\nCreate ${deployPath} with deployment configuration.`
       );
     }
 
     // Load deploy.local.yml if exists and merge
-    const localDeployPath = join(projectDir, 'deploy.local.yml');
+    const localDeployPath = join(projectDir, DEPLOY_LOCAL_CONFIG_FILE);
 
     try {
       await access(localDeployPath);
@@ -438,7 +445,7 @@ class ProjectDeployer {
   }
 
   private async findOutputDir(projectId: string): Promise<string> {
-    const outputDir = join(rootDir, '.output', projectId);
+    const outputDir = join(rootDir, OUTPUT_DIR, projectId);
 
     try {
       await access(outputDir);
