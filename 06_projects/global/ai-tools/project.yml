@@ -1,7 +1,7 @@
 id: ai-tools
 version: 1.0.0
-name: 'AI Tools Repository'
-description: 'A unified mono-repository for AI agent configuration - define once in YAML, deploy everywhere'
+name: "AI Tools Repository"
+description: "A unified mono-repository for AI agent configuration - define once in YAML, deploy everywhere"
 
 context:
   overview: |
@@ -14,7 +14,7 @@ context:
     It includes prompts for common tasks, agents for specific roles, rulepacks for coding standards,
     skills for tool integrations, and a project system for per-project configurations.
 
-  purpose: 'Enable teams to manage AI coding assistant configurations as code, with version control, validation, and automated deployment'
+  purpose: "Enable teams to manage AI coding assistant configurations as code, with version control, validation, and automated deployment"
 
 tech_stack:
   languages:
@@ -36,105 +36,109 @@ tech_stack:
     - prettier
 
 documentation:
-  readme: 'README.md'
+  readme: "README.md"
   main_docs:
-    prompts: 'prompts/README.md'
-    agents: 'docs/AGENTS.md'
-    skills: 'skills/README.md'
-    projects: 'projects/README.md'
-    tools: 'docs/TOOLS.md'
-    user_tools: 'docs/USER_TOOLS.md'
+    prompts: "03_prompts/README.md"
+    agents: "AGENTS.md"
+    skills: "02_skills/README.md"
+    projects: "06_projects/README.md"
+    recipes: "05_recipes/README.md"
+    tools: "90_docs/TOOLS.md"
+    user_tools: "90_docs/USER_TOOLS.md"
+    testing: "90_docs/TESTING.md"
   development:
-    style_guide: 'docs/STYLE_GUIDE.md'
-    changelog: 'docs/CHANGELOG.md'
-    planned_features: 'PLANNED_FEATURES.md'
+    style_guide: "90_docs/STYLE_GUIDE.md"
+    changelog: "90_docs/CHANGELOG.md"
+    planned_features: "90_docs/PLANNED_FEATURES.md"
+    implementation: "IMPLEMENTATION.md"
   schemas:
-    prompt: 'schemas/prompt.schema.json'
-    agent: 'schemas/agent.schema.json'
-    rulepack: 'schemas/rulepack.schema.json'
-    skill: 'schemas/skill.schema.json'
-    project: 'schemas/project.schema.json'
-    eval: 'schemas/eval.schema.json'
+    prompt: "10_schemas/prompt.schema.json"
+    agent: "10_schemas/agent.schema.json"
+    rulepack: "10_schemas/rulepack.schema.json"
+    skill: "10_schemas/skill.schema.json"
+    project: "10_schemas/project.schema.json"
+    feature: "10_schemas/feature.schema.json"
+    recipe: "10_schemas/recipe.schema.json"
+    eval: "10_schemas/eval.schema.json"
 
 commands:
   validation:
-    all: 'npm run validate'
-    lint: 'npm run lint'
-    format: 'npm run format'
+    all: "npm run validate"
+    lint: "npm run lint"
+    format: "npm run format"
 
   build:
-    all: 'npm run build'
-    docs: 'npm run docs'
-    skills: 'npm run skills'
+    all: "npm run build"
+    docs: "npm run docs"
+    skills: "npm run skills"
 
   generation:
-    prompt_library: 'npm run prompt-library'
-    prompt_html: 'npm run prompt-html'
-    use_prompt: 'npm run use-prompt'
+    prompt_library: "npm run prompt-library"
+    prompt_html: "npm run prompt-html"
+    use_prompt: "npm run use-prompt"
 
   projects:
-    create: 'npm run project:create <name>'
-    list: 'npm run project:list'
-    generate: 'npm run project:generate <project-id>'
-    deploy: 'npm run project:deploy <project-id>'
+    create: "npm run project:create <name>"
+    list: "npm run project:list"
+    generate: "npm run project:generate <project-id>"
+    deploy: "npm run project:deploy <project-id>"
 
   testing:
-    validate_and_build: 'npm test'
-    full_ci: 'npm run ci'
-    eval: 'npm run eval'
+    validate_and_build: "npm test"
+    full_ci: "npm run ci"
+    eval: "npm run eval"
 
   cleanup:
-    clean: 'npm run clean'
+    clean: "npm run clean"
 
 conventions:
   naming:
-    - 'Use kebab-case for manifest IDs (e.g., write-tests, code-reviewer)'
-    - 'Use kebab-case for file names (e.g., extract-method.yml)'
-    - 'Use camelCase for TypeScript functions and variables'
-    - 'Use PascalCase for TypeScript classes'
+    - "Use kebab-case for manifest IDs (e.g., write-tests, code-reviewer)"
+    - "Use kebab-case for file names (e.g., extract-method.yml)"
+    - "Use camelCase for TypeScript functions and variables"
+    - "Use PascalCase for TypeScript classes"
 
   patterns:
-    - 'All manifests must be YAML files with .yml extension'
-    - 'Follow JSON Schema definitions in schemas/ directory'
-    - 'Use semantic versioning for manifest versions (semver)'
-    - 'Include comprehensive descriptions (10-500 characters)'
-    - 'Organize manifests by category in appropriate directories'
+    - "All manifests must be YAML files with .yml extension"
+    - "Follow JSON Schema definitions in schemas/ directory"
+    - "Use semantic versioning for manifest versions (semver)"
+    - "Include comprehensive descriptions (10-500 characters)"
+    - "Organize manifests by category in appropriate directories"
 
   structure:
-    - 'prompts/ - Organized by category (refactor/, qa/, docs/)'
-    - 'agents/ - Agent manifests defining roles and behaviors'
-    - 'rulepacks/ - Coding standards and style rules'
-    - 'skills/ - Tool integrations and capabilities'
-    - 'projects/ - Project-specific configurations (global/ and local/)'
-    - 'schemas/ - JSON Schema definitions for validation'
-    - 'scripts/ - Build and utility scripts in TypeScript'
-    - 'adapters/ - Generated tool-specific outputs (gitignored)'
+    - "03_prompts/ - Organized by category (refactor/, qa/, docs/)"
+    - "04_agents/ - Agent manifests defining roles and behaviors"
+    - "01_rulepacks/ - Coding standards and style rules"
+    - "02_skills/ - Tool integrations and capabilities"
+    - "05_recipes/ - Multi-agent workflow definitions"
+    - "06_projects/ - Project-specific configurations (global/ and local/)"
+    - "10_schemas/ - JSON Schema definitions for validation"
+    - "11_scripts/ - Build and utility scripts in TypeScript"
+    - "12_templates/ - Template files for generation"
+    - "20_evals/ - Evaluation suites and test cases"
+    - "90_docs/ - Documentation files"
+    - "adapters/ - Generated tool-specific outputs (gitignored)"
 
   testing:
-    - 'Use Vitest as the test framework for TypeScript code'
-    - 'Test files mirror source structure: 11_scripts/foo.ts → 11_scripts/foo.test.ts'
-    - 'Run tests via: npm test (will run vitest when implemented)'
-    - 'All TypeScript scripts in 11_scripts/ should have corresponding .test.ts files'
-    - 'Test coverage target: 80% for new code'
-    - 'Run npm run validate before committing'
-    - 'Ensure all schemas pass validation'
-    - 'Test generated outputs with npm run build'
-    - 'Verify tool-specific adapters are correct'
+    - "Use Vitest as the test framework for TypeScript code"
+    - "Test files mirror source structure: 11_scripts/foo.ts → 11_scripts/foo.test.ts"
+    - "Run tests via: npm test (will run vitest when implemented)"
+    - "All TypeScript scripts in 11_scripts/ should have corresponding .test.ts files"
+    - "Test coverage target: 80% for new code"
+    - "Run npm run validate before committing"
+    - "Ensure all schemas pass validation"
+    - "Test generated outputs with npm run build"
+    - "Verify tool-specific adapters are correct"
 
   documentation:
-    - 'Update README.md for user-facing features'
-    - 'Document new manifest types in appropriate docs/'
-    - 'Include examples in manifest files'
-    - 'Keep CHANGELOG.md updated for releases'
-    - 'Add helpful comments in YAML manifests'
+    - "Update README.md for user-facing features"
+    - "Document new manifest types in appropriate docs/"
+    - "Include examples in manifest files"
+    - "Keep CHANGELOG.md updated for releases"
+    - "Add helpful comments in YAML manifests"
 
 ai_tools:
-  model: 'claude-haiku-4.5'
-  preferred_agents:
-    - code-reviewer
-    - feature-builder
-    - bug-fixer
-    - prompt-engineer
+  model: "claude-sonnet-4.5"
 
   whitelist_agents:
     - code-reviewer
@@ -176,11 +180,6 @@ ai_tools:
     - manifests/create-skill
     - manifests/create-recipe
 
-  preferred_rulepacks:
-    - base
-    - testing
-    - coding-typescript
-
   whitelist_rulepacks:
     - base
     - testing
@@ -191,26 +190,26 @@ ai_tools:
     - major-refactoring-cycle
 
   custom_rules:
-    - 'Always use chalk for colored terminal output'
-    - 'Use Ajv with ajv-formats for JSON Schema validation'
-    - 'Export classes from scripts for reusability (e.g., ProjectGenerator)'
-    - 'Use import.meta.url guards for CLI entry points'
-    - 'Follow the existing manifest structure - id, version, description are required'
-    - 'Generate tool-specific outputs in adapters/ directory (gitignored)'
-    - 'Keep source manifests in prompts/, agents/, rulepacks/, skills/'
-    - 'Use TypeScript strict mode with ES modules'
-    - 'Prefer async/await over callbacks'
-    - 'Use js-yaml for YAML parsing and dumping'
-    - 'All new features must include automated tests before being considered complete'
-    - 'Test infrastructure setup (Vitest) is a prerequisite for any feature work'
-    - 'No feature PRs without automated tests'
+    - "Always use chalk for colored terminal output"
+    - "Use Ajv with ajv-formats for JSON Schema validation"
+    - "Export classes from scripts for reusability (e.g., ProjectGenerator)"
+    - "Use import.meta.url guards for CLI entry points"
+    - "Follow the existing manifest structure - id, version, description are required"
+    - "Generate tool-specific outputs in adapters/ directory (gitignored)"
+    - "Keep source manifests in 03_prompts/, 04_agents/, 01_rulepacks/, 02_skills/, 05_recipes/"
+    - "Use TypeScript strict mode with ES modules"
+    - "Prefer async/await over callbacks"
+    - "Use js-yaml for YAML parsing and dumping"
+    - "All new features must include automated tests before being considered complete"
+    - "Test infrastructure setup (Vitest) is a prerequisite for any feature work"
+    - "No feature PRs without automated tests"
 
 metadata:
-  repository: 'https://github.com/cleanshipcz/ai-tools'
+  repository: "https://github.com/cleanshipcz/ai-tools"
   maintainers:
-    - 'cleanshipcz'
-  created: '2025-11-15'
-  updated: '2025-11-16'
+    - "cleanshipcz"
+  created: "2025-11-15"
+  updated: "2025-11-16"
   tags:
     - ai
     - tooling

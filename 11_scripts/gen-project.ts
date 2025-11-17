@@ -134,11 +134,21 @@ interface RecipeStep {
   };
 }
 
+interface Rulepack {
+  id: string;
+  extends?: string[];
+  rules: string[];
+  metadata?: {
+    tags?: string[];
+  };
+}
+
 export class ProjectGenerator {
   private project: Project | null = null;
   private projectDir: string = '';
   private promptsMap = new Map<string, string>(); // Maps prompt ID to its path
   private agentsCache = new Map<string, Agent>(); // Cache loaded agents
+  private rulepacksCache = new Map<string, Rulepack>(); // Cache loaded rulepacks
 
   // Public method to allow sharing agent loading logic
   public async loadAgentById(agentId: string): Promise<Agent | null> {
@@ -447,7 +457,24 @@ export class ProjectGenerator {
     return true;
   }
 
-  private shouldIncludeRulepack(rulepackId: string): boolean {
+  private async loadRulepack(rulepackId: string): Promise<Rulepack | null> {
+    // Check cache first
+    if (this.rulepacksCache.has(rulepackId)) {
+      return this.rulepacksCache.get(rulepackId)!;
+    }
+
+    try {
+      const rulepackPath = join(rootDir, '01_rulepacks', `${rulepackId}.yml`);
+      const content = await readFile(rulepackPath, 'utf-8');
+      const rulepack = loadYaml(content) as Rulepack;
+      this.rulepacksCache.set(rulepackId, rulepack);
+      return rulepack;
+    } catch {
+      return null;
+    }
+  }
+
+  private async shouldIncludeRulepack(rulepackId: string): Promise<boolean> {
     if (!this.project?.ai_tools) return true;
 
     const { whitelist_rulepacks, blacklist_rulepacks } = this.project.ai_tools;
@@ -462,8 +489,83 @@ export class ProjectGenerator {
       return !blacklist_rulepacks.includes(rulepackId);
     }
 
-    // No filtering configured, include all
+    // Tech-stack filtering: if project has tech_stack.languages defined,
+    // only include rulepacks that match the tech stack
+    if (this.project?.tech_stack?.languages && this.project.tech_stack.languages.length > 0) {
+      const rulepack = await this.loadRulepack(rulepackId);
+      if (rulepack?.metadata?.tags) {
+        const techStackLanguages = this.project.tech_stack.languages.map((lang) =>
+          lang.toLowerCase()
+        );
+        const rulepackTags = rulepack.metadata.tags.map((tag) => tag.toLowerCase());
+
+        // Check if any rulepack tag matches any tech-stack language
+        const hasLanguageMatch = rulepackTags.some((tag) => techStackLanguages.includes(tag));
+
+        // Special case: always include non-language-specific rulepacks (base, testing, security, reviewer, etc.)
+        const isLanguageSpecific = rulepackTags.some((tag) =>
+          [
+            'java',
+            'kotlin',
+            'python',
+            'typescript',
+            'javascript',
+            'go',
+            'rust',
+            'c++',
+            'c#',
+          ].includes(tag)
+        );
+
+        if (isLanguageSpecific && !hasLanguageMatch) {
+          return false; // Exclude language-specific rulepacks that don't match
+        }
+      }
+    }
+
+    // No filtering configured or passed all checks, include
     return true;
+  }
+
+  /**
+   * Resolve rulepacks into flat list of rules, filtering by tech-stack.
+   * Similar to build.ts resolveRulepacks() but with filtering.
+   */
+  private async resolveRulepacks(rulepackIds: string[]): Promise<string[]> {
+    const resolved: string[] = [];
+    const visited = new Set<string>();
+
+    const resolve = async (id: string) => {
+      if (visited.has(id)) return;
+      visited.add(id);
+
+      // Check if we should include this rulepack based on project config
+      if (!(await this.shouldIncludeRulepack(id))) {
+        return;
+      }
+
+      const rulepack = await this.loadRulepack(id);
+      if (!rulepack) {
+        console.warn(chalk.yellow(`  Warning: Rulepack "${id}" not found`));
+        return;
+      }
+
+      // Resolve parent rulepacks first
+      if (rulepack.extends) {
+        for (const parentId of rulepack.extends) {
+          await resolve(parentId);
+        }
+      }
+
+      // Add this rulepack's rules
+      resolved.push(...rulepack.rules);
+    };
+
+    for (const id of rulepackIds) {
+      await resolve(id);
+    }
+
+    return resolved;
   }
 
   private async generateGitHubCopilot(outputDir: string): Promise<void> {
@@ -535,7 +637,7 @@ export class ProjectGenerator {
         } else if (entry.name.endsWith('.instructions.md')) {
           // Rulepack instructions file
           const rulepackId = entry.name.replace(/\.instructions\.md$/, '');
-          if (!this.shouldIncludeRulepack(rulepackId)) {
+          if (!(await this.shouldIncludeRulepack(rulepackId))) {
             continue; // Skip this rulepack file
           }
         }
@@ -911,6 +1013,9 @@ export class ProjectGenerator {
           if (!this.shouldIncludeAgent(agentId)) {
             continue; // Skip this agent file
           }
+
+          // REGENERATE agent file with filtered rulepacks instead of copying
+          await this.generateWindsurfAgentFile(agentId, destPath);
         } else if (entry.name.startsWith('prompt-')) {
           // Convert prompt-docs-create-tutorial.md to docs/create-tutorial
           const withoutPrefix = entry.name.replace(/^prompt-/, '').replace(/\.md$/, '');
@@ -918,12 +1023,73 @@ export class ProjectGenerator {
           if (!this.shouldIncludePrompt(promptPath)) {
             continue; // Skip this prompt file
           }
+          await copyFile(srcPath, destPath);
+        } else {
+          await copyFile(srcPath, destPath);
         }
-        await copyFile(srcPath, destPath);
       } else {
         await copyFile(srcPath, destPath);
       }
     }
+  }
+
+  /**
+   * Generate Windsurf agent markdown file with filtered rulepacks.
+   * This regenerates the agent content instead of copying pre-built files.
+   */
+  private async generateWindsurfAgentFile(agentId: string, destPath: string): Promise<void> {
+    const agent = await this.loadAgent(agentId);
+    if (!agent) {
+      console.warn(chalk.yellow(`  Warning: Agent "${agentId}" not found, skipping`));
+      return;
+    }
+
+    const content: string[] = [];
+
+    // YAML frontmatter
+    content.push('---');
+    content.push('trigger: manual');
+    content.push('---');
+    content.push('');
+
+    // Agent header
+    content.push(`# Agent: ${agentId}`);
+    content.push('');
+    content.push(`**Purpose:** ${agent.purpose}`);
+    content.push('');
+
+    // Persona section (from system prompt)
+    if (agent.prompt?.system) {
+      content.push('## Persona');
+      content.push('');
+      content.push(agent.prompt.system);
+      content.push('');
+    }
+
+    // Constraints
+    if (agent.constraints && agent.constraints.length > 0) {
+      content.push('## Constraints');
+      content.push('');
+      for (const constraint of agent.constraints) {
+        content.push(`- ${constraint}`);
+      }
+      content.push('');
+    }
+
+    // Resolve and include filtered rulepacks
+    if (agent.rulepacks && agent.rulepacks.length > 0) {
+      const rules = await this.resolveRulepacks(agent.rulepacks);
+      if (rules.length > 0) {
+        content.push('## Rules');
+        content.push('');
+        for (const rule of rules) {
+          content.push(`- ${rule}`);
+        }
+        content.push('');
+      }
+    }
+
+    await writeFile(destPath, content.join('\n'), 'utf-8');
   }
 
   private async generateCursor(outputDir: string): Promise<void> {

@@ -414,6 +414,70 @@ describe('ProjectGenerator - Recipe Script Generation', () => {
       }
     });
   });
+
+  describe('Tech-stack filtering', () => {
+    it('should filter rulepacks by project tech-stack (TypeScript project)', async () => {
+      const { existsSync, readFileSync, readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+
+      // Check if we have a generated output for ai-tools project (which has tech_stack: [typescript])
+      const outputDir = join(rootDir, '.output', 'ai-tools', 'windsurf', '.windsurf', 'rules');
+
+      if (existsSync(outputDir)) {
+        const files = readdirSync(outputDir);
+        const agentFiles = files.filter((f) => f.startsWith('agent-'));
+
+        // Check a sample agent file
+        const featureBuilderFile = join(outputDir, 'agent-feature-builder.md');
+
+        if (existsSync(featureBuilderFile)) {
+          const content = readFileSync(featureBuilderFile, 'utf-8');
+
+          // Should contain TypeScript rules
+          expect(content).toContain('TypeScript');
+          expect(content).toContain('strict: true');
+          expect(content).toContain('PascalCase for types/interfaces');
+
+          // Should NOT contain Java rules (different tech-stack)
+          expect(content).not.toContain('Follow Java naming conventions');
+          expect(content).not.toContain('JavaDoc');
+          expect(content).not.toContain('JUnit 5');
+
+          // Should NOT contain Kotlin rules (different tech-stack)
+          expect(content).not.toContain('Follow Kotlin coding conventions');
+          expect(content).not.toContain('sealed classes for restricted class hierarchies');
+          expect(content).not.toContain('JUnit5 + MockK');
+
+          // Should NOT contain Python rules (different tech-stack)
+          expect(content).not.toContain('Follow PEP 8');
+          expect(content).not.toContain('Use pathlib for file path operations');
+          expect(content).not.toContain('Prefer f-strings for string formatting');
+        }
+      }
+    });
+
+    it('should include non-language-specific rulepacks regardless of tech-stack', async () => {
+      const { existsSync, readFileSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+
+      const outputDir = join(rootDir, '.output', 'ai-tools', 'windsurf', '.windsurf', 'rules');
+
+      if (existsSync(outputDir)) {
+        const featureBuilderFile = join(outputDir, 'agent-feature-builder.md');
+
+        if (existsSync(featureBuilderFile)) {
+          const content = readFileSync(featureBuilderFile, 'utf-8');
+
+          // Should always include base, testing, security rules
+          expect(content).toContain('Be precise and accurate');
+          expect(content).toContain('automated tests');
+          expect(content).toContain('Test coverage');
+        }
+      }
+    });
+  });
 });
 
 /**
@@ -424,4 +488,6 @@ describe('ProjectGenerator - Recipe Script Generation', () => {
  * 4. ⏳ Add --model support from recipe config
  * 5. ⏳ Add tool permissions support
  * 6. ⏳ Verify tests pass
+ * 7. ✅ Add tech-stack filtering tests
+ * 8. ⏳ Implement tech-stack filtering in shouldIncludeRulepack
  */

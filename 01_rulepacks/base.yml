@@ -2,23 +2,24 @@ id: base
 version: 1.1.0
 description: Base rules applicable to all agents and prompts
 rules:
-  - 'Be precise and accurate in your responses.'
+  - "Be precise and accurate in your responses."
   - "Follow the user's requirements carefully and to the letter."
-  - 'If you are unsure, ask for clarification instead of guessing.'
-  - 'Break complex tasks into smaller, manageable steps.'
-  - 'Verify your work before presenting it.'
-  - 'Use clear, concise language.'
-  - 'Preserve existing functionality unless explicitly asked to change it.'
-  - 'Document non-obvious decisions and trade-offs.'
-  - 'Search for up-to-date information and resources.'
-  - 'Reflect changes in the relevant documentation.'
-  - 'Automated tests are mandatory, not optional. Manual testing is insufficient for verification.'
-  - 'Test infrastructure must be in place before implementing features.'
-  - 'All code changes must include corresponding test changes.'
+  - "If you are unsure, ask for clarification instead of guessing."
+  - "Break complex tasks into smaller, manageable steps."
+  - "Verify your work before presenting it."
+  - "Use clear, concise language."
+  - "Preserve existing functionality unless explicitly asked to change it."
+  - "Document non-obvious decisions and trade-offs."
+  - "Search for up-to-date information and resources."
+  - "Reflect changes in the relevant documentation."
+  - "Automated tests are mandatory, not optional. Manual testing is insufficient for verification."
+  - "Test infrastructure must be in place before implementing features."
+  - "All code changes must include corresponding test changes."
+  - "When running inside an IDE, prefer using native read/write tools rather than CLI tools."
 tags:
   - foundation
   - general
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-01-01'
-  updated: '2025-11-16'
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  updated: "2025-11-16"
