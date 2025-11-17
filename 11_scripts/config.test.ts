@@ -75,8 +75,9 @@ describe('config.ts', () => {
   describe('getProjectSources', () => {
     it('should return default sources when config file does not exist', async () => {
       // given
-      // - no config file exists
+      // - no config files exist
       await rm(testConfigPath, { force: true });
+      await rm(testLocalConfigPath, { force: true });
       await reloadConfig();
 
       // when
@@ -93,6 +94,7 @@ describe('config.ts', () => {
     it('should load project sources from config.yml', async () => {
       // given
       // - a config file with custom project sources
+      // - no local config file
       const configContent = `
 project_sources:
   - ./06_projects/global
@@ -101,6 +103,7 @@ project_sources:
 `;
       await mkdir(testConfigDir, { recursive: true });
       await writeFile(testConfigPath, configContent, 'utf-8');
+      await rm(testLocalConfigPath, { force: true });
       await reloadConfig();
 
       // when
@@ -116,6 +119,7 @@ project_sources:
     it('should resolve relative paths to absolute paths', async () => {
       // given
       // - a config file with relative paths
+      // - no local config file
       const configContent = `
 project_sources:
   - ./06_projects/global
@@ -123,6 +127,7 @@ project_sources:
 `;
       await mkdir(testConfigDir, { recursive: true });
       await writeFile(testConfigPath, configContent, 'utf-8');
+      await rm(testLocalConfigPath, { force: true });
       await reloadConfig();
 
       // when
@@ -139,11 +144,13 @@ project_sources:
     it('should handle empty project_sources array', async () => {
       // given
       // - a config file with empty project_sources
+      // - no local config file
       const configContent = `
 project_sources: []
 `;
       await mkdir(testConfigDir, { recursive: true });
       await writeFile(testConfigPath, configContent, 'utf-8');
+      await rm(testLocalConfigPath, { force: true });
       await reloadConfig();
 
       // when
@@ -156,11 +163,13 @@ project_sources: []
     it('should handle missing project_sources field', async () => {
       // given
       // - a config file without project_sources field
+      // - no local config file
       const configContent = `
 other_config: value
 `;
       await mkdir(testConfigDir, { recursive: true });
       await writeFile(testConfigPath, configContent, 'utf-8');
+      await rm(testLocalConfigPath, { force: true });
       await reloadConfig();
 
       // when
@@ -176,6 +185,7 @@ other_config: value
     it('should handle invalid YAML gracefully', async () => {
       // given
       // - a config file with invalid YAML
+      // - no local config file
       const configContent = `
 project_sources:
   - item1
@@ -183,6 +193,7 @@ project_sources:
 `;
       await mkdir(testConfigDir, { recursive: true });
       await writeFile(testConfigPath, configContent, 'utf-8');
+      await rm(testLocalConfigPath, { force: true });
       await reloadConfig();
 
       // when
@@ -198,6 +209,7 @@ project_sources:
     it('should support both relative and absolute paths', async () => {
       // given
       // - a config with mixed path types
+      // - no local config file
       const configContent = `
 project_sources:
   - ./06_projects/global
@@ -206,6 +218,7 @@ project_sources:
 `;
       await mkdir(testConfigDir, { recursive: true });
       await writeFile(testConfigPath, configContent, 'utf-8');
+      await rm(testLocalConfigPath, { force: true });
       await reloadConfig();
 
       // when
@@ -223,12 +236,14 @@ project_sources:
     it('should reload configuration when called', async () => {
       // given
       // - an initial config
+      // - no local config file
       const initialConfig = `
 project_sources:
   - ./initial/path
 `;
       await mkdir(testConfigDir, { recursive: true });
       await writeFile(testConfigPath, initialConfig, 'utf-8');
+      await rm(testLocalConfigPath, { force: true });
       await reloadConfig();
 
       const initialSources = await getProjectSources();
@@ -242,6 +257,7 @@ project_sources:
   - ./updated/path
 `;
       await writeFile(testConfigPath, updatedConfig, 'utf-8');
+      await rm(testLocalConfigPath, { force: true });
       await reloadConfig();
 
       // then
