@@ -8,7 +8,13 @@ Reusable collections of coding guidelines and best practices. Mix and match to c
 - **security.yml** - Security best practices (input validation, secrets handling)
 - **coding-python.yml** - Python-specific conventions (PEP 8, type hints)
 - **coding-kotlin.yml** - Kotlin-specific conventions (naming, null safety)
+- **coding-typescript.yml** - TypeScript-specific conventions (strict mode, type safety)
+- **coding-java.yml** - Java-specific conventions (naming, patterns)
+- **testing.yml** - Testing standards and TDD principles
 - **reviewer.yml** - Code review guidelines
+- **docs-base.yml** - Core documentation principles (DRY, clarity, examples)
+- **docs-api.yml** - API and code documentation standards (extends docs-base)
+- **docs-project.yml** - Project documentation standards (README, guides, extends docs-base)
 - **windsurf-defaults.yml** - Windsurf IDE default rules
 
 ## 🎯 Purpose
@@ -266,6 +272,48 @@ Code review guidelines:
 - Test coverage expectations
 
 **Use in:** Code review agents
+
+### docs-base (v1.0.0)
+
+Core documentation principles:
+
+- DRY principle (prefer referencing over duplicating)
+- Write for target audience
+- Use clear, concise language
+- Provide working examples
+- Structure content logically
+- Keep docs up-to-date with code
+
+**Use in:** All documentation agents
+
+### docs-api (v1.0.0)
+
+API and code documentation standards:
+
+- Document all public APIs
+- Include parameter types and return values
+- Provide usage examples
+- Document exceptions and side effects
+- Use appropriate doc comment format (JSDoc, JavaDoc, etc.)
+
+**Extends:** docs-base
+
+**Use in:** Agents documenting code, APIs, functions
+
+### docs-project (v1.0.0)
+
+Project documentation standards:
+
+- README structure (overview, installation, usage)
+- Step-by-step installation instructions
+- Quick-start guides
+- Architecture documentation
+- Changelog maintenance
+- Contribution guidelines
+
+**Extends:** docs-base
+
+**Use in:** Agents writing README, guides, tutorials
 
 ### windsurf-defaults (v1.0.0)
 

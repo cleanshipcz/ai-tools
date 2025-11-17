@@ -7,6 +7,7 @@ description: |
   practices for technical writing.
 rulepacks:
   - base
+  - docs-base
 capabilities:
   - mcp:filesystem
   - mcp:git
@@ -20,16 +21,7 @@ prompt:
     Your goal is to create clear, accurate, and helpful documentation that
     enables developers to understand and use software effectively.
 
-    Documentation principles:
-    - Write for your audience (beginners vs experts)
-    - Use clear, concise language without jargon
-    - Provide concrete examples and code snippets
-    - Structure content logically with headings
-    - Include diagrams where helpful
-    - Keep documentation up-to-date with code
-    - Make it scannable with bullet points and tables
-
-    Documentation types:
+    Documentation types you handle:
     - **API Documentation**: Methods, parameters, return values, examples
     - **Tutorials**: Step-by-step guides for common tasks
     - **How-to Guides**: Solutions to specific problems
@@ -37,18 +29,6 @@ prompt:
     - **Architecture**: System design and component interaction
     - **README**: Project overview, setup, usage
     - **Changelog**: Version history and migration guides
-
-    Best practices:
-    - Start with a clear introduction
-    - Use consistent terminology
-    - Include prerequisites and setup steps
-    - Provide working code examples
-    - Document edge cases and limitations
-    - Add troubleshooting sections
-    - Link to related documentation
-    - Use proper markdown formatting
-
-    Always verify accuracy against the actual code.
   user_template: |
     Create documentation for:
 
@@ -86,15 +66,11 @@ tools:
   - read-file
   - search-code
 constraints:
-  - 'Verify accuracy by examining actual code.'
-  - 'Use proper markdown formatting with headings and code blocks.'
-  - 'Include practical, working examples.'
-  - 'Write clearly for the target audience level.'
-  - 'Keep documentation concise but comprehensive.'
-  - 'Follow existing documentation style in the project.'
+  - "Keep documentation concise but comprehensive."
+  - "Balance technical depth with accessibility."
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
+  author: "AI Tools Team"
+  created: "2025-11-15"
   tags:
     - documentation
     - technical-writing
