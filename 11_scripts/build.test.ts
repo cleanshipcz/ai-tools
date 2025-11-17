@@ -163,12 +163,105 @@ describe('build.ts', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('should generate separate rule files', async () => {
-      await createTestFixture('.windsurf/rules/typescript.md', '# TypeScript Rules\n');
-      await createTestFixture('.windsurf/rules/testing.md', '# Testing Rules\n');
+    it('should generate markdown files not JSON', async () => {
+      const { existsSync, readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const rulesDir = join(rootDir, 'adapters', 'windsurf', 'rules');
 
-      expect(testOutputExists('.windsurf/rules/typescript.md')).toBe(true);
-      expect(testOutputExists('.windsurf/rules/testing.md')).toBe(true);
+      expect(existsSync(rulesDir)).toBe(true);
+
+      const files = readdirSync(rulesDir);
+      const mdFiles = files.filter((f) => f.endsWith('.md'));
+      const jsonFiles = files.filter((f) => f.endsWith('.json'));
+
+      expect(mdFiles.length).toBeGreaterThan(0);
+      expect(jsonFiles.length).toBe(0);
+    });
+
+    it('should generate agent files with trigger: manual frontmatter', async () => {
+      const { existsSync, readFileSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const agentFile = join(rootDir, 'adapters', 'windsurf', 'rules', 'agent-code-reviewer.md');
+
+      expect(existsSync(agentFile)).toBe(true);
+
+      const content = readFileSync(agentFile, 'utf-8');
+      expect(content).toMatch(/^---\n/);
+      expect(content).toContain('trigger: manual');
+      expect(content).toMatch(/\n---\n/);
+      expect(content).toContain('# Agent:');
+      expect(content).toContain('## Persona');
+      expect(content).toContain('## Constraints');
+      expect(content).toContain('## Rules');
+    });
+
+    it('should generate prompt files with trigger: manual frontmatter', async () => {
+      const { existsSync, readFileSync, readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const rulesDir = join(rootDir, 'adapters', 'windsurf', 'rules');
+
+      const files = readdirSync(rulesDir);
+      const promptFiles = files.filter((f) => f.startsWith('prompt-') && f.endsWith('.md'));
+
+      expect(promptFiles.length).toBeGreaterThan(0);
+
+      // Test one prompt file
+      const promptFile = join(rulesDir, promptFiles[0]);
+      const content = readFileSync(promptFile, 'utf-8');
+
+      expect(content).toMatch(/^---\n/);
+      expect(content).toContain('trigger: manual');
+      expect(content).toMatch(/\n---\n/);
+    });
+
+    it('should name prompt files as prompt-category-id.md', async () => {
+      const { readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const rulesDir = join(rootDir, 'adapters', 'windsurf', 'rules');
+
+      const files = readdirSync(rulesDir);
+      const promptFiles = files.filter((f) => f.startsWith('prompt-'));
+
+      // Should have prompts with category prefixes
+      const hasRefactorPrompts = promptFiles.some((f) => f.startsWith('prompt-refactor-'));
+      const hasDocsPrompts = promptFiles.some((f) => f.startsWith('prompt-docs-'));
+      const hasQaPrompts = promptFiles.some((f) => f.startsWith('prompt-qa-'));
+
+      expect(hasRefactorPrompts).toBe(true);
+      expect(hasDocsPrompts).toBe(true);
+      expect(hasQaPrompts).toBe(true);
+    });
+
+    it('should include all agents in base adapters', async () => {
+      const { readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const rulesDir = join(rootDir, 'adapters', 'windsurf', 'rules');
+
+      const files = readdirSync(rulesDir);
+      const agentFiles = files.filter((f) => f.startsWith('agent-') && f.endsWith('.md'));
+
+      // Should have all main agents
+      expect(agentFiles).toContain('agent-code-reviewer.md');
+      expect(agentFiles).toContain('agent-feature-builder.md');
+      expect(agentFiles).toContain('agent-bug-fixer.md');
+      expect(agentFiles.length).toBeGreaterThanOrEqual(10);
+    });
+
+    it('should include all prompts in base adapters', async () => {
+      const { readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const rulesDir = join(rootDir, 'adapters', 'windsurf', 'rules');
+
+      const files = readdirSync(rulesDir);
+      const promptFiles = files.filter((f) => f.startsWith('prompt-') && f.endsWith('.md'));
+
+      expect(promptFiles.length).toBeGreaterThanOrEqual(20);
     });
   });
 

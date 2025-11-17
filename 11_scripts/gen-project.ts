@@ -174,7 +174,41 @@ export class ProjectGenerator {
     // Generate features if they exist
     await this.generateFeatures(projectId, outputDir);
 
+    // Merge feature workflows into main windsurf output
+    await this.mergeFeatureWorkflows(projectId, outputDir);
+
     console.log(chalk.green(`\n✅ Generation complete! Output in: ${outputDir}\n`));
+  }
+
+  private async mergeFeatureWorkflows(projectId: string, outputDir: string): Promise<void> {
+    // Check if features output exists
+    const featuresOutputDir = join(
+      rootDir,
+      '.output',
+      projectId,
+      'features',
+      '.windsurf',
+      'workflows'
+    );
+
+    try {
+      await access(featuresOutputDir);
+
+      // Copy workflows to main windsurf output
+      const windsurfOutputDir = join(outputDir, 'windsurf', '.windsurf', 'workflows');
+      await mkdir(windsurfOutputDir, { recursive: true });
+
+      const entries = await readdir(featuresOutputDir);
+      for (const entry of entries) {
+        const srcPath = join(featuresOutputDir, entry);
+        const destPath = join(windsurfOutputDir, entry);
+        await copyFile(srcPath, destPath);
+      }
+
+      console.log(chalk.gray(`  Merged ${entries.length} workflow(s) into windsurf output`));
+    } catch {
+      // No features or workflows, skip
+    }
   }
 
   private async generateFeatures(projectId: string, outputDir: string): Promise<void> {
@@ -688,45 +722,196 @@ export class ProjectGenerator {
     const windsurfDir = join(outputDir, '.windsurf');
     await mkdir(windsurfDir, { recursive: true });
 
-    // Copy base adapters (rules, presets) with filtering
+    // Copy base adapters (rules) with filtering
     const adapterSrcDir = join(rootDir, 'adapters', 'windsurf');
     try {
       await access(adapterSrcDir);
 
-      // Copy rules with filtering
+      // Copy rules with filtering (now markdown files)
       const rulesDir = join(adapterSrcDir, 'rules');
       const destRulesDir = join(windsurfDir, 'rules');
       await access(rulesDir);
       await this.copyWindsurfRulesWithFiltering(rulesDir, destRulesDir);
 
-      // Copy presets
-      const presetsDir = join(adapterSrcDir, 'presets');
-      const destPresetsDir = join(windsurfDir, 'presets');
-      try {
-        await access(presetsDir);
-        await this.copyDirectory(presetsDir, destPresetsDir);
-      } catch {
-        // Presets might not exist, that's ok
-      }
-
-      console.log(chalk.gray(`    Copied base rules and presets`));
+      console.log(chalk.gray(`    Copied base rules`));
     } catch {
       console.log(chalk.yellow(`    ! Base adapters not found. Run 'npm run build' first.`));
     }
 
-    // Generate project-specific rule file
-    const rules = this.buildProjectRules();
-    const config = {
-      name: this.project?.name || 'Project Rules',
-      version: this.project?.version || '1.0.0',
-      description: this.project?.description || '',
-      rules: rules,
-    };
+    // Generate project-specific context file with trigger: always_on
+    await this.generateWindsurfProjectContext(windsurfDir);
+  }
 
+  private async generateWindsurfProjectContext(windsurfDir: string): Promise<void> {
     const rulesDir = join(windsurfDir, 'rules');
     await mkdir(rulesDir, { recursive: true });
-    await writeFile(join(rulesDir, 'project-rules.json'), JSON.stringify(config, null, 2));
-    console.log(chalk.gray(`    Generated .windsurf/rules/project-rules.json`));
+
+    const content: string[] = [];
+
+    // YAML frontmatter with always_on trigger
+    content.push('---');
+    content.push('trigger: always_on');
+    content.push('---');
+    content.push('');
+
+    // Project header
+    content.push(`# Project: ${this.project?.name || 'Unknown Project'}`);
+    content.push('');
+    content.push(this.project?.description || '');
+    content.push('');
+
+    // Overview
+    if (this.project?.context?.overview) {
+      content.push('## Project Overview');
+      content.push('');
+      content.push(this.project.context.overview);
+      content.push('');
+    }
+
+    if (this.project?.context?.purpose) {
+      content.push(`**Purpose:** ${this.project.context.purpose}`);
+      content.push('');
+    }
+
+    // Tech Stack
+    if (this.project?.tech_stack) {
+      content.push('## Tech Stack');
+      content.push('');
+
+      const techStack = this.project.tech_stack;
+      if (techStack.languages && techStack.languages.length > 0) {
+        content.push(`**Languages:** ${techStack.languages.join(', ')}`);
+      }
+      if (techStack.frontend && techStack.frontend.length > 0) {
+        content.push(`**Frontend:** ${techStack.frontend.join(', ')}`);
+      }
+      if (techStack.backend && techStack.backend.length > 0) {
+        content.push(`**Backend:** ${techStack.backend.join(', ')}`);
+      }
+      if (techStack.database && techStack.database.length > 0) {
+        content.push(`**Database:** ${techStack.database.join(', ')}`);
+      }
+      if (techStack.infrastructure && techStack.infrastructure.length > 0) {
+        content.push(`**Infrastructure:** ${techStack.infrastructure.join(', ')}`);
+      }
+      content.push('');
+    }
+
+    // Commands
+    if (this.project?.commands) {
+      content.push('## Key Commands');
+      content.push('');
+      this.formatCommandSection(this.project.commands, content);
+      content.push('');
+    }
+
+    // Conventions
+    if (this.project?.conventions) {
+      content.push('## Project Conventions');
+      content.push('');
+
+      if (this.project.conventions.naming && this.project.conventions.naming.length > 0) {
+        content.push('### Naming');
+        content.push('');
+        for (const rule of this.project.conventions.naming) {
+          content.push(`- ${rule}`);
+        }
+        content.push('');
+      }
+
+      if (this.project.conventions.patterns && this.project.conventions.patterns.length > 0) {
+        content.push('### Patterns');
+        content.push('');
+        for (const rule of this.project.conventions.patterns) {
+          content.push(`- ${rule}`);
+        }
+        content.push('');
+      }
+
+      if (this.project.conventions.testing && this.project.conventions.testing.length > 0) {
+        content.push('### Testing');
+        content.push('');
+        for (const rule of this.project.conventions.testing) {
+          content.push(`- ${rule}`);
+        }
+        content.push('');
+      }
+
+      if (this.project.conventions.structure && this.project.conventions.structure.length > 0) {
+        content.push('### Project Structure');
+        content.push('');
+        for (const rule of this.project.conventions.structure) {
+          content.push(`- ${rule}`);
+        }
+        content.push('');
+      }
+    }
+
+    // Project-specific rules
+    if (this.project?.ai_tools?.custom_rules && this.project.ai_tools.custom_rules.length > 0) {
+      content.push('## Project-Specific Rules');
+      content.push('');
+      for (const rule of this.project.ai_tools.custom_rules) {
+        content.push(`- ${rule}`);
+      }
+      content.push('');
+    }
+
+    // Documentation references
+    if (this.project?.documentation) {
+      content.push('## Documentation');
+      content.push('');
+      this.formatDocumentationSection(this.project.documentation, content);
+      content.push('');
+    }
+
+    // Preferred agents
+    if (
+      this.project?.ai_tools?.preferred_agents &&
+      this.project.ai_tools.preferred_agents.length > 0
+    ) {
+      content.push('## Preferred Agents');
+      content.push('');
+      for (const agent of this.project.ai_tools.preferred_agents) {
+        content.push(`- ${agent}`);
+      }
+      content.push('');
+    }
+
+    await writeFile(join(rulesDir, 'project-context.md'), content.join('\n'));
+    console.log(chalk.gray(`    Generated .windsurf/rules/project-context.md`));
+  }
+
+  private formatCommandSection(
+    commands: Record<string, string | Record<string, string>>,
+    content: string[]
+  ): void {
+    for (const [category, value] of Object.entries(commands)) {
+      if (typeof value === 'string') {
+        content.push(`- \`${value}\` - ${category}`);
+      } else if (typeof value === 'object') {
+        content.push(`### ${category.charAt(0).toUpperCase() + category.slice(1)}`);
+        for (const [subcategory, command] of Object.entries(value)) {
+          content.push(`- \`${command}\` - ${subcategory}`);
+        }
+        content.push('');
+      }
+    }
+  }
+
+  private formatDocumentationSection(
+    docs: Record<string, string | Record<string, string>>,
+    content: string[]
+  ): void {
+    for (const [category, value] of Object.entries(docs)) {
+      if (typeof value === 'string') {
+        content.push(`- **${category}**: ${value}`);
+      } else if (typeof value === 'object') {
+        for (const [subcategory, path] of Object.entries(value)) {
+          content.push(`- **${subcategory}**: ${path}`);
+        }
+      }
+    }
   }
 
   private async copyWindsurfRulesWithFiltering(src: string, dest: string): Promise<void> {
@@ -740,11 +925,20 @@ export class ProjectGenerator {
 
       if (entry.isDirectory()) {
         await this.copyWindsurfRulesWithFiltering(srcPath, destPath);
-      } else if (entry.name.endsWith('.json')) {
-        // Check if this is an agent rule file
-        const agentId = entry.name.replace(/\.json$/, '');
-        if (!this.shouldIncludeAgent(agentId)) {
-          continue; // Skip this agent file
+      } else if (entry.name.endsWith('.md')) {
+        // Check if this is an agent or prompt rule file
+        if (entry.name.startsWith('agent-')) {
+          const agentId = entry.name.replace(/^agent-/, '').replace(/\.md$/, '');
+          if (!this.shouldIncludeAgent(agentId)) {
+            continue; // Skip this agent file
+          }
+        } else if (entry.name.startsWith('prompt-')) {
+          // Convert prompt-docs-create-tutorial.md to docs/create-tutorial
+          const withoutPrefix = entry.name.replace(/^prompt-/, '').replace(/\.md$/, '');
+          const promptPath = withoutPrefix.replace(/-/, '/'); // Only replace FIRST hyphen
+          if (!this.shouldIncludePrompt(promptPath)) {
+            continue; // Skip this prompt file
+          }
         }
         await copyFile(srcPath, destPath);
       } else {

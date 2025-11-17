@@ -299,28 +299,116 @@ export class FeatureGenerator {
   }
 
   private async generateWindsurfFeatures(features: Feature[], outputDir: string): Promise<void> {
-    const windsurfDir = join(outputDir, 'windsurf');
+    const windsurfDir = join(outputDir, '.windsurf', 'workflows');
     await mkdir(windsurfDir, { recursive: true });
 
     for (const feature of features) {
-      const config = {
-        name: feature.name,
-        description: feature.description,
-        model: feature.model,
-        context: feature.context || {},
-        files: feature.files || {},
-        conventions: feature.conventions || [],
-        snippets: feature.snippets || [],
-      };
+      const content: string[] = [];
 
-      await writeFile(
-        join(windsurfDir, `feature-${feature.id}.json`),
-        JSON.stringify(config, null, 2),
-        'utf-8'
-      );
+      // YAML frontmatter with description and turbo mode
+      content.push('---');
+      content.push(`description: ${feature.description}`);
+      content.push('auto_execution_mode: 3');
+      content.push('---');
+      content.push('');
+
+      // Feature header
+      content.push(`# Feature: ${feature.name}`);
+      content.push('');
+      content.push(feature.description);
+      content.push('');
+
+      // Overview
+      if (feature.context?.overview) {
+        content.push('## Overview');
+        content.push('');
+        content.push(feature.context.overview);
+        content.push('');
+      }
+
+      // Architecture
+      if (feature.context?.architecture) {
+        content.push('## Architecture');
+        content.push('');
+        content.push(feature.context.architecture);
+        content.push('');
+      }
+
+      // Dependencies
+      if (feature.context?.dependencies && feature.context.dependencies.length > 0) {
+        content.push('## Dependencies');
+        content.push('');
+        for (const dep of feature.context.dependencies) {
+          content.push(`- ${dep}`);
+        }
+        content.push('');
+      }
+
+      // Conventions
+      if (feature.conventions && feature.conventions.length > 0) {
+        content.push('## Conventions');
+        content.push('');
+        for (const convention of feature.conventions) {
+          content.push(`- ${convention}`);
+        }
+        content.push('');
+      }
+
+      // Acceptance Criteria (from recipe context)
+      if (feature.recipe?.context?.acceptance_criteria) {
+        content.push('## Acceptance Criteria');
+        content.push('');
+        content.push(feature.recipe.context.acceptance_criteria);
+        content.push('');
+      }
+
+      // Files
+      if (feature.files?.patterns && feature.files.patterns.length > 0) {
+        content.push('## Related Files');
+        content.push('');
+        for (const pattern of feature.files.patterns) {
+          content.push(`- ${pattern}`);
+        }
+        content.push('');
+      }
+
+      // Entry points
+      if (feature.files?.entry_points && feature.files.entry_points.length > 0) {
+        content.push('## Entry Points');
+        content.push('');
+        for (const entry of feature.files.entry_points) {
+          content.push(`- ${entry}`);
+        }
+        content.push('');
+      }
+
+      // Snippets
+      if (feature.snippets && feature.snippets.length > 0) {
+        content.push('## Code Snippets');
+        content.push('');
+        for (const snippet of feature.snippets) {
+          if (snippet.title) {
+            content.push(`### ${snippet.title}`);
+            content.push('');
+          }
+          if (snippet.description) {
+            content.push(snippet.description);
+            content.push('');
+          }
+          if (snippet.content) {
+            const lang = snippet.language || '';
+            content.push(`\`\`\`${lang}`);
+            content.push(snippet.content);
+            content.push('```');
+            content.push('');
+          }
+        }
+      }
+
+      await writeFile(join(windsurfDir, `feature-${feature.id}.md`), content.join('\n'), 'utf-8');
     }
 
-    console.log(chalk.gray(`    Generated ${features.length} Windsurf feature files`));
+    console.log(chalk.gray(`    Generated ${features.length} Windsurf workflow files`));
   }
 
   private async generateClaudeCodeFeatures(features: Feature[], outputDir: string): Promise<void> {

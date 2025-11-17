@@ -246,35 +246,123 @@ class Builder {
     const outputDir = join(rootDir, 'adapters', 'windsurf', 'rules');
     await mkdir(outputDir, { recursive: true });
 
-    // Generate rule files for each agent
+    // Generate markdown rule files for each agent with trigger: manual
     for (const [id, agent] of this.agents) {
       const rules = agent.rulepacks ? this.resolveRulepacks(agent.rulepacks) : [];
 
-      const windsurfConfig = {
-        name: agent.id,
-        version: agent.version || '1.0.0',
-        description: agent.purpose,
-        rules: rules,
-        settings: agent.defaults || {},
-      };
+      const content: string[] = [];
 
-      const outputPath = join(outputDir, `${id}.json`);
-      await writeFile(outputPath, JSON.stringify(windsurfConfig, null, 2));
+      // YAML frontmatter
+      content.push('---');
+      content.push('trigger: manual');
+      content.push('---');
+      content.push('');
+
+      // Agent header
+      content.push(`# Agent: ${id}`);
+      content.push('');
+      content.push(`**Purpose:** ${agent.purpose}`);
+      content.push('');
+
+      // Add default model if configured
+      if (agent.defaults?.model) {
+        content.push(`**Default Model:** ${agent.defaults.model}`);
+        content.push('');
+      }
+
+      // Include system prompt (the actual agent behavior)
+      if (agent.prompt?.system) {
+        content.push('## Persona');
+        content.push('');
+        content.push(agent.prompt.system.trim());
+        content.push('');
+      }
+
+      // Include constraints
+      if (agent.constraints && agent.constraints.length > 0) {
+        content.push('## Constraints');
+        content.push('');
+        for (const constraint of agent.constraints) {
+          content.push(`- ${constraint}`);
+        }
+        content.push('');
+      }
+
+      // Include expanded rulepacks (actual rules)
+      if (rules.length > 0) {
+        content.push('## Rules');
+        content.push('');
+        for (const rule of rules) {
+          content.push(`- ${rule}`);
+        }
+        content.push('');
+      }
+
+      const outputPath = join(outputDir, `agent-${id}.md`);
+      await writeFile(outputPath, content.join('\n'));
     }
 
-    // Generate preset files
-    const presetsDir = join(rootDir, 'adapters', 'windsurf', 'presets');
-    await mkdir(presetsDir, { recursive: true });
+    // Generate markdown rule files for each prompt with trigger: manual
+    for (const [id, prompt] of this.prompts) {
+      const content: string[] = [];
 
-    const basePreset = {
-      name: 'Base Configuration',
-      version: '1.0.0',
-      rules: this.resolveRulepacks(['base']),
-    };
+      // YAML frontmatter
+      content.push('---');
+      content.push('trigger: manual');
+      content.push('---');
+      content.push('');
 
-    await writeFile(join(presetsDir, 'base.json'), JSON.stringify(basePreset, null, 2));
+      content.push(`# ${id}`);
+      content.push('');
+      content.push(prompt.description);
+      content.push('');
 
-    console.log(chalk.gray(`    Generated ${this.agents.size} agent configs`));
+      // Add default model if configured
+      if (prompt.model) {
+        content.push(`**Default Model:** ${prompt.model}`);
+        content.push('');
+      }
+
+      if (prompt.variables && prompt.variables.length > 0) {
+        content.push('## Variables');
+        content.push('');
+        for (const variable of prompt.variables) {
+          const required = variable.required ? ' (required)' : '';
+          content.push(`- \`{{${variable.name}}}\`${required}: ${variable.description || ''}`);
+        }
+        content.push('');
+      }
+
+      if (prompt.content) {
+        content.push('## Prompt');
+        content.push('');
+        content.push(prompt.content);
+        content.push('');
+      }
+
+      if (prompt.system) {
+        content.push('## System Prompt');
+        content.push('');
+        content.push(prompt.system);
+        content.push('');
+      }
+
+      if (prompt.user) {
+        content.push('## User Prompt');
+        content.push('');
+        content.push(prompt.user);
+        content.push('');
+      }
+
+      const filename = prompt._sourcePath
+        ? 'prompt-' + prompt._sourcePath.replace('/', '-') + '.md'
+        : `prompt-${id}.md`;
+
+      await writeFile(join(outputDir, filename), content.join('\n'));
+    }
+
+    console.log(chalk.gray(`    Generated ${this.agents.size} agent rules`));
+    console.log(chalk.gray(`    Generated ${this.prompts.size} prompt rules`));
   }
 
   private async generateClaudeCodeAdapters(): Promise<void> {

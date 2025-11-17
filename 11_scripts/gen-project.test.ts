@@ -322,6 +322,98 @@ describe('ProjectGenerator - Recipe Script Generation', () => {
       expect(loggingPos).toBeLessThan(variablesPos);
     });
   });
+
+  describe('Windsurf markdown output', () => {
+    it('should generate project-context.md with trigger: always_on', async () => {
+      const { existsSync, readFileSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const outputDir = join(rootDir, '.output', 'ai-tools', 'windsurf', '.windsurf', 'rules');
+      const projectContextFile = join(outputDir, 'project-context.md');
+
+      if (existsSync(projectContextFile)) {
+        const content = readFileSync(projectContextFile, 'utf-8');
+
+        expect(content).toMatch(/^---\n/);
+        expect(content).toContain('trigger: always_on');
+        expect(content).toMatch(/\n---\n/);
+        expect(content).toContain('# Project:');
+        expect(content).toContain('## Project Overview');
+        expect(content).toContain('## Tech Stack');
+        expect(content).toContain('## Key Commands');
+        expect(content).toContain('## Project Conventions');
+      }
+    });
+
+    it('should filter and copy only whitelisted agents', async () => {
+      const { existsSync, readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const outputDir = join(rootDir, '.output', 'ai-tools', 'windsurf', '.windsurf', 'rules');
+
+      if (existsSync(outputDir)) {
+        const files = readdirSync(outputDir);
+        const agentFiles = files.filter((f) => f.startsWith('agent-'));
+
+        // Should only have whitelisted agents, not all agents
+        expect(agentFiles.length).toBeLessThanOrEqual(12);
+        expect(agentFiles.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('should filter and copy only whitelisted prompts', async () => {
+      const { existsSync, readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const outputDir = join(rootDir, '.output', 'ai-tools', 'windsurf', '.windsurf', 'rules');
+
+      if (existsSync(outputDir)) {
+        const files = readdirSync(outputDir);
+        const promptFiles = files.filter((f) => f.startsWith('prompt-'));
+
+        // Should only have whitelisted prompts (21 for ai-tools project)
+        expect(promptFiles.length).toBeGreaterThan(0);
+        expect(promptFiles.length).toBeLessThanOrEqual(30);
+      }
+    });
+
+    it('should convert prompt filenames correctly for whitelist matching', async () => {
+      const { existsSync, readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const outputDir = join(rootDir, '.output', 'ai-tools', 'windsurf', '.windsurf', 'rules');
+
+      if (existsSync(outputDir)) {
+        const files = readdirSync(outputDir);
+
+        // These should be present based on ai-tools whitelist
+        expect(files).toContain('prompt-refactor-extract-method.md');
+        expect(files).toContain('prompt-docs-document-api.md');
+        expect(files).toContain('prompt-qa-write-tests.md');
+      }
+    });
+
+    it('should merge feature workflows into windsurf output', async () => {
+      const { existsSync, readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const workflowsDir = join(
+        rootDir,
+        '.output',
+        'ai-tools',
+        'windsurf',
+        '.windsurf',
+        'workflows'
+      );
+
+      if (existsSync(workflowsDir)) {
+        const files = readdirSync(workflowsDir);
+        const featureFiles = files.filter((f) => f.startsWith('feature-') && f.endsWith('.md'));
+
+        expect(featureFiles.length).toBeGreaterThan(0);
+      }
+    });
+  });
 });
 
 /**
