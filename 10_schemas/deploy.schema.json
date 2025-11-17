@@ -17,13 +17,7 @@
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "enum": [
-          "github-copilot",
-          "windsurf",
-          "cursor",
-          "claude-code",
-          "copilot-cli"
-        ]
+        "enum": ["github-copilot", "windsurf", "cursor", "claude-code", "copilot-cli"]
       },
       "description": "List of AI coding tools to generate configurations for"
     },

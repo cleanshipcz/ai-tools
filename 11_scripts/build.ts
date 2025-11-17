@@ -391,7 +391,12 @@ class Builder {
         outputs: prompt.outputs || { format: 'text' },
       };
 
-      await writeFile(join(promptsDir, `${id}.json`), JSON.stringify(claudePrompt, null, 2));
+      // Use source path for consistent naming across tools (e.g., "refactor/extract-method" -> "refactor-extract-method.json")
+      const filename = prompt._sourcePath
+        ? prompt._sourcePath.replace(/\//g, '-') + '.json'
+        : `${id}.json`;
+
+      await writeFile(join(promptsDir, filename), JSON.stringify(claudePrompt, null, 2));
     }
 
     console.log(chalk.gray(`    Generated ${this.skills.size} skills`));

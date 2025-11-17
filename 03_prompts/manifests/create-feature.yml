@@ -11,19 +11,20 @@ tags:
 variables:
   - name: user_description
     required: true
-    description: 'Brief user description of what the feature should do'
+    description: "Brief user description of what the feature should do"
 
   - name: project_id
     required: false
-    description: 'Project ID where the feature belongs (e.g., ai-tools)'
+    description: "Project ID where the feature belongs (e.g., ai-tools)"
 
 rules:
-  - 'Ask clarifying questions BEFORE generating the manifest'
-  - 'Recommend concise descriptions, but allow detail when needed'
-  - 'Do NOT draft the full solution - just capture requirements'
-  - 'Focus on WHAT needs to be done, not HOW to do it'
-  - 'Use conversational tone to understand user intent'
-  - 'Suggest a kebab-case feature ID based on description'
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Recommend concise descriptions, but allow detail when needed"
+  - "Do NOT draft the full solution - just capture requirements"
+  - "Focus on WHAT needs to be done, not HOW to do it"
+  - "Use conversational tone to understand user intent"
+  - "Suggest a kebab-case feature ID based on description"
+  - "Follow the schema (10_schemas/feature.schema.json) for structure"
 
 content: |
   The user wants to create a new feature based on this description:
@@ -88,6 +89,6 @@ content: |
   You: [Creates simple ~80 line feature.yml]
 
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"

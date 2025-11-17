@@ -257,50 +257,22 @@
           "description": "Rulepack IDs to exclude from this project (mutually exclusive with whitelist_rulepacks)"
         }
       },
-      "allOf": [
-        {
-          "oneOf": [
-            {
-              "not": {
-                "anyOf": [
-                  { "required": ["whitelist_agents"] },
-                  { "required": ["blacklist_agents"] }
-                ]
-              }
-            },
-            { "required": ["whitelist_agents"] },
-            { "required": ["blacklist_agents"] }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "not": {
-                "anyOf": [
-                  { "required": ["whitelist_prompts"] },
-                  { "required": ["blacklist_prompts"] }
-                ]
-              }
-            },
-            { "required": ["whitelist_prompts"] },
-            { "required": ["blacklist_prompts"] }
-          ]
-        },
-        {
-          "oneOf": [
-            {
-              "not": {
-                "anyOf": [
-                  { "required": ["whitelist_rulepacks"] },
-                  { "required": ["blacklist_rulepacks"] }
-                ]
-              }
-            },
-            { "required": ["whitelist_rulepacks"] },
-            { "required": ["blacklist_rulepacks"] }
-          ]
-        }
-      ],
+      "not": {
+        "anyOf": [
+          {
+            "allOf": [{ "required": ["whitelist_agents"] }, { "required": ["blacklist_agents"] }]
+          },
+          {
+            "allOf": [{ "required": ["whitelist_prompts"] }, { "required": ["blacklist_prompts"] }]
+          },
+          {
+            "allOf": [
+              { "required": ["whitelist_rulepacks"] },
+              { "required": ["blacklist_rulepacks"] }
+            ]
+          }
+        ]
+      },
       "description": "AI tool configuration for this project"
     },
     "metadata": {

@@ -83,20 +83,20 @@ content: |
   User: "Node + TypeScript, Vitest for tests, npm test/build/start, /home/user/projects/my-cli"
 
   You: "Perfect! I'll create:
-  
+
   **project.yml:**
   - id: my-cli
   - Tech: typescript, node.js
   - Commands: test, build, start, lint
   - Conventions: TypeScript strict mode, test coverage 80%
   - Agents: feature-builder, code-reviewer, bug-fixer
-  
+
   **deploy.yml:**
   - target: /home/user/projects/my-cli
   - tools: [github-copilot, windsurf, cursor, claude-code]
   - mode: local
   - backup: true
-  
+
   Sound good?"
 
 outputs:

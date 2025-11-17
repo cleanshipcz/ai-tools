@@ -119,7 +119,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["claude-code", "copilot-cli", "cursor"]
+            "enum": ["claude-code", "copilot-cli", "cursor", "github-copilot", "windsurf"]
           },
           "description": "Tools to generate feature-bound recipe scripts for"
         }

@@ -1860,9 +1860,15 @@ export class ProjectGenerator {
       if (entry.isDirectory()) {
         await this.copyClaudePromptsWithFiltering(srcPath, destPath);
       } else if (entry.name.endsWith('.json')) {
-        // Claude Code uses JSON files for prompts
-        const promptId = entry.name.replace(/\.json$/, '');
-        if (!this.shouldIncludePrompt(promptId)) {
+        // Claude Code uses JSON files for prompts with naming: category-prompt-id.json
+        // e.g., "refactor-extract-method.json"
+        const filenameWithoutExt = entry.name.replace(/\.json$/, '');
+
+        // Convert filename back to path format for matching: "refactor-extract-method" -> "refactor/extract-method"
+        // This works because the first hyphen separates category from rest
+        const promptPath = filenameWithoutExt.replace('-', '/');
+
+        if (!this.shouldIncludePrompt(promptPath)) {
           continue; // Skip this prompt file
         }
         await copyFile(srcPath, destPath);

@@ -96,12 +96,15 @@ describe('deploy-project.ts', () => {
       // given
       // - a project exists with project.yml
       // - but NO deploy.yml file
-      await createTestFixture('06_projects/local/test-project/project.yml', 'id: test-project\nversion: 1.0.0\nname: Test\ndescription: Test project without deploy.yml');
-      
+      await createTestFixture(
+        '06_projects/local/test-project/project.yml',
+        'id: test-project\nversion: 1.0.0\nname: Test\ndescription: Test project without deploy.yml'
+      );
+
       // when
       // - deploy-all is executed
       // - it should skip this project
-      
+
       // then
       // - project should be skipped (not deployed)
       // - this is the BUG: projects created manually (not via create-project) don't have deploy.yml
@@ -112,12 +115,18 @@ describe('deploy-project.ts', () => {
     it('should include projects WITH deploy.yml during deploy-all', async () => {
       // given
       // - a project exists with BOTH project.yml AND deploy.yml
-      await createTestFixture('06_projects/local/test-project-2/project.yml', 'id: test-project-2\nversion: 1.0.0\nname: Test2\ndescription: Test project with deploy.yml');
-      await createTestFixture('06_projects/local/test-project-2/deploy.yml', 'target: ./output\ntools:\n  - github-copilot\nmode: local');
-      
+      await createTestFixture(
+        '06_projects/local/test-project-2/project.yml',
+        'id: test-project-2\nversion: 1.0.0\nname: Test2\ndescription: Test project with deploy.yml'
+      );
+      await createTestFixture(
+        '06_projects/local/test-project-2/deploy.yml',
+        'target: ./output\ntools:\n  - github-copilot\nmode: local'
+      );
+
       // when
       // - deploy-all is executed
-      
+
       // then
       // - project SHOULD be included (has deploy.yml)
       const hasDeployConfig = testOutputExists('06_projects/local/test-project-2/deploy.yml');
