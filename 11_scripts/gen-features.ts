@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { load as loadYaml } from 'js-yaml';
 import chalk from 'chalk';
 import { ProjectGenerator } from './gen-project.js';
+import { getProjectSources } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -110,21 +111,21 @@ export class FeatureGenerator {
   }
 
   private async findProjectDir(projectId: string): Promise<string | null> {
-    // Check global
-    let projectDir = join(rootDir, '06_projects', 'global', projectId);
-    try {
-      await access(projectDir);
-      return projectDir;
-    } catch {
-      // Try local
-      projectDir = join(rootDir, '06_projects', 'local', projectId);
+    // Use configured project sources
+    const projectSources = await getProjectSources();
+
+    for (const source of projectSources) {
+      const projectDir = join(source, projectId);
       try {
         await access(projectDir);
         return projectDir;
       } catch {
-        return null;
+        // Try next source
+        continue;
       }
     }
+
+    return null;
   }
 
   private async loadProject(projectDir: string): Promise<void> {
@@ -306,6 +307,14 @@ export class FeatureGenerator {
         for (const convention of feature.conventions) {
           content.push(`- ${convention}`);
         }
+        content.push('');
+      }
+
+      // Feature Description (from recipe context) - detailed implementation steps
+      if (feature.recipe?.context?.feature_description) {
+        content.push('## Implementation Steps');
+        content.push('');
+        content.push(feature.recipe.context.feature_description);
         content.push('');
       }
 

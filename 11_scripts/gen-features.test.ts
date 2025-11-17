@@ -47,6 +47,30 @@ describe('gen-features.ts', () => {
   });
 
   describe('Windsurf workflow generation', () => {
+    it('should generate workflows for external projects', async () => {
+      const { existsSync, readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+
+      // Check xbid project (external project in ai-tools-projects)
+      const xbidWorkflowsDir = join(
+        rootDir,
+        '.output',
+        'xbid',
+        'features',
+        '.windsurf',
+        'workflows'
+      );
+
+      // This test will fail until we fix findProjectDir to use configurable sources
+      expect(existsSync(xbidWorkflowsDir)).toBe(true);
+
+      if (existsSync(xbidWorkflowsDir)) {
+        const files = readdirSync(xbidWorkflowsDir);
+        expect(files.length).toBeGreaterThan(0);
+      }
+    });
+
     it('should generate workflows with auto_execution_mode: 3', async () => {
       const { existsSync, readFileSync, readdirSync } = await import('fs');
       const { join } = await import('path');
@@ -124,6 +148,34 @@ describe('gen-features.ts', () => {
         }
         // At least one feature should have acceptance criteria
         expect(hasAcceptanceCriteria).toBe(true);
+      }
+    });
+
+    it('should include recipe feature_description when available', async () => {
+      const { existsSync, readFileSync, readdirSync } = await import('fs');
+      const { join } = await import('path');
+      const rootDir = join(process.cwd());
+      const xbidWorkflowsDir = join(
+        rootDir,
+        '.output',
+        'xbid',
+        'features',
+        '.windsurf',
+        'workflows'
+      );
+
+      // Check xbid external project which has recipe.context.feature_description
+      if (existsSync(xbidWorkflowsDir)) {
+        const files = readdirSync(xbidWorkflowsDir);
+        expect(files.length).toBeGreaterThan(0);
+
+        // Check first file for feature_description content
+        const content = readFileSync(join(xbidWorkflowsDir, files[0]), 'utf-8');
+        
+        // Should have Implementation Steps section (from feature_description)
+        expect(content).toContain('## Implementation Steps');
+        expect(content).toContain('Phase 0');
+        expect(content).toContain('Phase 1');
       }
     });
   });
