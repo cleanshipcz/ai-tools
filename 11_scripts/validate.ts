@@ -107,11 +107,11 @@ class Validator {
   private async collectManifests(): Promise<ManifestFile[]> {
     const manifests: ManifestFile[] = [];
     const dirs = {
-      prompts: 'prompt',
-      agents: 'agent',
-      rulepacks: 'rulepack',
-      skills: 'skill',
-      recipes: 'recipe',
+      '03_prompts': 'prompt',
+      '04_agents': 'agent',
+      '01_rulepacks': 'rulepack',
+      '02_skills': 'skill',
+      '05_recipes': 'recipe',
       '20_evals/suites': 'eval',
       '06_projects/global': 'project',
       '06_projects/local': 'project',

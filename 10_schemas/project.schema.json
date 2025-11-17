@@ -197,14 +197,6 @@
           ],
           "description": "Default model for this project (overrides agent default, can be overridden by feature)"
         },
-        "preferred_agents": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
-          },
-          "description": "List of preferred agent IDs for this project"
-        },
         "preferred_rulepacks": {
           "type": "array",
           "items": {

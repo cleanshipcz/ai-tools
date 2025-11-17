@@ -264,12 +264,6 @@ class Builder {
       content.push(`**Purpose:** ${agent.purpose}`);
       content.push('');
 
-      // Add default model if configured
-      if (agent.defaults?.model) {
-        content.push(`**Default Model:** ${agent.defaults.model}`);
-        content.push('');
-      }
-
       // Include system prompt (the actual agent behavior)
       if (agent.prompt?.system) {
         content.push('## Persona');
@@ -316,12 +310,6 @@ class Builder {
       content.push('');
       content.push(prompt.description);
       content.push('');
-
-      // Add default model if configured
-      if (prompt.model) {
-        content.push(`**Default Model:** ${prompt.model}`);
-        content.push('');
-      }
 
       if (prompt.variables && prompt.variables.length > 0) {
         content.push('## Variables');

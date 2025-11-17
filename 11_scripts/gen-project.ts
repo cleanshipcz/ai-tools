@@ -707,14 +707,6 @@ export class ProjectGenerator {
     );
     lines.push('');
 
-    if (this.project.ai_tools?.preferred_agents?.length) {
-      lines.push('**Preferred Agents for this project**:');
-      for (const agent of this.project.ai_tools.preferred_agents) {
-        lines.push(`- ${agent}`);
-      }
-      lines.push('');
-    }
-
     return lines.join('\n');
   }
 
@@ -862,19 +854,6 @@ export class ProjectGenerator {
       content.push('## Documentation');
       content.push('');
       this.formatDocumentationSection(this.project.documentation, content);
-      content.push('');
-    }
-
-    // Preferred agents
-    if (
-      this.project?.ai_tools?.preferred_agents &&
-      this.project.ai_tools.preferred_agents.length > 0
-    ) {
-      content.push('## Preferred Agents');
-      content.push('');
-      for (const agent of this.project.ai_tools.preferred_agents) {
-        content.push(`- ${agent}`);
-      }
       content.push('');
     }
 
@@ -1184,15 +1163,6 @@ export class ProjectGenerator {
       lines.push('');
       for (const rule of this.project.ai_tools.custom_rules) {
         lines.push(`- ${rule}`);
-      }
-      lines.push('');
-    }
-
-    if (this.project.ai_tools?.preferred_agents?.length) {
-      lines.push('## Preferred Agents');
-      lines.push('');
-      for (const agent of this.project.ai_tools.preferred_agents) {
-        lines.push(`- ${agent}`);
       }
       lines.push('');
     }

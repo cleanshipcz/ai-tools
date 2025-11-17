@@ -31,17 +31,8 @@ interface Feature {
     dependencies?: string[];
   };
   files?: {
-    entry_points?: string[];
-    key_files?: string[];
     patterns?: string[];
   };
-  snippets?: Array<{
-    id: string;
-    title: string;
-    description?: string;
-    content: string;
-    language?: string;
-  }>;
   conventions?: string[];
   recipe?: {
     id: string;
@@ -240,30 +231,11 @@ export class FeatureGenerator {
         content.push('');
       }
 
-      if (feature.context?.architecture) {
+      if (feature.context.architecture) {
         content.push('## Architecture');
         content.push('');
         content.push(feature.context.architecture);
         content.push('');
-      }
-
-      if (feature.files) {
-        content.push('## Related Files');
-        content.push('');
-        if (feature.files.entry_points?.length) {
-          content.push('**Entry Points:**');
-          for (const file of feature.files.entry_points) {
-            content.push(`- \`${file}\``);
-          }
-          content.push('');
-        }
-        if (feature.files.key_files?.length) {
-          content.push('**Key Files:**');
-          for (const file of feature.files.key_files) {
-            content.push(`- \`${file}\``);
-          }
-          content.push('');
-        }
       }
 
       if (feature.conventions?.length) {
@@ -273,23 +245,6 @@ export class FeatureGenerator {
           content.push(`- ${convention}`);
         }
         content.push('');
-      }
-
-      if (feature.snippets?.length) {
-        content.push('## Code Snippets');
-        content.push('');
-        for (const snippet of feature.snippets) {
-          content.push(`### ${snippet.title}`);
-          if (snippet.description) {
-            content.push('');
-            content.push(snippet.description);
-          }
-          content.push('');
-          content.push('```' + (snippet.language || ''));
-          content.push(snippet.content);
-          content.push('```');
-          content.push('');
-        }
       }
 
       await writeFile(join(copilotDir, `feature-${feature.id}.md`), content.join('\n'), 'utf-8');
@@ -362,49 +317,6 @@ export class FeatureGenerator {
         content.push('');
       }
 
-      // Files
-      if (feature.files?.patterns && feature.files.patterns.length > 0) {
-        content.push('## Related Files');
-        content.push('');
-        for (const pattern of feature.files.patterns) {
-          content.push(`- ${pattern}`);
-        }
-        content.push('');
-      }
-
-      // Entry points
-      if (feature.files?.entry_points && feature.files.entry_points.length > 0) {
-        content.push('## Entry Points');
-        content.push('');
-        for (const entry of feature.files.entry_points) {
-          content.push(`- ${entry}`);
-        }
-        content.push('');
-      }
-
-      // Snippets
-      if (feature.snippets && feature.snippets.length > 0) {
-        content.push('## Code Snippets');
-        content.push('');
-        for (const snippet of feature.snippets) {
-          if (snippet.title) {
-            content.push(`### ${snippet.title}`);
-            content.push('');
-          }
-          if (snippet.description) {
-            content.push(snippet.description);
-            content.push('');
-          }
-          if (snippet.content) {
-            const lang = snippet.language || '';
-            content.push(`\`\`\`${lang}`);
-            content.push(snippet.content);
-            content.push('```');
-            content.push('');
-          }
-        }
-      }
-
       await writeFile(join(windsurfDir, `feature-${feature.id}.md`), content.join('\n'), 'utf-8');
     }
 
@@ -442,22 +354,6 @@ export class FeatureGenerator {
         }
       }
 
-      if (feature.snippets?.length) {
-        content.push('## Examples');
-        content.push('');
-        for (const snippet of feature.snippets) {
-          content.push(`**${snippet.title}**`);
-          if (snippet.description) {
-            content.push(snippet.description);
-          }
-          content.push('');
-          content.push('```' + (snippet.language || ''));
-          content.push(snippet.content);
-          content.push('```');
-          content.push('');
-        }
-      }
-
       await writeFile(join(claudeDir, `feature-${feature.id}.md`), content.join('\n'), 'utf-8');
     }
 
@@ -476,7 +372,6 @@ export class FeatureGenerator {
       context: feature.context || {},
       files: feature.files || {},
       conventions: feature.conventions || [],
-      snippets: feature.snippets || [],
     }));
 
     await writeFile(

@@ -16,43 +16,14 @@ context:
     - bcrypt
 
 files:
-  entry_points:
+  patterns:
     - src/auth/index.ts
     - src/middleware/auth.ts
-  key_files:
     - src/auth/strategies/jwt.ts
     - src/auth/strategies/oauth.ts
     - src/auth/controllers/auth.controller.ts
-  patterns:
     - src/auth/**/*.ts
     - tests/auth/**/*.test.ts
-
-snippets:
-  - id: protect-route
-    title: Protect a Route with Authentication
-    description: Apply authentication middleware to a route
-    language: typescript
-    content: |
-      router.get('/protected', 
-        authenticate('jwt'), 
-        (req, res) => {
-          res.json({ user: req.user });
-        }
-      );
-
-  - id: register-user
-    title: Register a New User
-    description: Example user registration with password hashing
-    language: typescript
-    content: |
-      async function registerUser(email: string, password: string) {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const user = await User.create({
-          email,
-          password: hashedPassword
-        });
-        return generateToken(user);
-      }
 
 conventions:
   - Always hash passwords before storing them in the database

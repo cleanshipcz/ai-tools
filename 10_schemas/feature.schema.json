@@ -52,20 +52,6 @@
     "files": {
       "type": "object",
       "properties": {
-        "entry_points": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Main entry point files for this feature"
-        },
-        "key_files": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Important files related to this feature"
-        },
         "patterns": {
           "type": "array",
           "items": {
@@ -75,37 +61,6 @@
         }
       },
       "description": "Files related to this feature"
-    },
-    "snippets": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "title", "content"],
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-            "description": "Snippet identifier"
-          },
-          "title": {
-            "type": "string",
-            "description": "Snippet title"
-          },
-          "description": {
-            "type": "string",
-            "description": "Snippet description"
-          },
-          "content": {
-            "type": "string",
-            "description": "Snippet content"
-          },
-          "language": {
-            "type": "string",
-            "description": "Programming language for syntax highlighting"
-          }
-        }
-      },
-      "description": "Code snippets and examples for this feature"
     },
     "conventions": {
       "type": "array",
@@ -218,5 +173,6 @@
       },
       "description": "Feature metadata"
     }
-  }
+  },
+  "additionalProperties": false
 }
