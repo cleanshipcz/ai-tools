@@ -1,7 +1,7 @@
 id: tech-stack-project
 version: 1.0.0
-name: "Tech-Stack Project Filtering"
-description: "Filter rulepacks by project tech-stack to reduce noise - TypeScript projects see only TypeScript rules, not Python or Kotlin"
+name: 'Tech-Stack Project Filtering'
+description: 'Filter rulepacks by project tech-stack to reduce noise - TypeScript projects see only TypeScript rules, not Python or Kotlin'
 
 context:
   overview: |
@@ -18,16 +18,16 @@ context:
 
 files:
   patterns:
-    - "10_schemas/rulepack.schema.json"
-    - "10_schemas/project.schema.json"
-    - "11_scripts/gen-project.ts"
-    - "01_rulepacks/*.yml"
+    - '10_schemas/rulepack.schema.json'
+    - '10_schemas/project.schema.json'
+    - '11_scripts/gen-project.ts'
+    - '01_rulepacks/*.yml'
 
 conventions:
-  - "Each rulepack must declare which tech-stacks it applies to via tags field"
-  - "Projects declare their tech-stack as array of language/tech names"
-  - "When generating adapters, filter rulepacks by matching tech-stack"
-  - "Backward compatible: projects without tech_stack declaration get all rulepacks"
+  - 'Each rulepack must declare which tech-stacks it applies to via tags field'
+  - 'Projects declare their tech-stack as array of language/tech names'
+  - 'When generating adapters, filter rulepacks by matching tech-stack'
+  - 'Backward compatible: projects without tech_stack declaration get all rulepacks'
 
 recipe:
   id: feature-delivery

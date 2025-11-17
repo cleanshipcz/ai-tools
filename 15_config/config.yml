@@ -1,0 +1,33 @@
+# AI Tools Configuration
+#
+# This file contains shared configuration for the ai-tools repository.
+# It is versioned and committed to git.
+#
+# For user-specific overrides, create config.local.yml (see config.local.yml.example)
+#
+# Configuration Merging:
+# ----------------------
+# config.local.yml (if it exists) is merged with this file using these rules:
+#   - Scalars: config.local.yml takes priority
+#   - Lists: Both lists are merged (config.yml + config.local.yml), duplicates removed
+#   - Maps: Recursively merged, config.local.yml takes priority for key conflicts
+
+# Project Sources
+# ---------------
+# Directories to search for project configurations.
+# Paths can be relative (to repository root) or absolute.
+#
+# These are shared project locations that all team members should use.
+# Add personal project directories in config.local.yml instead.
+#
+# Default: ['./06_projects/global', './06_projects/local']
+#
+# Examples:
+#   - ./06_projects/global         # Versioned, shared projects
+#   - ./06_projects/local          # Local, gitignored projects
+#   - /absolute/path/to/projects   # Projects in other locations
+#   - ../other-repo/projects       # Projects in sibling repository
+#
+project_sources:
+  - ./06_projects/global
+  - ./06_projects/local

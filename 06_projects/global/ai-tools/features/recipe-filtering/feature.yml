@@ -57,14 +57,14 @@ files:
     - 06_projects/**
 
 conventions:
-  - "Follow the existing filtering pattern for agents, prompts, and rulepacks"
-  - "Use whitelist_recipes and blacklist_recipes (mutually exclusive)"
-  - "Recipe IDs must match kebab-case pattern: ^[a-z0-9]+(-[a-z0-9]+)*$"
-  - "Implement shouldIncludeRecipe() method similar to shouldIncludeAgent()"
-  - "Apply filtering in both generation and deployment phases"
-  - "Update schema validation to prevent both whitelist and blacklist being defined"
-  - "Document the feature in projects/README.md and 05_recipes/README.md"
-  - "Preserve backwards compatibility - no filtering if neither list defined"
+  - 'Follow the existing filtering pattern for agents, prompts, and rulepacks'
+  - 'Use whitelist_recipes and blacklist_recipes (mutually exclusive)'
+  - 'Recipe IDs must match kebab-case pattern: ^[a-z0-9]+(-[a-z0-9]+)*$'
+  - 'Implement shouldIncludeRecipe() method similar to shouldIncludeAgent()'
+  - 'Apply filtering in both generation and deployment phases'
+  - 'Update schema validation to prevent both whitelist and blacklist being defined'
+  - 'Document the feature in projects/README.md and 05_recipes/README.md'
+  - 'Preserve backwards compatibility - no filtering if neither list defined'
 
 recipe:
   id: feature-delivery
@@ -162,8 +162,8 @@ recipe:
 metadata:
   status: draft
   owner: ai-tools-team
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  created: '2025-11-16'
+  updated: '2025-11-16'
   tags:
     - recipes
     - filtering

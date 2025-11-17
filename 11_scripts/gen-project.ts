@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile, writeFile, mkdir, readdir, access, copyFile } from 'fs/promises';
-import { join, dirname } from 'path';
+import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { load as loadYaml } from 'js-yaml';
 import chalk from 'chalk';
@@ -12,6 +12,7 @@ import {
   RECIPES_DIR,
   PROJECT_MANIFEST_FILE,
 } from './constants.js';
+import { getProjectSources } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -245,14 +246,18 @@ export class ProjectGenerator {
   }
 
   private async loadProject(projectId: string): Promise<void> {
-    // Check global projects first
-    let projectPath = join(rootDir, PROJECTS_DIR, 'global', projectId, PROJECT_MANIFEST_FILE);
-    let exists = await this.fileExists(projectPath);
+    // Check configured project sources
+    const projectSources = await getProjectSources();
+    let projectPath: string | null = null;
+    let exists = false;
 
-    if (!exists) {
-      // Check local projects
-      projectPath = join(rootDir, PROJECTS_DIR, 'local', projectId, PROJECT_MANIFEST_FILE);
-      exists = await this.fileExists(projectPath);
+    for (const source of projectSources) {
+      const candidatePath = join(source, projectId, PROJECT_MANIFEST_FILE);
+      exists = await this.fileExists(candidatePath);
+      if (exists) {
+        projectPath = candidatePath;
+        break;
+      }
     }
 
     if (!exists) {
@@ -264,8 +269,10 @@ export class ProjectGenerator {
       }
     }
 
-    if (!exists) {
-      throw new Error(`Project "${projectId}" not found in global, local, or external projects`);
+    if (!exists || !projectPath) {
+      throw new Error(
+        `Project "${projectId}" not found in configured project sources or external projects`
+      );
     }
 
     this.projectDir = dirname(projectPath);
@@ -1928,14 +1935,15 @@ export class ProjectGenerator {
   async listProjects(): Promise<void> {
     console.log(chalk.blue('\n📋 Available Projects:\n'));
 
-    console.log(chalk.bold('Global Projects:'));
-    await this.listProjectsInDir(join(rootDir, PROJECTS_DIR, 'global'));
+    // List projects from configured sources
+    const projectSources = await getProjectSources();
+    for (const source of projectSources) {
+      const sourceName = basename(source);
+      console.log(chalk.bold(`${sourceName} Projects:`));
+      await this.listProjectsInDir(source);
+      console.log('');
+    }
 
-    console.log('');
-    console.log(chalk.bold('Local Projects:'));
-    await this.listProjectsInDir(join(rootDir, PROJECTS_DIR, 'local'));
-
-    console.log('');
     console.log(chalk.bold('External Projects:'));
     await this.listExternalProjects();
 

@@ -11,6 +11,7 @@ import {
   PROJECT_MANIFEST_FILE,
   DEPLOY_CONFIG_FILE,
 } from './constants.js';
+import { getProjectSources } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -49,7 +50,25 @@ class ProjectCreator {
     console.log(chalk.gray(`  Created directory: ${PROJECTS_DIR}/${scope}/${projectId}/`));
 
     // Copy and customize template files
-    const templateDir = join(rootDir, PROJECTS_DIR, PROJECT_SCOPE_GLOBAL, 'template');
+    // Find template directory from configured project sources
+    const projectSources = await getProjectSources();
+    let templateDir: string | null = null;
+
+    for (const source of projectSources) {
+      const candidateTemplateDir = join(source, 'template');
+      try {
+        await readdir(candidateTemplateDir);
+        templateDir = candidateTemplateDir;
+        break;
+      } catch {
+        // Template not in this source, try next
+      }
+    }
+
+    if (!templateDir) {
+      // Fallback to hardcoded global template for backwards compatibility
+      templateDir = join(rootDir, PROJECTS_DIR, PROJECT_SCOPE_GLOBAL, 'template');
+    }
 
     // Copy project.yml
     const projectYmlPath = join(templateDir, 'project.yml');

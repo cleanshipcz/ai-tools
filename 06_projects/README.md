@@ -103,6 +103,99 @@ You'll see:
 
 ## Concepts
 
+### Project Sources Configuration
+
+**Configurable Project Locations** (`15_config/config.yml` + `config.local.yml`)
+
+The system searches for projects in directories defined in configuration files. This allows you to:
+
+- **Share team sources**: Define common paths in `config.yml` (versioned)
+- **Add personal sources**: Define your own paths in `config.local.yml` (gitignored)
+- **Support multiple repositories**: Include projects from other repos
+- **Maintain flexibility**: Use relative or absolute paths
+
+**Configuration Files:**
+
+1. **`15_config/config.yml`** (versioned, shared)
+   - Contains project sources for the entire team
+   - Committed to git
+   - Should include shared project locations
+
+2. **`15_config/config.local.yml`** (gitignored, personal)
+   - Contains your personal project sources
+   - NOT committed to git
+   - Create from `config.local.yml.example` template
+
+**Default Configuration (`config.yml`):**
+
+```yaml
+project_sources:
+  - ./06_projects/global # Versioned, shared projects
+  - ./06_projects/local # Local, gitignored projects
+```
+
+**Adding Personal Sources (`config.local.yml`):**
+
+Create `15_config/config.local.yml` to add your personal project locations:
+
+```yaml
+project_sources:
+  - /home/myuser/personal-projects
+  - /absolute/path/to/client-projects
+  - ../other-repo/projects
+```
+
+**Configuration Merging:**
+
+When both files exist, they are merged using these rules:
+
+- **Scalars** (strings, numbers): `config.local.yml` takes priority
+- **Lists** (arrays): Both lists are merged, duplicates removed
+  - Result: `config.yml` sources + `config.local.yml` sources
+- **Maps** (objects): Recursively merged, `config.local.yml` takes priority for conflicts
+
+**Example Merge:**
+
+If `config.yml` has:
+
+```yaml
+project_sources:
+  - ./06_projects/global
+  - ./06_projects/local
+```
+
+And `config.local.yml` has:
+
+```yaml
+project_sources:
+  - /home/user/my-projects
+  - ../external-projects
+```
+
+**Result:**
+
+```yaml
+project_sources:
+  - ./06_projects/global
+  - ./06_projects/local
+  - /home/user/my-projects
+  - ../external-projects
+```
+
+**Path Types:**
+
+- **Relative**: Resolved relative to repository root (e.g., `./06_projects/global`)
+- **Absolute**: Full file system paths (e.g., `/home/user/projects`)
+
+**Commands Using Configuration:**
+
+The system searches these directories when:
+
+- Listing projects (`npm run project:list`)
+- Loading projects for generation (`npm run project:generate`)
+- Deploying projects (`npm run project:deploy`)
+- Validating manifests (`npm run validate`)
+
 ### Global vs Local Projects
 
 **Global Projects** (`projects/global/`)

@@ -66,11 +66,11 @@ tools:
   - read-file
   - search-code
 constraints:
-  - "Keep documentation concise but comprehensive."
-  - "Balance technical depth with accessibility."
+  - 'Keep documentation concise but comprehensive.'
+  - 'Balance technical depth with accessibility.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-15"
+  author: 'AI Tools Team'
+  created: '2025-11-15'
   tags:
     - documentation
     - technical-writing

@@ -11,16 +11,16 @@ tags:
 variables:
   - name: user_description
     required: true
-    description: "Brief description of the project"
+    description: 'Brief description of the project'
 
 rules:
-  - "Ask clarifying questions BEFORE generating the manifests"
-  - "ALWAYS create BOTH project.yml AND deploy.yml files"
-  - "Follow the project schema (10_schemas/project.schema.json)"
-  - "Follow the deploy schema (10_schemas/deploy.schema.json)"
-  - "Keep project manifests focused on essential context"
-  - "Do NOT try to document the entire codebase"
-  - "Focus on what AI agents & local tools generating files need to know"
+  - 'Ask clarifying questions BEFORE generating the manifests'
+  - 'ALWAYS create BOTH project.yml AND deploy.yml files'
+  - 'Follow the project schema (10_schemas/project.schema.json)'
+  - 'Follow the deploy schema (10_schemas/deploy.schema.json)'
+  - 'Keep project manifests focused on essential context'
+  - 'Do NOT try to document the entire codebase'
+  - 'Focus on what AI agents & local tools generating files need to know'
 
 content: |
   The user wants to create a project manifest based on this description:
@@ -103,6 +103,6 @@ outputs:
   format: yaml
 
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-16"
-  updated: "2025-11-16"
+  author: 'AI Tools Team'
+  created: '2025-11-16'
+  updated: '2025-11-16'

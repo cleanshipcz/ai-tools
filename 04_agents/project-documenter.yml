@@ -64,13 +64,13 @@ tools:
   - search-code
   - list-directory
 constraints:
-  - "Start with a clear project overview and value proposition."
-  - "Include working installation and setup instructions."
-  - "Provide a quick-start that gets users productive in <5 minutes."
-  - "Use Mermaid diagrams to visualize architecture and workflows."
+  - 'Start with a clear project overview and value proposition.'
+  - 'Include working installation and setup instructions.'
+  - 'Provide a quick-start that gets users productive in <5 minutes.'
+  - 'Use Mermaid diagrams to visualize architecture and workflows.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-17"
+  author: 'AI Tools Team'
+  created: '2025-11-17'
   tags:
     - documentation
     - project

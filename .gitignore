@@ -29,6 +29,7 @@ evals/reports/
 config/providers.yml
 config/deploy.yml
 deploy.local.yml
+15_config/config.local.yml
 
 # Backups
 .backups/

@@ -63,13 +63,13 @@ tools:
   - read-file
   - search-code
 constraints:
-  - "Use the appropriate doc comment format for the language (JSDoc, JavaDoc, docstrings)."
-  - "Include type information in documentation."
-  - "Provide runnable code examples."
-  - "Document all edge cases and error conditions."
+  - 'Use the appropriate doc comment format for the language (JSDoc, JavaDoc, docstrings).'
+  - 'Include type information in documentation.'
+  - 'Provide runnable code examples.'
+  - 'Document all edge cases and error conditions.'
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-17"
+  author: 'AI Tools Team'
+  created: '2025-11-17'
   tags:
     - documentation
     - api

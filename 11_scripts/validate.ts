@@ -6,6 +6,7 @@ import { load as loadYaml } from 'js-yaml';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import chalk from 'chalk';
+import { getProjectSources } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -113,8 +114,6 @@ class Validator {
       '02_skills': 'skill',
       '05_recipes': 'recipe',
       '20_evals/suites': 'eval',
-      '06_projects/global': 'project',
-      '06_projects/local': 'project',
     };
 
     for (const [dir, type] of Object.entries(dirs)) {
@@ -154,10 +153,48 @@ class Validator {
       }
     }
 
-    // Collect feature manifests separately
-    const projectDirs = ['06_projects/global', '06_projects/local'];
-    for (const projectDir of projectDirs) {
-      const fullPath = join(rootDir, projectDir);
+    // Collect project manifests from configured sources
+    const projectSources = await getProjectSources();
+    for (const source of projectSources) {
+      try {
+        const files = await this.findYamlFiles(source);
+        for (const file of files) {
+          // Skip template files and deployment configs
+          if (file.includes('/template/')) continue;
+          if (file.endsWith('deploy.yml') || file.endsWith('deploy.local.yml')) continue;
+          // Skip feature manifests (will be collected separately)
+          if (file.includes('/features/') && file.endsWith('feature.yml')) continue;
+          // Only process project.yml files
+          if (!file.endsWith('project.yml')) continue;
+
+          try {
+            const content = await readFile(file, 'utf-8');
+            const parsed = loadYaml(content) as any;
+
+            if (!parsed || typeof parsed !== 'object') {
+              this.errors.push(`${relative(rootDir, file)}: Invalid YAML content`);
+              continue;
+            }
+
+            manifests.push({
+              path: file,
+              type: 'project',
+              id: parsed.id || 'unknown',
+              version: parsed.version,
+              content: parsed,
+            });
+          } catch (error) {
+            this.errors.push(`${relative(rootDir, file)}: Failed to parse YAML - ${error}`);
+          }
+        }
+      } catch (error) {
+        // Directory might not exist or can't be read
+      }
+    }
+
+    // Collect feature manifests separately from configured sources
+    for (const source of projectSources) {
+      const fullPath = source;
       try {
         const files = await this.findYamlFiles(fullPath);
         for (const file of files) {

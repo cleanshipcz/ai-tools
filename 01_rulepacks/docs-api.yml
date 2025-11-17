@@ -4,29 +4,29 @@ description: Rules for documenting code, APIs, functions, classes, and technical
 extends:
   - docs-base
 rules:
-  - "Document all public APIs, functions, classes, and methods."
-  - "Include parameter types, return types, and possible exceptions."
-  - "Provide usage examples for each public API."
-  - "Document function parameters: name, type, purpose, constraints."
-  - "Specify return values: type, meaning, possible values."
-  - "List all thrown exceptions and when they occur."
-  - "Include code examples that actually compile and run."
-  - "Document side effects and state changes."
-  - "Explain time and space complexity for algorithms."
-  - "Use appropriate doc comment format (JSDoc, JavaDoc, docstrings, etc.)."
-  - "Document class invariants and contract conditions."
-  - "Include example responses for API endpoints."
-  - "Document authentication and authorization requirements."
-  - "Specify rate limits, quotas, and usage constraints."
-  - "Include versioning information for APIs."
-  - "Document deprecated features with migration guidance."
-  - "Use inline comments for complex logic within implementations."
-  - "Document configuration options and environment variables."
+  - 'Document all public APIs, functions, classes, and methods.'
+  - 'Include parameter types, return types, and possible exceptions.'
+  - 'Provide usage examples for each public API.'
+  - 'Document function parameters: name, type, purpose, constraints.'
+  - 'Specify return values: type, meaning, possible values.'
+  - 'List all thrown exceptions and when they occur.'
+  - 'Include code examples that actually compile and run.'
+  - 'Document side effects and state changes.'
+  - 'Explain time and space complexity for algorithms.'
+  - 'Use appropriate doc comment format (JSDoc, JavaDoc, docstrings, etc.).'
+  - 'Document class invariants and contract conditions.'
+  - 'Include example responses for API endpoints.'
+  - 'Document authentication and authorization requirements.'
+  - 'Specify rate limits, quotas, and usage constraints.'
+  - 'Include versioning information for APIs.'
+  - 'Document deprecated features with migration guidance.'
+  - 'Use inline comments for complex logic within implementations.'
+  - 'Document configuration options and environment variables.'
 tags:
   - documentation
   - api
   - code
   - technical
 metadata:
-  author: "AI Tools Team"
-  created: "2025-11-17"
+  author: 'AI Tools Team'
+  created: '2025-11-17'

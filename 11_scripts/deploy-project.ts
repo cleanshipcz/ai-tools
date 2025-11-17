@@ -13,6 +13,7 @@ import {
   OUTPUT_DIR,
   BACKUPS_DIR,
 } from './constants.js';
+import { getProjectSources } from './config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -65,42 +66,30 @@ class ProjectDeployer {
     // Get all project IDs
     const projectIds: string[] = [];
 
-    // Check global projects
-    const globalDir = join(rootDir, PROJECTS_DIR, 'global');
-    try {
-      const globalEntries = await readdir(globalDir, { withFileTypes: true });
-      for (const entry of globalEntries) {
-        if (entry.isDirectory() && entry.name !== 'template') {
-          const deployPath = join(globalDir, entry.name, DEPLOY_CONFIG_FILE);
-          try {
-            await access(deployPath);
-            projectIds.push(entry.name);
-          } catch {
-            // No deploy.yml, skip
+    // Check configured project sources
+    const projectSources = await getProjectSources();
+    for (const source of projectSources) {
+      try {
+        const entries = await readdir(source, { withFileTypes: true });
+        for (const entry of entries) {
+          if (
+            entry.isDirectory() &&
+            entry.name !== 'template' &&
+            entry.name !== '.template' &&
+            !entry.name.startsWith('.')
+          ) {
+            const deployPath = join(source, entry.name, DEPLOY_CONFIG_FILE);
+            try {
+              await access(deployPath);
+              projectIds.push(entry.name);
+            } catch {
+              // No deploy.yml, skip
+            }
           }
         }
+      } catch {
+        // Directory doesn't exist or can't be read, skip
       }
-    } catch {
-      // No global directory
-    }
-
-    // Check local projects
-    const localDir = join(rootDir, PROJECTS_DIR, 'local');
-    try {
-      const localEntries = await readdir(localDir, { withFileTypes: true });
-      for (const entry of localEntries) {
-        if (entry.isDirectory() && entry.name !== 'README.md' && !entry.name.startsWith('.')) {
-          const deployPath = join(localDir, entry.name, DEPLOY_CONFIG_FILE);
-          try {
-            await access(deployPath);
-            projectIds.push(entry.name);
-          } catch {
-            // No deploy.yml, skip
-          }
-        }
-      }
-    } catch {
-      // No local directory
     }
 
     // Check external projects
@@ -176,36 +165,38 @@ class ProjectDeployer {
   }
 
   private async loadDeployConfig(projectId: string): Promise<DeploymentConfig> {
-    // Find project directory (check global first, then local, then external)
+    // Find project directory (check configured sources first, then external)
     let projectDir: string | null = null;
 
-    const globalProjectDir = join(rootDir, PROJECTS_DIR, 'global', projectId);
-    const localProjectDir = join(rootDir, PROJECTS_DIR, 'local', projectId);
-
-    try {
-      await access(globalProjectDir);
-      projectDir = globalProjectDir;
-    } catch {
+    // Check configured project sources
+    const projectSources = await getProjectSources();
+    for (const source of projectSources) {
+      const candidateDir = join(source, projectId);
       try {
-        await access(localProjectDir);
-        projectDir = localProjectDir;
+        await access(candidateDir);
+        projectDir = candidateDir;
+        break;
       } catch {
-        // Check external projects
-        try {
-          const { ExternalProjectManager } = await import('./external-projects.js');
-          const manager = new ExternalProjectManager();
-          const projects = await manager.getAllProjects();
-          const found = projects.find((p) => p.alias === projectId);
-          if (found) {
-            projectDir = found.path;
-          }
-        } catch {
-          // No external projects
-        }
+        // Directory doesn't exist, continue
+      }
+    }
 
-        if (!projectDir) {
-          throw new Error(`Project not found: ${projectId}`);
+    if (!projectDir) {
+      // Check external projects
+      try {
+        const { ExternalProjectManager } = await import('./external-projects.js');
+        const manager = new ExternalProjectManager();
+        const projects = await manager.getAllProjects();
+        const found = projects.find((p) => p.alias === projectId);
+        if (found) {
+          projectDir = found.path;
         }
+      } catch {
+        // No external projects
+      }
+
+      if (!projectDir) {
+        throw new Error(`Project not found: ${projectId}`);
       }
     }
 

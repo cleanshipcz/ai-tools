@@ -562,6 +562,7 @@ npm run eval -- --suite code-refactor
 A comprehensive automated testing infrastructure ensuring code quality and reliability across all build scripts and utilities.
 
 **Test Coverage:**
+
 - ✅ **156 automated tests** across 18 test files
 - ✅ **100% script coverage** (all 17 scripts tested)
 - ✅ **100% pass rate** - all tests passing
@@ -569,6 +570,7 @@ A comprehensive automated testing infrastructure ensuring code quality and relia
 - ✅ **CI/CD integrated** - automated testing on all PRs
 
 **Test Categories:**
+
 - **Core Systems** (58 tests): validate.ts, build.ts
 - **Project Management** (27 tests): project generation, deployment, creation
 - **Generators** (30 tests): skills, docs, features, prompts
@@ -593,6 +595,7 @@ npx vitest run 11_scripts/validate.test.ts
 ```
 
 **Test Infrastructure:**
+
 - **Framework:** Vitest 4.0.9 with TypeScript support
 - **Coverage:** @vitest/coverage-v8 for detailed reports
 - **Utilities:** Shared test helpers in test-utils.ts
