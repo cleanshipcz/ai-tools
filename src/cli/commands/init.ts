@@ -17,7 +17,7 @@ export const initCommand = new Command('init')
     await initProject(path, options);
   });
 
-export async function initProject(path: string, options: any) {
+async function initProject(path: string, options: any) {
   const config = ConfigService.getInstance();
   const externalService = new ExternalProjectService();
 

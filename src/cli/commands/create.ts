@@ -15,7 +15,7 @@ export const createCommand = new Command('create')
     await createProject(name, options);
   });
 
-export async function createProject(name: string, options: any) {
+async function createProject(name: string, options: any) {
   const config = ConfigService.getInstance();
   const scope = options.global ? 'global' : 'local';
   

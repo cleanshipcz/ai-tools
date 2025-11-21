@@ -246,21 +246,35 @@ async function rollbackProject(projectId: string, timestamp?: string) {
   console.log(chalk.yellow('Rollback functionality not yet implemented in new CLI'));
 }
 
-async function backupExisting(projectId: string, config: DeploymentConfig, targetPath: string) {
+export async function backupExisting(projectId: string, config: DeploymentConfig, targetPath: string) {
   const configService = ConfigService.getInstance();
-  const backupDir = configService.getPath('backups', projectId, new Date().toISOString().replace(/[:.]/g, '-'));
+  // Use configured backups directory (defaults to .backups)
+  const backupsRoot = configService.getPath(configService.dirs.backups, projectId);
+  const backupDir = join(backupsRoot, new Date().toISOString().replace(/[:.]/g, '-'));
+  
   await mkdir(backupDir, { recursive: true });
   
   // Logic to backup only what we are about to overwrite
-  // Simplified: backup the tool directories if they exist in target
   for (const tool of config.tools) {
-    // Map tool name to output directory name if needed (e.g. claude-code -> .claude)
-    // This mapping should ideally be in the ToolAdapter or a shared constant
     let dirName = tool;
     if (tool === 'claude-code') dirName = '.claude';
     else if (tool === 'cursor') dirName = '.cursor';
     else if (tool === 'windsurf') dirName = '.windsurf';
     else if (tool === 'github-copilot') dirName = '.github';
+    else if (tool === 'copilot-cli') {
+        // Backup specific files for copilot-cli
+        const files = ['AGENTS.md', '.cs.recipes'];
+        for (const file of files) {
+            const src = join(targetPath, file);
+            const dest = join(backupDir, file);
+            try {
+                await access(src);
+                await copyFileOrDir(src, dest);
+                console.log(chalk.gray(`    Backed up ${file}`));
+            } catch {}
+        }
+        continue;
+    }
     
     const targetToolPath = join(targetPath, dirName);
     try {
@@ -268,6 +282,28 @@ async function backupExisting(projectId: string, config: DeploymentConfig, targe
       await copyDirectory(targetToolPath, join(backupDir, dirName));
       console.log(chalk.gray(`    Backed up ${dirName}`));
     } catch {}
+  }
+
+  // Clean up old backups (keep latest 10)
+  try {
+    const entries = await readdir(backupsRoot, { withFileTypes: true });
+    const backups = entries
+        .filter(e => e.isDirectory())
+        .map(e => e.name)
+        .sort() // ISO strings sort chronologically
+        .reverse(); // Newest first
+
+    if (backups.length > 10) {
+        const toDelete = backups.slice(10);
+        const { rm } = await import('fs/promises');
+        for (const dir of toDelete) {
+            const pathToDelete = join(backupsRoot, dir);
+            await rm(pathToDelete, { recursive: true, force: true });
+            console.log(chalk.gray(`    Removed old backup: ${dir}`));
+        }
+    }
+  } catch (e) {
+    console.warn(chalk.yellow(`    Failed to clean up old backups: ${e}`));
   }
 }
 

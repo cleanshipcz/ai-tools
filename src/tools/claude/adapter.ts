@@ -24,18 +24,32 @@ export class ClaudeAdapter extends ToolAdapter {
     // Prompts
     const promptsDir = this.config.getPath(this.config.dirs.prompts);
     const promptsMap = new Map<string, string>();
+    
+    // Clean up destination prompts directory first
+    const destPromptsDir = join(claudeDir, 'prompts');
+    try {
+        const { rm } = await import('fs/promises');
+        await rm(destPromptsDir, { recursive: true, force: true });
+    } catch {}
+    await mkdir(destPromptsDir, { recursive: true });
+
     try {
       const promptFiles = await this.loader.findYamlFilesRelative(promptsDir);
       for (const relativePath of promptFiles) {
         const fullPath = join(promptsDir, relativePath);
         const prompt = await this.loader.loadYaml<Prompt>(fullPath);
-        promptsMap.set(prompt.id, relativePath.replace(/\.ya?ml$/, '').replace(/\\/g, '/'));
+        
+        // Determine path-based ID/Name
+        const pathWithoutExt = relativePath.replace(/\.ya?ml$/, '').replace(/\\/g, '/');
+        promptsMap.set(prompt.id, pathWithoutExt);
         
         if (this.resolver.shouldIncludePrompt(prompt.id, promptsMap, project)) {
            // Generate Claude-specific JSON for prompt
-           // Logic adapted from legacy build.ts
+           // Use path-derived ID for consistency with Windsurf
+           const namespacedId = pathWithoutExt.split('/').join('-');
+           
            const claudePrompt = {
-             id: prompt.id,
+             id: namespacedId, // Use the namespaced ID
              description: prompt.description,
              content: prompt.content,
              system: prompt.system,
@@ -43,11 +57,11 @@ export class ClaudeAdapter extends ToolAdapter {
              variables: prompt.variables
            };
            
-           const destDir = join(claudeDir, 'prompts');
-           await mkdir(destDir, { recursive: true });
+           // const destDir = join(claudeDir, 'prompts');
+           // await mkdir(destDir, { recursive: true });
            
-           // Use ID for filename to be safe and simple
-           await writeFile(join(destDir, `${prompt.id}.json`), JSON.stringify(claudePrompt, null, 2));
+           // Use namespaced ID for filename
+           await writeFile(join(destPromptsDir, `${namespacedId}.json`), JSON.stringify(claudePrompt, null, 2));
         }
       }
     } catch {}
