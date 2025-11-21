@@ -117,15 +117,14 @@ cd /path/to/your-actual-app
 ### For Developers (Managing Configs)
 
 ```bash
-# Validate and build all configs
+# Validate configurations
 npm run validate
-npm run build
 
-# Import into tools
-ls adapters/windsurf/          # Windsurf rules
-ls adapters/cursor/            # Cursor recipes
-ls adapters/claude-code/       # Claude Code skills & prompts
-ls adapters/github-copilot/    # GitHub Copilot instructions
+# Deploy all projects (generates artifacts for all tools)
+npm run project:deploy-all
+
+# Deploy a specific project
+npm run project:deploy my-app
 ```
 
 ---
@@ -209,13 +208,11 @@ Copy the `user` field, fill in variables, paste into ChatGPT/Claude.
 #### For Tool Users (Windsurf, Cursor, etc.)
 
 ```bash
-# Build tool-specific configs
-npm run build
+# Deploy configs to your project
+npm run project:deploy my-project
 
-# Import into your tool:
-# Windsurf: Settings → Rules → Import adapters/windsurf/rules/*.json
-# Cursor: Command Palette → Import adapters/cursor/recipes.json
-# Claude Code: Import from adapters/claude-code/
+# Or deploy to all projects
+npm run project:deploy-all
 ```
 
 Your AI assistant will automatically have access to all prompts.
@@ -256,7 +253,7 @@ outputs:
 
 ```bash
 npm run validate  # Check for errors
-npm run build     # Generate adapters
+npm run project:deploy-all # Deploy updates
 npm run prompt-library  # Update prompt library
 ```
 
@@ -283,13 +280,8 @@ Agents are complete AI assistants with bundled prompts, rules, and settings. The
 #### With AI Coding Tools
 
 ```bash
-# Build agent configs
-npm run build
-
-# Import into tool:
-# Windsurf: Import adapters/windsurf/rules/code-reviewer.json
-# Cursor: Import adapters/cursor/recipes.json
-# GitHub Copilot: Copy adapters/github-copilot/.github/ to your repo
+# Deploy agent configs
+npm run project:deploy-all
 ```
 
 **GitHub Copilot** - Agents become invokable prompts:
@@ -450,7 +442,7 @@ rulepacks:
   - coding-python
 ```
 
-When you build, these rules get merged into the agent configuration.
+When you deploy, these rules get merged into the agent configuration.
 
 ### Creating Custom Rulepacks
 
@@ -472,7 +464,7 @@ rules:
 
 ```bash
 npm run validate  # Checks for issues
-npm run build     # Bundles into agents/configs
+npm run project:deploy-all # Bundles into agents/configs
 ```
 
 ---
@@ -491,12 +483,10 @@ Skills are executable commands that AI agents can run - like running tests, lint
 ### Quick Usage
 
 ```bash
-# Build all adapters (includes Anthropic SKILL.md generation)
-npm run build
+# Deploy all adapters (includes Anthropic SKILL.md generation)
+npm run project:deploy-all
 
 # Skills are bundled into agents automatically
-# Windsurf/Cursor: Import agent configs
-# Claude Code: Use generated adapters/claude-code/skills/
 ```
 
 **Best of both worlds:** Tool-agnostic YAML source + native Anthropic Agent Skills format.
@@ -798,11 +788,21 @@ npm run project:create           # Create new project from template
 npm run project:init             # Initialize AI tools in external project
 npm run project:list             # List available projects (including external)
 npm run project:generate         # Generate project configurations (includes recipes)
-npm run project:generate-features # Generate feature-specific snippets
-npm run project:deploy           # Deploy to target project
-npm run project:deploy-all       # Deploy all projects at once
-npm run project:rollback         # Rollback deployment
-npm run project:external         # Manage external projects (add/remove/list)
+npm run project:deploy           # Deploy configurations to target
+npm run project:external         # Manage external projects
+```
+
+### For Developers (Managing Manifests)
+
+```bash
+npm run validate                 # Validate all manifests
+npm run build                    # Build global configurations
+npm run eval                     # Run evaluation suites
+npm run diff                     # Compare files or directories
+npm run clean                    # Clean generated artifacts
+npm run features                 # Generate feature files
+npm run skills                   # Generate skill files
+npm run docs                     # Generate documentation
 ```
 
 **Note:** Project generation automatically deploys recipe scripts to `.cs.recipes/` subdirectories for supported tools (claude-code, copilot-cli, cursor).

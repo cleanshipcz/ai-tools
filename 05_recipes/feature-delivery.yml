@@ -9,6 +9,7 @@ tags:
 tools:
   - claude-code
   - copilot-cli
+  - windsurf
 
 # Conversation strategy: 'continue' (maintain context) or 'separate' (fresh conversation per agent)
 conversationStrategy: separate

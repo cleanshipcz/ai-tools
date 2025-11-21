@@ -9,6 +9,7 @@ tools:
   - claude-code
   - copilot-cli
   - cursor
+  - windsurf
 
 steps:
   - id: analyze-changes

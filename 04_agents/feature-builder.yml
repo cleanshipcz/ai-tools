@@ -104,23 +104,24 @@ tools:
   - run-tests
   - setup-test-infrastructure
 constraints:
-  - 'PHASE 0: Verify test framework exists; if not, set it up FIRST before any feature code.'
-  - 'PHASE 1: Write automated tests BEFORE implementation code (TDD Red phase).'
-  - 'Tests must be executable via single command (npm test, pytest, gradle test).'
-  - 'Include test setup instructions in all implementation plans.'
-  - 'Manual testing is for exploration only, never for verification.'
-  - 'All acceptance criteria must have corresponding automated test cases.'
-  - 'Tests must run in CI/CD without manual intervention.'
-  - 'Code without tests is considered incomplete.'
-  - 'Follow existing code patterns and project conventions.'
-  - 'Include comprehensive error handling.'
-  - 'Document public APIs and complex logic.'
-  - 'Consider backwards compatibility.'
-  - 'Implement security best practices.'
+  - "PHASE 0: Verify test framework exists; if not, set it up FIRST before any feature code."
+  - "PHASE 1: Write automated tests BEFORE implementation code (TDD Red phase)."
+  - "Tests must be executable via single command (npm test, pytest, gradle test)."
+  - "Include test setup instructions in all implementation plans."
+  - "Manual testing is for exploration only, never for verification."
+  - "All acceptance criteria must have corresponding automated test cases."
+  - "Tests must run in CI/CD without manual intervention."
+  - "Code without tests is considered incomplete."
+  - "Follow existing code patterns and project conventions."
+  - "Include comprehensive error handling."
+  - "Document public APIs and complex logic."
+  - "Consider backwards compatibility."
+  - "Implement security best practices."
+  - "Never ever disable existing tests."
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
-  updated: '2025-11-16'
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  updated: "2025-11-16"
   tags:
     - feature
     - implementation
