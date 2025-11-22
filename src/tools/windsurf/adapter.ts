@@ -23,31 +23,11 @@ export class WindsurfAdapter extends ToolAdapter {
     await this.generateProjectContext(project, rulesDir);
 
     // 2. Copy and filter agents/prompts/rulepacks
-    // This logic mirrors copyDirectoryWithFiltering but adapted for Windsurf structure
-    // Windsurf uses flat structure in .windsurf/rules
+    // Use generic resolution for agents
+    const resolvedAgents = await this.resolver.resolveAllAgents(project);
     
-    // Load all agents and filter
-    const agentsDir = this.config.getPath(this.config.dirs.agents);
-    const agentFiles = await this.loader.findYamlFiles(agentsDir);
-    
-    // Helper to generate agents for a specific context
-    const generateAgentsForContext = async (suffix: string = '', context?: { languages?: string[] }) => {
-      for (const file of agentFiles) {
-        const agent = await this.loader.loadYaml<Agent>(file);
-        if (this.resolver.shouldIncludeAgent(agent.id, project)) {
-          await this.generateAgentRule(agent, rulesDir, project, suffix, context);
-        }
-      }
-    };
-
-    // Generate global agents
-    await generateAgentsForContext();
-
-    // Generate stack-specific agents
-    if (project.tech_stacks) {
-      for (const [stackName, stackContext] of Object.entries(project.tech_stacks)) {
-        await generateAgentsForContext(`-${stackName}`, stackContext);
-      }
+    for (const { agent, rules, suffix } of resolvedAgents) {
+      await this.generateAgentRuleWithRules(agent, rules, rulesDir, suffix);
     }
 
     // Load all prompts and filter
@@ -230,9 +210,7 @@ export class WindsurfAdapter extends ToolAdapter {
     await writeFile(join(outputDir, 'project-context.md'), content.join('\n'));
   }
 
-  private async generateAgentRule(agent: Agent, outputDir: string, project?: Project, suffix: string = '', context?: { languages?: string[] }): Promise<void> {
-    const rules = agent.rulepacks ? await this.resolver.resolveRulepacks(agent.rulepacks, project, context) : [];
-
+  private async generateAgentRuleWithRules(agent: Agent, rules: string[], outputDir: string, suffix: string = ''): Promise<void> {
     const content: string[] = [];
     content.push('---');
     content.push('trigger: manual');
@@ -269,6 +247,12 @@ export class WindsurfAdapter extends ToolAdapter {
     }
 
     await writeFile(join(outputDir, `agent-${agent.id}${suffix}.md`), content.join('\n'));
+  }
+
+  // Legacy method kept for generateGlobal if needed, or refactor generateGlobal too
+  private async generateAgentRule(agent: Agent, outputDir: string, project?: Project, suffix: string = '', context?: { languages?: string[] }): Promise<void> {
+     const rules = agent.rulepacks ? await this.resolver.resolveRulepacks(agent.rulepacks, project, context) : [];
+     await this.generateAgentRuleWithRules(agent, rules, outputDir, suffix);
   }
 
   private async generatePromptRule(prompt: Prompt, outputDir: string, filenameOverride?: string): Promise<void> {

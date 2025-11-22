@@ -1,5 +1,5 @@
 import { ToolAdapter } from '../base.js';
-import { Project, Agent } from '../../core/models/types.js';
+import { Project, Agent, Prompt } from '../../core/models/types.js';
 import { ConfigService } from '../../core/services/config.service.js';
 import { RecipeService } from '../../core/services/recipe.service.js';
 import { LoaderService } from '../../core/services/loader.service.js';
@@ -24,6 +24,62 @@ export class GitHubCopilotAdapter extends ToolAdapter {
 
     // Generate recipes
     await this.recipeService.generateRecipesForTool(this.name, outputDir, project);
+
+    // Generate prompts
+    const promptsDir = this.config.getPath(this.config.dirs.prompts);
+    const githubPromptsDir = join(githubDir, 'prompts');
+    const { rm } = await import('fs/promises');
+    await rm(githubPromptsDir, { recursive: true, force: true });
+    await mkdir(githubPromptsDir, { recursive: true });
+
+    const promptsMap = new Map<string, string>();
+    let promptFiles: string[] = [];
+    try {
+        promptFiles = await this.loader.findYamlFilesRelative(promptsDir);
+        
+        for (const relativePath of promptFiles) {
+            const fullPath = join(promptsDir, relativePath);
+            const prompt = await this.loader.loadYaml<Prompt>(fullPath);
+            const pathWithoutExt = relativePath.replace(/\.ya?ml$/, '').replace(/\\/g, '/');
+            promptsMap.set(prompt.id, pathWithoutExt);
+        }
+
+        // Helper to generate prompts for a specific context
+        const generatePromptsForContext = async (suffix: string = '', context?: { languages?: string[] }) => {
+          for (const relativePath of promptFiles) {
+            const fullPath = join(promptsDir, relativePath);
+            const prompt = await this.loader.loadYaml<Prompt>(fullPath);
+            
+            if (this.resolver.shouldIncludePrompt(prompt.id, promptsMap, project)) {
+              const pathWithoutExt = relativePath.replace(/\.ya?ml$/, '');
+              // Convert path separators to hyphens for the filename
+              const filename = `prompt-${pathWithoutExt.split(/[/\\]/).join('-')}${suffix}.md`;
+              await this.generatePromptFile(prompt, githubPromptsDir, filename);
+            }
+          }
+        };
+
+        // Generate global prompts
+        await generatePromptsForContext();
+
+        // Generate stack-specific prompts
+        if (project.tech_stacks) {
+          for (const [stackName, stackContext] of Object.entries(project.tech_stacks)) {
+            await generatePromptsForContext(`-${stackName}`, stackContext);
+          }
+        }
+
+        // Generate agents as prompts
+        // Use generic resolution for agents
+        const resolvedAgents = await this.resolver.resolveAllAgents(project);
+
+        for (const { agent, rules, suffix } of resolvedAgents) {
+            const filename = `agent-${agent.id}${suffix}.md`;
+            await this.generateAgentFile(agent, rules, githubPromptsDir, filename);
+        }
+    } catch (e) {
+        console.warn('Failed to generate prompts', e);
+    }
   }
 
   async generateGlobal(outputDir: string): Promise<void> {
@@ -59,69 +115,43 @@ export class GitHubCopilotAdapter extends ToolAdapter {
 
     const agentsDir = this.config.getPath(this.config.dirs.agents);
     try {
-      const agentFiles = await this.loader.findYamlFiles(agentsDir);
-      
-      // Helper to add agents for a specific context
-      const addAgentsForContext = async (suffix: string = '', context?: { languages?: string[] }) => {
-        for (const file of agentFiles) {
-          const agent = await this.loader.loadYaml<Agent>(file);
+      // Use generic resolution for agents
+      const resolvedAgents = await this.resolver.resolveAllAgents(project || {} as Project);
+
+      for (const { agent, rules, suffix } of resolvedAgents) {
+          lines.push(`### ${agent.id}${suffix}`);
+          lines.push('');
+          lines.push(`**Purpose:** ${agent.purpose}`);
+          lines.push('');
           
-          let include = true;
-          if (project) {
-            include = this.resolver.shouldIncludeAgent(agent.id, project);
-          }
-          
-          if (include) {
-            lines.push(`### ${agent.id}${suffix}`);
+          if (agent.prompt?.system) {
+            lines.push('**Persona:**');
             lines.push('');
-            lines.push(`**Purpose:** ${agent.purpose}`);
-            lines.push('');
-            
-            if (agent.prompt?.system) {
-              lines.push('**Persona:**');
-              lines.push('');
-              lines.push(agent.prompt.system);
-              lines.push('');
-            }
-
-            if (agent.constraints && agent.constraints.length > 0) {
-              lines.push('**Constraints:**');
-              lines.push('');
-              for (const constraint of agent.constraints) {
-                lines.push(`- ${constraint}`);
-              }
-              lines.push('');
-            }
-
-            // Resolve and add rules from rulepacks
-            if (agent.rulepacks && agent.rulepacks.length > 0) {
-              if (project) {
-                  const rules = await this.resolver.resolveRulepacks(agent.rulepacks, project, context);
-                  if (rules.length > 0) {
-                    lines.push('**Rules:**');
-                    lines.push('');
-                    for (const rule of rules) {
-                      lines.push(`- ${rule}`);
-                    }
-                    lines.push('');
-                  }
-              }
-            }
-
-            lines.push('---');
+            lines.push(agent.prompt.system);
             lines.push('');
           }
-        }
-      };
 
-      // Add global agents
-      await addAgentsForContext();
+          if (agent.constraints && agent.constraints.length > 0) {
+            lines.push('**Constraints:**');
+            lines.push('');
+            for (const constraint of agent.constraints) {
+              lines.push(`- ${constraint}`);
+            }
+            lines.push('');
+          }
 
-      // Add stack-specific agents
-      if (project?.tech_stacks) {
-        for (const [stackName, stackContext] of Object.entries(project.tech_stacks)) {
-          await addAgentsForContext(`-${stackName}`, stackContext);
-        }
+          // Add pre-resolved rules
+          if (rules.length > 0) {
+            lines.push('**Rules:**');
+            lines.push('');
+            for (const rule of rules) {
+              lines.push(`- ${rule}`);
+            }
+            lines.push('');
+          }
+
+          lines.push('---');
+          lines.push('');
       }
 
     } catch (e) {
@@ -204,5 +234,82 @@ export class GitHubCopilotAdapter extends ToolAdapter {
     }
 
     return lines.join('\n');
+  }
+
+  private async generatePromptFile(prompt: Prompt, outputDir: string, filenameOverride?: string): Promise<void> {
+    const content: string[] = [];
+    content.push(`# ${prompt.id}`);
+    content.push('');
+    content.push(prompt.description);
+    content.push('');
+
+    if (prompt.variables && prompt.variables.length > 0) {
+      content.push('## Variables');
+      content.push('');
+      for (const variable of prompt.variables) {
+        const required = variable.required ? ' (required)' : '';
+        content.push(`- \`{{${variable.name}}}\`${required}: ${variable.description || ''}`);
+      }
+      content.push('');
+    }
+
+    if (prompt.content) {
+      content.push('## Prompt');
+      content.push('');
+      content.push(prompt.content);
+      content.push('');
+    }
+
+    if (prompt.system) {
+      content.push('## System Prompt');
+      content.push('');
+      content.push(prompt.system);
+      content.push('');
+    }
+
+    if (prompt.user) {
+      content.push('## User Prompt');
+      content.push('');
+      content.push(prompt.user);
+      content.push('');
+    }
+
+    const filename = filenameOverride || `${prompt.id}.md`;
+    await writeFile(join(outputDir, filename), content.join('\n'));
+  }
+
+  private async generateAgentFile(agent: Agent, rules: string[], outputDir: string, filename: string): Promise<void> {
+    const content: string[] = [];
+    content.push(`# ${agent.id}`);
+    content.push('');
+    content.push(`**Purpose:** ${agent.purpose}`);
+    content.push('');
+
+    if (agent.prompt?.system) {
+      content.push('## Persona');
+      content.push('');
+      content.push(agent.prompt.system);
+      content.push('');
+    }
+
+    if (agent.constraints && agent.constraints.length > 0) {
+      content.push('## Constraints');
+      content.push('');
+      for (const constraint of agent.constraints) {
+        content.push(`- ${constraint}`);
+      }
+      content.push('');
+    }
+
+    if (rules.length > 0) {
+      content.push('## Rules');
+      content.push('');
+      for (const rule of rules) {
+        content.push(`- ${rule}`);
+      }
+      content.push('');
+    }
+
+    await writeFile(join(outputDir, filename), content.join('\n'));
   }
 }

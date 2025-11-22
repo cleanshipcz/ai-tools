@@ -47,24 +47,41 @@ export class RecipeService {
 
     await mkdir(recipesOutputDir, { recursive: true });
 
-    for (const recipeFile of recipeFiles) {
-      const recipeId = recipeFile.replace(/\.ya?ml$/, '').replace(/\\/g, '/').split('/').pop()!; // Use basename for ID in filename
+    // Helper to generate recipes for a specific context
+    const generateRecipesForContext = async (suffix: string = '', context?: { languages?: string[] }) => {
+      for (const recipeFile of recipeFiles) {
+        const recipeId = recipeFile.replace(/\.ya?ml$/, '').replace(/\\/g, '/').split('/').pop()!; // Use basename for ID in filename
 
-      // Filter recipes based on project config
-      if (project && !this.resolver.shouldIncludeRecipe(recipeId, project)) {
-        continue;
+        // Filter recipes based on project config
+        if (project && !this.resolver.shouldIncludeRecipe(recipeId, project)) {
+          continue;
+        }
+
+        const fullPath = join(recipesDir, recipeFile);
+        const recipe = await this.loader.loadYaml<Recipe>(fullPath);
+
+        // Skip if recipe doesn't support this tool
+        if (recipe.tools && Array.isArray(recipe.tools) && !recipe.tools.includes(tool)) {
+          continue;
+        }
+        
+        // If context is provided, we might want to filter recipes?
+        // Or just generate them with the suffix and let the script load the correct context.
+        // For now, we generate all included recipes for each stack, appending suffix.
+
+        const scriptPath = join(recipesOutputDir, `${recipeId}${suffix}.sh`);
+        await this.generateRecipeScript(recipe, tool, scriptPath, suffix);
       }
+    };
 
-      const fullPath = join(recipesDir, recipeFile);
-      const recipe = await this.loader.loadYaml<Recipe>(fullPath);
+    // Generate global recipes
+    await generateRecipesForContext();
 
-      // Skip if recipe doesn't support this tool
-      if (recipe.tools && Array.isArray(recipe.tools) && !recipe.tools.includes(tool)) {
-        continue;
+    // Generate stack-specific recipes
+    if (project?.tech_stacks) {
+      for (const [stackName, stackContext] of Object.entries(project.tech_stacks)) {
+        await generateRecipesForContext(`-${stackName}`, stackContext);
       }
-
-      const scriptPath = join(recipesOutputDir, `${recipeId}.sh`);
-      await this.generateRecipeScript(recipe, tool, scriptPath);
     }
   }
 
@@ -97,13 +114,13 @@ export class RecipeService {
     return null;
   }
 
-  async generateRecipeScript(recipe: Recipe, tool: string, outputPath: string): Promise<void> {
+  async generateRecipeScript(recipe: Recipe, tool: string, outputPath: string, suffix: string = ''): Promise<void> {
     // Ensure output directory exists
     const { dirname } = await import('path');
     await mkdir(dirname(outputPath), { recursive: true });
 
     let script = '#!/bin/bash\n\n';
-    script += `# Recipe: ${recipe.id}\n`;
+    script += `# Recipe: ${recipe.id}${suffix}\n`;
     script += `# Description: ${recipe.description}\n`;
     script += `# Tool: ${tool}\n\n`;
 
@@ -111,7 +128,14 @@ export class RecipeService {
 
     // Common functions
     script += 'function load_project_context() {\n';
-    script += '  if [ -f ".claude/project-context.json" ]; then\n';
+    script += `  if [ -f ".claude/project-context${suffix}.json" ]; then\n`;
+    script += `    PROJECT_CONTEXT=$(cat .claude/project-context${suffix}.json)\n`;
+    script += `  elif [ -f ".cursor/project-rules${suffix}.json" ]; then\n`;
+    script += `    PROJECT_CONTEXT=$(cat .cursor/project-rules${suffix}.json)\n`;
+    script += `  elif [ -f ".windsurf/rules/project-context${suffix}.md" ]; then\n`;
+    script += `    PROJECT_CONTEXT=$(cat .windsurf/rules/project-context${suffix}.md)\n`;
+    // Fallback to global if specific not found
+    script += '  elif [ -f ".claude/project-context.json" ]; then\n';
     script += '    PROJECT_CONTEXT=$(cat .claude/project-context.json)\n';
     script += '  elif [ -f ".cursor/project-rules.json" ]; then\n';
     script += '    PROJECT_CONTEXT=$(cat .cursor/project-rules.json)\n';

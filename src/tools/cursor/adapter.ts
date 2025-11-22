@@ -20,26 +20,30 @@ export class CursorAdapter extends ToolAdapter {
 
     // 1. Generate recipes.json from agents
     // This replaces the dependency on pre-built 'adapters' directory
-    const agentsDir = this.config.getPath(this.config.dirs.agents);
+    // 1. Generate recipes.json from agents
+    // This replaces the dependency on pre-built 'adapters' directory
     try {
-      const agentFiles = await this.loader.findYamlFiles(agentsDir);
+      // Use generic resolution for agents
+      const resolvedAgents = await this.resolver.resolveAllAgents(project);
       const recipes: any[] = [];
       
-      for (const file of agentFiles) {
-        const agent = await this.loader.loadYaml<Agent>(file);
-        
-        if (this.resolver.shouldIncludeAgent(agent.id, project)) {
+      for (const { agent, rules, suffix } of resolvedAgents) {
            // Convert Agent to Cursor Recipe format
            // Logic adapted from legacy build.ts
            const recipe = {
-             id: agent.id,
-             name: agent.id, // Cursor uses name as ID often
+             id: `${agent.id}${suffix}`, // Append suffix to ID
+             name: `${agent.id}${suffix}`, // Cursor uses name as ID often
              description: agent.description || agent.purpose,
              prompt: agent.prompt?.system || agent.purpose,
-             // Add other fields if needed
+             // Add rules to prompt or somewhere? Cursor recipes are simple.
+             // Maybe prepend rules to prompt?
            };
+           
+           if (rules.length > 0) {
+             recipe.prompt += `\n\nRules:\n${rules.map(r => `- ${r}`).join('\n')}`;
+           }
+
            recipes.push(recipe);
-        }
       }
       
       await writeFile(join(cursorDir, 'recipes.json'), JSON.stringify({ recipes }, null, 2));

@@ -74,9 +74,14 @@ export class ResolverService {
 
     const { whitelist_rulepacks, blacklist_rulepacks } = project.ai_tools;
 
-    // Whitelist takes precedence
+    // Whitelist takes precedence for INCLUSION, but we still might want to filter by tech stack
+    // If it's in the whitelist, we proceed to tech stack checks instead of returning true immediately.
+    // If it's NOT in the whitelist, we return false (if whitelist exists).
     if (whitelist_rulepacks && whitelist_rulepacks.length > 0) {
-      return whitelist_rulepacks.includes(rulepackId);
+      if (!whitelist_rulepacks.includes(rulepackId)) {
+        return false;
+      }
+      // It is whitelisted, but we still check tech stack constraints below
     }
 
     // Blacklist
@@ -88,33 +93,104 @@ export class ResolverService {
     // Use specific context if provided, otherwise fall back to global project tech stack
     const languages = techStackContext?.languages || project.tech_stack?.languages;
 
-    if (languages && languages.length > 0) {
-      const rulepack = await this.loadRulepack(rulepackId);
-      // Check tags at root level (as per YAMLs) or in metadata (legacy/fallback)
-      const tags = rulepack?.tags || rulepack?.metadata?.tags;
-      
-      if (tags) {
-        const techStackLanguages = languages.map((lang) =>
-          lang.toLowerCase()
-        );
-        const rulepackTags = tags.map((tag) => tag.toLowerCase());
+    const rulepack = await this.loadRulepack(rulepackId);
+    // Check tags at root level (as per YAMLs) or in metadata (legacy/fallback)
+    const tags = rulepack?.tags || rulepack?.metadata?.tags;
 
+    if (tags) {
+      const rulepackTags = tags.map((tag) => tag.toLowerCase());
+
+      if (languages && languages.length > 0) {
+        // We have a specific language context
+        const techStackLanguages = languages.map((lang) => lang.toLowerCase());
         const hasLanguageMatch = rulepackTags.some((tag) => techStackLanguages.includes(tag));
 
         // Check if rulepack is language-specific
-        const isLanguageSpecific = rulepackTags.some((tag) =>
+        // We use a heuristic list of common languages, OR we check against ALL languages defined in the project
+        const allProjectLanguages = this.getAllProjectLanguages(project);
+        const isLanguageSpecific = rulepackTags.some((tag) => 
           [
-            'java', 'kotlin', 'python', 'typescript', 'javascript', 'go', 'rust', 'c++', 'c#'
-          ].includes(tag)
+            'java', 'kotlin', 'python', 'typescript', 'javascript', 'go', 'rust', 'c++', 'c#', 'ruby', 'php', 'swift'
+          ].includes(tag) || allProjectLanguages.includes(tag)
         );
 
         if (isLanguageSpecific && !hasLanguageMatch) {
           return false;
         }
+      } else {
+        // No language context (Global context)
+        // If the rulepack is tagged with ANY language that is used in the project's tech stacks, exclude it.
+        // This prevents "python" rules from leaking into the global agent when "python" is only in the "backend" stack.
+        const allProjectLanguages = this.getAllProjectLanguages(project);
+        const isSpecificToSomeStack = rulepackTags.some(tag => allProjectLanguages.includes(tag));
+        
+        if (isSpecificToSomeStack) {
+           return false;
+        }
       }
     }
 
     return true;
+  }
+
+  private getAllProjectLanguages(project: Project): string[] {
+    const languages = new Set<string>();
+    
+    if (project.tech_stack?.languages) {
+      project.tech_stack.languages.forEach(l => languages.add(l.toLowerCase()));
+    }
+
+    if (project.tech_stacks) {
+      Object.values(project.tech_stacks).forEach(stack => {
+        if (stack.languages) {
+          stack.languages.forEach(l => languages.add(l.toLowerCase()));
+        }
+      });
+    }
+
+    return Array.from(languages);
+  }
+
+  /**
+   * Resolves all agents for a project, including global and stack-specific versions.
+   * This provides a generic way for all adapters to generate agents.
+   */
+  async resolveAllAgents(project: Project): Promise<{ agent: Agent; rules: string[]; suffix: string }[]> {
+    const results: { agent: Agent; rules: string[]; suffix: string }[] = [];
+    const agentsDir = this.config.getPath(this.config.dirs.agents);
+    let agentFiles: string[] = [];
+    
+    try {
+      agentFiles = await this.loader.findYamlFiles(agentsDir);
+    } catch {
+      return [];
+    }
+
+    // Helper to process agents for a context
+    const processContext = async (suffix: string, context?: { languages?: string[] }) => {
+      for (const file of agentFiles) {
+        const agent = await this.loader.loadYaml<Agent>(file);
+        if (this.shouldIncludeAgent(agent.id, project)) {
+          const rules = agent.rulepacks ? await this.resolveRulepacks(agent.rulepacks, project, context) : [];
+          results.push({ agent, rules, suffix });
+        }
+      }
+    };
+
+    // 1. Global Context
+    // Only generate global context if we don't have specific tech stacks OR if we explicitly want global fallback?
+    // Usually we always want global agents (e.g. for general tasks).
+    // Our updated shouldIncludeRulepack will ensure they don't have language-specific pollution.
+    await processContext('');
+
+    // 2. Stack-specific Contexts
+    if (project.tech_stacks) {
+      for (const [stackName, stackContext] of Object.entries(project.tech_stacks)) {
+        await processContext(`-${stackName}`, stackContext);
+      }
+    }
+
+    return results;
   }
 
   shouldIncludeAgent(agentId: string, project?: Project): boolean {

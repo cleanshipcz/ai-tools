@@ -96,12 +96,11 @@ export class ClaudeAdapter extends ToolAdapter {
     } catch {}
 
     // Agents
-    const agentsDir = this.config.getPath(this.config.dirs.agents);
     try {
-      const agentFiles = await this.loader.findYamlFiles(agentsDir);
-      for (const file of agentFiles) {
-        const agent = await this.loader.loadYaml<Agent>(file);
-        if (this.resolver.shouldIncludeAgent(agent.id, project)) {
+      // Use generic resolution for agents
+      const resolvedAgents = await this.resolver.resolveAllAgents(project);
+
+      for (const { agent, rules, suffix } of resolvedAgents) {
            // Generate Claude-specific agent MD
            const destDir = join(claudeDir, 'agents');
            await mkdir(destDir, { recursive: true });
@@ -117,17 +116,13 @@ description: ${agent.description}
                content += `${agent.prompt.system}\n\n`;
            }
            
-           if (agent.rulepacks) {
-               const rules = await this.resolver.resolveRulepacks(agent.rulepacks);
-               if (rules.length > 0) {
-                   content += `## Rules\n\n`;
-                   rules.forEach(r => content += `- ${r}\n`);
-                   content += `\n`;
-               }
+           if (rules.length > 0) {
+               content += `## Rules\n\n`;
+               rules.forEach(r => content += `- ${r}\n`);
+               content += `\n`;
            }
            
-           await writeFile(join(destDir, `${agent.id}.md`), content);
-        }
+           await writeFile(join(destDir, `${agent.id}${suffix}.md`), content);
       }
     } catch {}
 

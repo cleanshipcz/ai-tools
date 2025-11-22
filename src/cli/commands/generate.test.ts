@@ -102,5 +102,37 @@ ai_tools:
     const frontendContent = await fs.readFile(frontendAgentPath, 'utf-8');
     expect(frontendContent).toContain('strict TypeScript'); // Specific to TypeScript rules
     expect(frontendContent).not.toContain('PEP 8'); // Should NOT have Python rules
+
+    // Check Global Agent (Should NOT contain language specific rules if no global stack defined)
+    const globalAgentPath = join(windsurfRulesDir, 'agent-feature-builder.md');
+    expect(await fs.stat(globalAgentPath)).toBeDefined();
+    const globalContent = await fs.readFile(globalAgentPath, 'utf-8');
+    // This is the bug: global agent currently contains ALL rules because no filtering context is provided
+    expect(globalContent).not.toContain('PEP 8'); 
+    expect(globalContent).not.toContain('strict TypeScript');
+
+    // Check GitHub Copilot
+    const githubInstructionsPath = join(outputDir, projectId, 'github-copilot', '.github', 'instructions.md');
+    expect(await fs.stat(githubInstructionsPath)).toBeDefined();
+    const githubContent = await fs.readFile(githubInstructionsPath, 'utf-8');
+    // Should contain stack specific sections
+    expect(githubContent).toContain('### feature-builder-backend');
+    expect(githubContent).toContain('### feature-builder-frontend');
+    // Global section should NOT contain language specific rules
+    // We need to find the global section "### feature-builder" and check its content
+    // This is a bit hard with simple string matching, but let's try to ensure the *first* occurrence (global) doesn't have it.
+    // Or simpler: check that "PEP 8" appears in the backend section.
+    
+    // Check Cursor (Should fail currently as not implemented)
+    // Cursor generates recipes.json. We expect it to handle stacks now?
+    // The user wants "generic" solution. If generic, Cursor should probably generate something stack specific?
+    // But Cursor uses a single recipes.json. Maybe it should generate multiple recipes?
+    // e.g. "feature-builder-backend", "feature-builder-frontend" in recipes.json.
+    const cursorRecipesPath = join(outputDir, projectId, 'cursor', '.cursor', 'recipes.json');
+    expect(await fs.stat(cursorRecipesPath)).toBeDefined();
+    const cursorContent = JSON.parse(await fs.readFile(cursorRecipesPath, 'utf-8'));
+    const recipeIds = cursorContent.recipes.map((r: any) => r.id);
+    expect(recipeIds).toContain('feature-builder-backend');
+    expect(recipeIds).toContain('feature-builder-frontend');
   });
 });
