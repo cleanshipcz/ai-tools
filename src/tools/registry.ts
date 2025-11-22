@@ -4,6 +4,7 @@ import { CursorAdapter } from './cursor/adapter.js';
 import { ClaudeAdapter } from './claude/adapter.js';
 import { GitHubCopilotAdapter } from './github-copilot/adapter.js';
 import { CopilotCLIAdapter } from './copilot-cli/adapter.js';
+import { CodexAdapter } from './codex/adapter.js';
 
 export class ToolRegistry {
   private static instance: ToolRegistry;
@@ -22,6 +23,7 @@ export class ToolRegistry {
     this.register(new ClaudeAdapter());
     this.register(new GitHubCopilotAdapter());
     this.register(new CopilotCLIAdapter());
+    this.register(new CodexAdapter());
   }
 
   register(adapter: ToolAdapter) {

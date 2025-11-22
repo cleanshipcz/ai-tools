@@ -274,6 +274,28 @@ export async function backupExisting(projectId: string, config: DeploymentConfig
             } catch {}
         }
         continue;
+    } else if (tool === 'codex') {
+        // Backup AGENTS.md from project root
+        const agentsFile = 'AGENTS.md';
+        const srcAgents = join(targetPath, agentsFile);
+        const destAgents = join(backupDir, agentsFile);
+        try {
+            await access(srcAgents);
+            await copyFileOrDir(srcAgents, destAgents);
+            console.log(chalk.gray(`    Backed up ${agentsFile}`));
+        } catch {}
+
+        // Backup ~/.codex/prompts
+        const { homedir } = await import('os');
+        const homeCodexPrompts = join(homedir(), '.codex', 'prompts');
+        const destPrompts = join(backupDir, '.codex', 'prompts');
+        
+        try {
+            await access(homeCodexPrompts);
+            await copyDirectory(homeCodexPrompts, destPrompts);
+            console.log(chalk.gray(`    Backed up ~/.codex/prompts`));
+        } catch {}
+        continue;
     }
     
     const targetToolPath = join(targetPath, dirName);
@@ -307,7 +329,7 @@ export async function backupExisting(projectId: string, config: DeploymentConfig
   }
 }
 
-async function copyToTarget(projectId: string, config: DeploymentConfig, targetPath: string) {
+export async function copyToTarget(projectId: string, config: DeploymentConfig, targetPath: string) {
   const configService = ConfigService.getInstance();
   const outputDir = configService.getPath(configService.dirs.output, projectId);
 
@@ -353,6 +375,34 @@ async function copyToTarget(projectId: string, config: DeploymentConfig, targetP
                 await copyFileOrDir(src, dest);
                 console.log(chalk.green(`    ✓ Copied ${file}`));
             } catch {}
+        }
+        continue;
+    } else if (tool === 'codex') {
+        // Codex is special:
+        // AGENTS.md -> Project Root
+        // .codex/prompts -> ~/.codex/prompts
+        
+        // 1. Copy AGENTS.md to project root
+        const agentsFile = 'AGENTS.md';
+        const srcAgents = join(outputDir, agentsFile);
+        const destAgents = join(targetPath, agentsFile);
+        try {
+            await access(srcAgents);
+            await copyFileOrDir(srcAgents, destAgents);
+            console.log(chalk.green(`    ✓ Copied ${agentsFile}`));
+        } catch {}
+
+        // 2. Copy prompts to ~/.codex/prompts
+        const { homedir } = await import('os');
+        const homeCodexPrompts = join(homedir(), '.codex', 'prompts');
+        const srcPrompts = join(outputDir, '.codex', 'prompts');
+        
+        try {
+            await access(srcPrompts);
+            await copyDirectory(srcPrompts, homeCodexPrompts);
+            console.log(chalk.green(`    ✓ Copied .codex/prompts to ${homeCodexPrompts}`));
+        } catch (e) {
+             console.warn(chalk.yellow(`    Warning: Failed to copy prompts to ${homeCodexPrompts}: ${e}`));
         }
         continue;
     }

@@ -41,6 +41,10 @@ vi.mock('child_process', () => ({
   execSync: vi.fn(),
 }));
 
+vi.mock('os', () => ({
+  homedir: vi.fn().mockReturnValue('/home/user'),
+}));
+
 describe('deploy command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -95,5 +99,28 @@ describe('deploy command', () => {
 
       expect(mocks.rm).not.toHaveBeenCalled();
     });
+
+    it('should backup ~/.codex/prompts for codex tool', async () => {
+      mocks.readdir.mockResolvedValue([]);
+      
+      // We need to mock copyDirectory which is internal to deploy.ts
+      // But backupExisting calls copyFileOrDir which calls copyDirectory.
+      // In our mock of fs/promises, we mocked copyFile but not copyDirectory logic (it's in deploy.ts).
+      // Wait, copyDirectory is defined in deploy.ts and uses readdir/mkdir/copyFile from fs.
+      // So we can verify calls to fs functions.
+
+      await backupExisting(
+        'project-id',
+        { target: '/target', tools: ['codex'], mode: 'local' },
+        '/target'
+      );
+
+      // Should try to access ~/.codex/prompts
+      expect(mocks.access).toHaveBeenCalledWith('/home/user/.codex/prompts');
+      
+      // Should try to access AGENTS.md in target
+      expect(mocks.access).toHaveBeenCalledWith('/target/AGENTS.md');
+    });
   });
 });
+

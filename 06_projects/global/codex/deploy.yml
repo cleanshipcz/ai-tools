@@ -1,0 +1,9 @@
+# Deployment Configuration for Codex Global Project
+target: "/home/blaha/.codex"
+
+tools:
+  - codex
+
+mode: local
+backup: true
+auto_commit: false

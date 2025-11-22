@@ -1,0 +1,12 @@
+id: codex
+name: Codex Global Configuration
+description: Global configuration for Codex prompts and agents.
+version: 1.0.0
+
+# Include all agents by default or specify whitelist
+agents:
+  include: ["*"]
+
+# Include all prompts
+prompts:
+  include: ["*"]
