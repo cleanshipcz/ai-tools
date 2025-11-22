@@ -30,10 +30,23 @@ export class WindsurfAdapter extends ToolAdapter {
     const agentsDir = this.config.getPath(this.config.dirs.agents);
     const agentFiles = await this.loader.findYamlFiles(agentsDir);
     
-    for (const file of agentFiles) {
-      const agent = await this.loader.loadYaml<Agent>(file);
-      if (this.resolver.shouldIncludeAgent(agent.id, project)) {
-        await this.generateAgentRule(agent, rulesDir);
+    // Helper to generate agents for a specific context
+    const generateAgentsForContext = async (suffix: string = '', context?: { languages?: string[] }) => {
+      for (const file of agentFiles) {
+        const agent = await this.loader.loadYaml<Agent>(file);
+        if (this.resolver.shouldIncludeAgent(agent.id, project)) {
+          await this.generateAgentRule(agent, rulesDir, project, suffix, context);
+        }
+      }
+    };
+
+    // Generate global agents
+    await generateAgentsForContext();
+
+    // Generate stack-specific agents
+    if (project.tech_stacks) {
+      for (const [stackName, stackContext] of Object.entries(project.tech_stacks)) {
+        await generateAgentsForContext(`-${stackName}`, stackContext);
       }
     }
 
@@ -50,16 +63,29 @@ export class WindsurfAdapter extends ToolAdapter {
         promptsMap.set(prompt.id, pathWithoutExt);
     }
 
-    for (const relativePath of promptFiles) {
-      const fullPath = join(promptsDir, relativePath);
-      const prompt = await this.loader.loadYaml<Prompt>(fullPath);
-      
-      if (this.resolver.shouldIncludePrompt(prompt.id, promptsMap, project)) {
-        const pathWithoutExt = relativePath.replace(/\.ya?ml$/, '');
-        // Convert path separators to hyphens for the filename
-        // e.g. docs/document-api -> prompt-docs-document-api.md
-        const filename = `prompt-${pathWithoutExt.split(/[/\\]/).join('-')}.md`;
-        await this.generatePromptRule(prompt, rulesDir, filename);
+    // Helper to generate prompts for a specific context
+    const generatePromptsForContext = async (suffix: string = '', context?: { languages?: string[] }) => {
+      for (const relativePath of promptFiles) {
+        const fullPath = join(promptsDir, relativePath);
+        const prompt = await this.loader.loadYaml<Prompt>(fullPath);
+        
+        if (this.resolver.shouldIncludePrompt(prompt.id, promptsMap, project)) {
+          const pathWithoutExt = relativePath.replace(/\.ya?ml$/, '');
+          // Convert path separators to hyphens for the filename
+          // e.g. docs/document-api -> prompt-docs-document-api.md
+          const filename = `prompt-${pathWithoutExt.split(/[/\\]/).join('-')}${suffix}.md`;
+          await this.generatePromptRule(prompt, rulesDir, filename);
+        }
+      }
+    };
+
+    // Generate global prompts
+    await generatePromptsForContext();
+
+    // Generate stack-specific prompts
+    if (project.tech_stacks) {
+      for (const [stackName, stackContext] of Object.entries(project.tech_stacks)) {
+        await generatePromptsForContext(`-${stackName}`, stackContext);
       }
     }
 
@@ -76,7 +102,7 @@ export class WindsurfAdapter extends ToolAdapter {
     const agentFiles = await this.loader.findYamlFiles(agentsDir);
     for (const file of agentFiles) {
       const agent = await this.loader.loadYaml<Agent>(file);
-      await this.generateAgentRule(agent, rulesDir);
+      await this.generateAgentRule(agent, rulesDir, undefined);
     }
 
     // Load all prompts
@@ -122,6 +148,21 @@ export class WindsurfAdapter extends ToolAdapter {
       if (project.tech_stack.infrastructure) content.push(`**Infrastructure**: ${project.tech_stack.infrastructure.join(', ')}`);
       if (project.tech_stack.tools) content.push(`**Tools**: ${project.tech_stack.tools.join(', ')}`);
       content.push('');
+    }
+
+    if (project.tech_stacks) {
+      content.push('## Tech Stacks');
+      content.push('');
+      for (const [name, stack] of Object.entries(project.tech_stacks)) {
+        content.push(`### ${name}`);
+        if (stack.languages) content.push(`- **Languages**: ${stack.languages.join(', ')}`);
+        if (stack.frontend) content.push(`- **Frontend**: ${stack.frontend.join(', ')}`);
+        if (stack.backend) content.push(`- **Backend**: ${stack.backend.join(', ')}`);
+        if (stack.database) content.push(`- **Database**: ${stack.database.join(', ')}`);
+        if (stack.infrastructure) content.push(`- **Infrastructure**: ${stack.infrastructure.join(', ')}`);
+        if (stack.tools) content.push(`- **Tools**: ${stack.tools.join(', ')}`);
+        content.push('');
+      }
     }
 
     if (project.commands) {
@@ -189,8 +230,8 @@ export class WindsurfAdapter extends ToolAdapter {
     await writeFile(join(outputDir, 'project-context.md'), content.join('\n'));
   }
 
-  private async generateAgentRule(agent: Agent, outputDir: string): Promise<void> {
-    const rules = agent.rulepacks ? await this.resolver.resolveRulepacks(agent.rulepacks) : [];
+  private async generateAgentRule(agent: Agent, outputDir: string, project?: Project, suffix: string = '', context?: { languages?: string[] }): Promise<void> {
+    const rules = agent.rulepacks ? await this.resolver.resolveRulepacks(agent.rulepacks, project, context) : [];
 
     const content: string[] = [];
     content.push('---');
@@ -227,7 +268,7 @@ export class WindsurfAdapter extends ToolAdapter {
       content.push('');
     }
 
-    await writeFile(join(outputDir, `agent-${agent.id}.md`), content.join('\n'));
+    await writeFile(join(outputDir, `agent-${agent.id}${suffix}.md`), content.join('\n'));
   }
 
   private async generatePromptRule(prompt: Prompt, outputDir: string, filenameOverride?: string): Promise<void> {

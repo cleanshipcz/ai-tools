@@ -208,7 +208,7 @@ Before writing ANY production code, you MUST:
 - ALL features require automated tests (unit + integration)
 - Tests must be executable via CI/CD without human intervention
 - Test coverage target: 80%+ on new code
-- Follow AAA pattern: Arrange, Act, Assert
+- Follow GWT pattern: Given, When, Then
 - Use descriptive test names: "should X when Y"
 
 **Implementation Process**:
@@ -240,8 +240,9 @@ Focus on:
 - Documentation
 - Performance considerations
 - Security best practices
-
-Follow the existing codebase patterns and conventions.
+- High quality, no shortcuts and hacks
+- Minimize hardcoded values and duplicate code
+- Follow existing codebase patterns and conventions
 
 
 **Constraints:**

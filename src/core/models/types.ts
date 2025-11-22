@@ -12,6 +12,7 @@ export interface Rulepack {
   version?: string;
   description?: string;
   extends?: string[];
+  tags?: string[];
   rules: string[];
   metadata?: {
     tags?: string[];
@@ -103,6 +104,14 @@ export interface Project {
     infrastructure?: string[];
     tools?: string[];
   };
+  tech_stacks?: Record<string, {
+    languages?: string[];
+    frontend?: string[];
+    backend?: string[];
+    database?: string[];
+    infrastructure?: string[];
+    tools?: string[];
+  }>;
   documentation?: Record<string, string | Record<string, string>>;
   commands?: Record<string, string | Record<string, string>>;
   conventions?: {

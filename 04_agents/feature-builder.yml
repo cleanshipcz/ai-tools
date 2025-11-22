@@ -37,7 +37,7 @@ prompt:
     - ALL features require automated tests (unit + integration)
     - Tests must be executable via CI/CD without human intervention
     - Test coverage target: 80%+ on new code
-    - Follow AAA pattern: Arrange, Act, Assert
+    - Follow GWT pattern: Given, When, Then
     - Use descriptive test names: "should X when Y"
 
     **Implementation Process**:
@@ -69,8 +69,10 @@ prompt:
     - Documentation
     - Performance considerations
     - Security best practices
+    - High quality, no shortcuts and hacks
+    - Minimize hardcoded values and duplicate code
+    - Follow existing codebase patterns and conventions
 
-    Follow the existing codebase patterns and conventions.
   user_template: |
     Feature request:
     {{feature_description}}

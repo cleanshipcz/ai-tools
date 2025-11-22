@@ -17,7 +17,7 @@ export class ResolverService {
    * Resolve rulepacks into a flat list of rules, handling inheritance (extends).
    * Optionally filters rulepacks based on project configuration (whitelist/blacklist/tech-stack).
    */
-  async resolveRulepacks(rulepackIds: string[], project?: Project): Promise<string[]> {
+  async resolveRulepacks(rulepackIds: string[], project?: Project, techStackContext?: { languages?: string[] }): Promise<string[]> {
     const resolved: string[] = [];
     const visited = new Set<string>();
 
@@ -26,7 +26,7 @@ export class ResolverService {
       visited.add(id);
 
       // Check if we should include this rulepack based on project config
-      if (project && !(await this.shouldIncludeRulepack(id, project))) {
+      if (project && !(await this.shouldIncludeRulepack(id, project, techStackContext))) {
         return;
       }
 
@@ -69,7 +69,7 @@ export class ResolverService {
     }
   }
 
-  async shouldIncludeRulepack(rulepackId: string, project: Project): Promise<boolean> {
+  async shouldIncludeRulepack(rulepackId: string, project: Project, techStackContext?: { languages?: string[] }): Promise<boolean> {
     if (!project.ai_tools) return true;
 
     const { whitelist_rulepacks, blacklist_rulepacks } = project.ai_tools;
@@ -85,13 +85,19 @@ export class ResolverService {
     }
 
     // Tech-stack filtering
-    if (project.tech_stack?.languages && project.tech_stack.languages.length > 0) {
+    // Use specific context if provided, otherwise fall back to global project tech stack
+    const languages = techStackContext?.languages || project.tech_stack?.languages;
+
+    if (languages && languages.length > 0) {
       const rulepack = await this.loadRulepack(rulepackId);
-      if (rulepack?.metadata?.tags) {
-        const techStackLanguages = project.tech_stack.languages.map((lang) =>
+      // Check tags at root level (as per YAMLs) or in metadata (legacy/fallback)
+      const tags = rulepack?.tags || rulepack?.metadata?.tags;
+      
+      if (tags) {
+        const techStackLanguages = languages.map((lang) =>
           lang.toLowerCase()
         );
-        const rulepackTags = rulepack.metadata.tags.map((tag) => tag.toLowerCase());
+        const rulepackTags = tags.map((tag) => tag.toLowerCase());
 
         const hasLanguageMatch = rulepackTags.some((tag) => techStackLanguages.includes(tag));
 

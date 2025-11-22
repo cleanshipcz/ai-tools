@@ -45,7 +45,7 @@ export const generateCommand = new Command('generate')
     }
   });
 
-async function generateForProject(projectId: string, config: ConfigService, loader: LoaderService, registry: ToolRegistry) {
+export async function generateForProject(projectId: string, config: ConfigService, loader: LoaderService, registry: ToolRegistry) {
   console.log(chalk.blue(`\nGenerating for project: ${projectId}`));
 
   // 1. Load project manifest

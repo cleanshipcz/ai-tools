@@ -61,55 +61,69 @@ export class GitHubCopilotAdapter extends ToolAdapter {
     try {
       const agentFiles = await this.loader.findYamlFiles(agentsDir);
       
-      for (const file of agentFiles) {
-        const agent = await this.loader.loadYaml<Agent>(file);
-        
-        let include = true;
-        if (project) {
-          include = this.resolver.shouldIncludeAgent(agent.id, project);
-        }
-        
-        if (include) {
-          lines.push(`### ${agent.id}`);
-          lines.push('');
-          lines.push(`**Purpose:** ${agent.purpose}`);
-          lines.push('');
+      // Helper to add agents for a specific context
+      const addAgentsForContext = async (suffix: string = '', context?: { languages?: string[] }) => {
+        for (const file of agentFiles) {
+          const agent = await this.loader.loadYaml<Agent>(file);
           
-          if (agent.prompt?.system) {
-            lines.push('**Persona:**');
-            lines.push('');
-            lines.push(agent.prompt.system);
-            lines.push('');
+          let include = true;
+          if (project) {
+            include = this.resolver.shouldIncludeAgent(agent.id, project);
           }
-
-          if (agent.constraints && agent.constraints.length > 0) {
-            lines.push('**Constraints:**');
+          
+          if (include) {
+            lines.push(`### ${agent.id}${suffix}`);
             lines.push('');
-            for (const constraint of agent.constraints) {
-              lines.push(`- ${constraint}`);
+            lines.push(`**Purpose:** ${agent.purpose}`);
+            lines.push('');
+            
+            if (agent.prompt?.system) {
+              lines.push('**Persona:**');
+              lines.push('');
+              lines.push(agent.prompt.system);
+              lines.push('');
             }
-            lines.push('');
-          }
 
-          // Resolve and add rules from rulepacks
-          if (agent.rulepacks && agent.rulepacks.length > 0) {
-            if (project) {
-                const rules = await this.resolver.resolveRulepacks(agent.rulepacks, project);
-                if (rules.length > 0) {
-                  lines.push('**Rules:**');
-                  lines.push('');
-                  for (const rule of rules) {
-                    lines.push(`- ${rule}`);
+            if (agent.constraints && agent.constraints.length > 0) {
+              lines.push('**Constraints:**');
+              lines.push('');
+              for (const constraint of agent.constraints) {
+                lines.push(`- ${constraint}`);
+              }
+              lines.push('');
+            }
+
+            // Resolve and add rules from rulepacks
+            if (agent.rulepacks && agent.rulepacks.length > 0) {
+              if (project) {
+                  const rules = await this.resolver.resolveRulepacks(agent.rulepacks, project, context);
+                  if (rules.length > 0) {
+                    lines.push('**Rules:**');
+                    lines.push('');
+                    for (const rule of rules) {
+                      lines.push(`- ${rule}`);
+                    }
+                    lines.push('');
                   }
-                  lines.push('');
-                }
+              }
             }
-          }
 
-          lines.push('---');
-          lines.push('');
+            lines.push('---');
+            lines.push('');
+          }
+        }
+      };
+
+      // Add global agents
+      await addAgentsForContext();
+
+      // Add stack-specific agents
+      if (project?.tech_stacks) {
+        for (const [stackName, stackContext] of Object.entries(project.tech_stacks)) {
+          await addAgentsForContext(`-${stackName}`, stackContext);
         }
       }
+
     } catch (e) {
       console.warn('Failed to load agents for instructions.md generation', e);
     }
@@ -155,6 +169,20 @@ export class GitHubCopilotAdapter extends ToolAdapter {
             lines.push(`**Infrastructure:** ${project.tech_stack.infrastructure.join(', ')}`);
         }
         lines.push('');
+        }
+
+        if (project.tech_stacks) {
+        lines.push('## Tech Stacks');
+        lines.push('');
+        for (const [name, stack] of Object.entries(project.tech_stacks)) {
+            lines.push(`### ${name}`);
+            if (stack.languages?.length) lines.push(`- **Languages:** ${stack.languages.join(', ')}`);
+            if (stack.frontend?.length) lines.push(`- **Frontend:** ${stack.frontend.join(', ')}`);
+            if (stack.backend?.length) lines.push(`- **Backend:** ${stack.backend.join(', ')}`);
+            if (stack.database?.length) lines.push(`- **Database:** ${stack.database.join(', ')}`);
+            if (stack.infrastructure?.length) lines.push(`- **Infrastructure:** ${stack.infrastructure.join(', ')}`);
+            lines.push('');
+        }
         }
 
         // Commands
