@@ -2,10 +2,11 @@ import { Command } from 'commander';
 import { ToolRegistry } from '../../tools/registry.js';
 import { ConfigService } from '../../core/services/config.service.js';
 import { LoaderService } from '../../core/services/loader.service.js';
-import { Project } from '../../core/models/types.js';
+import { DeployConfig, Project } from '../../core/models/types.js';
 import chalk from 'chalk';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { readdir, stat } from 'fs/promises';
+import { applyDeployConfig } from '../../core/utils/project-config.js';
 
 export const generateCommand = new Command('generate')
   .description('Generate project configuration')
@@ -80,6 +81,15 @@ export async function generateForProject(projectId: string, config: ConfigServic
   let outputDir = config.getPath(config.dirs.output, projectId);
 
   const project = await loader.loadYaml<Project>(projectPath);
+  let deployConfig: DeployConfig | undefined;
+
+  try {
+    deployConfig = await loader.loadYaml<DeployConfig>(join(dirname(projectPath), 'deploy.yml'));
+  } catch {
+    // Optional: generate can still run without deploy.yml, though filters won't apply.
+  }
+
+  const effectiveProject = applyDeployConfig(project, deployConfig);
 
   // 2. Generate for each tool
   for (const adapter of registry.getAll()) {
@@ -87,7 +97,7 @@ export async function generateForProject(projectId: string, config: ConfigServic
     const toolOutputDir = join(outputDir, adapter.name);
     const { mkdir } = await import('fs/promises');
     await mkdir(toolOutputDir, { recursive: true });
-    await adapter.generate(project, toolOutputDir);
+    await adapter.generate(effectiveProject, toolOutputDir);
   }
   
   console.log(chalk.green(`✅ Generated ${projectId}`));

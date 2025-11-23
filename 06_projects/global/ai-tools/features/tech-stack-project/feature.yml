@@ -8,13 +8,13 @@ context:
     Currently all agents contain all rulepacks. A TypeScript project gets Python, Kotlin, Java rules mixed in.
     This clogs the context window unnecessarily.
 
-    Solution: Projects declare their tech-stack (typescript, python, kotlin, etc).
+    Solution: Projects declare their tech-stack in deploy.yml (typescript, python, kotlin, etc).
     When generating agents/prompts for that project, include only rulepacks tagged for those technologies.
 
     Example:
-    - Project with tech_stack: [typescript] → feature-builder only includes coding-typescript rules
-    - Project with tech_stack: [typescript, python] → feature-builder includes coding-typescript and coding-python
-    - Project with tech_stack: [kotlin] → feature-builder only includes coding-kotlin rules
+    - Project with deploy.yml tech_stack: [typescript] → feature-builder only includes coding-typescript rules
+    - Project with deploy.yml tech_stack: [typescript, python] → feature-builder includes coding-typescript and coding-python
+    - Project with deploy.yml tech_stack: [kotlin] → feature-builder only includes coding-kotlin rules
 
 files:
   patterns:
@@ -25,7 +25,7 @@ files:
 
 conventions:
   - 'Each rulepack must declare which tech-stacks it applies to via tags field'
-  - 'Projects declare their tech-stack as array of language/tech names'
+  - 'Projects declare their tech-stack in deploy.yml as array of language/tech names'
   - 'When generating adapters, filter rulepacks by matching tech-stack'
   - 'Backward compatible: projects without tech_stack declaration get all rulepacks'
 
@@ -40,10 +40,10 @@ recipe:
 
       Changes needed:
       1. Rulepack schema: Add tech_stacks array field listing which languages/techs this rulepack applies to
-      2. Project schema: Confirm tech_stack field exists for declaring project technologies
+      2. Deploy schema: Confirm tech_stack field exists for declaring project technologies
       3. gen-project.ts: Modify shouldIncludeRulepack() to filter by tech-stack match
       4. Update all rulepacks with appropriate tech_stacks tags
-      5. Update ai-tools project.yml tech_stack field
+      5. Update ai-tools deploy.yml tech_stack field
 
     acceptance_criteria: |
       - Rulepack schema supports tech_stacks array field

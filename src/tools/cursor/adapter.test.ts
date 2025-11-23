@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   resolver: {
     shouldIncludeAgent: vi.fn(),
     resolveRulepacks: vi.fn(),
+    resolveAllAgents: vi.fn(),
   },
   recipeService: {
     generateRecipesForTool: vi.fn(),
@@ -60,6 +61,7 @@ vi.mock('../../core/services/resolver.service.js', () => ({
   ResolverService: class {
     shouldIncludeAgent = mocks.resolver.shouldIncludeAgent;
     resolveRulepacks = mocks.resolver.resolveRulepacks;
+    resolveAllAgents = mocks.resolver.resolveAllAgents;
   },
 }));
 
@@ -78,13 +80,23 @@ describe('CursorAdapter', () => {
     version: '1.0.0',
     name: 'Test Project',
     description: 'A test project',
-    ai_tools: {
-        whitelist_agents: ['agent-1']
-    }
+    agents: { include: ['^agent-1$'] },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.resolver.resolveAllAgents.mockResolvedValue([
+      {
+        agent: {
+          id: 'agent-1',
+          purpose: 'Test Agent',
+          description: 'Agent Description',
+          prompt: { system: 'System Prompt' },
+        },
+        rules: [],
+        suffix: '',
+      },
+    ]);
     adapter = new CursorAdapter();
   });
 

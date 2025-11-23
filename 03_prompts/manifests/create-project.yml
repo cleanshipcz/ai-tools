@@ -47,10 +47,8 @@ content: |
      **project.yml** (follows 10_schemas/project.schema.json):
      - id, version (1.0.0), name, description
      - context: { overview, purpose }
-     - tech_stack: { languages, backend, frontend, infrastructure, tools }
      - commands: { test, build, run, deploy, etc. }
      - conventions: { naming, patterns, testing, structure, custom }
-     - ai_tools: { whitelist_agents, whitelist_prompts, whitelist_rulepacks }
      - documentation: { readme, architecture, api, changelog, custom }
      - metadata: { author, created, updated, tags }
 
@@ -60,6 +58,9 @@ content: |
      - mode: 'local' (auto-deploy) or 'manual' (show instructions)
      - backup: true (backup existing files before deploying)
      - auto_commit: false (optional git auto-commit)
+     - tech_stack / tech_stacks: { languages, backend, frontend, infrastructure, tools }
+     - ai_tools: { model, custom_rules }
+     - filters: { agents/prompts/rulepacks/recipes: { include: [], exclude: [] } using regex }
 
   **Start focused, allow detail:**
   - Essential context first

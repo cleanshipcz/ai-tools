@@ -32,7 +32,7 @@ export class WindsurfAdapter extends ToolAdapter {
 
     // Load all prompts and filter
     const promptsDir = this.config.getPath(this.config.dirs.prompts);
-    // We need the map to check whitelist against paths
+    // We need the map to check regex-based filters against paths
     const promptsMap = new Map<string, string>();
     const promptFiles = await this.loader.findYamlFilesRelative(promptsDir);
     

@@ -35,47 +35,7 @@ context:
 # ================================
 # TECHNOLOGY STACK (Optional)
 # ================================
-
-tech_stack:
-  # Programming languages used
-  languages:
-    - typescript
-    # - python
-    # - java
-    # - kotlin
-
-  # Frontend frameworks and libraries
-  frontend:
-    - react
-    # - vue
-    # - angular
-    # - svelte
-
-  # Backend frameworks and libraries
-  backend:
-    - node.js
-    # - express
-    # - django
-    # - spring-boot
-
-  # Database systems
-  database:
-    # - postgresql
-    # - mongodb
-    # - mysql
-
-  # Infrastructure and deployment tools
-  infrastructure:
-    # - docker
-    # - kubernetes
-    # - aws
-    # - terraform
-
-  # Development tools and utilities
-  tools:
-    # - jest
-    # - eslint
-    # - prettier
+# Moved to deploy.yml: tech_stack, tech_stacks, and ai_tools filtering
 
 # ================================
 # DOCUMENTATION REFERENCES (Optional)
@@ -162,33 +122,6 @@ conventions:
 # ================================
 # AI TOOLS CONFIGURATION (Optional but Recommended)
 # ================================
-
-ai_tools:
-  # Preferred agents to use with this project
-  # Available: code-reviewer, feature-builder, bug-fixer, tdd-navigator, kotlin-style-enforcer
-  preferred_agents:
-    - code-reviewer
-    - feature-builder
-
-  # Preferred rulepacks to apply
-  # Available: base, security, reviewer, coding-typescript, coding-python, coding-kotlin, coding-java
-  preferred_rulepacks:
-    - base
-    - coding-typescript
-    # - coding-python
-    # - security
-
-  # Project-specific custom rules for AI tools
-  custom_rules:
-    - 'Always use our custom logger utility instead of console.log'
-    - 'Follow our API response format: { success: boolean, data: any, error?: string }'
-    # Add any project-specific rules here
-
-  # Optionally exclude specific agents or rulepacks
-  # excluded_agents:
-  #   - kotlin-style-enforcer
-  # excluded_rulepacks:
-  #   - coding-java
 
 # ================================
 # METADATA (Optional)

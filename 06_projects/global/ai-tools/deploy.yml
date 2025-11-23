@@ -26,3 +26,73 @@ backup: true
 auto_commit: false
 # Git branch to use for auto-commit (optional)
 # git_branch: "chore/update-ai-config"
+
+tech_stack:
+  languages:
+    - typescript
+    - yaml
+    - markdown
+  frontend: []
+  backend:
+    - node.js
+  database: []
+  infrastructure:
+    - github-actions
+    - git
+  tools:
+    - tsx
+    - ajv
+    - js-yaml
+    - chalk
+    - prettier
+
+ai_tools:
+  model: 'claude-sonnet-4.5'
+
+agents:
+  include:
+    - '^code-reviewer$'
+    - '^feature-builder$'
+    - '^bug-fixer$'
+    - '^prompt-engineer$'
+    - '^refactoring-specialist$'
+    - '^documentation-writer$'
+    - '^project-planner$'
+    - '^manifest-builder$'
+    - '^ticket-manager$'
+    - '^organization-specialist$'
+
+prompts:
+  include:
+    - '^refactor/extract-method$'
+    - '^refactor/simplify-conditionals$'
+    - '^refactor/remove-duplication$'
+    - '^refactor/improve-naming$'
+    - '^refactor/add-error-handling$'
+    - '^docs/document-api$'
+    - '^docs/write-readme$'
+    - '^docs/create-tutorial$'
+    - '^docs/summarize-pr$'
+    - '^planning/design-architecture$'
+    - '^planning/create-implementation-plan$'
+    - '^planning/tech-decision-record$'
+    - '^qa/write-tests$'
+    - '^qa/setup-test-infrastructure$'
+    - '^manifests/create-prompt$'
+    - '^manifests/create-agent$'
+    - '^manifests/create-project$'
+    - '^manifests/create-feature$'
+    - '^manifests/create-rulepack$'
+    - '^manifests/create-skill$'
+    - '^manifests/create-recipe$'
+
+rulepacks:
+  include:
+    - '^base$'
+    - '^testing$'
+    - '^coding-typescript$'
+
+recipes:
+  include:
+    - '^feature-delivery$'
+    - '^major-refactoring-cycle$'

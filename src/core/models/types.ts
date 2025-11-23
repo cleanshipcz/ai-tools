@@ -96,22 +96,8 @@ export interface Project {
     overview?: string;
     purpose?: string;
   };
-  tech_stack?: {
-    languages?: string[];
-    frontend?: string[];
-    backend?: string[];
-    database?: string[];
-    infrastructure?: string[];
-    tools?: string[];
-  };
-  tech_stacks?: Record<string, {
-    languages?: string[];
-    frontend?: string[];
-    backend?: string[];
-    database?: string[];
-    infrastructure?: string[];
-    tools?: string[];
-  }>;
+  tech_stack?: TechStack;
+  tech_stacks?: Record<string, TechStack>;
   documentation?: Record<string, string | Record<string, string>>;
   commands?: Record<string, string | Record<string, string>>;
   conventions?: {
@@ -121,20 +107,11 @@ export interface Project {
     structure?: string[];
     custom?: string[];
   };
-  ai_tools?: {
-    model?: AIModel;
-    preferred_agents?: string[];
-    preferred_rulepacks?: string[];
-    custom_rules?: string[];
-    whitelist_agents?: string[];
-    whitelist_prompts?: string[];
-    whitelist_rulepacks?: string[];
-    whitelist_recipes?: string[];
-    blacklist_agents?: string[];
-    blacklist_prompts?: string[];
-    blacklist_rulepacks?: string[];
-    blacklist_recipes?: string[];
-  };
+  ai_tools?: AiToolsConfig;
+  agents?: IncludeExcludeConfig;
+  prompts?: IncludeExcludeConfig;
+  rulepacks?: IncludeExcludeConfig;
+  recipes?: IncludeExcludeConfig;
   metadata?: {
     repository?: string;
     maintainers?: string[];
@@ -142,6 +119,43 @@ export interface Project {
     updated?: string;
     tags?: string[];
   };
+}
+
+export interface TechStack {
+  languages?: string[];
+  frontend?: string[];
+  backend?: string[];
+  database?: string[];
+  infrastructure?: string[];
+  tools?: string[];
+}
+
+export interface AiToolsConfig {
+  model?: AIModel;
+  preferred_agents?: string[];
+  preferred_rulepacks?: string[];
+  custom_rules?: string[];
+}
+
+export interface IncludeExcludeConfig {
+  include?: string[];
+  exclude?: string[];
+}
+
+export interface DeployConfig {
+  target: string;
+  tools: ('github-copilot' | 'windsurf' | 'cursor' | 'claude-code' | 'copilot-cli')[];
+  mode: 'local' | 'manual';
+  auto_commit?: boolean;
+  git_branch?: string;
+  backup?: boolean;
+  ai_tools?: AiToolsConfig;
+  agents?: IncludeExcludeConfig;
+  prompts?: IncludeExcludeConfig;
+  rulepacks?: IncludeExcludeConfig;
+  recipes?: IncludeExcludeConfig;
+  tech_stack?: TechStack;
+  tech_stacks?: Record<string, TechStack>;
 }
 
 export interface Recipe {

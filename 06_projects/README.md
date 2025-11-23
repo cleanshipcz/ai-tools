@@ -488,9 +488,12 @@ context:
   purpose: 'Primary goal of the project'
 ```
 
-### Tech Stack (Optional)
+### Tech Stack (Configure in deploy.yml)
+
+Defined in `deploy.yml` so deployment filters can be applied per environment.
 
 ```yaml
+# deploy.yml
 tech_stack:
   languages:
     - typescript
@@ -556,9 +559,10 @@ conventions:
     - 'Any other conventions'
 ```
 
-### AI Tools Configuration (Optional but Recommended)
+### AI Tools Configuration (configure in deploy.yml)
 
 ```yaml
+# deploy.yml
 ai_tools:
   preferred_agents:
     - code-reviewer
@@ -570,117 +574,57 @@ ai_tools:
   custom_rules:
     - 'Always use our logger utility'
     - 'API responses must follow standard format'
-  blacklist_agents:
-    - kotlin-style-enforcer
-  blacklist_rulepacks:
-    - coding-java
 ```
 
-#### Filtering: Whitelist vs Blacklist
+#### Filtering: Regex include/exclude patterns (deploy.yml)
 
-You can control which agents, prompts, and rulepacks are included in your project using either **whitelist** (inclusive) or **blacklist** (exclusive) approaches. These are mutually exclusive - you can use one or the other, but not both for the same category.
-
-**Whitelist** - Only include specified items:
+Define filters in `deploy.yml` under top-level `agents`, `prompts`, `rulepacks`, and `recipes`. Legacy whitelist/blacklist arrays are rejected by the schema.
 
 ```yaml
-ai_tools:
-  whitelist_agents:
-    - code-reviewer
-    - refactoring-specialist
-  whitelist_prompts:
-    # You can reference prompts by ID (if unique)
-    - write-tests
-    # Or by path (recommended for clarity)
-    - refactor/extract-method
-    - refactor/simplify-conditionals
-    - docs/document-api
-    - planning/design-architecture
-  whitelist_rulepacks:
-    - base
-    - coding-typescript
+# deploy.yml
+agents:
+  include:
+    - '^code-reviewer$'
+    - '^feature-builder$'
+  exclude:
+    - 'experimental'
+prompts:
+  include:
+    - '^refactor/'
+  exclude:
+    - 'experimental'
+rulepacks:
+  include:
+    - '^(base|coding-typescript)$'
+recipes:
+  include:
+    - '^feature-'
+  exclude:
+    - 'deprecated'
 ```
-
-With whitelist, **only** the listed agents, prompts, and rulepacks will be included in the generated project configurations. All others are excluded.
-
-**Blacklist** - Exclude specified items:
-
-```yaml
-ai_tools:
-  blacklist_agents:
-    - kotlin-style-enforcer
-    - tdd-navigator
-  blacklist_prompts:
-    # You can exclude by ID
-    - add-null-safety
-    # Or by path
-    - refactor/add-null-safety
-    - planning/estimate-effort
-  blacklist_rulepacks:
-    - coding-kotlin
-    - coding-java
-```
-
-With blacklist, all agents, prompts, and rulepacks **except** the listed ones will be included in the generated project configurations.
 
 ##### Referencing Prompts
 
 Prompts are organized in subdirectories (e.g., `03_prompts/refactor/`, `03_prompts/docs/`, `03_prompts/planning/`, `03_prompts/qa/`). You can reference them in two ways:
 
-1. **By ID only** (works if the ID is unique across all subdirectories):
+1. **By path (recommended):**
 
    ```yaml
-   whitelist_prompts:
-     - write-tests
-     - extract-method
+   prompts:
+     include:
+       - '^refactor/(extract-method|simplify-conditionals)$'
+       - '^docs/(document-api|write-readme)$'
    ```
 
-2. **By path** (recommended for clarity and to avoid ambiguity):
+2. **By ID (only if unique across directories):**
 
    ```yaml
-   whitelist_prompts:
-     - refactor/extract-method
-     - refactor/simplify-conditionals
-     - docs/document-api
-     - docs/write-readme
-     - planning/design-architecture
-     - qa/write-tests
+   prompts:
+     include:
+       - '^write-tests$'
    ```
 
-The path-based approach is recommended because:
-
-- It's more explicit and clear
-- It avoids potential naming conflicts
-- It makes the project manifest more maintainable
-
-**Generated filenames:** When prompts are built into adapters, their filenames include the subdirectory prefix and a `prompt-` prefix to prevent conflicts and make them easily distinguishable from agents. For example:
-
-- `refactor/extract-method.yml` → `prompt-refactor-extract-method.prompt.md`
-- `docs/document-api.yml` → `prompt-docs-document-api.prompt.md`
-- `planning/design-architecture.yml` → `prompt-planning-design-architecture.prompt.md`
-
-Agents are prefixed with `agent-` (e.g., `agent-code-reviewer.prompt.md`), making it easy to distinguish between prompts and agents at a glance. This naming convention also ensures that prompts from different categories with similar names don't collide in the generated output.
-
-**Use cases:**
-
-- **Whitelist**: When you want to include only a small, specific set of tools
-  - Small focused projects
-  - Projects with strict requirements
-  - Projects that only need a few specific prompts
-
-- **Blacklist**: When you want most tools but need to exclude a few
-  - Large projects with many needs
-  - Projects that want default behavior except for specific exclusions
-  - Excluding language-specific tools not relevant to the project
-
-**Validation:**
-
-The schema enforces mutual exclusivity - if you try to use both `whitelist_agents` and `excluded_agents` in the same project, validation will fail with:
-
-```text
-Schema validation failed: must match exactly one schema in oneOf
-```
-
-This ensures clarity and prevents conflicting configurations.
+Use anchored patterns to avoid accidental matches. Schemas reject `whitelist_*` and `blacklist_*` keys; use `include`/`exclude` instead.
 
 ### Metadata (Optional)
 
@@ -1183,7 +1127,7 @@ Good: "Use PascalCase for React components (e.g., ProductCard, UserProfile)"
 
 ### 4. Document Custom Rules
 
-If your project has unique patterns, document them in `ai_tools.custom_rules`.
+If your project has unique patterns, document them in `deploy.yml` under `ai_tools.custom_rules`.
 
 ### 5. Keep It Updated
 
@@ -1266,15 +1210,13 @@ Always deploy with `backup: true` in your deployment config.
 
 ### Example 1: Simple TypeScript Project
 
+`project.yml`
+
 ```yaml
 id: simple-ts-app
 version: 1.0.0
 name: 'Simple TypeScript App'
 description: 'A simple TypeScript application with basic conventions'
-
-tech_stack:
-  languages:
-    - typescript
 
 conventions:
   naming:
@@ -1282,6 +1224,20 @@ conventions:
     - 'Use PascalCase for classes'
   patterns:
     - 'Use TypeScript strict mode'
+```
+
+`deploy.yml`
+
+```yaml
+target: './.output/'
+tools:
+  - github-copilot
+  - windsurf
+mode: local
+
+tech_stack:
+  languages:
+    - typescript
 
 ai_tools:
   preferred_rulepacks:
@@ -1290,6 +1246,8 @@ ai_tools:
 ```
 
 ### Example 2: Full-Stack Project
+
+`project.yml`
 
 ```yaml
 id: fullstack-app
@@ -1300,18 +1258,6 @@ description: 'React frontend with Node.js backend'
 context:
   overview: 'E-commerce web application with React and Node.js'
   purpose: 'Provide online shopping experience'
-
-tech_stack:
-  languages:
-    - typescript
-  frontend:
-    - react
-    - redux
-  backend:
-    - node.js
-    - express
-  database:
-    - postgresql
 
 commands:
   dev:
@@ -1327,6 +1273,28 @@ conventions:
     - 'Use hooks for state management'
   testing:
     - 'Minimum 80% test coverage'
+```
+
+`deploy.yml`
+
+```yaml
+target: './.output/'
+tools:
+  - github-copilot
+  - windsurf
+mode: local
+
+tech_stack:
+  languages:
+    - typescript
+  frontend:
+    - react
+    - redux
+  backend:
+    - node.js
+    - express
+  database:
+    - postgresql
 
 ai_tools:
   preferred_agents:

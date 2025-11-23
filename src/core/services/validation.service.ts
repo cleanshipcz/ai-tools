@@ -1,5 +1,5 @@
 import { readFile, stat } from 'fs/promises';
-import { join, dirname, relative } from 'path';
+import { join, dirname, relative, basename } from 'path';
 import { load as loadYaml } from 'js-yaml';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -17,7 +17,7 @@ export interface ValidationResult {
 
 interface ManifestFile {
   path: string;
-  type: 'prompt' | 'agent' | 'rulepack' | 'skill' | 'eval' | 'project' | 'recipe' | 'feature';
+  type: 'prompt' | 'agent' | 'rulepack' | 'skill' | 'eval' | 'project' | 'recipe' | 'feature' | 'deploy';
   id: string;
   version?: string;
   content: any;
@@ -96,6 +96,7 @@ export class ValidationService {
       project: 'project.schema.json',
       recipe: 'recipe.schema.json',
       feature: 'feature.schema.json',
+      deploy: 'deploy.schema.json',
     };
 
     const schemas: Record<string, any> = {};
@@ -165,13 +166,11 @@ export class ValidationService {
       try {
         const files = await this.loader.findYamlFiles(source);
         for (const file of files) {
-          // Skip template files and deployment configs
+          // Skip template files and local-only overrides
           if (file.includes('/template/')) continue;
-          if (file.endsWith('deploy.yml') || file.endsWith('deploy.local.yml')) continue;
+          if (file.endsWith('deploy.local.yml')) continue;
           // Skip feature manifests (will be collected separately)
           if (file.includes('/features/') && file.endsWith('feature.yml')) continue;
-          // Only process project.yml files
-          if (!file.endsWith('project.yml')) continue;
 
           try {
             const content = await readFile(file, 'utf-8');
@@ -181,6 +180,20 @@ export class ValidationService {
               result.errors.push(`${relative(this.config.rootDir, file)}: Invalid YAML content`);
               continue;
             }
+
+            if (file.endsWith('deploy.yml')) {
+              manifests.push({
+                path: file,
+                type: 'deploy',
+                id: parsed.id || basename(dirname(file)),
+                version: parsed.version,
+                content: parsed,
+              });
+              continue;
+            }
+
+            // Only process project.yml files
+            if (!file.endsWith('project.yml')) continue;
 
             manifests.push({
               path: file,
@@ -260,6 +273,10 @@ export class ValidationService {
 
   private validateIds(manifests: ManifestFile[], result: ValidationResult): void {
     for (const manifest of manifests) {
+      if (manifest.type === 'deploy') {
+        continue;
+      }
+
       const id = manifest.id;
 
       // Check kebab-case
@@ -281,6 +298,10 @@ export class ValidationService {
 
   private validateVersions(manifests: ManifestFile[], result: ValidationResult): void {
     for (const manifest of manifests) {
+      if (manifest.type === 'deploy') {
+        continue;
+      }
+
       if (manifest.version && !SEMVER_PATTERN.test(manifest.version)) {
         result.errors.push(
           `${relative(this.config.rootDir, manifest.path)}: Version "${manifest.version}" is not valid semver`
@@ -291,6 +312,10 @@ export class ValidationService {
 
   private validateReferences(manifests: ManifestFile[], result: ValidationResult): void {
     for (const manifest of manifests) {
+      if (manifest.type === 'deploy') {
+        continue;
+      }
+
       // Check rulepack references
       if (manifest.content.rulepacks) {
         for (const rulepackId of manifest.content.rulepacks) {
@@ -336,6 +361,10 @@ export class ValidationService {
 
   private async validateIncludes(manifests: ManifestFile[], result: ValidationResult): Promise<void> {
     for (const manifest of manifests) {
+      if (manifest.type === 'deploy') {
+        continue;
+      }
+
       if (manifest.content.includes) {
         for (const includePath of manifest.content.includes) {
           const absolutePath = join(dirname(manifest.path), includePath);

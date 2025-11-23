@@ -15,7 +15,7 @@ export class ResolverService {
 
   /**
    * Resolve rulepacks into a flat list of rules, handling inheritance (extends).
-   * Optionally filters rulepacks based on project configuration (whitelist/blacklist/tech-stack).
+   * Optionally filters rulepacks based on project configuration (regex allow/deny patterns and tech-stack).
    */
   async resolveRulepacks(rulepackIds: string[], project?: Project, techStackContext?: { languages?: string[] }): Promise<string[]> {
     const resolved: string[] = [];
@@ -70,24 +70,7 @@ export class ResolverService {
   }
 
   async shouldIncludeRulepack(rulepackId: string, project: Project, techStackContext?: { languages?: string[] }): Promise<boolean> {
-    if (!project.ai_tools) return true;
-
-    const { whitelist_rulepacks, blacklist_rulepacks } = project.ai_tools;
-
-    // Whitelist takes precedence for INCLUSION, but we still might want to filter by tech stack
-    // If it's in the whitelist, we proceed to tech stack checks instead of returning true immediately.
-    // If it's NOT in the whitelist, we return false (if whitelist exists).
-    if (whitelist_rulepacks && whitelist_rulepacks.length > 0) {
-      if (!whitelist_rulepacks.includes(rulepackId)) {
-        return false;
-      }
-      // It is whitelisted, but we still check tech stack constraints below
-    }
-
-    // Blacklist
-    if (blacklist_rulepacks && blacklist_rulepacks.length > 0) {
-      return !blacklist_rulepacks.includes(rulepackId);
-    }
+    if (!this.passesFilters(rulepackId, project.rulepacks)) return false;
 
     // Tech-stack filtering
     // Use specific context if provided, otherwise fall back to global project tech stack
@@ -151,6 +134,32 @@ export class ResolverService {
     return Array.from(languages);
   }
 
+  private matchesPattern(value: string, patterns: string[]): boolean {
+    return patterns.some((pattern) => {
+      try {
+        return new RegExp(pattern).test(value);
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  private passesFilters(value: string, filters?: { include?: string[]; exclude?: string[] }, altValues: string[] = []): boolean {
+    const candidates = [value, ...altValues];
+
+    if (filters?.include && filters.include.length > 0) {
+      const matchesInclude = candidates.some((candidate) => this.matchesPattern(candidate, filters.include!));
+      if (!matchesInclude) return false;
+    }
+
+    if (filters?.exclude && filters.exclude.length > 0) {
+      const matchesExclude = candidates.some((candidate) => this.matchesPattern(candidate, filters.exclude!));
+      if (matchesExclude) return false;
+    }
+
+    return true;
+  }
+
   /**
    * Resolves all agents for a project, including global and stack-specific versions.
    * This provides a generic way for all adapters to generate agents.
@@ -194,60 +203,18 @@ export class ResolverService {
   }
 
   shouldIncludeAgent(agentId: string, project?: Project): boolean {
-    if (!project?.ai_tools) return true;
-
-    const { whitelist_agents, blacklist_agents } = project.ai_tools;
-
-    if (whitelist_agents && whitelist_agents.length > 0) {
-      return whitelist_agents.includes(agentId);
-    }
-
-    if (blacklist_agents && blacklist_agents.length > 0) {
-      return !blacklist_agents.includes(agentId);
-    }
-
-    return true;
+    return this.passesFilters(agentId, project?.agents);
   }
 
   shouldIncludePrompt(promptIdOrPath: string, promptsMap: Map<string, string>, project?: Project): boolean {
-    if (!project?.ai_tools) return true;
-
-    const { whitelist_prompts, blacklist_prompts } = project.ai_tools;
     const promptPath = promptsMap.get(promptIdOrPath) || promptIdOrPath;
+    const promptTargets = [promptPath, promptIdOrPath];
 
-    if (whitelist_prompts && whitelist_prompts.length > 0) {
-      return whitelist_prompts.some((pattern) => {
-        return (
-          promptPath === pattern || promptPath.endsWith(`/${pattern}`) || promptIdOrPath === pattern
-        );
-      });
-    }
-
-    if (blacklist_prompts && blacklist_prompts.length > 0) {
-      return !blacklist_prompts.some((pattern) => {
-        return (
-          promptPath === pattern || promptPath.endsWith(`/${pattern}`) || promptIdOrPath === pattern
-        );
-      });
-    }
-
-    return true;
+    return this.passesFilters(promptIdOrPath, project?.prompts, promptTargets);
   }
 
   shouldIncludeRecipe(recipeId: string, project?: Project): boolean {
-    if (!project?.ai_tools) return true;
-
-    const { whitelist_recipes, blacklist_recipes } = project.ai_tools;
-
-    if (whitelist_recipes && whitelist_recipes.length > 0) {
-      return whitelist_recipes.includes(recipeId);
-    }
-
-    if (blacklist_recipes && blacklist_recipes.length > 0) {
-      return !blacklist_recipes.includes(recipeId);
-    }
-
-    return true;
+    return this.passesFilters(recipeId, project?.recipes);
   }
 
   /**

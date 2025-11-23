@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
     shouldIncludeAgent: vi.fn(),
     shouldIncludePrompt: vi.fn(),
     resolveRulepacks: vi.fn(),
+    resolveAllAgents: vi.fn(),
   },
   recipeService: {
     generateRecipesForTool: vi.fn(),
@@ -68,6 +69,7 @@ vi.mock('../../core/services/resolver.service.js', () => ({
     shouldIncludeAgent = mocks.resolver.shouldIncludeAgent;
     shouldIncludePrompt = mocks.resolver.shouldIncludePrompt;
     resolveRulepacks = mocks.resolver.resolveRulepacks;
+    resolveAllAgents = mocks.resolver.resolveAllAgents;
   },
 }));
 
@@ -86,14 +88,24 @@ describe('ClaudeAdapter', () => {
     version: '1.0.0',
     name: 'Test Project',
     description: 'A test project',
-    ai_tools: {
-        whitelist_agents: ['agent-1'],
-        whitelist_prompts: ['prompt-1']
-    }
+    agents: { include: ['^agent-1$'] },
+    prompts: { include: ['^prompt-1$'] },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.resolver.resolveAllAgents.mockResolvedValue([
+      {
+        agent: {
+          id: 'agent-1',
+          purpose: 'Test Agent',
+          description: 'Agent Description',
+          prompt: { system: 'System Prompt' },
+        },
+        rules: [],
+        suffix: '',
+      },
+    ]);
     adapter = new ClaudeAdapter();
   });
 

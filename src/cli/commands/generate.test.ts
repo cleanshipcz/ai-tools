@@ -63,16 +63,25 @@ id: ${projectId}
 version: 1.0.0
 name: Test Stack Integration
 description: Integration test for tech stacks
+`;
+    const deployYaml = `
+target: './'
+tools:
+  - github-copilot
+  - windsurf
+  - cursor
+mode: local
+agents:
+  include:
+    - '^feature-builder$'
 tech_stacks:
   backend:
     languages: [python]
   frontend:
     languages: [typescript]
-ai_tools:
-  whitelist_agents:
-    - feature-builder
 `;
     await fs.writeFile(join(projectDir, 'project.yml'), projectYaml);
+    await fs.writeFile(join(projectDir, 'deploy.yml'), deployYaml);
 
     // 2. Run Generation
     const config = ConfigService.getInstance();

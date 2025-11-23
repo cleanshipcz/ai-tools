@@ -193,4 +193,51 @@ version: v1.0
     expect(result.success).toBe(false);
     expect(result.errors).toContainEqual(expect.stringContaining('not valid semver'));
   });
+
+  it('should validate deploy manifests against deploy schema', async () => {
+    // given
+    // - deploy schema requires target, tools, and mode
+    // - deploy manifest intentionally omits target to trigger validation failure
+    (readFile as any).mockImplementation(async (path: string) => {
+      if (path.includes('deploy.schema.json')) {
+        return JSON.stringify({
+          type: 'object',
+          required: ['target', 'tools', 'mode'],
+          properties: {
+            target: { type: 'string' },
+            tools: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            mode: { type: 'string' },
+          },
+        });
+      }
+      if (path.includes('schemas')) {
+        return JSON.stringify({ type: 'object' });
+      }
+      if (path.endsWith('deploy.yml')) {
+        return `
+tools:
+  - github-copilot
+mode: local
+`;
+      }
+      return '';
+    });
+
+    mockLoader.findYamlFiles.mockImplementation(async (path: string) => {
+      if (path.includes('06_projects')) {
+        return ['/mock/root/06_projects/global/sample/deploy.yml'];
+      }
+      return [];
+    });
+
+    // when
+    const result = await service.validateAll();
+
+    // then
+    expect(result.success).toBe(false);
+    expect(result.errors.some((error: string) => error.includes('deploy.yml'))).toBe(true);
+  });
 });

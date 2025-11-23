@@ -1,14 +1,14 @@
 id: recipe-filtering
 version: 1.0.0
 name: Recipe Filtering for Projects
-description: Enable projects to whitelist or blacklist recipes, controlling which multi-agent workflows are available for deployment
+description: Enable projects to filter recipes with regex allow/deny patterns, controlling which multi-agent workflows are available for deployment
 
 context:
   overview: |
-    Add the ability for projects to control which recipes are available through whitelisting
-    or blacklisting. This extends the existing filtering system (agents, prompts, rulepacks)
-    to include recipes, allowing fine-grained control over which automated workflows can be
-    deployed to specific projects.
+    Add the ability for projects to control which recipes are available using regex-based
+    allow/deny patterns. This extends the existing filtering system (agents, prompts,
+    rulepacks) to include recipes, allowing fine-grained control over which automated
+    workflows can be deployed to specific projects.
 
     This feature is useful for:
     - Restricting complex workflows to mature projects only
@@ -17,21 +17,22 @@ context:
     - Enforcing project-specific workflow policies
 
   architecture: |
-    The implementation follows the existing filtering pattern used for agents, prompts, and rulepacks:
+    The implementation follows the existing regex filtering pattern used for agents, prompts,
+    and rulepacks:
 
-    1. **Schema Extension**: Add whitelist_recipes and blacklist_recipes arrays to project.schema.json
-       - Both are optional and mutually exclusive (only one can be defined)
-       - Array of recipe IDs matching pattern ^[a-z0-9]+(-[a-z0-9]+)*$
-       - Add validation rule to prevent both being defined simultaneously
+    1. **Schema Extension**: Add recipe_allow_patterns and recipe_deny_patterns arrays to
+       deploy.schema.json and remove legacy whitelist/blacklist fields.
+       - Arrays of regex strings used to include/exclude recipes
+       - Validation should reject unknown whitelist/blacklist keys
 
-    2. **Type Definitions**: Update AIToolsConfig interface in gen-project.ts
-       - Add whitelist_recipes?: string[]
-       - Add blacklist_recipes?: string[]
+    2. **Type Definitions**: Update AIToolsConfig interface in the generator
+       - Add recipe_allow_patterns?: string[]
+       - Add recipe_deny_patterns?: string[]
 
-    3. **Filtering Logic**: Implement shouldIncludeRecipe() method in ProjectGenerator class
-       - Check whitelist first (if defined, only included recipes allowed)
-       - Check blacklist second (if defined, exclude blacklisted recipes)
-       - Default to including all recipes if no filter defined
+    3. **Filtering Logic**: Implement shouldIncludeRecipe() method
+       - Allow patterns gate inclusion
+       - Deny patterns run after allow checks
+       - Default to including all recipes if no filters defined
 
     4. **Generator Integration**: Apply filtering in recipe generation methods
        - Filter recipes before deployment/generation
@@ -58,13 +59,13 @@ files:
 
 conventions:
   - 'Follow the existing filtering pattern for agents, prompts, and rulepacks'
-  - 'Use whitelist_recipes and blacklist_recipes (mutually exclusive)'
-  - 'Recipe IDs must match kebab-case pattern: ^[a-z0-9]+(-[a-z0-9]+)*$'
+  - 'Use recipe_allow_patterns and recipe_deny_patterns (regex strings)'
+  - 'Reject legacy whitelist/blacklist fields in schemas'
   - 'Implement shouldIncludeRecipe() method similar to shouldIncludeAgent()'
   - 'Apply filtering in both generation and deployment phases'
-  - 'Update schema validation to prevent both whitelist and blacklist being defined'
+  - 'Update schema validation to prevent whitelist/blacklist usage'
   - 'Document the feature in projects/README.md and 05_recipes/README.md'
-  - 'Preserve backwards compatibility - no filtering if neither list defined'
+  - 'Preserve backwards compatibility - no filtering if patterns omitted'
 
 recipe:
   id: feature-delivery
@@ -72,59 +73,47 @@ recipe:
     feature_description: |
       Implement recipe filtering for projects with the following components:
 
-      1. **Schema Extension** (10_schemas/project.schema.json):
-         - Add whitelist_recipes array property to ai_tools section
-         - Add blacklist_recipes array property to ai_tools section
-         - Add validation rule ensuring mutual exclusivity (oneOf pattern)
-         - Recipe IDs must match pattern ^[a-z0-9]+(-[a-z0-9]+)*$
+      1. **Schema Extension** (10_schemas/deploy.schema.json):
+         - Add recipe_allow_patterns and recipe_deny_patterns arrays to ai_tools
+         - Remove legacy whitelist_recipes/blacklist_recipes fields
+         - Enforce rejection of unknown whitelist/blacklist keys
 
-      2. **Type Definitions** (11_scripts/gen-project.ts):
-         - Add whitelist_recipes?: string[] to AIToolsConfig interface
-         - Add blacklist_recipes?: string[] to AIToolsConfig interface
+      2. **Type Definitions** (generator utilities):
+         - Add recipe_allow_patterns?: string[] to AIToolsConfig interface
+         - Add recipe_deny_patterns?: string[] to AIToolsConfig interface
 
-      3. **Filtering Logic** (11_scripts/gen-project.ts):
-         - Implement shouldIncludeRecipe(recipeId: string): boolean method
-         - Follow exact same pattern as shouldIncludeAgent() and shouldIncludeRulepack()
-         - Check whitelist first (if defined, only return true for included recipes)
-         - Check blacklist second (if defined, return false for excluded recipes)
-         - Default to true if no filtering configured
+      3. **Filtering Logic**:
+         - Implement shouldIncludeRecipe(recipeId: string): boolean using allow/deny regex patterns
+         - Default to true when no recipe patterns are configured
 
-      4. **Generator Integration** (11_scripts/gen-project.ts):
+      4. **Generator Integration**:
          - Apply shouldIncludeRecipe() filter when loading/processing recipes
-         - Find all recipe loading/generation points in the code
-         - Add filtering before recipe deployment or script generation
+         - Ensure filtering runs before recipe deployment or script generation
 
-      5. **Deploy Script Integration** (11_scripts/deploy-project.ts):
+      5. **Deploy Script Integration**:
          - Ensure filtering is respected during deployment
          - Only deploy recipes that pass shouldIncludeRecipe() check
 
       6. **Documentation Updates**:
-         - Update 06_projects/README.md with recipe filtering examples
+         - Update 06_projects/README.md with regex recipe filtering examples
          - Update 05_recipes/README.md mentioning project-level filtering
-         - Add examples showing both whitelist and blacklist usage
 
       7. **Testing**:
-         - Add test project configurations with whitelist_recipes
-         - Add test project configurations with blacklist_recipes
-         - Verify schema validation catches conflicting definitions
-         - Test generation and deployment with filtered recipes
+         - Add tests ensuring whitelist/blacklist keys fail schema validation
+         - Test generation and deployment with regex-based filtered recipes
 
     acceptance_criteria: |
       Schema Changes:
-      - [ ] whitelist_recipes added to project.schema.json with correct pattern validation
-      - [ ] blacklist_recipes added to project.schema.json
-      - [ ] Mutual exclusivity validation added (oneOf constraint in allOf)
-      - [ ] Schema validation passes: npm run validate
+      - [ ] recipe_allow_patterns and recipe_deny_patterns added to deploy schema as regex string arrays
+      - [ ] Legacy whitelist_recipes/blacklist_recipes keys are rejected by validation
 
       Type Definitions:
-      - [ ] whitelist_recipes?: string[] added to AIToolsConfig interface
-      - [ ] blacklist_recipes?: string[] added to AIToolsConfig interface
+      - [ ] recipe_allow_patterns?: string[] added to AIToolsConfig interface
+      - [ ] recipe_deny_patterns?: string[] added to AIToolsConfig interface
       - [ ] TypeScript compiles without errors
 
       Filtering Implementation:
-      - [ ] shouldIncludeRecipe() method implemented in ProjectGenerator class
-      - [ ] Whitelist logic: returns true only if recipe in whitelist (when defined)
-      - [ ] Blacklist logic: returns false if recipe in blacklist (when defined)
+      - [ ] shouldIncludeRecipe() method implemented in ProjectGenerator class using allow/deny regex patterns
       - [ ] Default behavior: returns true if no filtering configured
       - [ ] Method signature matches existing should* methods
 
@@ -135,25 +124,15 @@ recipe:
       - [ ] Filtered recipes do not get deployed to target projects
 
       Testing:
-      - [ ] Test project with whitelist_recipes validates successfully
-      - [ ] Test project with blacklist_recipes validates successfully
-      - [ ] Test project with both lists fails validation (mutual exclusivity)
-      - [ ] Generated adapters only contain whitelisted recipes
+      - [ ] Validation fails when whitelist/blacklist recipe keys are provided
+      - [ ] Generated adapters only contain recipes allowed by regex filters
       - [ ] Deployed projects only contain allowed recipes
       - [ ] No regression in existing agent/prompt/rulepack filtering
 
       Documentation:
       - [ ] 06_projects/README.md updated with recipe filtering section
-      - [ ] Examples showing whitelist_recipes usage
-      - [ ] Examples showing blacklist_recipes usage
       - [ ] 05_recipes/README.md mentions project-level filtering capability
-      - [ ] Clear explanation of whitelist vs blacklist behavior
-
-      Edge Cases:
-      - [ ] Empty whitelist array behaves correctly (includes nothing)
-      - [ ] Empty blacklist array behaves correctly (includes everything)
-      - [ ] Non-existent recipe IDs in filters are handled gracefully
-      - [ ] Projects without ai_tools section work without errors
+      - [ ] Clear explanation of regex allow/deny behavior
 
   tools:
     - copilot-cli

@@ -3,8 +3,9 @@ import { mkdir, writeFile, access } from 'fs/promises';
 import { ConfigService } from './config.service.js';
 import { LoaderService } from './loader.service.js';
 import { RecipeService } from './recipe.service.js';
-import { Feature, Project, AIModel, Recipe } from '../models/types.js';
+import { DeployConfig, Feature, Project, AIModel, Recipe } from '../models/types.js';
 import chalk from 'chalk';
+import { applyDeployConfig } from '../utils/project-config.js';
 
 export class FeatureService {
   private config = ConfigService.getInstance();
@@ -13,7 +14,7 @@ export class FeatureService {
   private project?: Project;
   private agentsMap = new Map<string, any>();
 
-  async generateFeatures(projectId: string): Promise<void> {
+  async generateFeatures(projectId: string, projectConfig?: Project): Promise<void> {
     console.log(chalk.blue(`\n🎯 Generating features for project: ${projectId}\n`));
 
     // Find project directory
@@ -23,7 +24,11 @@ export class FeatureService {
     }
 
     // Load project configuration
-    await this.loadProject(projectDir);
+    if (projectConfig) {
+      this.project = projectConfig;
+    } else {
+      await this.loadProject(projectDir);
+    }
 
     // Load all agents for model resolution
     await this.loadAgents();
@@ -81,7 +86,16 @@ export class FeatureService {
   private async loadProject(projectDir: string): Promise<void> {
     const projectPath = join(projectDir, 'project.yml');
     try {
-      this.project = await this.loader.loadYaml<Project>(projectPath);
+      const project = await this.loader.loadYaml<Project>(projectPath);
+      let deployConfig: DeployConfig | undefined;
+
+      try {
+        deployConfig = await this.loader.loadYaml<DeployConfig>(join(projectDir, 'deploy.yml'));
+      } catch {
+        // Optional deploy.yml
+      }
+
+      this.project = applyDeployConfig(project, deployConfig);
     } catch (error) {
       console.log(chalk.yellow(`  Warning: Could not load project.yml`));
     }

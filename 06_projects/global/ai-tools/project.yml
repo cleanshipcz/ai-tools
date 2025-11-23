@@ -3,6 +3,23 @@ version: 1.0.0
 name: 'AI Tools Repository'
 description: 'A unified mono-repository for AI agent configuration - define once in YAML, deploy everywhere'
 
+ai_tools:
+  model: 'claude-sonnet-4.5'
+  custom_rules:
+    - 'Always use chalk for colored terminal output'
+    - 'Use Ajv with ajv-formats for JSON Schema validation'
+    - 'Export classes from scripts for reusability (e.g., ProjectGenerator)'
+    - 'Use import.meta.url guards for CLI entry points'
+    - 'Follow the existing manifest structure - id, version, description are required'
+    - 'Generate tool-specific outputs in adapters/ directory (gitignored)'
+    - 'Keep source manifests in 03_prompts/, 04_agents/, 01_rulepacks/, 02_skills/, 05_recipes/'
+    - 'Use TypeScript strict mode with ES modules'
+    - 'Prefer async/await over callbacks'
+    - 'Use js-yaml for YAML parsing and dumping'
+    - 'All new features must include automated tests before being considered complete'
+    - 'Test infrastructure setup (Vitest) is a prerequisite for any feature work'
+    - 'No feature PRs without automated tests'
+
 context:
   overview: |
     A comprehensive solution for managing AI agent prompts, rules, skills, and tool configurations.
@@ -15,25 +32,6 @@ context:
     skills for tool integrations, and a project system for per-project configurations.
 
   purpose: 'Enable teams to manage AI coding assistant configurations as code, with version control, validation, and automated deployment'
-
-tech_stack:
-  languages:
-    - typescript
-    - yaml
-    - markdown
-  frontend: []
-  backend:
-    - node.js
-  database: []
-  infrastructure:
-    - github-actions
-    - git
-  tools:
-    - tsx
-    - ajv
-    - js-yaml
-    - chalk
-    - prettier
 
 documentation:
   readme: 'README.md'
@@ -136,73 +134,6 @@ conventions:
     - 'Include examples in manifest files'
     - 'Keep CHANGELOG.md updated for releases'
     - 'Add helpful comments in YAML manifests'
-
-ai_tools:
-  model: 'claude-sonnet-4.5'
-
-  whitelist_agents:
-    - code-reviewer
-    - feature-builder
-    - bug-fixer
-    - prompt-engineer
-    - refactoring-specialist
-    - documentation-writer
-    - project-planner
-    - manifest-builder
-    - ticket-manager
-    - organization-specialist
-
-  whitelist_prompts:
-    # Refactoring prompts
-    - refactor/extract-method
-    - refactor/simplify-conditionals
-    - refactor/remove-duplication
-    - refactor/improve-naming
-    - refactor/add-error-handling
-    # Documentation prompts
-    - docs/document-api
-    - docs/write-readme
-    - docs/create-tutorial
-    - docs/summarize-pr
-    # Planning prompts
-    - planning/design-architecture
-    - planning/create-implementation-plan
-    - planning/tech-decision-record
-    # QA prompts
-    - qa/write-tests
-    - qa/setup-test-infrastructure
-    # Manifest prompts
-    - manifests/create-prompt
-    - manifests/create-agent
-    - manifests/create-project
-    - manifests/create-feature
-    - manifests/create-rulepack
-    - manifests/create-skill
-    - manifests/create-recipe
-
-  whitelist_rulepacks:
-    - base
-    - testing
-    - coding-typescript
-
-  whitelist_recipes:
-    - feature-delivery
-    - major-refactoring-cycle
-
-  custom_rules:
-    - 'Always use chalk for colored terminal output'
-    - 'Use Ajv with ajv-formats for JSON Schema validation'
-    - 'Export classes from scripts for reusability (e.g., ProjectGenerator)'
-    - 'Use import.meta.url guards for CLI entry points'
-    - 'Follow the existing manifest structure - id, version, description are required'
-    - 'Generate tool-specific outputs in adapters/ directory (gitignored)'
-    - 'Keep source manifests in 03_prompts/, 04_agents/, 01_rulepacks/, 02_skills/, 05_recipes/'
-    - 'Use TypeScript strict mode with ES modules'
-    - 'Prefer async/await over callbacks'
-    - 'Use js-yaml for YAML parsing and dumping'
-    - 'All new features must include automated tests before being considered complete'
-    - 'Test infrastructure setup (Vitest) is a prerequisite for any feature work'
-    - 'No feature PRs without automated tests'
 
 metadata:
   repository: 'https://github.com/cleanshipcz/ai-tools'

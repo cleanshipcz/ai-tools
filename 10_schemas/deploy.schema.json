@@ -40,6 +40,148 @@
       "type": "string",
       "pattern": "^[a-zA-Z0-9/_-]+$",
       "description": "Git branch name to use for auto-commit (optional)"
+    },
+    "tech_stack": {
+      "$ref": "#/definitions/tech_stack"
+    },
+    "tech_stacks": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/tech_stack"
+      },
+      "description": "Named tech stack contexts for stack-specific outputs"
+    },
+    "ai_tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "type": "string",
+          "enum": [
+            "claude-sonnet-4.5",
+            "claude-sonnet-4",
+            "claude-haiku-4.5",
+            "gpt-5",
+            "gpt-5.1",
+            "gpt-5.1-codex-mini",
+            "gpt-5.1-codex"
+          ],
+          "description": "Default model for this project (overrides agent default, can be overridden by feature)"
+        },
+        "preferred_agents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "description": "Preferred agents to highlight for this deployment"
+        },
+        "agent_allow_patterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Regex patterns to include only matching agents"
+        },
+        "agent_deny_patterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Regex patterns to exclude matching agents (applied after allow)"
+        },
+        "preferred_rulepacks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "description": "List of preferred rulepack IDs for this project"
+        }
+      },
+      "description": "AI tool defaults used during deployment"
+    },
+    "agents": {
+      "type": "object",
+      "properties": {
+        "include": { "type": "array", "items": { "type": "string" } },
+        "exclude": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false,
+      "description": "Regex patterns for agent IDs to include/exclude"
+    },
+    "prompts": {
+      "type": "object",
+      "properties": {
+        "include": { "type": "array", "items": { "type": "string" } },
+        "exclude": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false,
+      "description": "Regex patterns for prompt IDs/paths to include/exclude"
+    },
+    "rulepacks": {
+      "type": "object",
+      "properties": {
+        "include": { "type": "array", "items": { "type": "string" } },
+        "exclude": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false,
+      "description": "Regex patterns for rulepack IDs to include/exclude"
+    },
+    "recipes": {
+      "type": "object",
+      "properties": {
+        "include": { "type": "array", "items": { "type": "string" } },
+        "exclude": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false,
+      "description": "Regex patterns for recipe IDs to include/exclude"
+    }
+  },
+  "definitions": {
+    "tech_stack": {
+      "type": "object",
+      "properties": {
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Programming languages used"
+        },
+        "frontend": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Frontend frameworks and libraries"
+        },
+        "backend": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Backend frameworks and libraries"
+        },
+        "database": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Database systems"
+        },
+        "infrastructure": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Infrastructure and deployment tools"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Development tools and utilities"
+        }
+      },
+      "description": "Technology stack used when generating tool outputs"
     }
   },
   "additionalProperties": false

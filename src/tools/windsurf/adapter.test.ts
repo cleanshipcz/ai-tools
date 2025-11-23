@@ -42,6 +42,7 @@ vi.mock('../../core/services/resolver.service.js', () => {
       shouldIncludeAgent = vi.fn().mockReturnValue(true);
       shouldIncludePrompt = vi.fn().mockReturnValue(true);
       resolveRulepacks = vi.fn().mockResolvedValue([]);
+      resolveAllAgents = vi.fn().mockResolvedValue([]);
     },
   };
 });

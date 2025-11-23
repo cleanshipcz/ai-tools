@@ -716,18 +716,15 @@ npm run project:deploy my-project
 npm run project:list
 ```
 
-### Example Project Manifest
+### Example Project Configuration
+
+`project.yml`
 
 ```yaml
 id: my-api
 version: 1.0.0
 name: 'My REST API'
 description: 'Node.js REST API with TypeScript'
-
-tech_stack:
-  languages: [typescript]
-  backend: [node.js, express]
-  database: [postgresql]
 
 conventions:
   naming:
@@ -736,10 +733,31 @@ conventions:
   patterns:
     - 'Use TypeScript strict mode'
     - 'API responses: { success, data, error }'
+```
+
+`deploy.yml`
+
+```yaml
+target: '../my-actual-project'
+tools: [github-copilot, windsurf]
+mode: local
+
+tech_stack:
+  languages: [typescript]
+  backend: [node.js, express]
+  database: [postgresql]
 
 ai_tools:
-  preferred_agents: [code-reviewer, feature-builder]
-  preferred_rulepacks: [base, coding-typescript, security]
+  model: claude-sonnet-4.5
+agents:
+  include:
+    - '^feature-builder$'
+    - '^code-reviewer$'
+rulepacks:
+  include:
+    - '^base$'
+    - '^coding-typescript$'
+    - '^security$'
   custom_rules:
     - 'Always use our logger utility (src/utils/logger.ts)'
 ```

@@ -3,22 +3,14 @@ import { ConfigService } from '../../core/services/config.service.js';
 import { LoaderService } from '../../core/services/loader.service.js';
 import { ExternalProjectService } from '../../core/services/external-project.service.js';
 import { ToolRegistry } from '../../tools/registry.js';
-import { Project } from '../../core/models/types.js';
+import { DeployConfig, Project } from '../../core/models/types.js';
 import { join, resolve, dirname } from 'path';
 import { readFile, access, mkdir, readdir, copyFile } from 'fs/promises';
 import { load as loadYaml } from 'js-yaml';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
 import { FeatureService } from '../../core/services/feature.service.js';
-
-interface DeploymentConfig {
-  target: string;
-  tools: string[];
-  mode: 'local' | 'manual';
-  auto_commit?: boolean;
-  git_branch?: string;
-  backup?: boolean;
-}
+import { applyDeployConfig } from '../../core/utils/project-config.js';
 
 export const deployCommand = new Command('deploy')
     .description('Deploy project configurations');
@@ -89,10 +81,10 @@ async function deployProject(projectId: string, options: any) {
 
   // 2. Load deployment config
   const deployConfigPath = join(projectDir, 'deploy.yml');
-  let deployConfig: DeploymentConfig;
+  let deployConfig: DeployConfig;
   try {
     const content = await readFile(deployConfigPath, 'utf-8');
-    deployConfig = loadYaml(content) as DeploymentConfig;
+    deployConfig = loadYaml(content) as DeployConfig;
   } catch {
     console.error(chalk.red(`No deploy.yml found in ${projectDir}`));
     process.exit(1);
@@ -102,7 +94,7 @@ async function deployProject(projectId: string, options: any) {
   try {
     const localDeployPath = join(projectDir, 'deploy.local.yml');
     const localContent = await readFile(localDeployPath, 'utf-8');
-    const localConfig = loadYaml(localContent) as Partial<DeploymentConfig>;
+    const localConfig = loadYaml(localContent) as Partial<DeployConfig>;
     deployConfig = { ...deployConfig, ...localConfig };
   } catch {
     // Ignore
@@ -123,6 +115,7 @@ async function deployProject(projectId: string, options: any) {
     // Load project manifest
     const projectPath = join(projectDir, 'project.yml');
     const project = await loader.loadYaml<Project>(projectPath);
+    const effectiveProject = applyDeployConfig(project, deployConfig);
     const outputDir = config.getPath(config.dirs.output, projectId);
 
     // Generate for each tool
@@ -130,7 +123,7 @@ async function deployProject(projectId: string, options: any) {
       const adapter = registry.getAdapter(toolName);
       if (adapter) {
         console.log(chalk.gray(`    Generating ${toolName}...`));
-        await adapter.generate(project, outputDir);
+        await adapter.generate(effectiveProject, outputDir);
       } else {
         console.warn(chalk.yellow(`    Unknown tool: ${toolName}`));
       }
@@ -138,7 +131,7 @@ async function deployProject(projectId: string, options: any) {
 
     // Generate features
     console.log(chalk.gray(`    Generating features...`));
-    await featureService.generateFeatures(projectId);
+    await featureService.generateFeatures(projectId, effectiveProject);
 
     // Merge feature workflows into Windsurf output if Windsurf is enabled
     if (deployConfig.tools.includes('windsurf')) {
@@ -246,7 +239,7 @@ async function rollbackProject(projectId: string, timestamp?: string) {
   console.log(chalk.yellow('Rollback functionality not yet implemented in new CLI'));
 }
 
-export async function backupExisting(projectId: string, config: DeploymentConfig, targetPath: string) {
+export async function backupExisting(projectId: string, config: DeployConfig, targetPath: string) {
   const configService = ConfigService.getInstance();
   // Use configured backups directory (defaults to .backups)
   const backupsRoot = configService.getPath(configService.dirs.backups, projectId);
@@ -329,7 +322,7 @@ export async function backupExisting(projectId: string, config: DeploymentConfig
   }
 }
 
-export async function copyToTarget(projectId: string, config: DeploymentConfig, targetPath: string) {
+export async function copyToTarget(projectId: string, config: DeployConfig, targetPath: string) {
   const configService = ConfigService.getInstance();
   const outputDir = configService.getPath(configService.dirs.output, projectId);
 
@@ -444,7 +437,7 @@ async function copyDirectory(src: string, dest: string) {
   }
 }
 
-async function gitCommit(projectId: string, config: DeploymentConfig, targetPath: string) {
+async function gitCommit(projectId: string, config: DeployConfig, targetPath: string) {
     try {
         execSync('git add .', { cwd: targetPath, stdio: 'ignore' });
         execSync(`git commit -m "chore: update AI tool configurations for ${projectId}"`, { cwd: targetPath, stdio: 'ignore' });

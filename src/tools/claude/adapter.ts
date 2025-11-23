@@ -227,7 +227,7 @@ description: ${agent.description}
         // Let's try to extract ID from the JSON content.
         if (promptData.id) {
            // We need to construct the "path" for the resolver.
-           // The resolver uses path for whitelist matching (e.g. "refactor/extract-method").
+           // The resolver uses path for regex filtering (e.g. "refactor/extract-method").
            // We might not have the path here.
            // But we can use the ID.
            
