@@ -6,7 +6,6 @@ import { join } from 'path';
 export class ResolverService {
   private loader: LoaderService;
   private config: ConfigService;
-  private rulepacksCache = new Map<string, Rulepack>();
 
   constructor() {
     this.loader = new LoaderService();
@@ -55,15 +54,9 @@ export class ResolverService {
   }
 
   async loadRulepack(rulepackId: string): Promise<Rulepack | null> {
-    if (this.rulepacksCache.has(rulepackId)) {
-      return this.rulepacksCache.get(rulepackId)!;
-    }
-
     try {
       const rulepackPath = this.config.getPath(this.config.dirs.rulepacks, `${rulepackId}.yml`);
-      const rulepack = await this.loader.loadYaml<Rulepack>(rulepackPath);
-      this.rulepacksCache.set(rulepackId, rulepack);
-      return rulepack;
+      return await this.loader.loadYaml<Rulepack>(rulepackPath, false);
     } catch {
       return null;
     }

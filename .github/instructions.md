@@ -55,6 +55,7 @@ Process:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - All new features MUST include automated tests before implementation is considered complete.
 - Tests must be executable via CI/CD pipeline without manual intervention.
 - Manual testing is for exploration only; regression prevention requires automated tests.
@@ -139,6 +140,7 @@ Provide specific, actionable feedback with examples where possible.
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
@@ -183,6 +185,7 @@ Documentation types you handle:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
@@ -278,6 +281,7 @@ Focus on:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - All new features MUST include automated tests before implementation is considered complete.
 - Tests must be executable via CI/CD pipeline without manual intervention.
 - Manual testing is for exploration only; regression prevention requires automated tests.
@@ -465,6 +469,7 @@ After creating manifests, remind users to run:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - Use strict TypeScript configuration (strict: true in tsconfig.json).
 - Prefer interfaces for public APIs, types for internal structures.
 - Use readonly for immutable properties and ReadonlyArray<T> for immutable arrays.
@@ -620,6 +625,7 @@ Output Formats:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
@@ -705,6 +711,7 @@ Use Mermaid for architecture and sequence diagrams.
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - All new features MUST include automated tests before implementation is considered complete.
 - Tests must be executable via CI/CD pipeline without manual intervention.
 - Manual testing is for exploration only; regression prevention requires automated tests.
@@ -824,6 +831,7 @@ repository format. Your expertise includes:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
@@ -893,6 +901,7 @@ Always explain WHY a refactoring improves the code.
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - Use strict TypeScript configuration (strict: true in tsconfig.json).
 - Prefer interfaces for public APIs, types for internal structures.
 - Use readonly for immutable properties and ReadonlyArray<T> for immutable arrays.
@@ -1002,6 +1011,7 @@ When breaking down epics:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
