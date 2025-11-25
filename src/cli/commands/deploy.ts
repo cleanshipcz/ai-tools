@@ -5,7 +5,7 @@ import { ExternalProjectService } from '../../core/services/external-project.ser
 import { ToolRegistry } from '../../tools/registry.js';
 import { DeployConfig, Project } from '../../core/models/types.js';
 import { join, resolve, dirname } from 'path';
-import { readFile, access, mkdir, readdir, copyFile } from 'fs/promises';
+import { readFile, access, mkdir, readdir, copyFile, rm } from 'fs/promises';
 import { load as loadYaml } from 'js-yaml';
 import chalk from 'chalk';
 import { execSync } from 'child_process';
@@ -117,6 +117,10 @@ async function deployProject(projectId: string, options: any) {
     const project = await loader.loadYaml<Project>(projectPath);
     const effectiveProject = applyDeployConfig(project, deployConfig);
     const outputDir = config.getPath(config.dirs.output, projectId);
+
+    // Ensure staging area is clean to avoid stale artifacts
+    await rm(outputDir, { recursive: true, force: true });
+    await mkdir(outputDir, { recursive: true });
 
     // Generate for each tool
     for (const toolName of deployConfig.tools) {
