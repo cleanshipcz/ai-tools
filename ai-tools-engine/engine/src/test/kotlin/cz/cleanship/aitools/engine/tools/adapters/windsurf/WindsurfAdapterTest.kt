@@ -2,10 +2,13 @@ package cz.cleanship.aitools.engine.tools.adapters.windsurf
 
 import cz.cleanship.aitools.engine.data.agent
 import cz.cleanship.aitools.engine.data.expectedAgent
+import cz.cleanship.aitools.engine.data.expectedFeature
 import cz.cleanship.aitools.engine.data.expectedPrompt
+import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulepacks
 import cz.cleanship.aitools.engine.tools.AgentContext
+import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.utils.StringOutput
 import org.assertj.core.api.Assertions.assertThat
@@ -23,7 +26,7 @@ class WindsurfAdapterTest {
     private val printers = Printers
     private lateinit var targetDir: File
     private lateinit var rulesDir: File
-    private lateinit var instructionsDir: File
+    private lateinit var workflowsDir: File
     private lateinit var output: StringOutput
 
     private lateinit var windsurfAdapter: WindsurfAdapter
@@ -32,7 +35,7 @@ class WindsurfAdapterTest {
     fun setUp() {
         targetDir = tempDir.resolve(".windsurf").toFile()
         rulesDir = targetDir.resolve("rules")
-        instructionsDir = targetDir.resolve("instructions")
+        workflowsDir = targetDir.resolve("workflows")
         output = StringOutput()
 
         windsurfAdapter = WindsurfAdapter(printers)
@@ -60,6 +63,27 @@ class WindsurfAdapterTest {
 
         // then
         assertThat(rulesDir.resolve("agent-${agent.id}.md").readText()).isEqualTo(withManualHeader(expectedAgent))
+    }
+
+
+    @Test
+    fun `should output a feature`() {
+        // given
+        val featureContext = FeatureContext(feature)
+
+        // when
+        windsurfAdapter.export(tempDir.toFile(), featureContext)
+
+        // then
+        assertThat(workflowsDir.resolve("feature-${feature.id}.md").readText()).isEqualTo("""
+            |---
+            |description: ${feature.description.replace("\n", " ")}
+            |auto_execution_mode: 3
+            |---
+            |
+            |$expectedFeature
+            |
+        """.trimMargin())
     }
 
     private fun withManualHeader(content: String) = """

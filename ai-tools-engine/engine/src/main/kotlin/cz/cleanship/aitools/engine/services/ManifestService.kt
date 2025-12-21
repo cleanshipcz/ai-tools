@@ -1,6 +1,7 @@
 package cz.cleanship.aitools.engine.services
 
 import cz.cleanship.aitools.engine.models.AgentManifest
+import cz.cleanship.aitools.engine.models.FeatureManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulepackManifest
 import java.io.File
@@ -29,6 +30,14 @@ class ManifestService(private val rootDir: File) {
         if (!dir.exists()) return emptyList()
         return loader.findYamlFiles(dir).map {
             loader.loadRulepack(it)
+        }
+    }
+
+    fun listFeatures(): List<FeatureManifest> {
+        val dir = File(rootDir, "02_features")
+        if (!dir.exists()) return emptyList()
+        return loader.findYamlFiles(dir).map {
+            loader.loadFeature(it)
         }
     }
 }

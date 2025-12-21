@@ -12,15 +12,3 @@ data class AgentManifest(
     val constraints: List<String> = emptyList(),
     override val metadata: ManifestMetadata,
 ) : VersionedManifest
-
-@Serializable
-data class AgentDefaults(
-    val temperature: Double = 0.3,
-    val style: String = "technical",
-)
-
-@Serializable
-data class AgentPrompt(
-    val system: String,
-    val userTemplate: String? = null,
-)

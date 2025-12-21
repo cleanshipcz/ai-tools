@@ -4,6 +4,7 @@ import cz.cleanship.aitools.engine.io.OutputStreamOutput
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulepackManifest
 import cz.cleanship.aitools.engine.tools.AgentContext
+import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Printer
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.ToolAdapter
@@ -29,6 +30,24 @@ class WindsurfAdapter(
         TODO("Not yet implemented")
     }
 
+    override fun export(projectDir: File, featureContext: FeatureContext) {
+        val feature = featureContext.feature
+        val targetFile = workflowsDir(projectDir).resolve("feature-${feature.id}.md")
+        targetFile.parentFile.mkdirs()
+        OutputStreamOutput(FileOutputStream(targetFile)).use {
+            it.appendText(
+                """
+                ---
+                description: ${feature.description.replace("\n", " ")}
+                auto_execution_mode: 3
+                ---
+            """.trimIndent()
+            )
+            it.appendLine()
+            printers.featurePrinter.print(featureContext, it)
+        }
+    }
+
     private fun <T> export(targetFile: File, printer: Printer<T>, entity: T) {
         targetFile.parentFile.mkdirs()
         OutputStreamOutput(FileOutputStream(targetFile)).use {
@@ -48,5 +67,5 @@ class WindsurfAdapter(
 
     private fun rulesDir(projectDir: File) = windsurfDir(projectDir).resolve("rules")
 
-    private fun instructionsDir(projectDir: File) = windsurfDir(projectDir).resolve("instructions")
+    private fun workflowsDir(projectDir: File) = windsurfDir(projectDir).resolve("workflows")
 }

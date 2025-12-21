@@ -1,6 +1,8 @@
 package cz.cleanship.aitools.engine.data
 
 import cz.cleanship.aitools.engine.models.AgentManifest
+import cz.cleanship.aitools.engine.models.InnerFeatureContext
+import cz.cleanship.aitools.engine.models.FeatureManifest
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.PromptOutput
@@ -150,5 +152,93 @@ val expectedPrompt = """
     
     Multiline
     content#3
+    
+""".trimIndent()
+
+val feature = FeatureManifest(
+    id = "id#1",
+    description = """
+        Multiline
+        description
+    """.trimIndent(),
+    context = InnerFeatureContext(
+        overview = """
+            Multiline
+            overview
+        """.trimIndent(),
+        architecture = """
+            Multiline
+            architecture
+        """.trimIndent(),
+        dependencies = listOf(
+            "Dependency#1",
+            "Dependency#2",
+        ),
+        files = listOf(
+            "File#1",
+            "File#2",
+        ),
+    ),
+    prompt = """
+        Multiline
+        prompt
+    """.trimIndent(),
+    acceptanceCriteria = listOf(
+        "Acceptance criteria#1",
+        "Acceptance criteria#2",
+    ),
+    constraints = listOf(
+        "Constraint#1",
+        "Constraint#2",
+    ),
+    metadata = ManifestMetadata(
+        version = Version("1.2.3"),
+        author = "Test Author",
+        created = "2025-01-01",
+    ),
+)
+
+val expectedFeature = """
+    # id#1
+    
+    Multiline
+    description
+    
+    ## Context
+    
+    ### Overview
+    
+    Multiline
+    overview
+    
+    ### Architecture
+    
+    Multiline
+    architecture
+    
+    ### Dependencies
+    
+    - Dependency#1
+    - Dependency#2
+    
+    ### Files
+    
+    - File#1
+    - File#2
+    
+    ## Prompt
+    
+    Multiline
+    prompt
+    
+    ## Acceptance Criteria
+    
+    - Acceptance criteria#1
+    - Acceptance criteria#2
+    
+    ## Constraints
+    
+    - Constraint#1
+    - Constraint#2
     
 """.trimIndent()

@@ -3,6 +3,7 @@ package cz.cleanship.aitools.engine.services
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import cz.cleanship.aitools.engine.models.AgentManifest
+import cz.cleanship.aitools.engine.models.FeatureManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulepackManifest
 import kotlinx.serialization.decodeFromString
@@ -26,6 +27,11 @@ class LoaderService {
     }
 
     fun loadRulepack(file: File): RulepackManifest {
+        val content = file.readText()
+        return yaml.decodeFromString(content)
+    }
+
+    fun loadFeature(file: File): FeatureManifest {
         val content = file.readText()
         return yaml.decodeFromString(content)
     }
