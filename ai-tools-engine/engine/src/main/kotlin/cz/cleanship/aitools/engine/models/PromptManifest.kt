@@ -7,7 +7,7 @@ data class PromptManifest(
     override val id: String,
     override val version: Version,
     val description: String,
-    val tags: List<String> = emptyList(),
+    val tags: Set<String> = emptySet(),
     val variables: List<PromptVariable> = emptyList(),
     val rules: List<String> = emptyList(),
     val content: String,

@@ -1,14 +1,11 @@
-package cz.cleanship.aitools.engine.services
+package cz.cleanship.aitools.engine.models
 
-import cz.cleanship.aitools.engine.models.ManifestMetadata
-import cz.cleanship.aitools.engine.models.PromptOutput
-import cz.cleanship.aitools.engine.models.PromptVariable
-import cz.cleanship.aitools.engine.models.Version
+import cz.cleanship.aitools.engine.services.LoaderService
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.io.File
 
-class PromptManifestLoaderTest {
+class PromptManifestTest {
 
     private val loaderService = LoaderService()
 

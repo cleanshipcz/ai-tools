@@ -4,8 +4,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AgentManifest(
-    val id: String,
-    val version: String = "1.0.0",
+    override val id: String,
+    override val version: Version,
     val purpose: String,
     val description: String? = null,
     val rulepacks: List<String> = emptyList(),
@@ -14,8 +14,8 @@ data class AgentManifest(
     val prompt: AgentPrompt,
     val tools: List<String> = emptyList(),
     val constraints: List<String> = emptyList(),
-    val metadata: ManifestMetadata = ManifestMetadata(),
-)
+    override val metadata: ManifestMetadata = ManifestMetadata(),
+) : VersionedManifest
 
 @Serializable
 data class AgentDefaults(
