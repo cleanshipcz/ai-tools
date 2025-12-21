@@ -4,8 +4,6 @@ description: |
   and provides constructive, actionable feedback.
 rulepacks:
   - base
-  - reviewer
-  - security
 persona: |
   You are a senior software engineer conducting a thorough code review.
   Your goal is to identify defects, security risks, performance issues,

@@ -1,9 +1,9 @@
 package cz.cleanship.aitools.engine.tools.adapters.windsurf
 
 import cz.cleanship.aitools.engine.io.OutputStreamOutput
-import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulepackManifest
+import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.Printer
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.ToolAdapter
@@ -20,9 +20,9 @@ class WindsurfAdapter(
         export(targetFile, printers.promptPrinter, promptManifest)
     }
 
-    override fun export(projectDir: File, agentManifest: AgentManifest) {
-        val targetFile = rulesDir(projectDir).resolve("agent-${agentManifest.id}.md")
-        export(targetFile, printers.agentPrinter, agentManifest)
+    override fun export(projectDir: File, agentContext: AgentContext) {
+        val targetFile = rulesDir(projectDir).resolve("agent-${agentContext.agent.id}.md")
+        export(targetFile, printers.agentPrinter, agentContext)
     }
 
     override fun export(projectDir: File, rulepackManifest: RulepackManifest) {
@@ -32,6 +32,14 @@ class WindsurfAdapter(
     private fun <T> export(targetFile: File, printer: Printer<T>, entity: T) {
         targetFile.parentFile.mkdirs()
         OutputStreamOutput(FileOutputStream(targetFile)).use {
+            it.appendText(
+                """
+                ---
+                trigger: manual
+                ---
+            """.trimIndent()
+            )
+            it.appendLine()
             printer.print(entity, it)
         }
     }

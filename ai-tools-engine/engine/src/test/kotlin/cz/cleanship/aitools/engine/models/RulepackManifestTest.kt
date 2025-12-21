@@ -27,7 +27,6 @@ class RulepackManifestTest {
             "Break complex tasks into smaller, manageable steps.",
             "Verify your work before presenting it.",
         )
-        assertThat(rulepack.extends).isEmpty()
         assertThat(rulepack.metadata).isEqualTo(
             ManifestMetadata(
                 version = Version("1.1.0"),

@@ -25,7 +25,7 @@ class AgentManifestTest {
             and provides constructive, actionable feedback.
             """.trimIndent()
         )
-        assertThat(agent.rulepacks).containsExactlyInAnyOrder("base", "reviewer", "security")
+        assertThat(agent.rulepacks).containsExactlyInAnyOrder("base")
         assertThat(agent.persona.trim()).isEqualTo(
             """
             You are a senior software engineer conducting a thorough code review.
