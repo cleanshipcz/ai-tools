@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine.tools
 
+import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.PromptOutput
 import cz.cleanship.aitools.engine.models.PromptVariable
@@ -20,7 +21,6 @@ class PromptPrinterTest {
                 Multiline
                 description#1
             """.trimIndent(),
-            tags = setOf("tag1", "tag2"),
             variables = listOf(
                 PromptVariable(name = "var1", required =  true, description = """
                     Multiline
@@ -37,6 +37,10 @@ class PromptPrinterTest {
                 content#3
             """.trimIndent(),
             outputs = PromptOutput(format = "format1", examples = listOf("example1", "example2")),
+            metadata = ManifestMetadata(
+                author = "Test Author",
+                created = "2025-01-01",
+            ),
         )
         val byteArrayOutputStream = ByteArrayOutputStream()
         val output = Output(byteArrayOutputStream)

@@ -2,7 +2,7 @@ package cz.cleanship.aitools.engine.services
 
 import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
-import cz.cleanship.aitools.engine.models.RulePackManifest
+import cz.cleanship.aitools.engine.models.RulepackManifest
 import java.io.File
 
 class ManifestService(private val rootDir: File) {
@@ -24,7 +24,7 @@ class ManifestService(private val rootDir: File) {
         }
     }
 
-    fun listRulepacks(): List<RulePackManifest> {
+    fun listRulepacks(): List<RulepackManifest> {
         val dir = File(rootDir, "01_rulepacks")
         if (!dir.exists()) return emptyList()
         return loader.findYamlFiles(dir).map {

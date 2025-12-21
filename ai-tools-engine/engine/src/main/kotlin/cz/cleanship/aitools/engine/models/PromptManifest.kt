@@ -6,8 +6,7 @@ import kotlinx.serialization.Serializable
 data class PromptManifest(
     override val id: String,
     override val version: Version,
-    val description: String,
-    val tags: Set<String> = emptySet(),
+    override val description: String,
     val variables: List<PromptVariable> = emptyList(),
     val rules: List<String> = emptyList(),
     val content: String,

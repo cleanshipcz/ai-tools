@@ -21,7 +21,6 @@ class PromptManifestTest {
         assertThat(prompt.id).isEqualTo("summarize-pr")
         assertThat(prompt.version).isEqualTo(Version("1.0.0"))
         assertThat(prompt.description).isEqualTo("Generate a concise summary of a pull request")
-        assertThat(prompt.tags).containsExactlyInAnyOrder("docs", "pr", "git")
         assertThat(prompt.variables).containsExactlyInAnyOrder(
             PromptVariable(name = "diff", required = true, description = "The git diff to summarize"),
             PromptVariable(name = "context", required = false, description = "Additional context about the PR")
@@ -65,7 +64,7 @@ class PromptManifestTest {
                 author = "AI Tools Team",
                 created = "2025-01-01",
                 updated = null,
-                tags = emptySet(),
+                tags = setOf("docs", "pr", "git"),
             )
         )
     }

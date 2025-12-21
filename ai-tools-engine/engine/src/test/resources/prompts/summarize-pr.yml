@@ -1,10 +1,6 @@
 id: summarize-pr
 version: 1.0.0
 description: Generate a concise summary of a pull request
-tags:
-  - docs
-  - pr
-  - git
 variables:
   - name: diff
     required: true
@@ -41,3 +37,7 @@ outputs:
 metadata:
   author: 'AI Tools Team'
   created: '2025-01-01'
+  tags:
+    - docs
+    - pr
+    - git
