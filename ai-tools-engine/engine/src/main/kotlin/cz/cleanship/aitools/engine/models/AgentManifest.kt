@@ -28,11 +28,3 @@ data class AgentPrompt(
     val system: String,
     val userTemplate: String? = null,
 )
-
-@Serializable
-data class ManifestMetadata(
-    val author: String? = null,
-    val created: String? = null,
-    val updated: String? = null,
-    val tags: List<String> = emptyList(),
-)

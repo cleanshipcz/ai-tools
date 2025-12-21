@@ -1,6 +1,7 @@
 package cz.cleanship.aitools.engine.models
 
-interface VersionedEntity {
+interface VersionedManifest {
     val version: Version
     val id: String
+    val metadata: ManifestMetadata
 }

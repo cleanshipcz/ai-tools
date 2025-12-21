@@ -13,8 +13,13 @@ data class Version(
     val major: Int,
     val minor: Int,
     val patch: Int,
-    val suffix: String? = null
+    val suffix: String? = null,
 ) : Comparable<Version> {
+
+    constructor(version: String) : this(parse(version))
+
+    constructor(version: Version) : this(version.major, version.minor, version.patch, version.suffix)
+
     override fun compareTo(other: Version): Int {
         if (major != other.major) return major.compareTo(other.major)
         if (minor != other.minor) return minor.compareTo(other.minor)
@@ -34,21 +39,19 @@ data class Version(
         fun parse(version: String): Version {
             val pattern = Regex("""^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$""")
             val match = pattern.matchEntire(version) ?: throw IllegalArgumentException("Invalid version format: $version. Expected MAJOR.MINOR.PATCH(-SUFFIX)")
-            
+
             val (major, minor, patch, suffix) = match.destructured
             return Version(major.toInt(), minor.toInt(), patch.toInt(), suffix.ifBlank { null })
         }
     }
 }
 
+fun String.toVersion(): Version = Version.parse(this)
+
 object VersionSerializer : KSerializer<Version> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Version", PrimitiveKind.STRING)
 
-    override fun serialize(encoder: Encoder, value: Version) {
-        encoder.encodeString(value.toString())
-    }
+    override fun serialize(encoder: Encoder, value: Version) = encoder.encodeString(value.toString())
 
-    override fun deserialize(decoder: Decoder): Version {
-        return Version.parse(decoder.decodeString())
-    }
+    override fun deserialize(decoder: Decoder): Version = Version.parse(decoder.decodeString())
 }

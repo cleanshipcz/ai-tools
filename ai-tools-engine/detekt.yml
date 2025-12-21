@@ -18,6 +18,10 @@ style:
     active: false        # do not enforce maximum line length, it's not the 90's anymore
   WildcardImport:
     active: false
+  DestructuringDeclarationWithTooManyEntries: # hurts readability when enforced
+    active: false
+  ReturnCount: # fully idiotic for e.g., compareTo
+    active: false
 
 naming:
   TopLevelPropertyNaming:
