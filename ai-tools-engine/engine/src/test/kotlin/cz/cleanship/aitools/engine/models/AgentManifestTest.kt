@@ -19,28 +19,22 @@ class AgentManifestTest {
 
         // then
         assertThat(agent.id).isEqualTo("code-reviewer")
-        assertThat(agent.version).isEqualTo(Version("2.1.0"))
-        assertThat(agent.purpose).isEqualTo("Structured code review with actionable findings")
-        assertThat(agent.description?.trim()).isEqualTo(
+        assertThat(agent.description.trim()).isEqualTo(
             """
             A senior code reviewer agent that analyzes code changes, identifies issues,
             and provides constructive, actionable feedback.
             """.trimIndent()
         )
         assertThat(agent.rulepacks).containsExactlyInAnyOrder("base", "reviewer", "security")
-        assertThat(agent.capabilities).containsExactlyInAnyOrder("mcp:git", "mcp:filesystem")
-        assertThat(agent.defaults).isEqualTo(
-            AgentDefaults(
-                temperature = 0.2,
-                style = "terse",
-            )
-        )
-        assertThat(agent.prompt.system.trim()).isEqualTo(
+        assertThat(agent.persona.trim()).isEqualTo(
             """
             You are a senior software engineer conducting a thorough code review.
             Your goal is to identify defects, security risks, performance issues,
             and areas for improvement while being constructive and educational.
-
+            """.trimIndent()
+        )
+        assertThat(agent.prompt.trim()).isEqualTo(
+            """
             Focus on:
             - Correctness and logic errors
             - Security vulnerabilities
@@ -48,34 +42,18 @@ class AgentManifestTest {
             - Code maintainability
             - Test coverage
             - Documentation quality
-
-            Provide specific, actionable feedback with examples where possible.
-            """.trimIndent()
-        )
-        assertThat(agent.prompt.userTemplate?.trim()).isEqualTo(
-            """
-            Review the following changes:
-
-            Repository context:
-            {{context}}
-
-            Diff:
-            ```diff
-            {{diff}}
-            ```
-
-            {{#focus}}
-            Special focus areas: {{focus}}
-            {{/focus}}
+            
+            Review the changes (to be provided later).
 
             Provide a structured review with:
             1. Critical issues (must fix)
             2. Important suggestions (should fix)
             3. Minor improvements (nice to have)
             4. Positive observations
+            
+            Provide specific, actionable feedback with examples where possible.
             """.trimIndent()
         )
-        assertThat(agent.tools).containsExactlyInAnyOrder("git-diff", "read-file", "search-code")
         assertThat(agent.constraints).containsExactlyInAnyOrder(
             "Do not approve code with security vulnerabilities.",
             "Flag missing test coverage for new functionality.",
@@ -83,6 +61,7 @@ class AgentManifestTest {
         )
         assertThat(agent.metadata).isEqualTo(
             ManifestMetadata(
+                version = Version("2.1.0"),
                 author = "AI Tools Team",
                 created = "2025-01-01",
                 updated = null,

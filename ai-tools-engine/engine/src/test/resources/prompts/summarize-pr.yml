@@ -1,5 +1,4 @@
 id: summarize-pr
-version: 1.0.0
 description: Generate a concise summary of a pull request
 variables:
   - name: diff
@@ -35,6 +34,7 @@ content: |
 outputs:
   format: markdown
 metadata:
+  version: 1.0.0
   author: 'AI Tools Team'
   created: '2025-01-01'
   tags:

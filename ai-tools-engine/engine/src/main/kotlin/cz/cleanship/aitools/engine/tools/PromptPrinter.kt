@@ -1,39 +1,24 @@
 package cz.cleanship.aitools.engine.tools
 
+import cz.cleanship.aitools.engine.io.Output
 import cz.cleanship.aitools.engine.models.PromptManifest
 
 class PromptPrinter : Printer<PromptManifest> {
 
     override fun print(entity: PromptManifest, output: Output): Output {
-        output.appendLine("# ${entity.id}")
-        output.appendLine()
-        output.appendText(entity.description)
-        output.appendLine()
+        output.appendTextTopic("# ${entity.id}", entity.description)
 
-        if (entity.variables.isNotEmpty()) {
-            output.appendLine("## Variables")
-            output.appendLine()
-            for (variable in entity.variables) {
-                val required = if (variable.required) " (required)" else ""
-                val indentedDescription = variable.description.lines().joinToString("\n  ")
-                output.appendLine("- `{{${variable.name}}}`$required: $indentedDescription")
+        output.appendListTopic(
+            "## Variables",
+            entity.variables.map {
+                val required = if (it.required) " (required)" else ""
+                "`{{${it.name}}}`$required: ${it.description}"
             }
-            output.appendLine()
-        }
+        )
 
-        if (entity.rules.isNotEmpty()) {
-            output.appendLine("## Rules")
-            output.appendLine()
-            for (rule in entity.rules) {
-                output.appendLine("- $rule")
-            }
-            output.appendLine()
-        }
+        output.appendListTopic("## Rules", entity.rules)
 
-        output.appendLine("## Prompt")
-        output.appendLine()
-        output.appendText(entity.content)
-        output.appendLine()
+        output.appendTextTopic("## Prompt", entity.content)
 
         return output
     }

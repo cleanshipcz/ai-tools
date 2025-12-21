@@ -6,7 +6,7 @@ pnpm-lock.yaml
 
 # Build outputs
 dist/
-adapters/
+/adapters/
 *.tsbuildinfo
 
 # Generated documentation

@@ -1,6 +1,7 @@
 package cz.cleanship.aitools.engine.models
 
 import cz.cleanship.aitools.engine.services.LoaderService
+import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -19,7 +20,6 @@ class PromptManifestTest {
 
         // then
         assertThat(prompt.id).isEqualTo("summarize-pr")
-        assertThat(prompt.version).isEqualTo(Version("1.0.0"))
         assertThat(prompt.description).isEqualTo("Generate a concise summary of a pull request")
         assertThat(prompt.variables).containsExactlyInAnyOrder(
             PromptVariable(name = "diff", required = true, description = "The git diff to summarize"),
@@ -61,6 +61,7 @@ class PromptManifestTest {
         )
         assertThat(prompt.metadata).isEqualTo(
             ManifestMetadata(
+                version = Version("1.0.0"),
                 author = "AI Tools Team",
                 created = "2025-01-01",
                 updated = null,

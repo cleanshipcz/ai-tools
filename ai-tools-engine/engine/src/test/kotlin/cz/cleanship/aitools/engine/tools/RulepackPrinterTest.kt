@@ -3,18 +3,18 @@ package cz.cleanship.aitools.engine.tools
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.RulepackManifest
 import cz.cleanship.aitools.engine.models.Version
+import cz.cleanship.aitools.engine.utils.StringOutput
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayOutputStream
 
-class RulePackPrinterTest {
+class RulepackPrinterTest {
 
     @Test
     fun `should print rulepack manifest`() {
         // given
         val rulepack = RulepackManifest(
             id = "test-rulepack",
-            version = Version("1.2.3"),
             description = """
                 Multiline
                 description
@@ -26,19 +26,20 @@ class RulePackPrinterTest {
             ),
             extends = listOf("base", "security"),
             metadata = ManifestMetadata(
+                version = Version("1.2.3"),
                 author = "Test Author",
                 created = "2025-01-01",
             ),
         )
-        val byteArrayOutputStream = ByteArrayOutputStream()
-        val output = Output(byteArrayOutputStream)
+        val output = StringOutput()
 
         // when
-        RulePackPrinter().print(rulepack, output)
-        output.close()
+        output.use {
+            RulepackPrinter().print(rulepack, it)
+        }
 
         // then
-        assertThat(byteArrayOutputStream.toString().trimIndent()).isEqualTo("""
+        assertThat(output.getContent().trimIndent()).isEqualTo("""
             # test-rulepack
             
             Multiline

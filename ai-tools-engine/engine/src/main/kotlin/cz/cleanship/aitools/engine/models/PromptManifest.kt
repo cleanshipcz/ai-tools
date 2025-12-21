@@ -5,13 +5,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class PromptManifest(
     override val id: String,
-    override val version: Version,
     override val description: String,
     val variables: List<PromptVariable> = emptyList(),
     val rules: List<String> = emptyList(),
     val content: String,
     val outputs: PromptOutput? = null,
-    override val metadata: ManifestMetadata = ManifestMetadata(),
+    override val metadata: ManifestMetadata,
 ) : VersionedManifest
 
 @Serializable

@@ -19,7 +19,6 @@ class RulepackManifestTest {
 
         // then
         assertThat(rulepack.id).isEqualTo("base")
-        assertThat(rulepack.version).isEqualTo(Version("1.1.0"))
         assertThat(rulepack.description).isEqualTo("Base rules applicable to all agents and prompts")
         assertThat(rulepack.rules).containsExactlyInAnyOrder(
             "Be precise and accurate in your responses.",
@@ -31,6 +30,7 @@ class RulepackManifestTest {
         assertThat(rulepack.extends).isEmpty()
         assertThat(rulepack.metadata).isEqualTo(
             ManifestMetadata(
+                version = Version("1.1.0"),
                 author = "AI Tools Team",
                 created = "2025-01-01",
                 updated = "2025-11-16",
