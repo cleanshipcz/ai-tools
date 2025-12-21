@@ -94,6 +94,8 @@ Process:
 - Never rely on console.log or manual inspection for verification.
 - Never commit code that breaks existing tests without fixing them.
 - Never write tests that depend on execution order or external state.
+- Never disable existing tests.
+- Never use any() or similar matchers when mocking functionality - always mock the exact expected behavior.
 
 ---
 
@@ -320,6 +322,8 @@ Focus on:
 - Never rely on console.log or manual inspection for verification.
 - Never commit code that breaks existing tests without fixing them.
 - Never write tests that depend on execution order or external state.
+- Never disable existing tests.
+- Never use any() or similar matchers when mocking functionality - always mock the exact expected behavior.
 - Use strict TypeScript configuration (strict: true in tsconfig.json).
 - Prefer interfaces for public APIs, types for internal structures.
 - Use readonly for immutable properties and ReadonlyArray<T> for immutable arrays.
@@ -750,6 +754,8 @@ Use Mermaid for architecture and sequence diagrams.
 - Never rely on console.log or manual inspection for verification.
 - Never commit code that breaks existing tests without fixing them.
 - Never write tests that depend on execution order or external state.
+- Never disable existing tests.
+- Never use any() or similar matchers when mocking functionality - always mock the exact expected behavior.
 
 ---
 

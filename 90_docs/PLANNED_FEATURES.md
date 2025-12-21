@@ -105,3 +105,10 @@ See [`05_recipes/README.md`](../05_recipes/README.md) for complete documentation
 - [ ] Cost analytics dashboard
 - [ ] Version control integration (Git hooks for prompt changes)
 - [ ] Prompt optimization suggestions (A/B testing automation)
+
+## Skills
+
+- support for Anthropic-compatible skills
+- they should be also for OpenAI
+- make it somehow work for other tools as well
+- e.g. add xbid skill, xbid components can also be skill, etc. 

@@ -56,7 +56,7 @@ export class FeatureService {
     const outputDir = join(this.config.getPath(this.config.dirs.output), projectId, 'features');
     await mkdir(outputDir, { recursive: true });
 
-    await this.generateGitHubCopilotFeatures(features, outputDir);
+    await this.generateGitHubCopilotFeatures(features, outputDir, projectId);
     await this.generateWindsurfFeatures(features, outputDir);
     await this.generateClaudeCodeFeatures(features, outputDir);
     await this.generateCursorFeatures(features, outputDir);
@@ -161,9 +161,21 @@ export class FeatureService {
     return features;
   }
 
-  private async generateGitHubCopilotFeatures(features: Feature[], outputDir: string): Promise<void> {
+  private async generateGitHubCopilotFeatures(
+    features: Feature[],
+    outputDir: string,
+    projectId?: string
+  ): Promise<void> {
     const copilotDir = join(outputDir, 'github-copilot');
     await mkdir(copilotDir, { recursive: true });
+
+    // Also generate in project .github/instructions if projectId is provided
+    let instructionsDir: string | undefined;
+    if (projectId) {
+      const projectOutputDir = join(this.config.getPath(this.config.dirs.output), projectId);
+      instructionsDir = join(projectOutputDir, '.github', 'instructions');
+      await mkdir(instructionsDir, { recursive: true });
+    }
 
     for (const feature of features) {
       const content: string[] = [];
@@ -176,7 +188,9 @@ export class FeatureService {
       if (feature.model) {
         content.push(`**Default Model for this Feature:** ${feature.model}`);
         content.push('');
-        content.push('*This is the highest priority model setting, overriding project and agent defaults.*');
+        content.push(
+          '*This is the highest priority model setting, overriding project and agent defaults.*'
+        );
         content.push('');
       }
 
@@ -203,7 +217,16 @@ export class FeatureService {
         content.push('');
       }
 
-      await writeFile(join(copilotDir, `feature-${feature.id}.md`), content.join('\n'), 'utf-8');
+      const fileContent = content.join('\n');
+      await writeFile(join(copilotDir, `feature-${feature.id}.md`), fileContent, 'utf-8');
+
+      if (instructionsDir) {
+        await writeFile(
+          join(instructionsDir, `feature-${feature.id}.instructions.md`),
+          fileContent,
+          'utf-8'
+        );
+      }
     }
     console.log(chalk.gray(`    Generated ${features.length} GitHub Copilot feature files`));
   }
@@ -352,7 +375,8 @@ export class FeatureService {
       try {
         const recipe = await this.loader.loadYaml<Recipe>(recipePath);
 
-        const tools = feature.recipe!.tools || recipe.tools || ['claude-code', 'copilot-cli', 'cursor'];
+        const tools = feature.recipe!.tools ||
+          recipe.tools || ['claude-code', 'copilot-cli', 'cursor'];
 
         for (const tool of tools) {
           if (recipe.tools && Array.isArray(recipe.tools) && !recipe.tools.includes(tool)) {
@@ -384,7 +408,11 @@ export class FeatureService {
           console.log(chalk.gray(`    Generated ${tool} script for feature: ${feature.name}`));
         }
       } catch (error: any) {
-        console.log(chalk.yellow(`    ! Could not generate recipe for feature ${feature.name}: ${error.message}`));
+        console.log(
+          chalk.yellow(
+            `    ! Could not generate recipe for feature ${feature.name}: ${error.message}`
+          )
+        );
       }
     }
   }

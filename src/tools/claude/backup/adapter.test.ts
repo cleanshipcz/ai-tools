@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ClaudeAdapter } from './adapter.js';
-import { Project } from '../../core/models/types.js';
+import { Project } from '../../../core/models/types.js';
 import * as fs from 'fs/promises';
 import { join } from 'path';
 
