@@ -1,0 +1,7 @@
+# Local Gradle Properties Example
+# Copy this file to gradle.properties and uncomment the properties you want to override locally
+# Note: gradle.properties is tracked in git, so for local-only overrides, you can also create
+# a file named gradle.local.properties (not tracked) or use command-line flags
+
+# Skip code analysis (ktlint + Detekt) during local development (useful when testing/prototyping)
+skipLocalCodeAnalysis=true

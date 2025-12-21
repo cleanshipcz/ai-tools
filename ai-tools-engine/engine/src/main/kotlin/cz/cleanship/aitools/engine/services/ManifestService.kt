@@ -1,0 +1,34 @@
+package cz.cleanship.aitools.engine.services
+
+import cz.cleanship.aitools.engine.models.AgentManifest
+import cz.cleanship.aitools.engine.models.PromptManifest
+import cz.cleanship.aitools.engine.models.RulepackManifest
+import java.io.File
+
+class ManifestService(private val rootDir: File) {
+    private val loader = LoaderService()
+
+    fun listAgents(): List<AgentManifest> {
+        val dir = File(rootDir, "04_agents")
+        if (!dir.exists()) return emptyList()
+        return loader.findYamlFiles(dir).mapNotNull {
+            try { loader.loadAgent(it) } catch (e: Exception) { null }
+        }
+    }
+
+    fun listPrompts(): List<PromptManifest> {
+        val dir = File(rootDir, "03_prompts")
+        if (!dir.exists()) return emptyList()
+        return loader.findYamlFiles(dir).mapNotNull {
+            try { loader.loadPrompt(it) } catch (e: Exception) { null }
+        }
+    }
+
+    fun listRulepacks(): List<RulepackManifest> {
+        val dir = File(rootDir, "01_rulepacks")
+        if (!dir.exists()) return emptyList()
+        return loader.findYamlFiles(dir).mapNotNull {
+            try { loader.loadRulepack(it) } catch (e: Exception) { null }
+        }
+    }
+}

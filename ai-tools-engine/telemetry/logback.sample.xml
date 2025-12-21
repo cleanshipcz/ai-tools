@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!--
+      Minimal Logback JSON configuration for SLF4J 2.x + logstash-logback-encoder.
+      - Correlates logs with OpenTelemetry using TraceJsonProvider (trace_id/span_id)
+      - Prints to STDOUT
+
+      Copy this file into your application as src/main/resources/logback.xml and adjust levels as needed.
+    -->
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp/>
+                <loggerName/>
+                <threadName/>
+                <logLevel/>
+                <message/>
+
+                <!-- Write trace_id/span_id from current OpenTelemetry span -->
+                <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
+
+                <!-- If you also want MDC fields on every log, uncomment: -->
+                <!-- <mdc/> -->
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- Example of bumping verbosity for your app/package -->
+    <!-- <logger name="com.example" level="DEBUG"/> -->
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
