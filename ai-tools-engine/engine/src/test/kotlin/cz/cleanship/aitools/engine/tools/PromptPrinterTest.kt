@@ -11,7 +11,7 @@ class PromptPrinterTest {
     @Test
     fun `should print prompt manifest`() {
         // given
-        val prompt = prompt
+        val prompt = PromptContext(prompt)
         val output = StringOutput()
 
         // when

@@ -1,33 +1,23 @@
 package cz.cleanship.aitools.engine.tools.adapters.windsurf
 
 import cz.cleanship.aitools.engine.io.OutputStreamOutput
-import cz.cleanship.aitools.engine.models.PromptManifest
-import cz.cleanship.aitools.engine.models.RulepackManifest
-import cz.cleanship.aitools.engine.tools.AgentContext
-import cz.cleanship.aitools.engine.tools.FeatureContext
-import cz.cleanship.aitools.engine.tools.Printer
-import cz.cleanship.aitools.engine.tools.Printers
-import cz.cleanship.aitools.engine.tools.ToolAdapter
+import cz.cleanship.aitools.engine.tools.*
 import java.io.File
 import java.io.FileOutputStream
 
 class WindsurfAdapter(
-    private val printers: Printers,
+    private val printers: Printers = Printers,
 ) : ToolAdapter {
 
 
-    override fun export(projectDir: File, promptManifest: PromptManifest) {
-        val targetFile = rulesDir(projectDir).resolve("prompt-${promptManifest.id}.md")
-        export(targetFile, printers.promptPrinter, promptManifest)
+    override fun export(projectDir: File, promptContext: PromptContext) {
+        val targetFile = rulesDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md")
+        export(targetFile, printers.promptPrinter, promptContext)
     }
 
     override fun export(projectDir: File, agentContext: AgentContext) {
         val targetFile = rulesDir(projectDir).resolve("agent-${agentContext.agent.id}.md")
         export(targetFile, printers.agentPrinter, agentContext)
-    }
-
-    override fun export(projectDir: File, rulepackManifest: RulepackManifest) {
-        TODO("Not yet implemented")
     }
 
     override fun export(projectDir: File, featureContext: FeatureContext) {

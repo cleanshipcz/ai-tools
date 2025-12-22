@@ -2,10 +2,8 @@ package cz.cleanship.aitools.engine.services
 
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
-import cz.cleanship.aitools.engine.models.AgentManifest
-import cz.cleanship.aitools.engine.models.FeatureManifest
-import cz.cleanship.aitools.engine.models.PromptManifest
-import cz.cleanship.aitools.engine.models.RulepackManifest
+import com.charleskorn.kaml.YamlException
+import cz.cleanship.aitools.engine.models.*
 import kotlinx.serialization.decodeFromString
 import java.io.File
 
@@ -16,28 +14,44 @@ class LoaderService {
         ),
     )
 
-    fun loadAgent(file: File): AgentManifest {
-        val content = file.readText()
-        return yaml.decodeFromString(content)
+    fun loadAgent(file: File): AgentManifest = yaml.load(file)
+
+    fun loadPrompt(file: File): PromptManifest = yaml.load(file)
+
+    fun loadRulepack(file: File): RulepackManifest = yaml.load(file)
+
+    fun loadFeature(file: File): FeatureManifest = yaml.load(file)
+
+    inline fun <reified T> Yaml.load(file: File): T {
+        try {
+            val content = file.readText()
+            return decodeFromString(content)
+        } catch (ex: YamlException) {
+            throw YamlException("Failed to load ${file.absolutePath}", ex.path, ex)
+        }
     }
 
-    fun loadPrompt(file: File): PromptManifest {
-        val content = file.readText()
-        return yaml.decodeFromString(content)
-    }
+    fun loadAll(locations: Locations): AllManifests = AllManifests(
+        agents = loadAllFromDirectories(locations.agents, ::loadAgent),
+        features = loadAllFromDirectories(locations.features, ::loadFeature),
+        prompts = loadAllFromDirectories(locations.prompts, ::loadPrompt),
+        rulepacks = loadAllFromDirectories(locations.rulepacks, ::loadRulepack),
+    )
 
-    fun loadRulepack(file: File): RulepackManifest {
-        val content = file.readText()
-        return yaml.decodeFromString(content)
-    }
-
-    fun loadFeature(file: File): FeatureManifest {
-        val content = file.readText()
-        return yaml.decodeFromString(content)
-    }
+    private fun <T : VersionedManifest> loadAllFromDirectories(directories: List<File>, loader: (File) -> T): Map<String, T> =
+        directories.flatMap { directory ->
+            findYamlFiles(directory).map { loader(it) }
+        }.associateBy { it.id }
 
     fun findYamlFiles(directory: File): List<File> = directory
         .walkTopDown()
         .filter { it.isFile && (it.extension == "yml" || it.extension == "yaml") }
         .toList()
 }
+
+data class Locations(
+    val agents: List<File>,
+    val features: List<File>,
+    val prompts: List<File>,
+    val rulepacks: List<File>,
+)

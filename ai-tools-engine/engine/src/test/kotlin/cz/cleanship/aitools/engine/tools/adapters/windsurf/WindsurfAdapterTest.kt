@@ -1,15 +1,10 @@
 package cz.cleanship.aitools.engine.tools.adapters.windsurf
 
-import cz.cleanship.aitools.engine.data.agent
-import cz.cleanship.aitools.engine.data.expectedAgent
-import cz.cleanship.aitools.engine.data.expectedFeature
-import cz.cleanship.aitools.engine.data.expectedPrompt
-import cz.cleanship.aitools.engine.data.feature
-import cz.cleanship.aitools.engine.data.prompt
-import cz.cleanship.aitools.engine.data.rulepacks
+import cz.cleanship.aitools.engine.data.*
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Printers
+import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.utils.StringOutput
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -44,13 +39,13 @@ class WindsurfAdapterTest {
     @Test
     fun `should output a prompt`() {
         // given
-        val prompt = prompt
+        val prompt = PromptContext(prompt)
 
         // when
         windsurfAdapter.export(tempDir.toFile(), prompt)
 
         // then
-        assertThat(rulesDir.resolve("prompt-${prompt.id}.md").readText()).isEqualTo(withManualHeader(expectedPrompt))
+        assertThat(rulesDir.resolve("prompt-${prompt.prompt.id}.md").readText()).isEqualTo(withManualHeader(expectedPrompt))
     }
 
     @Test
@@ -75,7 +70,8 @@ class WindsurfAdapterTest {
         windsurfAdapter.export(tempDir.toFile(), featureContext)
 
         // then
-        assertThat(workflowsDir.resolve("feature-${feature.id}.md").readText()).isEqualTo("""
+        assertThat(workflowsDir.resolve("feature-${feature.id}.md").readText()).isEqualTo(
+            """
             |---
             |description: ${feature.description.replace("\n", " ")}
             |auto_execution_mode: 3
@@ -83,7 +79,8 @@ class WindsurfAdapterTest {
             |
             |$expectedFeature
             |
-        """.trimMargin())
+        """.trimMargin()
+        )
     }
 
     private fun withManualHeader(content: String) = """
