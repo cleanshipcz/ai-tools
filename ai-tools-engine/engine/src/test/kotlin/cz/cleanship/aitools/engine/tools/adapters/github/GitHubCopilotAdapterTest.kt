@@ -2,6 +2,7 @@ package cz.cleanship.aitools.engine.tools.adapters.github
 
 import cz.cleanship.aitools.engine.data.agent
 import cz.cleanship.aitools.engine.data.expectedAgent
+import cz.cleanship.aitools.engine.data.expectedFeature
 import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
@@ -24,11 +25,16 @@ class GitHubCopilotAdapterTest {
 
     private val printers = Printers
     private lateinit var targetDir: File
+    private lateinit var promptsDir: File
+    private lateinit var instructionsDir: File
+
     private lateinit var adapter: GitHubCopilotAdapter
 
     @BeforeEach
     fun setUp() {
         targetDir = tempDir.resolve(".github").toFile()
+        promptsDir = targetDir.resolve("prompts")
+        instructionsDir = targetDir.resolve("instructions")
         adapter = GitHubCopilotAdapter(printers)
     }
 
@@ -41,24 +47,19 @@ class GitHubCopilotAdapterTest {
         adapter.export(tempDir.toFile(), prompt)
 
         // then
-        val expectedOutput = expectedPrompt.trim()
-        assertThat(targetDir.resolve("prompts/prompt-${prompt.prompt.id}.prompt.md").readText().trim()).isEqualTo(expectedOutput)
+        assertThat(promptsDir.resolve("prompt-${prompt.prompt.id}.prompt.md").readText()).isEqualTo(withApplyToHeader(expectedPrompt))
     }
 
     @Test
-    fun `should output an agent with applyTo frontmatter`() {
+    fun `should output an agent`() {
         // given
-        val agent = agent
+        val agent = AgentContext(agent, rulesets)
 
         // when
-        adapter.export(tempDir.toFile(), AgentContext(agent, rulesets))
+        adapter.export(tempDir.toFile(), agent)
 
         // then
-        val content = targetDir.resolve("instructions/agent-${agent.id}.instructions.md").readText().trim()
-        
-        assertThat(content).startsWith("---")
-        assertThat(content).contains("applyTo: \"**\"")
-        assertThat(content).contains(expectedAgent.trim())
+        assertThat(instructionsDir.resolve("agent-${agent.agent.id}.instructions.md").readText()).isEqualTo(withApplyToHeader(expectedAgent))
     }
 
     @Test
@@ -70,8 +71,15 @@ class GitHubCopilotAdapterTest {
         adapter.export(tempDir.toFile(), featureContext)
 
         // then
-        // We'll put features in workflows_docs or features folder?
-        // Let's say `.github/features/`
-        assertThat(targetDir.resolve("features/feature-${feature.id}.md").readText()).contains(feature.description)
+        assertThat(instructionsDir.resolve("feature-${featureContext.feature.id}.instructions.md").readText()).isEqualTo(withApplyToHeader(expectedFeature))
     }
+
+    private fun withApplyToHeader(content: String) = """
+        |---
+        |applyTo: "**/*"
+        |---
+        |
+        |$content
+        |
+        """.trimMargin()
 }

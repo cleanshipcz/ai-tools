@@ -22,18 +22,16 @@ class WindsurfAdapterTest {
     private lateinit var targetDir: File
     private lateinit var rulesDir: File
     private lateinit var workflowsDir: File
-    private lateinit var output: StringOutput
 
-    private lateinit var windsurfAdapter: WindsurfAdapter
+    private lateinit var adapter: WindsurfAdapter
 
     @BeforeEach
     fun setUp() {
         targetDir = tempDir.resolve(".windsurf").toFile()
         rulesDir = targetDir.resolve("rules")
         workflowsDir = targetDir.resolve("workflows")
-        output = StringOutput()
 
-        windsurfAdapter = WindsurfAdapter(printers)
+        adapter = WindsurfAdapter(printers)
     }
 
     @Test
@@ -42,7 +40,7 @@ class WindsurfAdapterTest {
         val prompt = PromptContext(prompt, rulesets)
 
         // when
-        windsurfAdapter.export(tempDir.toFile(), prompt)
+        adapter.export(tempDir.toFile(), prompt)
 
         // then
         assertThat(rulesDir.resolve("prompt-${prompt.prompt.id}.md").readText()).isEqualTo(withManualHeader(expectedPrompt))
@@ -54,7 +52,7 @@ class WindsurfAdapterTest {
         val agent = agent
 
         // when
-        windsurfAdapter.export(tempDir.toFile(), AgentContext(agent, rulesets))
+        adapter.export(tempDir.toFile(), AgentContext(agent, rulesets))
 
         // then
         assertThat(rulesDir.resolve("agent-${agent.id}.md").readText()).isEqualTo(withManualHeader(expectedAgent))
@@ -67,7 +65,7 @@ class WindsurfAdapterTest {
         val featureContext = FeatureContext(feature)
 
         // when
-        windsurfAdapter.export(tempDir.toFile(), featureContext)
+        adapter.export(tempDir.toFile(), featureContext)
 
         // then
         assertThat(workflowsDir.resolve("feature-${feature.id}.md").readText()).isEqualTo(
