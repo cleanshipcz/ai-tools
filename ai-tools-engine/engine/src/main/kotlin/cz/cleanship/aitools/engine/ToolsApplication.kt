@@ -7,10 +7,17 @@ import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ProjectPrompts
 import cz.cleanship.aitools.engine.models.Version
 import cz.cleanship.aitools.engine.services.Locations
+import cz.cleanship.aitools.engine.tools.adapters.antigravity.AntigravityAdapter
+import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
 import java.io.File
 
 fun main() {
-    ToolsEngine().process(
+    ToolsEngine(
+        tools = listOf(
+//            WindsurfAdapter(),
+            AntigravityAdapter(),
+        )
+    ).process(
         Locations(
             rulesets = listOf(File("01_rulesets")),
             features = listOf(),
@@ -23,12 +30,12 @@ fun main() {
             metadata = ManifestMetadata(
                 version = Version("0.0.1"),
             ),
-            directory = "build",
+            directory = "./",
             prompts = ProjectPrompts(
                 filter = ProjectFilter.ByTags(listOf("planning"))
             ),
             agents = ProjectAgents(
-                filter = ProjectFilter.ByWhitelistedIds(listOf("bug-fixer", "code-reviewer"))
+                filter = ProjectFilter.ByWhitelistedIds(listOf("feature-builder"))
             ),
         )
     )

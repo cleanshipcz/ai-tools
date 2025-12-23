@@ -36,9 +36,9 @@
     "editor.wordWrap": "on"
   },
   "files.exclude": {
-    "**/node_modules": true,
-    "**/.git": true,
-    "**/dist": true
+    "**/.git": false,
+    "**/dist": true,
+    "**/node_modules": true
   },
   "search.exclude": {
     "**/node_modules": true,

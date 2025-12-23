@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
+import cz.cleanship.aitools.engine.tools.adapters.antigravity.AntigravityAdapter
 import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -17,6 +18,7 @@ class ToolsEngine(
     private val filterService: FilterService = FilterService(),
     private val tools: List<ToolAdapter> = listOf(
         WindsurfAdapter(),
+        AntigravityAdapter(),
     ),
 ) {
 
