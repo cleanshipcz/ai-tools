@@ -59,6 +59,7 @@ temp/
 *.tmp
 
 # Agentic files - they are managed by this project
+.agent
 .claude
 .cursor
 .github/instructions
