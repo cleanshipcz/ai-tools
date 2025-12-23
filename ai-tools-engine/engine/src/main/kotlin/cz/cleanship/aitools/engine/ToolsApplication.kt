@@ -1,7 +1,10 @@
 package cz.cleanship.aitools.engine
 
 import cz.cleanship.aitools.engine.models.ManifestMetadata
+import cz.cleanship.aitools.engine.models.ProjectAgents
+import cz.cleanship.aitools.engine.models.ProjectFilter
 import cz.cleanship.aitools.engine.models.ProjectManifest
+import cz.cleanship.aitools.engine.models.ProjectPrompts
 import cz.cleanship.aitools.engine.models.Version
 import cz.cleanship.aitools.engine.services.Locations
 import java.io.File
@@ -20,7 +23,13 @@ fun main() {
             metadata = ManifestMetadata(
                 version = Version("0.0.1"),
             ),
-            directory = File("build"),
+            directory = "build",
+            prompts = ProjectPrompts(
+                filter = ProjectFilter.ByTags(listOf("planning"))
+            ),
+            agents = ProjectAgents(
+                filter = ProjectFilter.ByWhitelistedIds(listOf("bug-fixer", "code-reviewer"))
+            ),
         )
     )
 }
