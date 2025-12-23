@@ -12,7 +12,7 @@ ai_tools:
     - 'Use import.meta.url guards for CLI entry points'
     - 'Follow the existing manifest structure - id, version, description are required'
     - 'Generate tool-specific outputs in adapters/ directory (gitignored)'
-    - 'Keep source manifests in 03_prompts/, 04_agents/, 01_rulepacks/, 02_skills/, 05_recipes/'
+    - 'Keep source manifests in 03_prompts/, 04_agents/, 01_rulesets/, 02_skills/, 05_recipes/'
     - 'Use TypeScript strict mode with ES modules'
     - 'Prefer async/await over callbacks'
     - 'Use js-yaml for YAML parsing and dumping'
@@ -28,7 +28,7 @@ context:
 
     The repository provides a build system that transforms unified YAML manifests into
     tool-specific formats, ensuring consistency across different AI coding environments.
-    It includes prompts for common tasks, agents for specific roles, rulepacks for coding standards,
+    It includes prompts for common tasks, agents for specific roles, rulesets for coding standards,
     skills for tool integrations, and a project system for per-project configurations.
 
   purpose: 'Enable teams to manage AI coding assistant configurations as code, with version control, validation, and automated deployment'
@@ -52,7 +52,7 @@ documentation:
   schemas:
     prompt: '10_schemas/prompt.schema.json'
     agent: '10_schemas/agent.schema.json'
-    rulepack: '10_schemas/rulepack.schema.json'
+    ruleset: '10_schemas/ruleset.schema.json'
     skill: '10_schemas/skill.schema.json'
     project: '10_schemas/project.schema.json'
     feature: '10_schemas/feature.schema.json'
@@ -106,7 +106,7 @@ conventions:
   structure:
     - '03_prompts/ - Organized by category (refactor/, qa/, docs/)'
     - '04_agents/ - Agent manifests defining roles and behaviors'
-    - '01_rulepacks/ - Coding standards and style rules'
+    - '01_rulesets/ - Coding standards and style rules'
     - '02_skills/ - Tool integrations and capabilities'
     - '05_recipes/ - Multi-agent workflow definitions'
     - '06_projects/ - Project-specific configurations (global/ and local/)'

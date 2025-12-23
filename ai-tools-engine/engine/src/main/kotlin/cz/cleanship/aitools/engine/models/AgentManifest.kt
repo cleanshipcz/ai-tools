@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 data class AgentManifest(
     override val id: String,
     override val description: String,
-    val rulepacks: List<String> = emptyList(),
+    val rulesets: List<String> = emptyList(),
     val rules: List<String> = emptyList(),
     val persona: String,
     val prompt: String,

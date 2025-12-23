@@ -221,7 +221,7 @@ A YAML file (`project.yml`) containing:
 - **Documentation**: Links to docs
 - **Commands**: Dev, build, test, deploy commands
 - **Conventions**: Naming, patterns, testing rules
-- **AI Tools Config**: Preferred agents, rulepacks, custom rules
+- **AI Tools Config**: Preferred agents, rulesets, custom rules
 
 ### Generated Outputs
 
@@ -567,7 +567,7 @@ ai_tools:
   preferred_agents:
     - code-reviewer
     - feature-builder
-  preferred_rulepacks:
+  preferred_rulesets:
     - base
     - coding-typescript
     - security
@@ -578,7 +578,7 @@ ai_tools:
 
 #### Filtering: Regex include/exclude patterns (deploy.yml)
 
-Define filters in `deploy.yml` under top-level `agents`, `prompts`, `rulepacks`, and `recipes`. Legacy whitelist/blacklist arrays are rejected by the schema.
+Define filters in `deploy.yml` under top-level `agents`, `prompts`, `rulesets`, and `recipes`. Legacy whitelist/blacklist arrays are rejected by the schema.
 
 ```yaml
 # deploy.yml
@@ -593,7 +593,7 @@ prompts:
     - '^refactor/'
   exclude:
     - 'experimental'
-rulepacks:
+rulesets:
   include:
     - '^(base|coding-typescript)$'
 recipes:
@@ -1240,7 +1240,7 @@ tech_stack:
     - typescript
 
 ai_tools:
-  preferred_rulepacks:
+  preferred_rulesets:
     - base
     - coding-typescript
 ```
@@ -1300,7 +1300,7 @@ ai_tools:
   preferred_agents:
     - code-reviewer
     - feature-builder
-  preferred_rulepacks:
+  preferred_rulesets:
     - base
     - coding-typescript
     - security

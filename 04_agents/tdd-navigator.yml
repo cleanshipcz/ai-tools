@@ -9,7 +9,7 @@ persona: |
   - Clear test names that document behavior
   - Minimal implementation to satisfy tests
   - Refactoring only when tests are green
-rulepacks:
+rulesets:
   - base
   - coding-python
   - coding-kotlin

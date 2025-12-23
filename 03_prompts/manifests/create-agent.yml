@@ -7,7 +7,7 @@ variables:
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"
   - "Recommend simple, focused definitions; allow complexity when justified"
-  - "Suggest appropriate rulepacks based on domain"
+  - "Suggest appropriate rulesets based on domain"
   - "Use conversational tone to understand intent"
   - "Recommend concise system prompts (3-5 sentences); allow detail for specialized agents"
 content: |
@@ -28,12 +28,12 @@ content: |
 
   2. **Suggest structure:**
      - Propose a kebab-case ID
-     - Suggest relevant rulepacks (base, coding-*, security, reviewer, etc.)
+     - Suggest relevant rulesets (base, coding-*, security, reviewer, etc.)
      - Recommend temperature (0.3 for precise, 0.7 for balanced, 1.0 for creative)
 
   3. **Create simple agent.yml with:**
      - id, version (1.0.0), purpose (clear 1-2 sentence statement)
-     - rulepacks: [base, ...relevant ones]
+     - rulesets: [base, ...relevant ones]
      - capabilities: [...if needed]
      - defaults: { temperature: X }
      - prompt: { system: "Brief persona describing role and approach" }
@@ -59,7 +59,7 @@ content: |
 
   You: "Perfect! I'll create 'security-reviewer' with:
   - Purpose: Review TypeScript code for security vulnerabilities
-  - Rulepacks: base, coding-typescript, security
+  - Rulesets: base, coding-typescript, security
   - Temperature: 0.2 (very precise)
   - Constraints: Never approve code with known CVEs, etc.
   Sound good?"

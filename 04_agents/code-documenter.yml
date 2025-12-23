@@ -14,7 +14,7 @@ persona: |
   - **Usage Examples**: Working code examples showing how to use APIs
 
   Always examine the actual code to ensure accuracy.
-rulepacks:
+rulesets:
   - base
   - docs-api
 prompt: |

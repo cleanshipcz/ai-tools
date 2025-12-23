@@ -82,11 +82,11 @@ prompts:
     - '^manifests/create-agent$'
     - '^manifests/create-project$'
     - '^manifests/create-feature$'
-    - '^manifests/create-rulepack$'
+    - '^manifests/create-ruleset$'
     - '^manifests/create-skill$'
     - '^manifests/create-recipe$'
 
-rulepacks:
+rulesets:
   include:
     - '^base$'
     - '^testing$'

@@ -71,20 +71,20 @@ variables:
 - [ ] Specifies output format
 - [ ] Includes constraints or rules
 - [ ] Has at least one example (if applicable)
-- [ ] References appropriate rulepacks
+- [ ] References appropriate rulesets
 - [ ] Free of secrets or sensitive data
 
 ### Agent Quality Checklist
 
 - [ ] Clear purpose statement
 - [ ] Appropriate temperature setting (0.0-1.0)
-- [ ] Relevant rulepacks included
+- [ ] Relevant rulesets included
 - [ ] Required capabilities documented
 - [ ] System prompt is focused
 - [ ] User template uses variables correctly
 - [ ] Constraints are explicit
 
-### Rulepack Quality Checklist
+### Ruleset Quality Checklist
 
 - [ ] Rules are specific and actionable
 - [ ] Each rule is 5-500 characters
@@ -98,13 +98,13 @@ variables:
 
 - Remove redundant instructions
 - Use includes for shared content
-- Avoid repeating rulepack content in prompts
+- Avoid repeating ruleset content in prompts
 - Keep system prompts under 1000 tokens
 
 ### Optimization Techniques
 
 1. **Use Includes**: Share common constraints
-2. **Reference Rulepacks**: Don't inline rules
+2. **Reference Rulesets**: Don't inline rules
 3. **Template Efficiently**: Use conditionals for optional sections
 4. **Compress Examples**: Use minimal examples
 
@@ -190,13 +190,13 @@ includes:
   - ../shared/acceptance_criteria.md
 ```
 
-### Rulepack Composition
+### Ruleset Composition
 
 ```yaml
 extends:
   - base
   - security
-rulepacks:
+rulesets:
   - coding-python
 ```
 

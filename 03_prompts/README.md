@@ -7,10 +7,10 @@ Atomic, reusable prompt templates for AI models. These manifests define specific
 Prompts are the atomic building blocks of AI interaction in the `ai-tools` ecosystem. They provide:
 
 - ✅ **Structure**: A clear way to define input variables and expected output.
-- ✅ **Rulepacks**: Reusable sets of rules (referenced by ID).
+- ✅ **Rulesets**: Reusable sets of rules (referenced by ID).
 - ✅ **Rules**: Custom rules specific for the given prompt.
 - ✅ **Consistency**: Ensure the same logic is applied across different workflows.
-- ✅ **Composition**: Prompts can be included in agents or used via rulepacks.
+- ✅ **Composition**: Prompts can be included in agents or used via rulesets.
 
 **Think of prompts as:** Specialized templates for specific engineering tasks like renaming variables, generating tests, or documenting APIs.
 
@@ -25,7 +25,7 @@ variables:             # List of input variables
   - name: variable_name
     required: true
     description: Summary...
-rulepacks:             # Reusable sets of rules (Rulepack IDs)
+rulesets:             # Reusable sets of rules (Ruleset IDs)
   - base
 rules:                 # Custom rules specific for this given prompt
   - 'Do X always'
@@ -48,7 +48,7 @@ Each prompt should do ONE thing well. Instead of a "refactor code" prompt, we ha
 Use Mustache syntax (`{{variable}}`) to make prompts dynamic and reusable. Required variables ensure the AI has the necessary context, while optional variables allow for flexibility.
 
 ### Rule-Based Constraints
-Use reusable **Rulepacks** to ensure consistency across the project, and the **rules** field to provide specific behavioral constraints tailored to a single prompt. This keeps the `content` focused on the template while ensuring quality and standard compliance.
+Use reusable **Rulesets** to ensure consistency across the project, and the **rules** field to provide specific behavioral constraints tailored to a single prompt. This keeps the `content` focused on the template while ensuring quality and standard compliance.
 
 ### Composition via Shared Snippets
 Common prompt sections (like acceptance criteria or security constraints) can be shared across multiple prompts to ensure consistency and ease of maintenance.

@@ -14,7 +14,7 @@ persona: |
   - **Convention over Configuration**: Use established patterns
   - **Minimal Depth**: Keep hierarchies shallow (3-4 levels max)
   - **Clear Naming**: Use descriptive, searchable names
-rulepacks:
+rulesets:
   - base
 prompt: |
   Analyze, design, and implement logical organizational structures for projects and documentation.

@@ -15,12 +15,12 @@ persona: |
   **Manifest Types You Create:**
   1. **Project Manifests**: Define project context, tech stack, and conventions.
   2. **Feature Manifests**: Document feature-specific context and architecture.
-  3. **Agent Manifests**: Define agent purpose, persona, rulepacks, prompt (process), and constraints.
+  3. **Agent Manifests**: Define agent purpose, persona, rulesets, prompt (process), and constraints.
   4. **Prompt Manifests**: Create atomic, single-purpose prompts with Mustache syntax.
-  5. **Rulepack Manifests**: Define specific and actionable coding standards.
+  5. **Ruleset Manifests**: Define specific and actionable coding standards.
   6. **Skill Manifests**: Define tool integrations and commands.
   7. **Recipe Manifests**: Define multi-agent workflow sequences with a document-first pattern.
-rulepacks:
+rulesets:
   - base
   - coding-typescript
 prompt: |
@@ -41,7 +41,7 @@ constraints:
   - Ensure semver format for versions (start at 1.0.0)
   - Keep descriptions between 10-500 characters
   - Include author and created date in metadata
-  - Reference existing rulepacks and agents accurately
+  - Reference existing rulesets and agents accurately
   - Use Mustache syntax for all variable interpolation
   - Organize files following repository conventions
   - Validate YAML syntax before presenting

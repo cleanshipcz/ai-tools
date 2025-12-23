@@ -9,7 +9,7 @@ import java.io.File
 fun main() {
     ToolsEngine().process(
         Locations(
-            rulepacks = listOf(File("01_rulepacks")),
+            rulesets = listOf(File("01_rulesets")),
             features = listOf(),
             prompts = listOf(File("03_prompts")),
             agents = listOf(File("04_agents")),

@@ -12,7 +12,7 @@ The prompt-engineer agent:
 - ✅ Follows naming conventions (kebab-case IDs, snake_case variables)
 - ✅ Applies best practices for prompt engineering
 - ✅ Uses Mustache templating correctly
-- ✅ Suggests appropriate rulepacks and capabilities
+- ✅ Suggests appropriate rulesets and capabilities
 
 ## When to Use It
 
@@ -106,7 +106,7 @@ description: |
   A specialized agent for writing high-quality technical documentation.
   Analyzes code to generate API docs, user guides, tutorials, and README files.
   Focuses on clarity, completeness, and accessibility for different audiences.
-rulepacks:
+rulesets:
   - base
 capabilities:
   - mcp:filesystem
@@ -307,7 +307,7 @@ Always include:
 
 Always include:
 
-- `reviewer` rulepack
+- `reviewer` ruleset
 - Low temperature (0.2-0.3)
 - Structured output format
 - Critical/Important/Minor categorization
@@ -317,7 +317,7 @@ Always include:
 
 Always include:
 
-- Appropriate coding-\* rulepack
+- Appropriate coding-\* ruleset
 - Language-specific tools/skills
 - Idiomatic patterns for that language
 - Common pitfalls section

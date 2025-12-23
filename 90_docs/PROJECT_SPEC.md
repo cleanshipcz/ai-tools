@@ -2,13 +2,13 @@
 Comprehensive description of the AI Tools repository as it exists today. Use this as a reference if rewriting the system from scratch.
 
 ## Purpose and Scope
-- Single source of truth in YAML for prompts, agents, rulepacks, skills, recipes, projects, and features.
+- Single source of truth in YAML for prompts, agents, rulesets, skills, recipes, projects, and features.
 - CLI generates tool-specific outputs for Windsurf, Cursor, Claude Code, GitHub Copilot, Copilot CLI, and Codex.
 - Deploy pipeline copies staged outputs into target projects with backups and optional auto-commit.
 - Validation, doc generation, prompt libraries, skill generation, recipe runners, and utilities (diff/clean/eval) are built-in.
 
 ## High-Level Architecture
-- **Manifests (YAML):** Located under numbered directories (`01_rulepacks`, `02_skills`, `03_prompts`, `04_agents`, `05_recipes`, `06_projects`, `07_mcp`).
+- **Manifests (YAML):** Located under numbered directories (`01_rulesets`, `02_skills`, `03_prompts`, `04_agents`, `05_recipes`, `06_projects`, `07_mcp`).
 - **CLI (TypeScript):** Entry `src/cli/index.ts` wiring commander subcommands to services.
 - **Core Services:** Config, loader, resolver, validation, deployment, feature generation, recipe generation, prompt library generation, docs generation, skill generation, diff/clean/eval utilities.
 - **Tool Adapters:** Per-tool generators in `src/tools/` producing staged outputs under `.output/<project>/...`.
@@ -16,11 +16,11 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - **Tests:** Vitest-based suite (see scripts and services tests).
 
 ## Data Model (types)
-- **Rulepack:** `id`, `rules[]`, optional `extends`, `tags`, `version`, `metadata`.
--, **Agent:** `id`, `purpose`, `rulepacks[]`, `prompt.system`, defaults (model/temperature), `constraints`, `capabilities`, `tools`.
+- **Ruleset:** `id`, `rules[]`, optional `extends`, `tags`, `version`, `metadata`.
+-, **Agent:** `id`, `purpose`, `rulesets[]`, `prompt.system`, defaults (model/temperature), `constraints`, `capabilities`, `tools`.
 - **Prompt:** `id`, `description`, `content/system/user`, `variables[]`, `rules[]`, `tags`.
 - **Skill:** `id`, `description`, `command`/`mcp_tool`, `inputs`/`outputs`, `tags`.
-- **Project:** `id`, `name`, `description`, `context`, `tech_stack`/`tech_stacks`, `commands`, `conventions`, `ai_tools`, include/exclude filters for prompts/agents/rulepacks/recipes.
+- **Project:** `id`, `name`, `description`, `context`, `tech_stack`/`tech_stacks`, `commands`, `conventions`, `ai_tools`, include/exclude filters for prompts/agents/rulesets/recipes.
 - **Feature:** `id`, `name`, `description`, `context`, `conventions`, `model`, `recipes[]`, `snippets`, `variables` (see feature service expectations).
 - **DeployConfig:** `target`, `tools[]`, `mode`, `backup`, `auto_commit`, `ai_tools`, include/exclude filters, stack overrides.
 - **Recipe:** `id`, `description`, `steps[]`, `tools[]`, `loop`, `variables`, `toolOptions`, `conversationStrategy`.
@@ -46,8 +46,8 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 ## Core Services (behavioral summary)
 - **ConfigService:** Resolves repo root, directory names, config merge (`config.yml` + `config.local.yml`), project sources default to `06_projects/global` and `06_projects/local`, provides path helpers.
 - **LoaderService:** YAML loading, directory scanning for manifests (used throughout).
-- **ResolverService:** Include/exclude filtering for prompts/agents/rulepacks/recipes against project/deploy config and tech stacks; resolves rulepack inheritance.
-- **ValidationService:** Loads JSON Schemas from `10_schemas`, validates manifests, enforces semver and kebab-case IDs, reference checks (rulepacks exist, etc.), security regex scan for secrets, includes validation for features/deploy/project references.
+- **ResolverService:** Include/exclude filtering for prompts/agents/rulesets/recipes against project/deploy config and tech stacks; resolves ruleset inheritance.
+- **ValidationService:** Loads JSON Schemas from `10_schemas`, validates manifests, enforces semver and kebab-case IDs, reference checks (rulesets exist, etc.), security regex scan for secrets, includes validation for features/deploy/project references.
 - **DocsService:** Generates `docs/AGENTS.md` from loaded agents/prompts/skills.
 - **PromptService:** Builds Markdown and HTML prompt libraries, interactive prompt filler (`use`), groups by category inferred from path, supports variable substitution.
 - **SkillService:** Converts `02_skills` YAML into Anthropic `SKILL.md` folders under `adapters/claude-code/skills`, with inputs/outputs/env/timeout notes.
@@ -57,7 +57,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - **DiffService / CleanService / EvalService:** Utility functions for diffing, cleaning generated files, and running evaluation suites.
 
 ## Tool Adapters (staged outputs)
-- **WindsurfAdapter:** `.windsurf/` with `project-context.md`, agent rules (resolved rulepacks), prompt rules (path-aware filenames), stack-specific suffixes, recipes via `.cs.recipes/`, feature workflows merged during deploy.
+- **WindsurfAdapter:** `.windsurf/` with `project-context.md`, agent rules (resolved rulesets), prompt rules (path-aware filenames), stack-specific suffixes, recipes via `.cs.recipes/`, feature workflows merged during deploy.
 - **CursorAdapter:** `.cursor/recipes.json` (agents as recipes), `.cursor/project-rules.json` (conventions + ai_tools rules), `.cs.recipes/`.
 - **ClaudeAdapter (claude-code):** `.claude/` with prompts as JSON (path-derived IDs), skills copied from `02_skills`, agents as markdown with resolved rules, `project-context.json`, `.cs.recipes/`.
 - **GitHubCopilotAdapter:** `.github/` with `instructions.md` (agents + project context), prompts and agents as markdown, `.cs.recipes/`.
@@ -66,14 +66,14 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 
 ## Project and Deploy Flow
 1. **Load project manifest** (`project.yml`) from configured sources; optional merge of `deploy.yml` overrides via `applyDeployConfig`.
-2. **Filtering:** Include/exclude filters for prompts, agents, rulepacks, recipes; tech stack contexts (global + `tech_stacks` with suffixes) applied when generating prompts/recipes.
+2. **Filtering:** Include/exclude filters for prompts, agents, rulesets, recipes; tech stack contexts (global + `tech_stacks` with suffixes) applied when generating prompts/recipes.
 3. **Generation:** For each selected tool, adapters write staged outputs into `.output/<project>/...`.
 4. **Features:** FeatureService generates feature snippets/workflows/scripts into `.output/<project>/features/...`; Windsurf workflows are merged into main `.windsurf/workflows` during deploy if tool enabled.
 5. **Deployment:** `copyToTarget` maps tool names to final paths (`.windsurf`, `.cursor`, `.claude`, `.github`, `AGENTS.md`, `.cs.recipes`, `.codex/prompts`) and copies to `target` with recursive directory copy. Backups stored under `.backups/<project>/<timestamp>/` before overwrite; old backups pruned to keep latest 10. Codex deploy additionally syncs `~/.codex/prompts`.
 6. **Auto-commit:** If `auto_commit` and `mode=local`, runs `git add .` + commit in target.
 
 ## Prompt and Agent Handling
-- Agents resolved via ResolverService (include/exclude + rulepack resolution). Rulepacks flatten inheritance for adapters.
+- Agents resolved via ResolverService (include/exclude + ruleset resolution). Rulesets flatten inheritance for adapters.
 - Prompts filtered by project rules using path map; stack-specific variants generated with suffixes.
 - Prompt library generation skips shared snippets and groups by category (first path segment).
 
@@ -97,7 +97,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 
 ## Validation and Security
 - JSON Schema enforcement for all manifest types; semver and kebab-case checks.
-- Reference checks ensure linked rulepacks/agents/prompts/recipes exist.
+- Reference checks ensure linked rulesets/agents/prompts/recipes exist.
 - Security scan for common secret patterns across manifests.
 - Feature content checks to ensure expected structure.
 
@@ -120,7 +120,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 ## Rebuild-from-Scratch Checklist
 1. Recreate manifest schemas and loaders (YAML parsing, path scanning, schema validation, secret scan).
 2. Implement ConfigService with merged config and project source resolution.
-3. Implement ResolverService for include/exclude filters and rulepack inheritance.
+3. Implement ResolverService for include/exclude filters and ruleset inheritance.
 4. Port core services: Validation, Docs, Prompt library (md/html + filler), Skills generator, Feature generator, Recipe generator/runner, Diff/Clean/Eval utilities.
 5. Implement ToolRegistry and adapters for Windsurf, Cursor, Claude Code, GitHub Copilot, Copilot CLI, Codex with correct output shapes and suffix handling.
 6. Implement CLI commands (commander) mirroring current surface and options.

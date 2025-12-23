@@ -26,13 +26,13 @@
       "type": "string",
       "description": "Detailed description of the agent"
     },
-    "rulepacks": {
+    "rulesets": {
       "type": "array",
       "items": {
         "type": "string",
         "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
       },
-      "description": "List of rulepack IDs to include"
+      "description": "List of ruleset IDs to include"
     },
     "capabilities": {
       "type": "array",

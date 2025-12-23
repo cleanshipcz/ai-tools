@@ -96,7 +96,7 @@ See [`05_recipes/README.md`](../05_recipes/README.md) for complete documentation
 - [x] switch --no-confirm to --interactive for step-by-step with confirmation (by default doesn't require confirmation)
 - [x] For all recipes, the first step needs to be: analysis of the relevant content with output to a document, then detailed plan of the change with output to a document; these documents then need to be included in context and maintained
 - [x] Organization agent -> good in organizing files, folders, documents, topics, etc.
-- [x] Organize this repository -> add enumerated prefix for folders (e.g. 01_rulepacks, 02_skills, ..., 90_docs)
+- [x] Organize this repository -> add enumerated prefix for folders (e.g. 01_rulesets, 02_skills, ..., 90_docs)
 
 ### Model selection (v1.3.0)
 
@@ -151,7 +151,7 @@ The effective model is displayed in generated outputs for all tools (GitHub Copi
 ## Tech-stack project
 
 - project defines a tech stack
-- prompts & agents for that project are generated with rulepacks relevant only for that tech stack
+- prompts & agents for that project are generated with rulesets relevant only for that tech stack
   - currently e.g. the feature-builder has all python, typescript, kotlin and java rules
 - project can have multiple tech stacks (e.g. backend, frontend, infra, mobile, etc)
 

@@ -89,7 +89,7 @@ prompts:
   # exclude:
   #   - 'prompts/legacy/'
 
-rulepacks:
+rulesets:
   include:
     - '^base$'
     - '^coding-typescript$'

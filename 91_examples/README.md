@@ -17,8 +17,8 @@ Each subdirectory contains a self-contained example with:
 
 Learn the fundamentals:
 
-- Creating a simple rulepack
-- Defining an agent with the rulepack
+- Creating a simple ruleset
+- Defining an agent with the ruleset
 - Building and using the generated configs
 
 ### prompt-with-variables/
@@ -33,7 +33,7 @@ Advanced prompt features:
 
 Composing complex agents:
 
-- Extending multiple rulepacks
+- Extending multiple rulesets
 - Configuring capabilities and tools
 - Setting appropriate defaults
 

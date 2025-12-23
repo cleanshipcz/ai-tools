@@ -429,7 +429,7 @@ command:
 
 - [Agents](../04_agents/README.md) - Agents that use skills
 - [MCP](../07_mcp/README.md) - MCP servers expose skills to agents
-- [Rulepacks](../01_rulepacks/README.md) - Guidelines for using skills
+- [Rulesets](../01_rulesets/README.md) - Guidelines for using skills
 
 ## 💡 Usage Examples
 

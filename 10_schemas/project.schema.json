@@ -157,13 +157,13 @@
           },
           "description": "Preferred agents to highlight for this project"
         },
-        "preferred_rulepacks": {
+        "preferred_rulesets": {
           "type": "array",
           "items": {
             "type": "string",
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
-          "description": "List of preferred rulepack IDs for this project"
+          "description": "List of preferred ruleset IDs for this project"
         },
         "custom_rules": {
           "type": "array",

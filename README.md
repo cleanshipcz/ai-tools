@@ -1,7 +1,7 @@
 # AI Tools Repository
 > Manifest-driven generator for AI coding assistant configs
 
-This repository is the source of truth for prompts, rulepacks, agents, skills, recipes, and project manifests. The CLI reads the YAML in this repo and produces tool-specific outputs for Windsurf, Cursor, Claude Code, GitHub Copilot, Copilot CLI, and Codex. Deployments copy the generated files into your target project with backups and optional auto-commit.
+This repository is the source of truth for prompts, rulesets, agents, skills, recipes, and project manifests. The CLI reads the YAML in this repo and produces tool-specific outputs for Windsurf, Cursor, Claude Code, GitHub Copilot, Copilot CLI, and Codex. Deployments copy the generated files into your target project with backups and optional auto-commit.
 
 ## What You Get
 - Schema validation for all manifests (`npm run validate`)
@@ -14,7 +14,7 @@ This repository is the source of truth for prompts, rulepacks, agents, skills, r
 - Docs generator (`npm run docs generate`), diff/clean utilities, and optional eval runner
 
 ## Repository Layout
-- `01_rulepacks/` – reusable rule sets
+- `01_rulesets/` – reusable rule sets
 - `02_skills/` – skill manifests (converted to `SKILL.md`)
 - `03_prompts/` – prompt manifests
 - `04_agents/` – agent manifests
@@ -59,7 +59,7 @@ Use `--dry-run`, `--force`, or `--interactive` to control deployment. Outputs ar
 ## Prompts and Agents
 - Generate libraries: `npm run prompt-library` (Markdown) and `npm run prompt-html` (interactive browser).
 - Interactive fill/copy: `npm run use-prompt <prompt-id>`.
-- Agents, prompts, and rulepacks are filtered per project using include/exclude rules in `project.yml` / `deploy.yml`.
+- Agents, prompts, and rulesets are filtered per project using include/exclude rules in `project.yml` / `deploy.yml`.
 
 ## Recipes
 - Discover: `npm run recipe:list`

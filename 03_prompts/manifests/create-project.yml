@@ -50,7 +50,7 @@ content: |
      - auto_commit: false (optional git auto-commit)
      - tech_stack / tech_stacks: { languages, backend, frontend, infrastructure, tools }
      - ai_tools: { model, custom_rules }
-     - filters: { agents/prompts/rulepacks/recipes: { include: [], exclude: [] } using regex }
+     - filters: { agents/prompts/rulesets/recipes: { include: [], exclude: [] } using regex }
 
   **Start focused, allow detail:**
   - Essential context first

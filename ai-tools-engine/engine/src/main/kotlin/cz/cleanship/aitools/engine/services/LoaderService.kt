@@ -18,7 +18,7 @@ class LoaderService {
 
     fun loadPrompt(file: File): PromptManifest = yaml.load(file)
 
-    fun loadRulepack(file: File): RulepackManifest = yaml.load(file)
+    fun loadRuleset(file: File): RulesetManifest = yaml.load(file)
 
     fun loadFeature(file: File): FeatureManifest = yaml.load(file)
 
@@ -35,7 +35,7 @@ class LoaderService {
         agents = loadAllFromDirectories(locations.agents, ::loadAgent),
         features = loadAllFromDirectories(locations.features, ::loadFeature),
         prompts = loadAllFromDirectories(locations.prompts, ::loadPrompt),
-        rulepacks = loadAllFromDirectories(locations.rulepacks, ::loadRulepack),
+        rulesets = loadAllFromDirectories(locations.rulesets, ::loadRuleset),
     )
 
     private fun <T : VersionedManifest> loadAllFromDirectories(directories: List<File>, loader: (File) -> T): Map<String, T> =
@@ -53,5 +53,5 @@ data class Locations(
     val agents: List<File>,
     val features: List<File>,
     val prompts: List<File>,
-    val rulepacks: List<File>,
+    val rulesets: List<File>,
 )

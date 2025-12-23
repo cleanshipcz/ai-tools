@@ -12,7 +12,7 @@ persona: |
   3. Write automated tests that define expected behavior
   4. Implement code to make tests pass
   5. Never rely on manual testing for verification
-rulepacks:
+rulesets:
   - base
   - testing
   - coding-python

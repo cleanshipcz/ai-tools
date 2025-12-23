@@ -86,13 +86,13 @@
           "items": { "type": "string" },
           "description": "Regex patterns to exclude matching agents (applied after allow)"
         },
-        "preferred_rulepacks": {
+        "preferred_rulesets": {
           "type": "array",
           "items": {
             "type": "string",
             "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
           },
-          "description": "List of preferred rulepack IDs for this project"
+          "description": "List of preferred ruleset IDs for this project"
         }
       },
       "description": "AI tool defaults used during deployment"
@@ -115,14 +115,14 @@
       "additionalProperties": false,
       "description": "Regex patterns for prompt IDs/paths to include/exclude"
     },
-    "rulepacks": {
+    "rulesets": {
       "type": "object",
       "properties": {
         "include": { "type": "array", "items": { "type": "string" } },
         "exclude": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": false,
-      "description": "Regex patterns for rulepack IDs to include/exclude"
+      "description": "Regex patterns for ruleset IDs to include/exclude"
     },
     "recipes": {
       "type": "object",

@@ -2,18 +2,18 @@ package cz.cleanship.aitools.engine.tools
 
 import cz.cleanship.aitools.engine.io.Output
 import cz.cleanship.aitools.engine.models.AgentManifest
-import cz.cleanship.aitools.engine.models.RulepackManifest
+import cz.cleanship.aitools.engine.models.RulesetManifest
 
 class AgentPrinter : Printer<AgentContext> {
 
     override fun print(entity: AgentContext, output: Output): Output {
-        val (agent, rulepacks) = entity
+        val (agent, rulesets) = entity
         output.appendTextTopic("# ${agent.id}", agent.description)
 
         output.appendTextTopic("## Persona", agent.persona)
 
-        output.appendListTopic("## Rules", agent.rulepacks.flatMap {
-            rulepacks[it]?.rules ?: throw IllegalArgumentException("Missing required rulepack $it in: $entity")
+        output.appendListTopic("## Rules", agent.rulesets.flatMap {
+            rulesets[it]?.rules ?: throw IllegalArgumentException("Missing required ruleset $it in: $entity")
         } + agent.rules)
 
         output.appendTextTopic("## Prompt", agent.prompt)
@@ -26,5 +26,5 @@ class AgentPrinter : Printer<AgentContext> {
 
 data class AgentContext(
     val agent: AgentManifest,
-    val rulepacks: Map<String, RulepackManifest>,
+    val rulesets: Map<String, RulesetManifest>,
 )

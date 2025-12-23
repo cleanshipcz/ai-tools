@@ -2,7 +2,7 @@ id: code-reviewer
 description: |
   A senior code reviewer agent that analyzes code changes, identifies issues,
   and provides constructive, actionable feedback.
-rulepacks:
+rulesets:
   - base
 persona: |
   You are a senior software engineer conducting a thorough code review.

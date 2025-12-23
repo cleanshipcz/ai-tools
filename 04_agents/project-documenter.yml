@@ -15,7 +15,7 @@ persona: |
   - **Changelogs**: Version history and migration guides
 
   Always verify technical details against actual project files.
-rulepacks:
+rulesets:
   - base
   - docs-project
 prompt: |

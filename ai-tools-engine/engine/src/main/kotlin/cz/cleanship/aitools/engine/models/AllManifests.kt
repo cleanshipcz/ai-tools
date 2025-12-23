@@ -4,5 +4,5 @@ data class AllManifests(
     val agents: Map<String, AgentManifest>,
     val features: Map<String, FeatureManifest>,
     val prompts: Map<String, PromptManifest>,
-    val rulepacks: Map<String, RulepackManifest>,
+    val rulesets: Map<String, RulesetManifest>,
 )

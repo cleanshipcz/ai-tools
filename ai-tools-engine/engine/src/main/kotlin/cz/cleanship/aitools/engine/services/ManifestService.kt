@@ -3,7 +3,7 @@ package cz.cleanship.aitools.engine.services
 import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.FeatureManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
-import cz.cleanship.aitools.engine.models.RulepackManifest
+import cz.cleanship.aitools.engine.models.RulesetManifest
 import java.io.File
 
 class ManifestService(private val rootDir: File) {
@@ -25,11 +25,11 @@ class ManifestService(private val rootDir: File) {
         }
     }
 
-    fun listRulepacks(): List<RulepackManifest> {
-        val dir = File(rootDir, "01_rulepacks")
+    fun listRulesets(): List<RulesetManifest> {
+        val dir = File(rootDir, "01_rulesets")
         if (!dir.exists()) return emptyList()
         return loader.findYamlFiles(dir).map {
-            loader.loadRulepack(it)
+            loader.loadRuleset(it)
         }
     }
 

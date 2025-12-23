@@ -7,7 +7,7 @@ context:
   overview: |
     Add the ability for projects to control which recipes are available using regex-based
     allow/deny patterns. This extends the existing filtering system (agents, prompts,
-    rulepacks) to include recipes, allowing fine-grained control over which automated
+    rulesets) to include recipes, allowing fine-grained control over which automated
     workflows can be deployed to specific projects.
 
     This feature is useful for:
@@ -18,7 +18,7 @@ context:
 
   architecture: |
     The implementation follows the existing regex filtering pattern used for agents, prompts,
-    and rulepacks:
+    and rulesets:
 
     1. **Schema Extension**: Add recipe_allow_patterns and recipe_deny_patterns arrays to
        deploy.schema.json and remove legacy whitelist/blacklist fields.
@@ -58,7 +58,7 @@ files:
     - 06_projects/**
 
 conventions:
-  - 'Follow the existing filtering pattern for agents, prompts, and rulepacks'
+  - 'Follow the existing filtering pattern for agents, prompts, and rulesets'
   - 'Use recipe_allow_patterns and recipe_deny_patterns (regex strings)'
   - 'Reject legacy whitelist/blacklist fields in schemas'
   - 'Implement shouldIncludeRecipe() method similar to shouldIncludeAgent()'
@@ -127,7 +127,7 @@ recipe:
       - [ ] Validation fails when whitelist/blacklist recipe keys are provided
       - [ ] Generated adapters only contain recipes allowed by regex filters
       - [ ] Deployed projects only contain allowed recipes
-      - [ ] No regression in existing agent/prompt/rulepack filtering
+      - [ ] No regression in existing agent/prompt/ruleset filtering
 
       Documentation:
       - [ ] 06_projects/README.md updated with recipe filtering section

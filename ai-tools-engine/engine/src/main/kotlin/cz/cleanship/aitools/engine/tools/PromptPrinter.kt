@@ -2,12 +2,12 @@ package cz.cleanship.aitools.engine.tools
 
 import cz.cleanship.aitools.engine.io.Output
 import cz.cleanship.aitools.engine.models.PromptManifest
-import cz.cleanship.aitools.engine.models.RulepackManifest
+import cz.cleanship.aitools.engine.models.RulesetManifest
 
 class PromptPrinter : Printer<PromptContext> {
 
     override fun print(entity: PromptContext, output: Output): Output {
-        val (prompt, rulepacks) = entity
+        val (prompt, rulesets) = entity
         output.appendTextTopic("# ${prompt.id}", prompt.description)
 
         output.appendListTopic(
@@ -18,8 +18,8 @@ class PromptPrinter : Printer<PromptContext> {
             }
         )
 
-        output.appendListTopic("## Rules", prompt.rulepacks.flatMap {
-            rulepacks[it]?.rules ?: throw IllegalArgumentException("Missing required rulepack $it in: $entity")
+        output.appendListTopic("## Rules", prompt.rulesets.flatMap {
+            rulesets[it]?.rules ?: throw IllegalArgumentException("Missing required ruleset $it in: $entity")
         } + prompt.rules)
 
         output.appendTextTopic("## Prompt", entity.prompt.content)
@@ -30,5 +30,5 @@ class PromptPrinter : Printer<PromptContext> {
 
 data class PromptContext(
     val prompt: PromptManifest,
-    val rulepacks: Map<String, RulepackManifest>,
+    val rulesets: Map<String, RulesetManifest>,
 )

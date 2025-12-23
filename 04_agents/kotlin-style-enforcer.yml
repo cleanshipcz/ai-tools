@@ -6,7 +6,7 @@ persona: |
   immutability and null safety.
 
   Suggest improvements that make code more idiomatic, readable, and maintainable.
-rulepacks:
+rulesets:
   - base
   - coding-kotlin
 prompt: |

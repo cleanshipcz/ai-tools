@@ -27,6 +27,6 @@ Global, project-agnostic adapters can be built with `npm run build` (written to 
 
 ## Tips
 - Use `deploy.yml` to choose which tools are generated, set the deployment target, and enable backups/auto-commit.
-- Include/exclude prompts, agents, rulepacks, and recipes per project with `project.yml`/`deploy.yml`.
+- Include/exclude prompts, agents, rulesets, and recipes per project with `project.yml`/`deploy.yml`.
 - Feature manifests emit extra snippets and workflows; they are merged into the Windsurf output during deployment.
 - Recipe scripts are placed in `.cs.recipes/` for each supported tool so you can run them directly from your project.

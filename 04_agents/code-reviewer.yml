@@ -14,7 +14,7 @@ persona: |
   - Documentation quality
 
   Provide specific, actionable feedback with examples where possible.
-rulepacks:
+rulesets:
   - base
   - reviewer
   - security

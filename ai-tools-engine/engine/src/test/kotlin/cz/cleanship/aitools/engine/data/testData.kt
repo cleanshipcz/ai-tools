@@ -7,12 +7,12 @@ import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.PromptOutput
 import cz.cleanship.aitools.engine.models.PromptVariable
-import cz.cleanship.aitools.engine.models.RulepackManifest
+import cz.cleanship.aitools.engine.models.RulesetManifest
 import cz.cleanship.aitools.engine.models.Version
 
 
-val rulepack = RulepackManifest(
-    id = "test-rulepack",
+val ruleset = RulesetManifest(
+    id = "test-ruleset",
     description = """
         Multiline
         description
@@ -27,8 +27,8 @@ val rulepack = RulepackManifest(
     ),
 )
 
-val expectedRulepack = """
-    # test-rulepack
+val expectedRuleset = """
+    # test-ruleset
     
     Multiline
     description
@@ -41,8 +41,8 @@ val expectedRulepack = """
 
 """.trimIndent()
 
-val rulepacks = mapOf(
-    rulepack.id to rulepack,
+val rulesets = mapOf(
+    ruleset.id to ruleset,
 )
 
 val agent = AgentManifest(
@@ -51,7 +51,7 @@ val agent = AgentManifest(
         Multiline
         description
     """.trimIndent(),
-    rulepacks = listOf("test-rulepack"),
+    rulesets = listOf("test-ruleset"),
     rules = listOf("rule1", "rule2"),
     persona = """
         Multiline
@@ -120,7 +120,7 @@ val prompt = PromptManifest(
                 """.trimIndent()
         ),
     ),
-    rulepacks = listOf("test-rulepack"),
+    rulesets = listOf("test-ruleset"),
     rules = listOf("rule1", "rule2"),
     content = """
                 Multiline

@@ -2,7 +2,7 @@
   "yaml.schemas": {
     "./schemas/agent.schema.json": "agents/*.yml",
     "./schemas/prompt.schema.json": "prompts/**/*.yml",
-    "./schemas/rulepack.schema.json": "rulepacks/*.yml",
+    "./schemas/ruleset.schema.json": "rulesets/*.yml",
     "./schemas/skill.schema.json": "skills/*.yml",
     "./schemas/eval.schema.json": "evals/suites/*.yml"
   },

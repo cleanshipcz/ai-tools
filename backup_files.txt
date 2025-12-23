@@ -33,7 +33,7 @@
 .claude/prompts/manifests-create-project.json
 .claude/prompts/manifests-create-prompt.json
 .claude/prompts/manifests-create-recipe.json
-.claude/prompts/manifests-create-rulepack.json
+.claude/prompts/manifests-create-ruleset.json
 .claude/prompts/manifests-create-skill.json
 .claude/prompts/planning-create-implementation-plan.json
 .claude/prompts/planning-design-architecture.json
@@ -98,7 +98,7 @@
 .github/prompts/prompt-manifests-create-project.prompt.md
 .github/prompts/prompt-manifests-create-prompt.prompt.md
 .github/prompts/prompt-manifests-create-recipe.prompt.md
-.github/prompts/prompt-manifests-create-rulepack.prompt.md
+.github/prompts/prompt-manifests-create-ruleset.prompt.md
 .github/prompts/prompt-manifests-create-skill.prompt.md
 .github/prompts/prompt-planning-create-implementation-plan.prompt.md
 .github/prompts/prompt-planning-design-architecture.prompt.md
@@ -134,7 +134,7 @@
 .windsurf/rules/prompt-manifests-create-project.md
 .windsurf/rules/prompt-manifests-create-prompt.md
 .windsurf/rules/prompt-manifests-create-recipe.md
-.windsurf/rules/prompt-manifests-create-rulepack.md
+.windsurf/rules/prompt-manifests-create-ruleset.md
 .windsurf/rules/prompt-manifests-create-skill.md
 .windsurf/rules/prompt-planning-create-implementation-plan.md
 .windsurf/rules/prompt-planning-design-architecture.md

@@ -39,7 +39,7 @@ class WindsurfAdapterTest {
     @Test
     fun `should output a prompt`() {
         // given
-        val prompt = PromptContext(prompt, rulepacks)
+        val prompt = PromptContext(prompt, rulesets)
 
         // when
         windsurfAdapter.export(tempDir.toFile(), prompt)
@@ -54,7 +54,7 @@ class WindsurfAdapterTest {
         val agent = agent
 
         // when
-        windsurfAdapter.export(tempDir.toFile(), AgentContext(agent, rulepacks))
+        windsurfAdapter.export(tempDir.toFile(), AgentContext(agent, rulesets))
 
         // then
         assertThat(rulesDir.resolve("agent-${agent.id}.md").readText()).isEqualTo(withManualHeader(expectedAgent))

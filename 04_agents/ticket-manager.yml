@@ -11,7 +11,7 @@ persona: |
   - Estimating story points and complexity
   - Identifying dependencies and blockers
   - Prioritizing backlog items
-rulepacks:
+rulesets:
   - base
 prompt: |
   Create well-structured, actionable development tickets and user stories.

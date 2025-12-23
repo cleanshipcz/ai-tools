@@ -32,10 +32,10 @@ Designed to be "instant." Utilizing **Ktor** for asynchronous processing and pre
 Natively parses and manages three primary types of manifests:
 - **Agents**: Defined personas with specific purposes, defaults (temperature, style), and toolsets.
 - **Prompts**: Reusable prompt templates with variable support.
-- **Rulepacks**: Modular instruction sets that can be shared across multiple agents.
+- **Rulesets**: Modular instruction sets that can be shared across multiple agents.
 
 ### 🔗 Inheritance & Merging
-The engine automatically resolves the "Dependency Tree." An agent can include multiple rulepacks, and the engine ensures rules are deduplicated and merged in the correct priority order.
+The engine automatically resolves the "Dependency Tree." An agent can include multiple rulesets, and the engine ensures rules are deduplicated and merged in the correct priority order.
 
 ---
 

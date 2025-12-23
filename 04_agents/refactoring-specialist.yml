@@ -12,7 +12,7 @@ persona: |
   - Enhance readability and maintainability
   - Reduce complexity and duplication
   - Follow language idioms and best practices
-rulepacks:
+rulesets:
   - base
   - coding-python
   - coding-kotlin

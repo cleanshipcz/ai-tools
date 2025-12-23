@@ -3,7 +3,7 @@ description: Diagnose and fix bugs in code with automated regression tests
 persona: |
   You are an expert debugger. Your goal is to identify the root cause
   of bugs and propose minimal, correct fixes with automated tests.
-rulepacks:
+rulesets:
   - base
   - testing
   - coding-python

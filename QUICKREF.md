@@ -32,7 +32,7 @@ npm run clean               # Remove generated files
 - **Files**: Match ID with .yml extension (e.g., `code-reviewer.yml`)
 - **Versions**: Semantic versioning (e.g., `1.2.3`)
 
-## Creating a Rulepack
+## Creating a Ruleset
 
 ```yaml
 id: my-rules
@@ -51,7 +51,7 @@ rules:
 id: my-agent
 version: 1.0.0
 purpose: What this agent does
-rulepacks:
+rulesets:
   - base
   - my-rules
 capabilities:
@@ -147,7 +147,7 @@ content: |
 ├── agents/          # Your agent definitions
 ├── prompts/         # Your prompts
 │   └── shared/      # Shared includes
-├── rulepacks/       # Your rulepacks
+├── rulesets/       # Your rulesets
 ├── skills/          # Your skills (YAML → SKILL.md)
 ├── mcp/             # MCP configurations
 ├── evals/           # Evaluation suites
@@ -163,14 +163,14 @@ content: |
 ### Add a New Agent
 
 1. Create `agents/my-agent.yml`
-2. Reference existing rulepacks or create new ones
+2. Reference existing rulesets or create new ones
 3. Run `npm run validate`
 4. Run `npm run build`
 5. Check `adapters/windsurf/rules/my-agent.json`
 
-### Modify a Rulepack
+### Modify a Ruleset
 
-1. Edit `rulepacks/my-rules.yml`
+1. Edit `rulesets/my-rules.yml`
 2. Bump version if changing behavior
 3. Run `npm run validate`
 4. Run `npm run build`
@@ -196,7 +196,7 @@ All YAML files are validated against JSON schemas:
 
 - `schemas/prompt.schema.json`
 - `schemas/agent.schema.json`
-- `schemas/rulepack.schema.json`
+- `schemas/ruleset.schema.json`
 - `schemas/skill.schema.json`
 - `schemas/eval.schema.json`
 
@@ -227,7 +227,7 @@ api_key: ${OPENAI_API_KEY}
 ## Troubleshooting
 
 **Validation fails**: Read error message, fix the issue
-**Build fails**: Check for missing rulepacks or broken includes
+**Build fails**: Check for missing rulesets or broken includes
 **Eval fails**: Ensure datasets exist and are valid JSONL
 **TypeScript errors**: Run `npm install` first
 
@@ -236,7 +236,7 @@ api_key: ${OPENAI_API_KEY}
 - Keep IDs stable once published
 - Version semantically (MAJOR.MINOR.PATCH)
 - Write clear descriptions (10-500 chars)
-- Use rulepacks to avoid duplication
+- Use rulesets to avoid duplication
 - Test with evals before committing
 - Set realistic budgets
 - Document non-obvious decisions

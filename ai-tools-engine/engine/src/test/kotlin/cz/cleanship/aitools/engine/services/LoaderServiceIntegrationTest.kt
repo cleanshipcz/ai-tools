@@ -34,7 +34,7 @@ class LoaderServiceIntegrationTest {
             and provides constructive, actionable feedback.
             """.trimIndent()
         )
-        assertThat(agent.rulepacks).containsExactlyInAnyOrder("base")
+        assertThat(agent.rulesets).containsExactlyInAnyOrder("base")
         assertThat(agent.persona.trim()).isEqualTo(
             """
             You are a senior software engineer conducting a thorough code review.
@@ -100,7 +100,7 @@ class LoaderServiceIntegrationTest {
             "Group related changes together.",
             "Use bullet points for clarity.",
         )
-        assertThat(prompt.rulepacks).containsExactlyInAnyOrder("base")
+        assertThat(prompt.rulesets).containsExactlyInAnyOrder("base")
         assertThat(prompt.content.trim()).isEqualTo(
             """
             Analyze this pull request and provide a clear summary:
@@ -141,24 +141,24 @@ class LoaderServiceIntegrationTest {
     }
 
     @Test
-    fun `should deserialize rulepack correctly`() {
+    fun `should deserialize ruleset correctly`() {
         // given
-        val file = File(javaClass.getResource("/rulepacks/base.yml")!!.toURI())
+        val file = File(javaClass.getResource("/rulesets/base.yml")!!.toURI())
 
         // when
-        val rulepack = loaderService.loadRulepack(file)
+        val ruleset = loaderService.loadRuleset(file)
 
         // then
-        assertThat(rulepack.id).isEqualTo("base")
-        assertThat(rulepack.description).isEqualTo("Base rules applicable to all agents and prompts")
-        assertThat(rulepack.rules).containsExactlyInAnyOrder(
+        assertThat(ruleset.id).isEqualTo("base")
+        assertThat(ruleset.description).isEqualTo("Base rules applicable to all agents and prompts")
+        assertThat(ruleset.rules).containsExactlyInAnyOrder(
             "Be precise and accurate in your responses.",
             "Follow the user's requirements carefully and to the letter.",
             "If you are unsure, ask for clarification instead of guessing.",
             "Break complex tasks into smaller, manageable steps.",
             "Verify your work before presenting it.",
         )
-        assertThat(rulepack.metadata).isEqualTo(
+        assertThat(ruleset.metadata).isEqualTo(
             ManifestMetadata(
                 version = Version("1.1.0"),
                 author = "AI Tools Team",

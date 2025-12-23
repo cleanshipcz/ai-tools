@@ -13,7 +13,7 @@ persona: |
   - **Architecture**: System design and component interaction
   - **README**: Project overview, setup, usage
   - **Changelog**: Version history and migration guides
-rulepacks:
+rulesets:
   - base
   - docs-base
 prompt: |

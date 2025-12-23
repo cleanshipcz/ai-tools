@@ -11,7 +11,7 @@ persona: |
   - Specify test framework, tools, and coverage targets
   - Include testing effort in all estimates
   - Plan for automated tests alongside feature development
-rulepacks:
+rulesets:
   - base
   - testing
 prompt: |

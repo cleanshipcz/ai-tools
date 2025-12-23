@@ -24,10 +24,10 @@ class ToolsEngine(
         val destination = project.directory
         for (adapter in tools) {
             allData.agents.values.forEach {
-                adapter.export(destination, AgentContext(it, allData.rulepacks))
+                adapter.export(destination, AgentContext(it, allData.rulesets))
             }
             allData.prompts.values.forEach {
-                adapter.export(destination, PromptContext(it, allData.rulepacks))
+                adapter.export(destination, PromptContext(it, allData.rulesets))
             }
             allData.features.values.forEach {
                 adapter.export(destination, FeatureContext(it))
