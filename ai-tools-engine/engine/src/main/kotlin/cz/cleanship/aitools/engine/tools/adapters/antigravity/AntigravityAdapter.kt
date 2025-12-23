@@ -1,64 +1,48 @@
 package cz.cleanship.aitools.engine.tools.adapters.antigravity
 
-import cz.cleanship.aitools.engine.io.OutputStreamOutput
+import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
-import cz.cleanship.aitools.engine.tools.Printer
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
-import org.slf4j.LoggerFactory
 import java.io.File
-import java.io.FileOutputStream
 
 class AntigravityAdapter(
     private val printers: Printers = Printers,
+    private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
 
 
-    override fun export(projectDir: File, promptContext: PromptContext) {
-        val targetFile = rulesDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md")
-        export(targetFile, printers.promptPrinter, promptContext)
-        LOG.info("Exported prompt ${promptContext.prompt.id} to ${targetFile.absolutePath}")
+    override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
+        promptContext.prompt,
+        rulesDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md"),
+    ) {
+        it.appendText(ruleHeader)
+        printers.promptPrinter.print(promptContext, it)
     }
 
-    override fun export(projectDir: File, agentContext: AgentContext) {
-        val targetFile = rulesDir(projectDir).resolve("agent-${agentContext.agent.id}.md")
-        export(targetFile, printers.agentPrinter, agentContext)
-        LOG.info("Exported agent ${agentContext.agent.id} to ${targetFile.absolutePath}")
+    override fun export(projectDir: File, agentContext: AgentContext) = exportService.export(
+        agentContext.agent,
+        rulesDir(projectDir).resolve("agent-${agentContext.agent.id}.md"),
+    ) {
+        it.appendText(ruleHeader)
+        printers.agentPrinter.print(agentContext, it)
     }
 
-    override fun export(projectDir: File, featureContext: FeatureContext) {
-        val feature = featureContext.feature
-        val targetFile = workflowsDir(projectDir).resolve("feature-${feature.id}.md")
-        targetFile.parentFile.mkdirs()
-        OutputStreamOutput(FileOutputStream(targetFile)).use {
-            it.appendText(
-                """
+    override fun export(projectDir: File, featureContext: FeatureContext) = exportService.export(
+        featureContext.feature,
+        workflowsDir(projectDir).resolve("feature-${featureContext.feature.id}.md"),
+    ) {
+        it.appendText(
+            """
                 ---
-                description: ${feature.description.replace("\n", " ")}
+                description: ${featureContext.feature.description.replace("\n", " ")}
                 ---
+                
             """.trimIndent()
-            )
-            it.appendLine()
-            printers.featurePrinter.print(featureContext, it)
-        }
-        LOG.info("Exported feature ${featureContext.feature.id} to ${targetFile.absolutePath}")
-    }
-
-    private fun <T> export(targetFile: File, printer: Printer<T>, entity: T) {
-        targetFile.parentFile.mkdirs()
-        OutputStreamOutput(FileOutputStream(targetFile)).use {
-            it.appendText(
-                """
-                ---
-                trigger: manual
-                ---
-            """.trimIndent()
-            )
-            it.appendLine()
-            printer.print(entity, it)
-        }
+        )
+        printers.featurePrinter.print(featureContext, it)
     }
 
     private fun windsurfDir(projectDir: File) = projectDir.resolve(".agent")
@@ -68,6 +52,11 @@ class AntigravityAdapter(
     private fun workflowsDir(projectDir: File) = windsurfDir(projectDir).resolve("workflows")
 
     companion object {
-        private val LOG = LoggerFactory.getLogger(AntigravityAdapter::class.java)
+        private val ruleHeader = """
+            ---
+            trigger: manual
+            ---
+            
+        """.trimIndent()
     }
 }
