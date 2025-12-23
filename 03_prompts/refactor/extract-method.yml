@@ -1,4 +1,4 @@
-id: extract-method
+id: refactor-extract-method
 description: Extract a pure function from a selected block of code
 variables:
   - name: code

@@ -1,4 +1,4 @@
-id: create-skill
+id: manifests-create-skill
 description: Clarify tool/command requirements and create a simple skill.yml manifest
 variables:
   - name: user_description

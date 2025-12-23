@@ -1,4 +1,4 @@
-id: setup-test-infrastructure
+id: qa-setup-test-infrastructure
 description: Set up automated testing infrastructure for a project with test framework, configuration, and examples
 variables:
   - name: language

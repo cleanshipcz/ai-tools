@@ -1,4 +1,4 @@
-id: create-implementation-plan
+id: planning-create-implementation-plan
 description: Break down a project into phases with tasks and timeline
 variables:
   - name: project

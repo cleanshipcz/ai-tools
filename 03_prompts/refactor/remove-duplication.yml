@@ -1,4 +1,4 @@
-id: remove-duplication
+id: refactor-remove-duplication
 description: Identify and eliminate code duplication (DRY principle)
 variables:
   - name: code

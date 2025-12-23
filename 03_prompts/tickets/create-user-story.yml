@@ -1,4 +1,4 @@
-id: create-user-story
+id: tickets-create-user-story
 description: Create a well-structured user story with acceptance criteria
 variables:
   - name: feature

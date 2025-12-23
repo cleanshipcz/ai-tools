@@ -1,4 +1,4 @@
-id: simplify-conditionals
+id: refactor-simplify-conditionals
 description: Simplify complex conditional logic for better readability
 variables:
   - name: code

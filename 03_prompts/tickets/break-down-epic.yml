@@ -1,4 +1,4 @@
-id: break-down-epic
+id: tickets-break-down-epic
 description: Break down an epic into smaller, manageable user stories
 variables:
   - name: epic

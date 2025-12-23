@@ -1,4 +1,4 @@
-id: create-agent
+id: manifests-create-agent
 description: Clarify agent requirements and create a simple agent.yml manifest
 variables:
   - name: user_description

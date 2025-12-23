@@ -1,4 +1,4 @@
-id: create-ruleset
+id: manifests-create-ruleset
 description: Clarify coding standards and create a simple ruleset.yml manifest
 variables:
   - name: user_description

@@ -1,4 +1,4 @@
-id: create-project
+id: manifests-create-project
 description: Clarify project context and create project.yml and deploy.yml manifests
 variables:
   - name: user_description

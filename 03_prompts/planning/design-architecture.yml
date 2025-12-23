@@ -1,4 +1,4 @@
-id: design-architecture
+id: planning-design-architecture
 description: Design system architecture for a new feature or project
 variables:
   - name: requirements

@@ -1,4 +1,4 @@
-id: create-recipe
+id: manifests-create-recipe
 description: Clarify workflow steps and create a simple recipe.yml manifest
 variables:
   - name: user_description

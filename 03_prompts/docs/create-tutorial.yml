@@ -1,4 +1,4 @@
-id: create-tutorial
+id: docs-create-tutorial
 description: Write a step-by-step tutorial for a specific task
 variables:
   - name: task

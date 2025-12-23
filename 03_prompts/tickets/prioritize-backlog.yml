@@ -1,4 +1,4 @@
-id: prioritize-backlog
+id: tickets-prioritize-backlog
 description: Prioritize and organize a product backlog
 variables:
   - name: backlog_items

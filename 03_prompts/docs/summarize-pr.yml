@@ -1,4 +1,4 @@
-id: summarize-pr
+id: docs-summarize-pr
 description: Generate a concise summary of a pull request
 variables:
   - name: diff

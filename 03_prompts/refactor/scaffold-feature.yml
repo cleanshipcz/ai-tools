@@ -1,4 +1,4 @@
-id: scaffold-feature
+id: refactor-scaffold-feature
 description: Generate boilerplate code structure for a new feature
 variables:
   - name: feature_name

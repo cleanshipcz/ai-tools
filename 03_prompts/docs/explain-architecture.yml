@@ -1,4 +1,4 @@
-id: explain-architecture
+id: docs-explain-architecture
 description: Document system architecture with diagrams
 variables:
   - name: system

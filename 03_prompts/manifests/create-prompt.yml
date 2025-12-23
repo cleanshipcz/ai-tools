@@ -1,4 +1,4 @@
-id: create-prompt
+id: manifests-create-prompt
 description: Clarify prompt requirements and create a simple prompt.yml manifest
 variables:
   - name: user_description

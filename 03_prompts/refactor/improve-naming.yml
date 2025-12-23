@@ -1,4 +1,4 @@
-id: improve-naming
+id: refactor-improve-naming
 description: Rename variables, functions, and classes for better clarity
 variables:
   - name: code

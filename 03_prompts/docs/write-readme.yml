@@ -1,4 +1,4 @@
-id: write-readme
+id: docs-write-readme
 description: Create a comprehensive README.md for a project
 variables:
   - name: project_name

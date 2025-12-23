@@ -1,4 +1,4 @@
-id: tech-decision-record
+id: planning-tech-decision-record
 description: Create an Architecture Decision Record (ADR) for a technical decision
 variables:
   - name: decision

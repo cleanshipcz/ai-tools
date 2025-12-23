@@ -1,4 +1,4 @@
-id: create-bug-report
+id: tickets-create-bug-report
 description: Create a detailed bug report with reproduction steps
 variables:
   - name: bug_description

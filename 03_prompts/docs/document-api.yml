@@ -1,4 +1,4 @@
-id: document-api
+id: docs-document-api
 description: Generate comprehensive API documentation
 variables:
   - name: code

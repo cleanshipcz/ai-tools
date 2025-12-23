@@ -1,4 +1,4 @@
-id: estimate-effort
+id: planning-estimate-effort
 description: Estimate development effort for a feature or project
 variables:
   - name: feature

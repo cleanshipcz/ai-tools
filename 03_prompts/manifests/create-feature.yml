@@ -1,4 +1,4 @@
-id: create-feature
+id: manifests-create-feature
 description: Capture and clarify feature requirements, then create a simple feature.yml manifest
 variables:
   - name: user_description
