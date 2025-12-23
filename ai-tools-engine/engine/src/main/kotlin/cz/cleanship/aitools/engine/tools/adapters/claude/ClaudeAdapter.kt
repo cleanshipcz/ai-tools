@@ -17,6 +17,10 @@ class ClaudeAdapter(
     private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
 
+    init {
+        TODO("Not implemented yet")
+    }
+
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
         claudeDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md"),
@@ -35,14 +39,6 @@ class ClaudeAdapter(
         featureContext.feature,
         claudeDir(projectDir).resolve("workflows").resolve("feature-${featureContext.feature.id}.md"),
     ) {
-        it.appendText(
-            """
-            # ${featureContext.feature.id}
-            
-            ${featureContext.feature.description}
-            
-            """.trimIndent()
-        )
         printers.featurePrinter.print(featureContext, it)
     }
 

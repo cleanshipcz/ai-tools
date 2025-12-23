@@ -17,6 +17,10 @@ class CursorAdapter(
     private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
 
+    init {
+        TODO("Not implemented yet")
+    }
+
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
         cursorDir(projectDir).resolve("prompts").resolve("prompt-${promptContext.prompt.id}.md"),

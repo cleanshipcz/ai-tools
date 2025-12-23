@@ -13,7 +13,6 @@ class AntigravityAdapter(
     private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
 
-
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
         rulesDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md"),

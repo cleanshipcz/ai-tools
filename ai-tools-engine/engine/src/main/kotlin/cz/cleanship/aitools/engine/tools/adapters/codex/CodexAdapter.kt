@@ -17,6 +17,10 @@ class CodexAdapter(
     private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
 
+    init {
+        TODO("Not implemented yet")
+    }
+
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
         codexDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md"),
