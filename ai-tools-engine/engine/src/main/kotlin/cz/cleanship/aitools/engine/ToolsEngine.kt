@@ -1,6 +1,5 @@
 package cz.cleanship.aitools.engine
 
-import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.services.LoaderService
 import cz.cleanship.aitools.engine.services.Locations
@@ -28,7 +27,7 @@ class ToolsEngine(
                 adapter.export(destination, AgentContext(it, allData.rulepacks))
             }
             allData.prompts.values.forEach {
-                adapter.export(destination, PromptContext(it))
+                adapter.export(destination, PromptContext(it, allData.rulepacks))
             }
             allData.features.values.forEach {
                 adapter.export(destination, FeatureContext(it))

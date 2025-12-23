@@ -1,24 +1,14 @@
 id: create-recipe
-version: 2.0.0
 description: Clarify workflow steps and create a simple recipe.yml manifest
-
-tags:
-  - manifests
-  - recipes
-  - workflows
-  - yaml
-
 variables:
   - name: user_description
     required: true
-    description: 'Brief description of the workflow or process'
-
+    description: "Brief description of the workflow or process"
 rules:
-  - 'Ask clarifying questions BEFORE generating the manifest'
-  - 'Recommend keeping workflows simple (3-7 steps) but allow complexity when justified'
-  - 'Each step should have one clear purpose'
-  - 'Recommend document-first pattern (analysis → plan → implement) for multi-step workflows'
-
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Recommend keeping workflows simple (3-7 steps) but allow complexity when justified"
+  - "Each step should have one clear purpose"
+  - "Recommend document-first pattern (analysis → plan → implement) for multi-step workflows"
 content: |
   The user wants to create a recipe based on this description:
 
@@ -74,6 +64,14 @@ content: |
   3. Implement (feature-builder → code, includes analysis + plan)
   4. Review (code-reviewer → review, includes all docs)
   Sound good?"
-
 outputs:
   format: yaml
+metadata:
+  version: 2.0.0
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  tags:
+    - manifests
+    - recipes
+    - workflows
+    - yaml

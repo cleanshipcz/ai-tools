@@ -13,8 +13,8 @@ class AgentPrinter : Printer<AgentContext> {
         output.appendTextTopic("## Persona", agent.persona)
 
         output.appendListTopic("## Rules", agent.rulepacks.flatMap {
-            rulepacks[it]?.rules ?: throw IllegalArgumentException("Missing required rulepack ${it} in: $entity")
-        })
+            rulepacks[it]?.rules ?: throw IllegalArgumentException("Missing required rulepack $it in: $entity")
+        } + agent.rules)
 
         output.appendTextTopic("## Prompt", agent.prompt)
 

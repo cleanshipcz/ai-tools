@@ -1,24 +1,14 @@
 id: create-rulepack
-version: 2.0.0
 description: Clarify coding standards and create a simple rulepack.yml manifest
-
-tags:
-  - manifests
-  - rulepacks
-  - standards
-  - yaml
-
 variables:
   - name: user_description
     required: true
-    description: 'Brief description of the coding standards or rules needed'
-
+    description: "Brief description of the coding standards or rules needed"
 rules:
-  - 'Ask clarifying questions BEFORE generating the manifest'
-  - 'Keep rules specific and actionable'
-  - 'Group rules by category for clarity'
-  - 'Focus on WHAT to do, not extensive HOW'
-
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Keep rules specific and actionable"
+  - "Group rules by category for clarity"
+  - "Focus on WHAT to do, not extensive HOW"
 content: |
   The user wants to create a rulepack based on this description:
 
@@ -67,11 +57,15 @@ content: |
   - Google-style docstrings
   - Dataclass usage patterns
   Sound good?"
-
 outputs:
   format: yaml
-
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  version: 2.0.0
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"
+  tags:
+    - manifests
+    - rulepacks
+    - standards
+    - yaml

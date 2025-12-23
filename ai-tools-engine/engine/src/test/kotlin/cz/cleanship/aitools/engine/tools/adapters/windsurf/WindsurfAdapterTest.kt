@@ -39,7 +39,7 @@ class WindsurfAdapterTest {
     @Test
     fun `should output a prompt`() {
         // given
-        val prompt = PromptContext(prompt)
+        val prompt = PromptContext(prompt, rulepacks)
 
         // when
         windsurfAdapter.export(tempDir.toFile(), prompt)

@@ -52,6 +52,7 @@ val agent = AgentManifest(
         description
     """.trimIndent(),
     rulepacks = listOf("test-rulepack"),
+    rules = listOf("rule1", "rule2"),
     persona = """
         Multiline
         persona
@@ -84,6 +85,8 @@ val expectedAgent = """
     - Rule number one.
     - Rule number two.
     - Rule number three.
+    - rule1
+    - rule2
     
     ## Prompt
     
@@ -117,6 +120,7 @@ val prompt = PromptManifest(
                 """.trimIndent()
         ),
     ),
+    rulepacks = listOf("test-rulepack"),
     rules = listOf("rule1", "rule2"),
     content = """
                 Multiline
@@ -145,6 +149,9 @@ val expectedPrompt = """
     
     ## Rules
     
+    - Rule number one.
+    - Rule number two.
+    - Rule number three.
     - rule1
     - rule2
     

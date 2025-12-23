@@ -1,10 +1,5 @@
 id: improve-naming
-version: 1.0.0
 description: Rename variables, functions, and classes for better clarity
-tags:
-  - refactor
-  - naming
-  - readability
 variables:
   - name: code
     required: true
@@ -48,5 +43,10 @@ content: |
 outputs:
   format: code
 metadata:
+  version: 1.0.0
   author: 'AI Tools Team'
   created: '2025-11-15'
+  tags:
+    - refactor
+    - naming
+    - readability

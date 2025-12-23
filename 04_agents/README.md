@@ -7,7 +7,8 @@ Complete AI assistants with bundled personas, prompts, and rulepacks. These mani
 Agents are **complete packages** that define specialized AI behaviors for specific tasks. They combine:
 
 - ✅ **Persona**: Defines the agent's identity, role, and overarching goal.
-- ✅ **Rulepacks**: A collection of coding guidelines and standards.
+- ✅ **Rulepacks**: Reusable sets of coding guidelines and standards (referenced by ID).
+- ✅ **Rules**: Custom rules specific to the given agent.
 - ✅ **Process/Prompt**: The core instructions and methodology the agent follows.
 - ✅ **Constraints**: Strict boundaries and "must-dos" for the agent's behavior.
 
@@ -22,14 +23,16 @@ id: agent-id           # Unique identifier for the agent
 description: summary   # Brief description of the agent's purpose
 persona: |             # Defines the identity and role
   Role definition...
-rulepacks:             # List of rulepack IDs to include
+rulepacks:             # Reusable sets of rules (Rulepack IDs)
   - base
   - specialized-rulepack
+rules:                 # Custom rules specific for this given agent
+  - 'Do X always'
+  - 'Follow convention Y'
 prompt: |              # The core methodology or process
   Step-by-step instructions...
-constraints:           # Strict behavioral rules
-  - 'Do X always'
-  - 'Never do Y'
+constraints:           # Strict behavioral boundaries
+  - 'Never delete X'
 metadata:              # Manifest metadata
   version: 1.0.0
   author: AI Tools Team
@@ -41,8 +44,8 @@ metadata:              # Manifest metadata
 ### Single Responsibility
 Each agent should have ONE clear purpose. Instead of creating a "generic developer" agent, we create specialized agents like `bug-fixer`, `code-reviewer`, or `project-planner`.
 
-### Composition via Rulepacks
-Rather than listing hundreds of rules in every agent, they are composed from reusable **Rulepacks**. This ensures consistency across different agents.
+### Composition via Rulepacks & Rules
+Rather than listing hundreds of rules in every agent, they are composed from reusable **Rulepacks** for consistency, while allowing for **Rules** to define agent-specific behavior.
 
 ### Process-Oriented Prompts
 The `prompt` field should define a clear methodology or step-by-step process. This gives the agent a "way of working" that leads to more predictable and high-quality results.

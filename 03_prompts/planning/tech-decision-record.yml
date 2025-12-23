@@ -1,25 +1,20 @@
 id: tech-decision-record
-version: 1.0.0
 description: Create an Architecture Decision Record (ADR) for a technical decision
-tags:
-  - planning
-  - adr
-  - decision
 variables:
   - name: decision
     required: true
-    description: 'The technical decision to document'
+    description: "The technical decision to document"
   - name: context
     required: false
-    description: 'Background and context for the decision'
+    description: "Background and context for the decision"
   - name: alternatives
     required: false
-    description: 'Alternative approaches considered'
+    description: "Alternative approaches considered"
 rules:
-  - 'Document the context and problem clearly.'
-  - 'List alternatives considered.'
-  - 'Explain the rationale for the chosen approach.'
-  - 'Document consequences (positive and negative).'
+  - "Document the context and problem clearly."
+  - "List alternatives considered."
+  - "Explain the rationale for the chosen approach."
+  - "Document consequences (positive and negative)."
 content: |
   Create an Architecture Decision Record (ADR) for:
 
@@ -91,9 +86,13 @@ content: |
   ## References
 
   - Links to relevant documentation, discussions, or resources
-
 outputs:
   format: markdown
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  tags:
+    - planning
+    - adr
+    - decision

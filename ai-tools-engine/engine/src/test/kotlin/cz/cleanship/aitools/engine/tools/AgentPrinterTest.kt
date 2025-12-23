@@ -12,12 +12,12 @@ class AgentPrinterTest {
     @Test
     fun `should print agent manifest`() {
         // given
-        val agent = agent
+        val context = AgentContext(agent, rulepacks)
         val output = StringOutput()
 
         // when
         output.use {
-            AgentPrinter().print(AgentContext(agent, rulepacks), it)
+            AgentPrinter().print(context, it)
         }
 
         // then

@@ -7,6 +7,7 @@ data class AgentManifest(
     override val id: String,
     override val description: String,
     val rulepacks: List<String> = emptyList(),
+    val rules: List<String> = emptyList(),
     val persona: String,
     val prompt: String,
     val constraints: List<String> = emptyList(),

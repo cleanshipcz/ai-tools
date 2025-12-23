@@ -1,10 +1,5 @@
-id: write-tests
-version: 1.0.0
+id: qa-write-tests
 description: Generate comprehensive unit tests for given code
-tags:
-  - qa
-  - testing
-  - tdd
 variables:
   - name: code
     required: true
@@ -15,8 +10,6 @@ variables:
   - name: test_framework
     required: false
     description: 'Testing framework to use (e.g., pytest, junit, jest)'
-includes:
-  - ../shared/acceptance_criteria.md
 rules:
   - 'Cover happy path, edge cases, and error conditions.'
   - 'Use descriptive test names that explain what is being tested.'
@@ -47,5 +40,10 @@ content: |
 outputs:
   format: code
 metadata:
+  version: 1.0.0
   author: 'AI Tools Team'
   created: '2025-01-01'
+  tags:
+    - qa
+    - testing
+    - tdd

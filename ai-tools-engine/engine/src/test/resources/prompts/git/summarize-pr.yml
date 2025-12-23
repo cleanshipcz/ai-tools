@@ -1,4 +1,4 @@
-id: summarize-pr
+id: git-summarize-pr
 description: Generate a concise summary of a pull request
 variables:
   - name: diff
@@ -7,6 +7,8 @@ variables:
   - name: context
     required: false
     description: 'Additional context about the PR'
+rulepacks:
+  - 'base'
 rules:
   - 'Be concise but comprehensive.'
   - 'Highlight breaking changes prominently.'

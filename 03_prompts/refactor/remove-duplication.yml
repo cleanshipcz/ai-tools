@@ -1,27 +1,20 @@
 id: remove-duplication
-version: 1.0.0
 description: Identify and eliminate code duplication (DRY principle)
-tags:
-  - refactor
-  - duplication
-  - dry
 variables:
   - name: code
     required: true
-    description: 'The code containing duplication'
+    description: "The code containing duplication"
   - name: language
     required: true
-    description: 'Programming language of the code'
+    description: "Programming language of the code"
   - name: context
     required: false
-    description: 'Additional context about the codebase'
-includes:
-  - ../shared/constraints.md
+    description: "Additional context about the codebase"
 rules:
-  - 'Extract common logic into reusable functions.'
-  - 'Preserve behavior of all duplicated sections.'
-  - 'Use appropriate abstraction level.'
-  - 'Avoid over-abstraction for minor duplication.'
+  - "Extract common logic into reusable functions."
+  - "Preserve behavior of all duplicated sections."
+  - "Use appropriate abstraction level."
+  - "Avoid over-abstraction for minor duplication."
 content: |
   Eliminate duplication in the following {{language}} code:
 
@@ -49,5 +42,10 @@ content: |
 outputs:
   format: code
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  tags:
+    - refactor
+    - duplication
+    - dry

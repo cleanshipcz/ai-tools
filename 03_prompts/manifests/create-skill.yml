@@ -1,24 +1,14 @@
 id: create-skill
-version: 2.0.0
 description: Clarify tool/command requirements and create a simple skill.yml manifest
-
-tags:
-  - manifests
-  - skills
-  - tools
-  - yaml
-
 variables:
   - name: user_description
     required: true
-    description: 'Brief description of the tool or command to integrate'
-
+    description: "Brief description of the tool or command to integrate"
 rules:
-  - 'Ask clarifying questions BEFORE generating the manifest'
-  - 'Keep skill definitions simple and focused'
-  - 'One command or tool per skill'
-  - 'Focus on WHAT the tool does, not HOW to implement it'
-
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Keep skill definitions simple and focused"
+  - "One command or tool per skill"
+  - "Focus on WHAT the tool does, not HOW to implement it"
 content: |
   The user wants to create a skill based on this description:
 
@@ -67,11 +57,15 @@ content: |
   - Environment: Python + pytest installed
   - Usage example included
   Sound good?"
-
 outputs:
   format: yaml
-
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  version: 2.0.0
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"
+  tags:
+    - manifests
+    - skills
+    - tools
+    - yaml

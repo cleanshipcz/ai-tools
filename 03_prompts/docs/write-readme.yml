@@ -1,32 +1,27 @@
 id: write-readme
-version: 1.0.0
 description: Create a comprehensive README.md for a project
-tags:
-  - docs
-  - readme
-  - getting-started
 variables:
   - name: project_name
     required: true
-    description: 'Name of the project'
+    description: "Name of the project"
   - name: project_description
     required: true
-    description: 'What the project does'
+    description: "What the project does"
   - name: tech_stack
     required: false
-    description: 'Technologies used'
+    description: "Technologies used"
   - name: installation_steps
     required: false
-    description: 'How to install/setup'
+    description: "How to install/setup"
   - name: usage_examples
     required: false
-    description: 'How to use the project'
+    description: "How to use the project"
 rules:
-  - 'Start with a clear project description.'
-  - 'Include installation instructions.'
-  - 'Provide usage examples.'
-  - 'Add badges for build status, coverage, etc.'
-  - 'Include contributing guidelines reference.'
+  - "Start with a clear project description."
+  - "Include installation instructions."
+  - "Provide usage examples."
+  - "Add badges for build status, coverage, etc."
+  - "Include contributing guidelines reference."
 content: |
   Create a README.md for the project "{{project_name}}":
 
@@ -59,9 +54,13 @@ content: |
   12. **Acknowledgments**: Dependencies and inspiration
 
   Use proper markdown formatting with code blocks, lists, and links.
-
 outputs:
   format: markdown
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  tags:
+    - docs
+    - readme
+    - getting-started
