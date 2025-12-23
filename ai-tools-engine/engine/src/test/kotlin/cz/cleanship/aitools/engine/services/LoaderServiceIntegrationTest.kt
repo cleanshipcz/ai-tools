@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine.services
 
+import cz.cleanship.aitools.engine.models.InnerFeatureContext
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.PromptOutput
 import cz.cleanship.aitools.engine.models.PromptVariable
@@ -165,6 +166,45 @@ class LoaderServiceIntegrationTest {
                 created = "2025-01-01",
                 updated = "2025-11-16",
                 tags = setOf("foundation", "general"),
+            )
+        )
+    }
+
+    @Test
+    fun `should deserialize feature correctly`() {
+        // given
+        val file = File(javaClass.getResource("/features/new-ui.yml")!!.toURI())
+
+        // when
+        val feature = loaderService.loadFeature(file)
+
+        // then
+        assertThat(feature.id).isEqualTo("new-ui")
+        assertThat(feature.description).isEqualTo("Create a new UI for the application")
+        assertThat(feature.context).isEqualTo(
+            InnerFeatureContext(
+                overview = "The goal is to modernize the user interface using React and Tailwind CSS.\n",
+                architecture = "Standard React architecture with functional components and hooks.\n",
+                dependencies = listOf("react", "tailwindcss"),
+                files = listOf("src/App.tsx", "src/components/Dashboard.tsx")
+            )
+        )
+        assertThat(feature.prompt.trim()).isEqualTo("Follow the design guidelines in the UI kit.")
+        assertThat(feature.acceptanceCriteria).containsExactlyInAnyOrder(
+            "Responsive design (mobile, tablet, desktop)",
+            "Dark mode support",
+            "Accessibility (WCAG 2.1 AA)"
+        )
+        assertThat(feature.constraints).containsExactlyInAnyOrder(
+            "Use functional components",
+            "No class components"
+        )
+        assertThat(feature.metadata).isEqualTo(
+            ManifestMetadata(
+                version = Version("1.0.0"),
+                author = "AI Tools Team",
+                created = "2025-01-01",
+                tags = setOf("ui", "react"),
             )
         )
     }
