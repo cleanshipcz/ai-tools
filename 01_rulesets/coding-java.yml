@@ -1,8 +1,5 @@
 id: coding-java
-version: 1.0.0
 description: Java coding standards and best practices
-extends:
-  - base
 rules:
   - "Follow Java naming conventions: PascalCase for classes, camelCase for methods/variables."
   - "Use meaningful package names in reverse domain notation (com.example.project)."
@@ -28,10 +25,11 @@ rules:
   - "Leverage pattern matching (Java 16+) for instanceof checks."
   - "Do not use DisplayName in tests."
   - "Use ParameterizedTests for duplicate/very similar tests, prefer CsvSource for simple inputs."
-tags:
-  - java
-  - coding
-  - style
 metadata:
+  version: 1.0.0
   author: "AI Tools Team"
   created: "2025-11-15"
+  tags:
+    - java
+    - coding
+    - style

@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
+import org.slf4j.LoggerFactory
 
 class ToolsEngine(
     private val loaderService: LoaderService = LoaderService(),
@@ -20,7 +21,9 @@ class ToolsEngine(
         locations: Locations,
         project: ProjectManifest
     ) {
+        LOG.info("Processing project {}", project.id)
         val allData = loaderService.loadAll(locations)
+        LOG.info("Loaded {} agents, {} prompts, {} features, {} rulesets", allData.agents.size, allData.prompts.size, allData.features.size, allData.rulesets.size)
         val destination = project.directory
         for (adapter in tools) {
             allData.agents.values.forEach {
@@ -33,5 +36,10 @@ class ToolsEngine(
                 adapter.export(destination, FeatureContext(it))
             }
         }
+        LOG.info("Processing project {} completed", project.id)
+    }
+
+    companion object {
+        private val LOG = LoggerFactory.getLogger(ToolsEngine::class.java)
     }
 }

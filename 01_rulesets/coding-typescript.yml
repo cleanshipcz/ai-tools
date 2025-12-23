@@ -1,8 +1,5 @@
 id: coding-typescript
-version: 1.0.0
 description: TypeScript coding standards and best practices
-extends:
-  - base
 rules:
   - 'Use strict TypeScript configuration (strict: true in tsconfig.json).'
   - 'Prefer interfaces for public APIs, types for internal structures.'
@@ -22,10 +19,11 @@ rules:
   - 'Prefer named exports over default exports for better refactoring.'
   - 'Use utility types (Partial, Pick, Omit, Record) appropriately.'
   - 'Document complex types and public APIs with JSDoc comments.'
-tags:
-  - typescript
-  - coding
-  - style
 metadata:
+  version: 1.0.0
   author: 'AI Tools Team'
   created: '2025-11-15'
+  tags:
+    - typescript
+    - coding
+    - style

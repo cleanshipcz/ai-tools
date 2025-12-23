@@ -1,5 +1,4 @@
 id: testing
-version: 1.0.0
 description: Automated testing standards and best practices for test-driven development
 
 rules:
@@ -59,14 +58,14 @@ rules:
   - "Never disable existing tests."
   - "Never use any() or similar matchers when mocking functionality - always mock the exact expected behavior."
 
-tags:
-  - testing
-  - quality
-  - tdd
-  - automation
-  - best-practices
-
 metadata:
+  version: 1.0.0
   author: "AI Tools Team"
   created: "2025-11-16"
   updated: "2025-11-16"
+  tags:
+    - testing
+    - quality
+    - tdd
+    - automation
+    - best-practices
