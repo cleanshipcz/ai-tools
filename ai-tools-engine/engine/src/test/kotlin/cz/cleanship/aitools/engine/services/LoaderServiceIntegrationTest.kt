@@ -7,6 +7,7 @@ import cz.cleanship.aitools.engine.models.PromptVariable
 import cz.cleanship.aitools.engine.models.Version
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.io.File
 

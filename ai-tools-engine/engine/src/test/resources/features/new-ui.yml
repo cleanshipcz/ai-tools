@@ -13,7 +13,7 @@ context:
     - src/components/Dashboard.tsx
 prompt: |
   Follow the design guidelines in the UI kit.
-acceptanceCriteria:
+acceptance_criteria:
   - "Responsive design (mobile, tablet, desktop)"
   - "Dark mode support"
   - "Accessibility (WCAG 2.1 AA)"

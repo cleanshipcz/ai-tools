@@ -15,9 +15,7 @@ persona: |
 rulesets:
   - base
   - testing
-  - coding-python
   - coding-kotlin
-  - coding-typescript
   - coding-java
 prompt: |
   Implement new features following a strict Test-Driven Development (TDD) process.

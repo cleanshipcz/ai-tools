@@ -8,17 +8,17 @@ data class FeatureManifest(
     override val id: String,
     override val description: String,
     override val metadata: ManifestMetadata,
-    val context: InnerFeatureContext,
+    val context: InnerFeatureContext? = null,
     val prompt: String,
     @SerialName("acceptance_criteria")
-    val acceptanceCriteria: List<String>,
-    val constraints: List<String>,
+    val acceptanceCriteria: List<String>? = null,
+    val constraints: List<String>? = null,
 ) : VersionedManifest
 
 @Serializable
 data class InnerFeatureContext(
-    val overview: String,
-    val architecture: String,
-    val dependencies: List<String>,
-    val files: List<String>,
+    val overview: String? = null,
+    val architecture: String? = null,
+    val dependencies: List<String>? = null,
+    val files: List<String>? = null,
 )

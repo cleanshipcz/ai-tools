@@ -12,10 +12,10 @@ class FeaturePrinter : Printer<FeatureContext> {
         output.appendLine("## Context")
         output.appendLine()
 
-        output.appendTextTopic("### Overview", feature.context.overview)
-        output.appendTextTopic("### Architecture", feature.context.architecture)
-        output.appendListTopic("### Dependencies", feature.context.dependencies)
-        output.appendListTopic("### Files", feature.context.files)
+        output.appendTextTopic("### Overview", feature.context?.overview)
+        output.appendTextTopic("### Architecture", feature.context?.architecture)
+        output.appendListTopic("### Dependencies", feature.context?.dependencies)
+        output.appendListTopic("### Files", feature.context?.files)
 
         output.appendTextTopic("## Prompt", feature.prompt)
 
