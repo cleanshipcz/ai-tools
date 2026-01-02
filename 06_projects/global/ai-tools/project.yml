@@ -68,6 +68,12 @@ deploy:
         - 'manifests-create-ruleset'
         - 'manifests-create-skill'
         - 'manifests-create-recipe'
+  rulesets:
+    filter:
+      type: 'tags'
+      tags:
+        - common
+        - kotlin
 metadata:
   version: 1.0.0
   author: 'cleanshipcz'

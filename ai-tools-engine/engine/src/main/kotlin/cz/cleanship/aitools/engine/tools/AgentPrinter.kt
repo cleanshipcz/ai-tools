@@ -4,7 +4,9 @@ import cz.cleanship.aitools.engine.io.Output
 import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
 
-class AgentPrinter : Printer<AgentContext> {
+class AgentPrinter(
+    private val rulesetResolver: RulesetResolver = RulesetResolver(),
+) : Printer<AgentContext> {
 
     override fun print(entity: AgentContext, output: Output): Output {
         val (agent, rulesets) = entity
@@ -12,9 +14,8 @@ class AgentPrinter : Printer<AgentContext> {
 
         output.appendTextTopic("## Persona", agent.persona)
 
-        output.appendListTopic("## Rules", agent.rulesets.flatMap {
-            rulesets[it]?.rules ?: throw IllegalArgumentException("Missing required ruleset $it in: $entity")
-        } + agent.rules)
+        val matchedRulesets = rulesetResolver.resolve(agent.rulesets, rulesets)
+        output.appendListTopic("## Rules", matchedRulesets.flatMap { it.rules } + agent.rules)
 
         output.appendTextTopic("## Prompt", agent.prompt)
 

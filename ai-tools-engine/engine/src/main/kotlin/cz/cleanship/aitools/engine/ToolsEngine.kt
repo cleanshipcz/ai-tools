@@ -38,16 +38,16 @@ class ToolsEngine(
                 features = filterService.filter((allData.features[projectManifest] ?: emptyMap()).values, projectManifest.deploy.features.filter).associateBy { it.id },
                 agents = filterService.filter(allData.agents.values, projectManifest.deploy.agents.filter).associateBy { it.id },
                 prompts = filterService.filter(allData.prompts.values, projectManifest.deploy.prompts.filter).associateBy { it.id },
-                rulesets = allData.rulesets,
+                rulesets = filterService.filter(allData.rulesets.values, projectManifest.deploy.rulesets.filter).associateBy { it.id },
             )
 
             val destination = File(project.manifest.deploy.directory).absoluteFile
             for (adapter in tools) {
                 project.agents.values.forEach {
-                    adapter.export(destination, AgentContext(it, allData.rulesets))
+                    adapter.export(destination, AgentContext(it, project.rulesets))
                 }
                 project.prompts.values.forEach {
-                    adapter.export(destination, PromptContext(it, allData.rulesets))
+                    adapter.export(destination, PromptContext(it, project.rulesets))
                 }
                 project.features.values.forEach {
                     adapter.export(destination, FeatureContext(it))

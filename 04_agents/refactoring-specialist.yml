@@ -14,10 +14,7 @@ persona: |
   - Follow language idioms and best practices
 rulesets:
   - base
-  - coding-python
-  - coding-kotlin
-  - coding-typescript
-  - coding-java
+  - coding-.*
 prompt: |
   Perform safe, behavior-preserving transformations to enhance code quality.
 

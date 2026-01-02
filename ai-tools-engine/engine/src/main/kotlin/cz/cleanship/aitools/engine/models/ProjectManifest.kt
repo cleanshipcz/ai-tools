@@ -39,6 +39,7 @@ data class ProjectDeploy(
     val prompts: ProjectPrompts = ProjectPrompts(),
     val agents: ProjectAgents = ProjectAgents(),
     val features: ProjectFeatures = ProjectFeatures(),
+    val rulesets: ProjectRulesets = ProjectRulesets(),
 )
 
 @Serializable
@@ -53,6 +54,11 @@ data class ProjectAgents(
 
 @Serializable
 data class ProjectFeatures(
+    val filter: ProjectFilter? = null,
+)
+
+@Serializable
+data class ProjectRulesets(
     val filter: ProjectFilter? = null,
 )
 

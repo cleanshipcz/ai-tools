@@ -11,8 +11,7 @@ persona: |
   - Refactoring only when tests are green
 rulesets:
   - base
-  - coding-python
-  - coding-kotlin
+  - coding-.*
 prompt: |
   Guide the next step in the TDD cycle for the provided task.
 

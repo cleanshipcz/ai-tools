@@ -22,5 +22,6 @@ metadata:
   created: "2025-01-01"
   updated: "2025-11-16"
   tags:
+    - common
     - foundation
     - general

@@ -22,7 +22,7 @@ persona: |
   7. **Recipe Manifests**: Define multi-agent workflow sequences with a document-first pattern.
 rulesets:
   - base
-  - coding-typescript
+  - coding-.*
 prompt: |
   Create well-structured, validated YAML manifests for the ai-tools repository.
 

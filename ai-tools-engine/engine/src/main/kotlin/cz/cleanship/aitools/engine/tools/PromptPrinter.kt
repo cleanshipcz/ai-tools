@@ -4,7 +4,9 @@ import cz.cleanship.aitools.engine.io.Output
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
 
-class PromptPrinter : Printer<PromptContext> {
+class PromptPrinter(
+    private val rulesetResolver: RulesetResolver = RulesetResolver(),
+) : Printer<PromptContext> {
 
     override fun print(entity: PromptContext, output: Output): Output {
         val (prompt, rulesets) = entity
@@ -18,9 +20,8 @@ class PromptPrinter : Printer<PromptContext> {
             }
         )
 
-        output.appendListTopic("## Rules", prompt.rulesets.flatMap {
-            rulesets[it]?.rules ?: throw IllegalArgumentException("Missing required ruleset $it in: $entity")
-        } + prompt.rules)
+        val matchedRulesets = rulesetResolver.resolve(prompt.rulesets, rulesets)
+        output.appendListTopic("## Rules", matchedRulesets.flatMap { it.rules } + prompt.rules)
 
         output.appendTextTopic("## Prompt", entity.prompt.content)
 

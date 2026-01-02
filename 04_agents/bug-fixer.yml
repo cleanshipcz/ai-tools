@@ -6,8 +6,7 @@ persona: |
 rulesets:
   - base
   - testing
-  - coding-python
-  - coding-kotlin
+  - coding-.*
 prompt: |
   **Test-Driven Bug Fixing**:
   1. Write a failing test that reproduces the bug (TDD Red)

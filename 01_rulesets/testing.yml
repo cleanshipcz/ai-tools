@@ -64,6 +64,7 @@ metadata:
   created: "2025-11-16"
   updated: "2025-11-16"
   tags:
+    - common
     - testing
     - quality
     - tdd
