@@ -4,6 +4,7 @@ import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.io.OutputStreamOutput
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printer
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
@@ -19,6 +20,10 @@ class CursorAdapter(
 
     init {
         TODO("Not implemented yet")
+    }
+
+    override fun export(projectDir: File, globalContext: GlobalContext) {
+        TODO("Not yet implemented")
     }
 
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(

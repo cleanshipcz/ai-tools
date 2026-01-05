@@ -3,6 +3,7 @@ package cz.cleanship.aitools.engine.tools.adapters.github
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
@@ -12,6 +13,22 @@ class GitHubCopilotAdapter(
     private val printers: Printers = Printers,
     private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
+
+    override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
+        globalContext.project,
+        githubDir(projectDir).resolve("copilot-instructions.md"),
+    ) {
+        it.appendText(
+            """
+            # Copilot Instructions for this project
+            
+            ## Description
+            
+            ${globalContext.project.description}                
+            """.trimIndent()
+        )
+        printers.globalFilePrinter.print(globalContext, it)
+    }
 
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,

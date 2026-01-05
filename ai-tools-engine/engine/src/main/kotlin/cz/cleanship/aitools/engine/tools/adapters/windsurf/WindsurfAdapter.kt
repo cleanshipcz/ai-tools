@@ -1,20 +1,34 @@
 package cz.cleanship.aitools.engine.tools.adapters.windsurf
 
 import cz.cleanship.aitools.engine.services.ExportService
-import cz.cleanship.aitools.engine.io.OutputStreamOutput
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
-import cz.cleanship.aitools.engine.tools.Printer
+import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
-
 import java.io.File
 
 class WindsurfAdapter(
     private val printers: Printers = Printers,
     private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
+
+    override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
+        globalContext.project,
+        rulesDir(projectDir).resolve("project.md"),
+    ) {
+        it.appendText(
+            """
+                ---
+                trigger: always_on
+                description: ${globalContext.project.description.replace("\n", " ")}
+                ---
+                
+            """.trimIndent()
+        )
+        printers.globalFilePrinter.print(globalContext, it)
+    }
 
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,

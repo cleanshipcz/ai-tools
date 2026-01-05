@@ -3,6 +3,7 @@ package cz.cleanship.aitools.engine.tools.adapters.antigravity
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
@@ -12,6 +13,23 @@ class AntigravityAdapter(
     private val printers: Printers = Printers,
     private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
+
+    override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
+        globalContext.project,
+        rulesDir(projectDir).resolve("project.md"),
+    ) {
+        it.appendText(
+            """
+                ---
+                trigger: always_on
+                glob:
+                description: ${globalContext.project.description.replace("\n", " ")}
+                ---
+                
+            """.trimIndent()
+        )
+        printers.globalFilePrinter.print(globalContext, it)
+    }
 
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
@@ -44,11 +62,11 @@ class AntigravityAdapter(
         printers.featurePrinter.print(featureContext, it)
     }
 
-    private fun windsurfDir(projectDir: File) = projectDir.resolve(".agent")
+    private fun agentDir(projectDir: File) = projectDir.resolve(".agent")
 
-    private fun rulesDir(projectDir: File) = windsurfDir(projectDir).resolve("rules")
+    private fun rulesDir(projectDir: File) = agentDir(projectDir).resolve("rules")
 
-    private fun workflowsDir(projectDir: File) = windsurfDir(projectDir).resolve("workflows")
+    private fun workflowsDir(projectDir: File) = agentDir(projectDir).resolve("workflows")
 
     companion object {
         private val ruleHeader = """
