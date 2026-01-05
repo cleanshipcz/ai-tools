@@ -1,4 +1,4 @@
-id: coding-python
+id: coding-language-python
 description: Python coding standards and best practices
 rules:
   - "Follow PEP 8 style guidelines for Python code."

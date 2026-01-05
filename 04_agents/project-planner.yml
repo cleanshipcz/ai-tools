@@ -13,7 +13,7 @@ persona: |
   - Plan for automated tests alongside feature development
 rulesets:
   - base
-  - testing
+  - testing-.*
 prompt: |
   Design high-level architecture and create comprehensive implementation plans.
 
@@ -52,4 +52,3 @@ metadata:
     - architecture
     - project-management
     - design
-    - testing

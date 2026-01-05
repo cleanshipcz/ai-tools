@@ -10,12 +10,7 @@ rules:
   - "Preserve existing functionality unless explicitly asked to change it."
   - "Document non-obvious decisions and trade-offs."
   - "Search for up-to-date information and resources."
-  - "Reflect changes in the relevant documentation."
-  - "Automated tests are mandatory, not optional. Manual testing is insufficient for verification."
-  - "Test infrastructure must be in place before implementing features."
-  - "All code changes must include corresponding test changes."
-  - "When running inside an IDE, prefer using native read/write tools rather than CLI tools."
-  - "Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests."
+  - "Absolutely always prioritize quality over quantity. Everything should be high-grade."
 metadata:
   version: 1.1.0
   author: "AI Tools Team"

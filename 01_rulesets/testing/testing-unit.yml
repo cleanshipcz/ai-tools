@@ -1,0 +1,14 @@
+id: testing-unit
+description: Unit testing standards and best practices
+rules:
+  - "Unit tests MUST cover: happy path, edge cases, error conditions, boundary values."
+  - "Mock all external dependencies for unit tests; tests should not require network/database/filesystem access."
+  - "Every public function/method MUST have at least one unit test case."
+  - "Avoid using any() or similar matchers when mocking functionality - always mock the exact expected behavior."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  tags:
+    - unit
+    - testing

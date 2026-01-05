@@ -1,4 +1,4 @@
-id: coding-typescript
+id: coding-language-typescript
 description: TypeScript coding standards and best practices
 rules:
   - 'Use strict TypeScript configuration (strict: true in tsconfig.json).'

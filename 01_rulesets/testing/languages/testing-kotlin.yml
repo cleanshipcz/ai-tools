@@ -1,0 +1,13 @@
+id: testing-language-kotlin
+description: Kotlin testing standards and best practices
+rules:
+  - "Do not use DisplayName in tests."
+  - "Use ParameterizedTests for duplicate/very similar tests, prefer CsvSource for simple inputs."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  tags:
+    - kotlin
+    - testing
+    - style

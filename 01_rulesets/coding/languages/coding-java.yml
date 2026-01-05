@@ -1,10 +1,9 @@
-id: coding-java
+id: coding-language-java
 description: Java coding standards and best practices
 rules:
   - "Follow Java naming conventions: PascalCase for classes, camelCase for methods/variables."
   - "Use meaningful package names in reverse domain notation (com.example.project)."
   - "Prefer composition over inheritance."
-  - "Use interfaces to define contracts and abstract classes for shared behavior."
   - "Leverage Java Streams API for collection operations."
   - "Use Optional<T> to avoid null pointer exceptions."
   - "Follow the Single Responsibility Principle for classes."
@@ -23,8 +22,6 @@ rules:
   - "Handle exceptions appropriately; don't catch Exception or Throwable."
   - "Use sealed classes/interfaces (Java 17+) for restricted hierarchies."
   - "Leverage pattern matching (Java 16+) for instanceof checks."
-  - "Do not use DisplayName in tests."
-  - "Use ParameterizedTests for duplicate/very similar tests, prefer CsvSource for simple inputs."
 metadata:
   version: 1.0.0
   author: "AI Tools Team"

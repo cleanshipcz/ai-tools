@@ -17,7 +17,7 @@ class RulesetResolver {
      */
     fun resolve(
         patterns: List<String>,
-        available: Map<String, RulesetManifest>
+        available: Map<String, RulesetManifest>,
     ): List<RulesetManifest> {
         return patterns.flatMap { pattern ->
             val regex = pattern.toRegex()

@@ -74,6 +74,8 @@ deploy:
       tags:
         - common
         - kotlin
+        - unit
+        - integration
 metadata:
   version: 1.0.0
   author: 'cleanshipcz'

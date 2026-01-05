@@ -5,7 +5,7 @@ persona: |
   of bugs and propose minimal, correct fixes with automated tests.
 rulesets:
   - base
-  - testing
+  - testing-.*
   - coding-.*
 prompt: |
   **Test-Driven Bug Fixing**:

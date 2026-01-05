@@ -14,8 +14,12 @@ persona: |
   5. Never rely on manual testing for verification
 rulesets:
   - base
-  - testing
-  - coding-.*
+  - coding-common
+  - coding-language-.*
+  - testing-common
+  - testing-unit
+  - testing-integration
+  - testing-language-.*
 prompt: |
   Implement new features following a strict Test-Driven Development (TDD) process.
 

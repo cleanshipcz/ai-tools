@@ -1,4 +1,4 @@
-id: coding-kotlin
+id: coding-language-kotlin
 description: Kotlin coding standards and best practices
 rules:
   - "Prefer immutable data classes over mutable classes."
