@@ -27,6 +27,8 @@ context:
         changelog: 90_docs/CHANGELOG.md
         planned_features: 90_docs/PLANNED_FEATURES.md
         implementation: IMPLEMENTATION.md
+  rules:
+    - Verify correct output for ai-tools-engine project with running `./gradlew clean build`, focus on running ktlint and detekt
 deploy:
   directory: "/home/blaha/Documents/Projects/ai-tools/"
   agents:

@@ -1,5 +1,7 @@
 package cz.cleanship.aitools.engine.tools.adapters.cursor
 
+import cz.cleanship.aitools.engine.models.ProjectManifest
+import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
@@ -13,6 +15,12 @@ class CursorAdapter(
     private val printers: Printers = Printers,
     private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
+
+    override val toolType: ToolType = ToolType.CURSOR
+
+    override fun prepare(projectDir: File, project: ProjectManifest) {
+        TODO("Not yet implemented")
+    }
 
     init {
         TODO("Not implemented yet")

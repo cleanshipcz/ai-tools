@@ -36,6 +36,7 @@ data class ProjectDocumentationItem(
 @Serializable
 data class ProjectDeploy(
     val directory: String,
+    val replace: Boolean = false,
     val prompts: ProjectPrompts = ProjectPrompts(),
     val agents: ProjectAgents = ProjectAgents(),
     val features: ProjectFeatures = ProjectFeatures(),

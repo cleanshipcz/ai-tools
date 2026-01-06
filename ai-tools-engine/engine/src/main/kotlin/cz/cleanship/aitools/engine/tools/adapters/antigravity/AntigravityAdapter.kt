@@ -1,5 +1,7 @@
 package cz.cleanship.aitools.engine.tools.adapters.antigravity
 
+import cz.cleanship.aitools.engine.models.ProjectManifest
+import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
@@ -13,6 +15,14 @@ class AntigravityAdapter(
     private val printers: Printers = Printers,
     private val exportService: ExportService = ExportService(),
 ) : ToolAdapter {
+
+    override val toolType: ToolType = ToolType.ANTIGRAVITY
+
+    override fun prepare(projectDir: File, project: ProjectManifest) {
+        if (project.deploy.replace) {
+            agentDir(projectDir).deleteRecursively()
+        }
+    }
 
     override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
         globalContext.project,

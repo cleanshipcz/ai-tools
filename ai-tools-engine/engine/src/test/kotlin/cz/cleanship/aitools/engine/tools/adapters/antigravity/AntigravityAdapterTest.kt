@@ -7,11 +7,15 @@ import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.models.ProjectDeploy
+import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.utils.StringOutput
+import io.mockk.every
+import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -85,6 +89,47 @@ class AntigravityAdapterTest {
             |
             """.trimMargin(),
         )
+    }
+
+    @Test
+    fun `prepare should delete agent directory when replace is true`() {
+        // given
+        val projectDir = tempDir.toFile()
+        val agentDir = projectDir.resolve(".agent")
+        agentDir.mkdirs()
+        File(agentDir, "some-file.txt").writeText("content")
+
+        val manifest = mockk<ProjectManifest>()
+        val deploy = mockk<ProjectDeploy>()
+        every { manifest.deploy } returns deploy
+        every { deploy.replace } returns true
+
+        // when
+        antigravityAdapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(agentDir).doesNotExist()
+    }
+
+    @Test
+    fun `prepare should keep agent directory when replace is false`() {
+        // given
+        val projectDir = tempDir.toFile()
+        val agentDir = projectDir.resolve(".agent")
+        agentDir.mkdirs()
+        File(agentDir, "some-file.txt").writeText("content")
+
+        val manifest = mockk<ProjectManifest>()
+        val deploy = mockk<ProjectDeploy>()
+        every { manifest.deploy } returns deploy
+        every { deploy.replace } returns false
+
+        // when
+        antigravityAdapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(agentDir).exists()
+        assertThat(File(agentDir, "some-file.txt")).exists()
     }
 
     private fun withManualHeader(content: String) = """

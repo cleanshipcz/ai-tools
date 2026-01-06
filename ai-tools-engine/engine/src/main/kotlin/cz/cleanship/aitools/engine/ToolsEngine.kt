@@ -53,6 +53,11 @@ class ToolsEngine(
 
     private fun exportAdapter(project: Project, adapter: ToolAdapter, destination: File) {
         try {
+            LOG.info("{}: Processing agent {}", project.manifest.id, adapter.toolType)
+            if (project.manifest.deploy.replace) {
+                LOG.warn("{}: Replacing existing agentic files in {}.", project.manifest.id, destination)
+            }
+            adapter.prepare(destination, project.manifest)
             adapter.export(destination, GlobalContext(project.manifest))
             project.agents.values.forEach {
                 adapter.export(destination, AgentContext(it, project.rulesets))

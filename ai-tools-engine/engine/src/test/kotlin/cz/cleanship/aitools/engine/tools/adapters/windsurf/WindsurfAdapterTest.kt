@@ -7,10 +7,14 @@ import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.models.ProjectDeploy
+import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
+import io.mockk.every
+import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -83,6 +87,47 @@ class WindsurfAdapterTest {
             |
             """.trimMargin(),
         )
+    }
+
+    @Test
+    fun `prepare should delete windsurf directory when replace is true`() {
+        // given
+        val projectDir = tempDir.toFile()
+        val windsurfDir = projectDir.resolve(".windsurf")
+        windsurfDir.mkdirs()
+        File(windsurfDir, "some-file.txt").writeText("content")
+
+        val manifest = mockk<ProjectManifest>()
+        val deploy = mockk<ProjectDeploy>()
+        every { manifest.deploy } returns deploy
+        every { deploy.replace } returns true
+
+        // when
+        adapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(windsurfDir).doesNotExist()
+    }
+
+    @Test
+    fun `prepare should keep windsurf directory when replace is false`() {
+        // given
+        val projectDir = tempDir.toFile()
+        val windsurfDir = projectDir.resolve(".windsurf")
+        windsurfDir.mkdirs()
+        File(windsurfDir, "some-file.txt").writeText("content")
+
+        val manifest = mockk<ProjectManifest>()
+        val deploy = mockk<ProjectDeploy>()
+        every { manifest.deploy } returns deploy
+        every { deploy.replace } returns false
+
+        // when
+        adapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(windsurfDir).exists()
+        assertThat(File(windsurfDir, "some-file.txt")).exists()
     }
 
     private fun withManualHeader(content: String) = """
