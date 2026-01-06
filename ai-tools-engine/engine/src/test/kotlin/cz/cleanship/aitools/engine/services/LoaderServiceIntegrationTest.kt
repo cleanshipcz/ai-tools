@@ -7,7 +7,6 @@ import cz.cleanship.aitools.engine.models.PromptVariable
 import cz.cleanship.aitools.engine.models.Version
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import java.io.File
 
@@ -34,7 +33,7 @@ class LoaderServiceIntegrationTest {
             """
             A senior code reviewer agent that analyzes code changes, identifies issues,
             and provides constructive, actionable feedback.
-            """.trimIndent()
+            """.trimIndent(),
         )
         assertThat(agent.rulesets).containsExactlyInAnyOrder("base")
         assertThat(agent.persona.trim()).isEqualTo(
@@ -42,7 +41,7 @@ class LoaderServiceIntegrationTest {
             You are a senior software engineer conducting a thorough code review.
             Your goal is to identify defects, security risks, performance issues,
             and areas for improvement while being constructive and educational.
-            """.trimIndent()
+            """.trimIndent(),
         )
         assertThat(agent.prompt.trim()).isEqualTo(
             """
@@ -63,7 +62,7 @@ class LoaderServiceIntegrationTest {
             4. Positive observations
             
             Provide specific, actionable feedback with examples where possible.
-            """.trimIndent()
+            """.trimIndent(),
         )
         assertThat(agent.constraints).containsExactlyInAnyOrder(
             "Do not approve code with security vulnerabilities.",
@@ -77,7 +76,7 @@ class LoaderServiceIntegrationTest {
                 created = "2025-01-01",
                 updated = null,
                 tags = setOf("review", "quality"),
-            )
+            ),
         )
     }
 
@@ -94,7 +93,7 @@ class LoaderServiceIntegrationTest {
         assertThat(prompt.description).isEqualTo("Generate a concise summary of a pull request")
         assertThat(prompt.variables).containsExactlyInAnyOrder(
             PromptVariable(name = "diff", required = true, description = "The git diff to summarize"),
-            PromptVariable(name = "context", required = false, description = "Additional context about the PR")
+            PromptVariable(name = "context", required = false, description = "Additional context about the PR"),
         )
         assertThat(prompt.rules).containsExactlyInAnyOrder(
             "Be concise but comprehensive.",
@@ -123,13 +122,13 @@ class LoaderServiceIntegrationTest {
             5. **Impact**: Areas of the codebase affected
             
             Format as markdown suitable for a PR description.
-            """.trimIndent()
+            """.trimIndent(),
         )
         assertThat(prompt.outputs).isEqualTo(
             PromptOutput(
                 format = "markdown",
                 examples = emptyList(),
-            )
+            ),
         )
         assertThat(prompt.metadata).isEqualTo(
             ManifestMetadata(
@@ -138,7 +137,7 @@ class LoaderServiceIntegrationTest {
                 created = "2025-01-01",
                 updated = null,
                 tags = setOf("docs", "pr", "git"),
-            )
+            ),
         )
     }
 
@@ -167,7 +166,7 @@ class LoaderServiceIntegrationTest {
                 created = "2025-01-01",
                 updated = "2025-11-16",
                 tags = setOf("foundation", "general"),
-            )
+            ),
         )
     }
 
@@ -187,18 +186,18 @@ class LoaderServiceIntegrationTest {
                 overview = "The goal is to modernize the user interface using React and Tailwind CSS.\n",
                 architecture = "Standard React architecture with functional components and hooks.\n",
                 dependencies = listOf("react", "tailwindcss"),
-                files = listOf("src/App.tsx", "src/components/Dashboard.tsx")
-            )
+                files = listOf("src/App.tsx", "src/components/Dashboard.tsx"),
+            ),
         )
         assertThat(feature.prompt.trim()).isEqualTo("Follow the design guidelines in the UI kit.")
         assertThat(feature.acceptanceCriteria).containsExactlyInAnyOrder(
             "Responsive design (mobile, tablet, desktop)",
             "Dark mode support",
-            "Accessibility (WCAG 2.1 AA)"
+            "Accessibility (WCAG 2.1 AA)",
         )
         assertThat(feature.constraints).containsExactlyInAnyOrder(
             "Use functional components",
-            "No class components"
+            "No class components",
         )
         assertThat(feature.metadata).isEqualTo(
             ManifestMetadata(
@@ -206,7 +205,7 @@ class LoaderServiceIntegrationTest {
                 author = "AI Tools Team",
                 created = "2025-01-01",
                 tags = setOf("ui", "react"),
-            )
+            ),
         )
     }
 }

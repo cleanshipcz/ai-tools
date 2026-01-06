@@ -16,7 +16,7 @@ class RulesetResolverTest {
         id = id,
         description = "Description for $id",
         rules = rules,
-        metadata = ManifestMetadata(version = Version("1.0.0"))
+        metadata = ManifestMetadata(version = Version("1.0.0")),
     )
 
     @Nested
@@ -27,7 +27,7 @@ class RulesetResolverTest {
             // given
             val rulesets = mapOf(
                 "base" to createRuleset("base"),
-                "coding-java" to createRuleset("coding-java")
+                "coding-java" to createRuleset("coding-java"),
             )
 
             // when
@@ -47,14 +47,15 @@ class RulesetResolverTest {
             val rulesets = mapOf(
                 "base" to createRuleset("base"),
                 "coding-java" to createRuleset("coding-java"),
-                "coding-kotlin" to createRuleset("coding-kotlin")
+                "coding-kotlin" to createRuleset("coding-kotlin"),
             )
 
             // when
             val result = resolver.resolve(listOf("coding-.*"), rulesets)
 
             // then
-            assertThat(result).extracting("id")
+            assertThat(result)
+                .extracting("id")
                 .containsExactlyInAnyOrder("coding-java", "coding-kotlin")
         }
 
@@ -64,14 +65,15 @@ class RulesetResolverTest {
             val rulesets = mapOf(
                 "base" to createRuleset("base"),
                 "coding-java" to createRuleset("coding-java"),
-                "coding-kotlin" to createRuleset("coding-kotlin")
+                "coding-kotlin" to createRuleset("coding-kotlin"),
             )
 
             // when
             val result = resolver.resolve(listOf("base", "coding-.*"), rulesets)
 
             // then
-            assertThat(result).extracting("id")
+            assertThat(result)
+                .extracting("id")
                 .containsExactlyInAnyOrder("base", "coding-java", "coding-kotlin")
         }
 
@@ -79,7 +81,7 @@ class RulesetResolverTest {
         fun `should not duplicate rulesets when patterns overlap`() {
             // given
             val rulesets = mapOf(
-                "coding-java" to createRuleset("coding-java")
+                "coding-java" to createRuleset("coding-java"),
             )
 
             // when
@@ -94,7 +96,7 @@ class RulesetResolverTest {
             // given
             val rulesets = mapOf(
                 "base-v" to createRuleset("base-v"),
-                "base-v1" to createRuleset("base-v1")
+                "base-v1" to createRuleset("base-v1"),
             )
 
             // pattern "base-v[0-9]*" should match "base-v" (0 digits) and "base-v1" (1 digit)
@@ -105,7 +107,8 @@ class RulesetResolverTest {
             val result = resolver.resolve(listOf("base-v[0-9]*"), rulesets)
 
             // then
-            assertThat(result).extracting("id")
+            assertThat(result)
+                .extracting("id")
                 .containsExactlyInAnyOrder("base-v", "base-v1")
         }
     }
@@ -117,13 +120,13 @@ class RulesetResolverTest {
         fun `should throw when pattern matches no rulesets`() {
             // given
             val rulesets = mapOf(
-                "base" to createRuleset("base")
+                "base" to createRuleset("base"),
             )
 
             // when/then
             assertThatThrownBy {
                 resolver.resolve(listOf("nonexistent-.*"), rulesets)
-            }.isInstanceOf(IllegalArgumentException::class.java)
+            }.isInstanceOf(RulesetResolvingException::class.java)
                 .hasMessageContaining("nonexistent-.*")
         }
 
@@ -131,15 +134,14 @@ class RulesetResolverTest {
         fun `should throw when exact id does not exist`() {
             // given
             val rulesets = mapOf(
-                "base" to createRuleset("base")
+                "base" to createRuleset("base"),
             )
 
             // when/then
             assertThatThrownBy {
                 resolver.resolve(listOf("missing-ruleset"), rulesets)
-            }.isInstanceOf(IllegalArgumentException::class.java)
+            }.isInstanceOf(RulesetResolvingException::class.java)
                 .hasMessageContaining("missing-ruleset")
         }
     }
 }
-

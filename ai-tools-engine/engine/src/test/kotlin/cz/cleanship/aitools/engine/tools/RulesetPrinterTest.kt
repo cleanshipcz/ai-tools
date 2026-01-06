@@ -22,5 +22,4 @@ class RulesetPrinterTest {
         // then
         assertThat(output.getContent().trimIndent()).isEqualTo(expectedRuleset)
     }
-
 }

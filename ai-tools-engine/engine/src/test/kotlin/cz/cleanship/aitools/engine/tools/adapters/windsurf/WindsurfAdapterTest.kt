@@ -1,11 +1,16 @@
 package cz.cleanship.aitools.engine.tools.adapters.windsurf
 
-import cz.cleanship.aitools.engine.data.*
+import cz.cleanship.aitools.engine.data.agent
+import cz.cleanship.aitools.engine.data.expectedAgent
+import cz.cleanship.aitools.engine.data.expectedFeature
+import cz.cleanship.aitools.engine.data.expectedPrompt
+import cz.cleanship.aitools.engine.data.feature
+import cz.cleanship.aitools.engine.data.prompt
+import cz.cleanship.aitools.engine.data.rulesets
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
-import cz.cleanship.aitools.engine.utils.StringOutput
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -58,7 +63,6 @@ class WindsurfAdapterTest {
         assertThat(rulesDir.resolve("agent-${agent.id}.md").readText()).isEqualTo(withManualHeader(expectedAgent))
     }
 
-
     @Test
     fun `should output a feature`() {
         // given
@@ -77,7 +81,7 @@ class WindsurfAdapterTest {
             |
             |$expectedFeature
             |
-        """.trimMargin()
+            """.trimMargin(),
         )
     }
 

@@ -25,14 +25,14 @@ class GitHubCopilotAdapter(
             ## Description
             
             ${globalContext.project.description}                
-            """.trimIndent()
+            """.trimIndent(),
         )
         printers.globalFilePrinter.print(globalContext, it)
     }
 
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
-        promptsDir(projectDir).resolve("prompt-${promptContext.prompt.id}.prompt.md")
+        promptsDir(projectDir).resolve("prompt-${promptContext.prompt.id}.prompt.md"),
     ) {
         it.appendText(header)
         printers.promptPrinter.print(promptContext, it)
@@ -40,7 +40,7 @@ class GitHubCopilotAdapter(
 
     override fun export(projectDir: File, agentContext: AgentContext) = exportService.export(
         agentContext.agent,
-        instructionsDir(projectDir).resolve("agent-${agentContext.agent.id}.instructions.md")
+        instructionsDir(projectDir).resolve("agent-${agentContext.agent.id}.instructions.md"),
     ) {
         it.appendText(header)
         printers.agentPrinter.print(agentContext, it)
@@ -48,7 +48,7 @@ class GitHubCopilotAdapter(
 
     override fun export(projectDir: File, featureContext: FeatureContext) = exportService.export(
         featureContext.feature,
-        instructionsDir(projectDir).resolve("feature-${featureContext.feature.id}.instructions.md")
+        instructionsDir(projectDir).resolve("feature-${featureContext.feature.id}.instructions.md"),
     ) {
         it.appendText(header)
         printers.featurePrinter.print(featureContext, it)
@@ -61,12 +61,12 @@ class GitHubCopilotAdapter(
     private fun instructionsDir(projectDir: File) = githubDir(projectDir).resolve("instructions")
 
     companion object {
-        private val header = """
+        private val header =
+            """
             ---
             applyTo: "**/*"
             ---
             
-        """.trimIndent()
+            """.trimIndent()
     }
-
 }

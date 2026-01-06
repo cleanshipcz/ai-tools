@@ -1,11 +1,11 @@
 import { ToolAdapter } from '../base.js';
-import { Project, Agent } from '../../core/models/types.js';
+import { Project } from '../../core/models/types.js';
 import { ConfigService } from '../../core/services/config.service.js';
 import { LoaderService } from '../../core/services/loader.service.js';
 import { ResolverService } from '../../core/services/resolver.service.js';
 import { RecipeService } from '../../core/services/recipe.service.js';
 import { join } from 'path';
-import { mkdir, writeFile, readFile, access } from 'fs/promises';
+import { access, mkdir, readFile, writeFile } from 'fs/promises';
 
 export class CursorAdapter extends ToolAdapter {
   name = 'cursor';
@@ -26,28 +26,27 @@ export class CursorAdapter extends ToolAdapter {
       // Use generic resolution for agents
       const resolvedAgents = await this.resolver.resolveAllAgents(project);
       const recipes: any[] = [];
-      
-      for (const { agent, rules, suffix } of resolvedAgents) {
-           // Convert Agent to Cursor Recipe format
-           // Logic adapted from legacy build.ts
-           const recipe = {
-             id: `${agent.id}${suffix}`, // Append suffix to ID
-             name: `${agent.id}${suffix}`, // Cursor uses name as ID often
-             description: agent.description || agent.purpose,
-             prompt: agent.prompt?.system || agent.purpose,
-             // Add rules to prompt or somewhere? Cursor recipes are simple.
-             // Maybe prepend rules to prompt?
-           };
-           
-           if (rules.length > 0) {
-             recipe.prompt += `\n\nRules:\n${rules.map(r => `- ${r}`).join('\n')}`;
-           }
 
-           recipes.push(recipe);
+      for (const { agent, rules, suffix } of resolvedAgents) {
+        // Convert Agent to Cursor Recipe format
+        // Logic adapted from legacy build.ts
+        const recipe = {
+          id: `${agent.id}${suffix}`, // Append suffix to ID
+          name: `${agent.id}${suffix}`, // Cursor uses name as ID often
+          description: agent.description || agent.purpose,
+          prompt: agent.prompt?.system || agent.purpose,
+          // Add rules to prompt or somewhere? Cursor recipes are simple.
+          // Maybe prepend rules to prompt?
+        };
+
+        if (rules.length > 0) {
+          recipe.prompt += `\n\nRules:\n${rules.map((r) => `- ${r}`).join('\n')}`;
+        }
+
+        recipes.push(recipe);
       }
-      
+
       await writeFile(join(cursorDir, 'recipes.json'), JSON.stringify({ recipes }, null, 2));
-      
     } catch {}
 
     // 2. Generate project-rules.json
@@ -97,7 +96,10 @@ export class CursorAdapter extends ToolAdapter {
     // Add AI tools preferences
     if (project.ai_tools) {
       if (project.ai_tools.preferred_rulesets) {
-        const resolvedRules = await this.resolver.resolveRulesets(project.ai_tools.preferred_rulesets, project);
+        const resolvedRules = await this.resolver.resolveRulesets(
+          project.ai_tools.preferred_rulesets,
+          project
+        );
         rules.push(...resolvedRules);
       }
 

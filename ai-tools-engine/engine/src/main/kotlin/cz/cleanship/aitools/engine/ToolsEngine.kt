@@ -1,13 +1,14 @@
 package cz.cleanship.aitools.engine
 
+import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.Project
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
-import cz.cleanship.aitools.engine.services.Locations
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.PromptContext
+import cz.cleanship.aitools.engine.tools.RulesetResolvingException
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.adapters.antigravity.AntigravityAdapter
 import cz.cleanship.aitools.engine.tools.adapters.github.GitHubCopilotAdapter
@@ -26,7 +27,7 @@ class ToolsEngine(
 ) {
 
     fun process(
-        locations: Locations
+        locations: Locations,
     ) {
         LOG.info("Processing locations {}", locations)
         val allData = loaderService.loadAll(locations)
@@ -44,18 +45,27 @@ class ToolsEngine(
 
             val destination = File(project.manifest.deploy.directory).absoluteFile
             for (adapter in tools) {
-                adapter.export(destination, GlobalContext(project.manifest))
-                project.agents.values.forEach {
-                    adapter.export(destination, AgentContext(it, project.rulesets))
-                }
-                project.prompts.values.forEach {
-                    adapter.export(destination, PromptContext(it, project.rulesets))
-                }
-                project.features.values.forEach {
-                    adapter.export(destination, FeatureContext(it))
-                }
+                exportAdapter(project, adapter, destination)
             }
             LOG.info("Processing project {} completed", project.manifest.id)
+        }
+    }
+
+    private fun exportAdapter(project: Project, adapter: ToolAdapter, destination: File) {
+        try {
+            adapter.export(destination, GlobalContext(project.manifest))
+            project.agents.values.forEach {
+                adapter.export(destination, AgentContext(it, project.rulesets))
+            }
+            project.prompts.values.forEach {
+                adapter.export(destination, PromptContext(it, project.rulesets))
+            }
+            project.features.values.forEach {
+                adapter.export(destination, FeatureContext(it))
+            }
+        } catch (ex: RulesetResolvingException) {
+            // TODO add context in nested inSpan blocks
+            LOG.error("Failed to resolve rulesets for project {}", project.manifest.id, ex)
         }
     }
 

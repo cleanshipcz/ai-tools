@@ -5,5 +5,5 @@ data class AllManifests(
     val prompts: Map<String, PromptManifest>,
     val rulesets: Map<String, RulesetManifest>,
     val projects: Map<String, ProjectManifest>,
-    val features: Map<ProjectManifest, Map<String, FeatureManifest>>
+    val features: Map<ProjectManifest, Map<String, FeatureManifest>>,
 )

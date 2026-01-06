@@ -1,17 +1,11 @@
 package cz.cleanship.aitools.engine
 
 import cz.cleanship.aitools.engine.services.ConfigService
-import cz.cleanship.aitools.engine.services.Locations
-import cz.cleanship.aitools.engine.tools.adapters.antigravity.AntigravityAdapter
-import java.io.File
+import cz.cleanship.aitools.engine.tools.ToolFactory
 
 fun main() {
+    val config = ConfigService().loadConfig()
     ToolsEngine(
-        tools = listOf(
-//            WindsurfAdapter(),
-            AntigravityAdapter(),
-        )
-    ).process(
-        ConfigService().loadConfig()
-    )
+        tools = config.tools.map { ToolFactory.create(it) },
+    ).process(config.locations)
 }

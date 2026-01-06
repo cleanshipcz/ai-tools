@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test
 
 class FeaturePrinterTest {
 
-
     @Test
     fun `should print feature manifest`() {
         // given

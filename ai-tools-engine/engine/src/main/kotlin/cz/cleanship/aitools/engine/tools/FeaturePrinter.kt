@@ -24,10 +24,9 @@ class FeaturePrinter : Printer<FeatureContext> {
         output.appendListTopic("## Constraints", feature.constraints)
 
         return output
-
     }
 }
 
 data class FeatureContext(
-    val feature: FeatureManifest
+    val feature: FeatureManifest,
 )

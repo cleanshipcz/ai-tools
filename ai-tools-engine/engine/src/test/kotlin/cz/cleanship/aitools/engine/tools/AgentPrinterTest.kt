@@ -23,5 +23,4 @@ class AgentPrinterTest {
         // then
         assertThat(output.getContent().trimIndent()).isEqualTo(expectedAgent)
     }
-
 }

@@ -20,12 +20,12 @@ class WindsurfAdapter(
     ) {
         it.appendText(
             """
-                ---
-                trigger: always_on
-                description: ${globalContext.project.description.replace("\n", " ")}
-                ---
-                
-            """.trimIndent()
+            ---
+            trigger: always_on
+            description: ${globalContext.project.description.replace("\n", " ")}
+            ---
+            
+            """.trimIndent(),
         )
         printers.globalFilePrinter.print(globalContext, it)
     }
@@ -57,7 +57,7 @@ class WindsurfAdapter(
             auto_execution_mode: 3
             ---
             
-            """.trimIndent()
+            """.trimIndent(),
         )
         printers.featurePrinter.print(featureContext, it)
     }
@@ -69,11 +69,12 @@ class WindsurfAdapter(
     private fun workflowsDir(projectDir: File) = windsurfDir(projectDir).resolve("workflows")
 
     companion object {
-        private val manualHeader = """
+        private val manualHeader =
+            """
             ---
             trigger: manual
             ---
             
-        """.trimIndent()
+            """.trimIndent()
     }
 }

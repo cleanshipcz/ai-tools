@@ -1,16 +1,15 @@
 package cz.cleanship.aitools.engine.models
 
-import kotlinx.serialization.Serializable
+import java.io.File
 
-@Serializable
 data class EngineConfig(
-    val locations: LocationsConfig? = null,
+    val locations: Locations,
+    val tools: List<ToolType>,
 )
 
-@Serializable
-data class LocationsConfig(
-    val agents: List<String>? = null,
-    val projects: List<String>? = null,
-    val prompts: List<String>? = null,
-    val rulesets: List<String>? = null,
+data class Locations(
+    val agents: List<File>,
+    val projects: List<File>,
+    val prompts: List<File>,
+    val rulesets: List<File>,
 )

@@ -1,11 +1,11 @@
 import { ToolAdapter } from '../../base.js';
-import { Project, Agent, Prompt } from '../../../core/models/types.js';
+import { Project, Prompt } from '../../../core/models/types.js';
 import { ConfigService } from '../../../core/services/config.service.js';
 import { LoaderService } from '../../../core/services/loader.service.js';
 import { ResolverService } from '../../../core/services/resolver.service.js';
 import { RecipeService } from '../../../core/services/recipe.service.js';
-import { join, dirname } from 'path';
-import { mkdir, writeFile, copyFile, access, readdir, readFile } from 'fs/promises';
+import { dirname, join } from 'path';
+import { copyFile, mkdir, readdir, readFile, writeFile } from 'fs/promises';
 
 export class ClaudeAdapter extends ToolAdapter {
   name = 'claude-code';
@@ -28,8 +28,8 @@ export class ClaudeAdapter extends ToolAdapter {
     // Clean up destination prompts directory first
     const destPromptsDir = join(claudeDir, 'prompts');
     try {
-        const { rm } = await import('fs/promises');
-        await rm(destPromptsDir, { recursive: true, force: true });
+      const { rm } = await import('fs/promises');
+      await rm(destPromptsDir, { recursive: true, force: true });
     } catch {}
     await mkdir(destPromptsDir, { recursive: true });
 
@@ -44,24 +44,27 @@ export class ClaudeAdapter extends ToolAdapter {
         promptsMap.set(prompt.id, pathWithoutExt);
 
         if (this.resolver.shouldIncludePrompt(prompt.id, promptsMap, project)) {
-           // Generate Claude-specific JSON for prompt
-           // Use path-derived ID for consistency with Windsurf
-           const namespacedId = pathWithoutExt.split('/').join('-');
+          // Generate Claude-specific JSON for prompt
+          // Use path-derived ID for consistency with Windsurf
+          const namespacedId = pathWithoutExt.split('/').join('-');
 
-           const claudePrompt = {
-             id: namespacedId, // Use the namespaced ID
-             description: prompt.description,
-             content: prompt.content,
-             system: prompt.system,
-             user: prompt.user,
-             variables: prompt.variables
-           };
+          const claudePrompt = {
+            id: namespacedId, // Use the namespaced ID
+            description: prompt.description,
+            content: prompt.content,
+            system: prompt.system,
+            user: prompt.user,
+            variables: prompt.variables,
+          };
 
-           // const destDir = join(claudeDir, 'prompts');
-           // await mkdir(destDir, { recursive: true });
+          // const destDir = join(claudeDir, 'prompts');
+          // await mkdir(destDir, { recursive: true });
 
-           // Use namespaced ID for filename
-           await writeFile(join(destPromptsDir, `${namespacedId}.json`), JSON.stringify(claudePrompt, null, 2));
+          // Use namespaced ID for filename
+          await writeFile(
+            join(destPromptsDir, `${namespacedId}.json`),
+            JSON.stringify(claudePrompt, null, 2)
+          );
         }
       }
     } catch {}
@@ -86,13 +89,12 @@ export class ClaudeAdapter extends ToolAdapter {
         // Copy all files in skill dir
         const entries = await readdir(skillDir);
         for (const entry of entries) {
-            await copyFile(join(skillDir, entry), join(skillDestDir, entry));
+          await copyFile(join(skillDir, entry), join(skillDestDir, entry));
         }
       }
 
       // Generate skills.json
       await writeFile(join(claudeDir, 'skills.json'), JSON.stringify({ skills }, null, 2));
-
     } catch {}
 
     // Agents
@@ -101,28 +103,28 @@ export class ClaudeAdapter extends ToolAdapter {
       const resolvedAgents = await this.resolver.resolveAllAgents(project);
 
       for (const { agent, rules, suffix } of resolvedAgents) {
-           // Generate Claude-specific agent MD
-           const destDir = join(claudeDir, 'agents');
-           await mkdir(destDir, { recursive: true });
+        // Generate Claude-specific agent MD
+        const destDir = join(claudeDir, 'agents');
+        await mkdir(destDir, { recursive: true });
 
-           let content = `---
+        let content = `---
 description: ${agent.description}
 ---
 
 # ${agent.purpose}
 
 `;
-           if (agent.prompt?.system) {
-               content += `${agent.prompt.system}\n\n`;
-           }
+        if (agent.prompt?.system) {
+          content += `${agent.prompt.system}\n\n`;
+        }
 
-           if (rules.length > 0) {
-               content += `## Rules\n\n`;
-               rules.forEach(r => content += `- ${r}\n`);
-               content += `\n`;
-           }
+        if (rules.length > 0) {
+          content += `## Rules\n\n`;
+          rules.forEach((r) => (content += `- ${r}\n`));
+          content += `\n`;
+        }
 
-           await writeFile(join(destDir, `${agent.id}${suffix}.md`), content);
+        await writeFile(join(destDir, `${agent.id}${suffix}.md`), content);
       }
     } catch {}
 
@@ -154,7 +156,11 @@ description: ${agent.description}
     }
   }
 
-  private async copyPromptsWithFiltering(src: string, dest: string, project: Project): Promise<void> {
+  private async copyPromptsWithFiltering(
+    src: string,
+    dest: string,
+    project: Project
+  ): Promise<void> {
     await mkdir(dest, { recursive: true });
     const entries = await readdir(src, { withFileTypes: true });
 
@@ -226,23 +232,23 @@ description: ${agent.description}
 
         // Let's try to extract ID from the JSON content.
         if (promptData.id) {
-           // We need to construct the "path" for the resolver.
-           // The resolver uses path for regex filtering (e.g. "refactor/extract-method").
-           // We might not have the path here.
-           // But we can use the ID.
+          // We need to construct the "path" for the resolver.
+          // The resolver uses path for regex filtering (e.g. "refactor/extract-method").
+          // We might not have the path here.
+          // But we can use the ID.
 
-           // Let's load all prompts to build the map, similar to gen-project.ts
-           const promptsDir = this.config.getPath(this.config.dirs.prompts);
-           const promptsMap = new Map<string, string>();
-           const promptFiles = await this.loader.findYamlFilesRelative(promptsDir);
-           for (const f of promptFiles) {
-             const p = await this.loader.loadYaml<Prompt>(join(promptsDir, f));
-             promptsMap.set(p.id, f.replace(/\.ya?ml$/, '').replace(/\\/g, '/'));
-           }
+          // Let's load all prompts to build the map, similar to gen-project.ts
+          const promptsDir = this.config.getPath(this.config.dirs.prompts);
+          const promptsMap = new Map<string, string>();
+          const promptFiles = await this.loader.findYamlFilesRelative(promptsDir);
+          for (const f of promptFiles) {
+            const p = await this.loader.loadYaml<Prompt>(join(promptsDir, f));
+            promptsMap.set(p.id, f.replace(/\.ya?ml$/, '').replace(/\\/g, '/'));
+          }
 
-           if (this.resolver.shouldIncludePrompt(promptData.id, promptsMap, project)) {
-             await copyFile(srcPath, destPath);
-           }
+          if (this.resolver.shouldIncludePrompt(promptData.id, promptsMap, project)) {
+            await copyFile(srcPath, destPath);
+          }
         } else {
           // Fallback: include if no ID found (safe default?) or exclude?
           // Let's include.
@@ -252,7 +258,11 @@ description: ${agent.description}
     }
   }
 
-  private async copyAgentsWithFiltering(src: string, dest: string, project: Project): Promise<void> {
+  private async copyAgentsWithFiltering(
+    src: string,
+    dest: string,
+    project: Project
+  ): Promise<void> {
     await mkdir(dest, { recursive: true });
     const entries = await readdir(src, { withFileTypes: true });
 
@@ -298,7 +308,10 @@ description: ${agent.description}
     }
     if (project.ai_tools) {
       if (project.ai_tools.preferred_rulesets) {
-        const resolvedRules = await this.resolver.resolveRulesets(project.ai_tools.preferred_rulesets, project);
+        const resolvedRules = await this.resolver.resolveRulesets(
+          project.ai_tools.preferred_rulesets,
+          project
+        );
         rules.push(...resolvedRules);
       }
       if (project.ai_tools.custom_rules) {

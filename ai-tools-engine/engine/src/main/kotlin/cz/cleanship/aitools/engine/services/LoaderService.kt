@@ -7,6 +7,7 @@ import com.charleskorn.kaml.YamlException
 import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.FeatureManifest
+import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
@@ -57,24 +58,18 @@ class LoaderService {
             prompts = loadAllFromDirectories(locations.prompts, ::loadPrompt),
             rulesets = loadAllFromDirectories(locations.rulesets, ::loadRuleset),
             projects = projectsWithFeatures.map { it.first }.associateBy { it.id },
-            features = projectsWithFeatures.associate { it.first to it.second.associateBy { f -> f.id } }
+            features = projectsWithFeatures.associate { it.first to it.second.associateBy { f -> f.id } },
         )
     }
 
     private fun <T : VersionedManifest> loadAllFromDirectories(directories: List<File>, loader: (File) -> T, filter: (File) -> Boolean = { true }): Map<String, T> =
-        directories.flatMap { directory ->
-            findYamlFiles(directory).filter(filter).map { loader(it) }
-        }.associateBy { it.id }
+        directories
+            .flatMap { directory ->
+                findYamlFiles(directory).filter(filter).map { loader(it) }
+            }.associateBy { it.id }
 
     fun findYamlFiles(directory: File): List<File> = directory
         .walkTopDown()
         .filter { it.isFile && (it.extension == "yml" || it.extension == "yaml") }
         .toList()
 }
-
-data class Locations(
-    val agents: List<File>,
-    val projects: List<File>,
-    val prompts: List<File>,
-    val rulesets: List<File>,
-)

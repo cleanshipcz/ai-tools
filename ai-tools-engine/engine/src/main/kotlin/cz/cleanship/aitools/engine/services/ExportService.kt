@@ -22,5 +22,4 @@ class ExportService {
     companion object {
         private val LOG = LoggerFactory.getLogger(ExportService::class.java)
     }
-
 }

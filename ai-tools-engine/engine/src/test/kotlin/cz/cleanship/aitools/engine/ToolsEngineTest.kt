@@ -1,25 +1,11 @@
 package cz.cleanship.aitools.engine
 
-import cz.cleanship.aitools.engine.models.ManifestMetadata
-import cz.cleanship.aitools.engine.models.ProjectAgents
-import cz.cleanship.aitools.engine.models.ProjectFeatures
-import cz.cleanship.aitools.engine.models.ProjectFilter
-import cz.cleanship.aitools.engine.models.ProjectManifest
-import cz.cleanship.aitools.engine.models.ProjectPrompts
-import cz.cleanship.aitools.engine.models.Version
-import cz.cleanship.aitools.engine.services.Locations
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
-import java.io.File
-import java.nio.file.Path
-
 class ToolsEngineTest {
 
-    @TempDir
-    lateinit var tempDir: Path
-
-    private val engine = ToolsEngine()
+//    @TempDir
+//    lateinit var tempDir: Path
+//
+//    private val engine = ToolsEngine()
 
 //    @Test
 //    fun `should process project and export tools`() {

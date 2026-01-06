@@ -23,5 +23,4 @@ class PromptPrinterTest {
         // then
         assertThat(output.getContent().trimIndent()).isEqualTo(expectedPrompt)
     }
-
 }

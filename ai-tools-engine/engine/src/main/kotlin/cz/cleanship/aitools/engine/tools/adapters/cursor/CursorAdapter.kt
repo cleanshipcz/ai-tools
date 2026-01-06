@@ -1,17 +1,13 @@
 package cz.cleanship.aitools.engine.tools.adapters.cursor
 
 import cz.cleanship.aitools.engine.services.ExportService
-import cz.cleanship.aitools.engine.io.OutputStreamOutput
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.GlobalContext
-import cz.cleanship.aitools.engine.tools.Printer
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
-
 import java.io.File
-
 
 class CursorAdapter(
     private val printers: Printers = Printers,
@@ -35,7 +31,7 @@ class CursorAdapter(
 
     override fun export(projectDir: File, agentContext: AgentContext) = exportService.export(
         agentContext.agent,
-        cursorDir(projectDir).resolve("rules").resolve("agent-${agentContext.agent.id}.mdc")
+        cursorDir(projectDir).resolve("rules").resolve("agent-${agentContext.agent.id}.mdc"),
     ) {
         it.appendText(
             """
@@ -45,7 +41,7 @@ class CursorAdapter(
             alwaysApply: true
             ---
             
-            """.trimIndent()
+            """.trimIndent(),
         )
         printers.agentPrinter.print(agentContext, it)
     }
@@ -60,12 +56,11 @@ class CursorAdapter(
             
             ${featureContext.feature.description}
             
-            """.trimIndent()
+            """.trimIndent(),
         )
         it.appendLine()
         printers.featurePrinter.print(featureContext, it)
     }
 
     private fun cursorDir(projectDir: File) = projectDir.resolve(".cursor")
-
 }

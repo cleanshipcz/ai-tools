@@ -11,20 +11,22 @@ class GlobalFilePrinter : Printer<GlobalContext> {
 
         output.appendTextTopic(
             "## Overview",
-            project.context.overview
+            project.context.overview,
         )
 
         output.appendListTopic(
             "## Rules",
-            project.context.rules
+            project.context.rules,
         )
 
         output.appendListTopic(
             "## Documentation files",
-            (project.context.documentation.readme?.let { listOf(it) } ?: emptyList()) +
-                    project.context.documentation.additional.map {
-                        "${it.path} - (${it.description})"
-                    }
+            (
+                project.context.documentation.readme
+                    ?.let { listOf(it) } ?: emptyList()
+            ) + project.context.documentation.additional.map {
+                "${it.path} - (${it.description})"
+            },
         )
 
         return output
@@ -32,5 +34,5 @@ class GlobalFilePrinter : Printer<GlobalContext> {
 }
 
 data class GlobalContext(
-    val project: ProjectManifest
+    val project: ProjectManifest,
 )

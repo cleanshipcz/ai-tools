@@ -1,17 +1,13 @@
 package cz.cleanship.aitools.engine.tools.adapters.codex
 
 import cz.cleanship.aitools.engine.services.ExportService
-import cz.cleanship.aitools.engine.io.OutputStreamOutput
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.GlobalContext
-import cz.cleanship.aitools.engine.tools.Printer
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
-
 import java.io.File
-
 
 class CodexAdapter(
     private val printers: Printers = Printers,
@@ -50,12 +46,11 @@ class CodexAdapter(
             
             ${featureContext.feature.description}
             
-            """.trimIndent()
+            """.trimIndent(),
         )
         it.appendLine()
         printers.featurePrinter.print(featureContext, it)
     }
 
     private fun codexDir(projectDir: File) = projectDir.resolve(".codex")
-
 }

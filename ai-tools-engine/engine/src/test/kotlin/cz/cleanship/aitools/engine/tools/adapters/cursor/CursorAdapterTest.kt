@@ -56,7 +56,7 @@ class CursorAdapterTest {
 
         // then
         val content = targetDir.resolve("rules/agent-${agent.id}.mdc").readText().trim()
-        
+
         assertThat(content).startsWith("---")
         assertThat(content).contains("description: ${agent.description.replace("\n", " ")}")
         assertThat(content).contains("globs: \"**/*\"")

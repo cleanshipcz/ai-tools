@@ -3,11 +3,14 @@ package cz.cleanship.aitools.engine.services
 import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
-import cz.cleanship.aitools.engine.models.LocationsConfig
+import cz.cleanship.aitools.engine.models.ConfigManifest
 import cz.cleanship.aitools.engine.models.EngineConfig
+import cz.cleanship.aitools.engine.models.Locations
+import cz.cleanship.aitools.engine.models.LocationsConfig
 import kotlinx.serialization.decodeFromString
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.FileNotFoundException
 
 class ConfigService {
     private val yaml = Yaml(
@@ -17,41 +20,44 @@ class ConfigService {
         ),
     )
 
-    fun loadConfig(workingDirectory: File = File(".")): Locations {
-        val defaultConfig = loadConfigFile(File(workingDirectory, "config.yml")) ?: EngineConfig()
-        val localConfig = loadConfigFile(File(workingDirectory, "config.local.yml"))
+    fun loadConfig(workingDirectory: File = File(".")): EngineConfig {
+        // TODO make config file location configurable
+        // config.yml and config.local.yml are defaults that can be overriden based on the strategy
+        // default strategy, key=merge -> config, then config.local, then provided (just like config vs config.local)
+        // key=override -> provided config is the only relevant (this is when e.g. I want to deploy only a specific subset of projects/tools)
+        val defaultConfig = loadConfigFile(File(workingDirectory, "config.yml"))
+            ?: throw FileNotFoundException("Missing default config file: ${File(workingDirectory, "config.yml").absolutePath}")
+        val localConfig = loadConfigFile(File(workingDirectory, "config.local.yml")) ?: ConfigManifest()
 
         val mergedConfig = merge(defaultConfig, localConfig)
         val locations = mergedConfig.locations ?: LocationsConfig()
+        val tools = mergedConfig.tools ?: emptyList()
 
-        return Locations(
-            agents = resolvePaths(workingDirectory, locations.agents),
-            projects = resolvePaths(workingDirectory, locations.projects),
-            prompts = resolvePaths(workingDirectory, locations.prompts),
-            rulesets = resolvePaths(workingDirectory, locations.rulesets),
+        return EngineConfig(
+            locations = Locations(
+                agents = resolvePaths(workingDirectory, locations.agents),
+                projects = resolvePaths(workingDirectory, locations.projects),
+                prompts = resolvePaths(workingDirectory, locations.prompts),
+                rulesets = resolvePaths(workingDirectory, locations.rulesets),
+            ),
+            tools = tools,
         )
     }
 
-    private fun loadConfigFile(file: File): EngineConfig? {
-        return if (file.exists()) {
-            LOG.info("Loading config from {}", file.absolutePath)
-            try {
-                yaml.decodeFromString<EngineConfig>(file.readText())
-            } catch (e: Exception) {
-                LOG.error("Failed to parse config file: {}", file.absolutePath, e)
-                null
-            }
-        } else {
-            LOG.debug("Config file not found: {}", file.absolutePath)
-            null
-        }
+    private fun loadConfigFile(file: File): ConfigManifest? = if (file.exists()) {
+        LOG.info("Loading config from {}", file.absolutePath)
+        yaml.decodeFromString<ConfigManifest>(file.readText())
+    } else {
+        LOG.debug("Config file not found: {}", file.absolutePath)
+        null
     }
 
-    private fun merge(default: EngineConfig, local: EngineConfig?): EngineConfig {
+    private fun merge(default: ConfigManifest, local: ConfigManifest?): ConfigManifest {
         if (local == null) return default
 
-        return EngineConfig(
-            locations = mergeLocations(default.locations, local.locations)
+        return ConfigManifest(
+            locations = mergeLocations(default.locations, local.locations),
+            tools = local.tools ?: default.tools,
         )
     }
 
@@ -67,16 +73,14 @@ class ConfigService {
         )
     }
 
-    private fun resolvePaths(workingDirectory: File, paths: List<String>?): List<File> {
-        return paths?.map { path ->
-            val file = File(path)
-            if (file.isAbsolute) {
-                file
-            } else {
-                File(workingDirectory, path).absoluteFile
-            }
-        } ?: emptyList()
-    }
+    private fun resolvePaths(workingDirectory: File, paths: List<String>?): List<File> = paths?.map { path ->
+        val file = File(path)
+        if (file.isAbsolute) {
+            file
+        } else {
+            File(workingDirectory, path).absoluteFile
+        }
+    } ?: emptyList()
 
     companion object {
         private val LOG = LoggerFactory.getLogger(ConfigService::class.java)

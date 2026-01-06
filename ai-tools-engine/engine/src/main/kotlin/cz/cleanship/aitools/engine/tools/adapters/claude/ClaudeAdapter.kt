@@ -1,17 +1,13 @@
 package cz.cleanship.aitools.engine.tools.adapters.claude
 
 import cz.cleanship.aitools.engine.services.ExportService
-import cz.cleanship.aitools.engine.io.OutputStreamOutput
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.GlobalContext
-import cz.cleanship.aitools.engine.tools.Printer
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
-
 import java.io.File
-
 
 class ClaudeAdapter(
     private val printers: Printers = Printers,
@@ -48,5 +44,4 @@ class ClaudeAdapter(
     }
 
     private fun claudeDir(projectDir: File) = projectDir.resolve(".claude")
-
 }

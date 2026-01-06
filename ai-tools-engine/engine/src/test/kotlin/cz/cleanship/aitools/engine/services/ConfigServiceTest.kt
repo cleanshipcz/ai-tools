@@ -1,14 +1,19 @@
 package cz.cleanship.aitools.engine.services
 
+import cz.cleanship.aitools.engine.models.ToolType
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.io.FileNotFoundException
 
 class ConfigServiceTest {
 
     @Test
-    fun `should load default config when local config is missing`(@TempDir tempDir: File) {
+    fun `should load default config when local config is missing`(
+        @TempDir tempDir: File,
+    ) {
         val configFile = File(tempDir, "config.yml")
         configFile.writeText(
             """
@@ -17,20 +22,25 @@ class ConfigServiceTest {
                 - "agents_default"
               projects:
                 - "projects_default"
-            """.trimIndent()
+            tools:
+                - windsurf
+            """.trimIndent(),
         )
 
         val service = ConfigService()
-        val locations = service.loadConfig(tempDir)
+        val (locations, tools) = service.loadConfig(tempDir)
 
         assertThat(locations.agents).extracting("name").containsExactly("agents_default")
         assertThat(locations.projects).extracting("name").containsExactly("projects_default")
         assertThat(locations.prompts).isEmpty()
         assertThat(locations.rulesets).isEmpty()
+        assertThat(tools).containsExactly(ToolType.WINDSURF)
     }
 
     @Test
-    fun `should override default config with local config`(@TempDir tempDir: File) {
+    fun `should override default config with local config`(
+        @TempDir tempDir: File,
+    ) {
         val configFile = File(tempDir, "config.yml")
         configFile.writeText(
             """
@@ -39,7 +49,9 @@ class ConfigServiceTest {
                 - "agents_default"
               projects:
                 - "projects_default"
-            """.trimIndent()
+            tools:
+                - windsurf
+            """.trimIndent(),
         )
 
         val localConfigFile = File(tempDir, "config.local.yml")
@@ -50,33 +62,44 @@ class ConfigServiceTest {
                 - "projects_local"
               rulesets:
                 - "rulesets_local"
-            """.trimIndent()
+            tools:
+                - antigravity
+                - github_copilot
+            """.trimIndent(),
         )
 
         val service = ConfigService()
-        val locations = service.loadConfig(tempDir)
+        val (locations, tools) = service.loadConfig(tempDir)
 
         // Agents should settle on default (not in local)
         assertThat(locations.agents).extracting("name").containsExactly("agents_default")
-        
+
         // Projects should be overridden by local
         assertThat(locations.projects).extracting("name").containsExactly("projects_local")
-        
+
         // Rulesets should take local value (default was null/empty)
         assertThat(locations.rulesets).extracting("name").containsExactly("rulesets_local")
-        
+
         // Prompts should stay empty
         assertThat(locations.prompts).isEmpty()
+
+        // Tools should be overridden by local
+        assertThat(tools).containsExactly(ToolType.ANTIGRAVITY, ToolType.GITHUB_COPILOT)
     }
 
     @Test
-    fun `should handle missing config file gracefully`(@TempDir tempDir: File) {
+    fun `should throw exception when missing config file`(
+        @TempDir tempDir: File,
+    ) {
+        // given
         val service = ConfigService()
-        val locations = service.loadConfig(tempDir)
 
-        assertThat(locations.agents).isEmpty()
-        assertThat(locations.projects).isEmpty()
-        assertThat(locations.prompts).isEmpty()
-        assertThat(locations.rulesets).isEmpty()
+        // when
+        val exception = assertThatThrownBy {
+            service.loadConfig(tempDir)
+        }
+
+        // then
+        exception.isInstanceOf(FileNotFoundException::class.java)
     }
 }

@@ -18,7 +18,7 @@ class FilterServiceTest {
         override val description: String = "Description for $id"
         override val metadata: ManifestMetadata = ManifestMetadata(
             version = Version("1.0.0"),
-            tags = tags
+            tags = tags,
         )
     }
 
@@ -28,7 +28,7 @@ class FilterServiceTest {
         val manifests = listOf(
             createManifest("m1", setOf("tag1", "common")),
             createManifest("m2", setOf("tag2", "common")),
-            createManifest("m3", setOf("tag3"))
+            createManifest("m3", setOf("tag3")),
         )
         val filter = ProjectFilter.ByTags(listOf("tag1", "tag2"))
 
@@ -36,7 +36,8 @@ class FilterServiceTest {
         val result = filterService.filter(manifests, filter)
 
         // then
-        assertThat(result).extracting("id")
+        assertThat(result)
+            .extracting("id")
             .containsExactlyInAnyOrder("m1", "m2")
     }
 
@@ -46,7 +47,7 @@ class FilterServiceTest {
         val manifests = listOf(
             createManifest("m1"),
             createManifest("m2"),
-            createManifest("m3")
+            createManifest("m3"),
         )
         val filter = ProjectFilter.ByWhitelistedIds(listOf("m1", "m3"))
 
@@ -54,7 +55,8 @@ class FilterServiceTest {
         val result = filterService.filter(manifests, filter)
 
         // then
-        assertThat(result).extracting("id")
+        assertThat(result)
+            .extracting("id")
             .containsExactlyInAnyOrder("m1", "m3")
     }
 
@@ -64,7 +66,7 @@ class FilterServiceTest {
         val manifests = listOf(
             createManifest("m1"),
             createManifest("m2"),
-            createManifest("m3")
+            createManifest("m3"),
         )
         val filter = ProjectFilter.ByBlacklistedIds(listOf("m2"))
 
@@ -72,7 +74,8 @@ class FilterServiceTest {
         val result = filterService.filter(manifests, filter)
 
         // then
-        assertThat(result).extracting("id")
+        assertThat(result)
+            .extracting("id")
             .containsExactlyInAnyOrder("m1", "m3")
     }
 
@@ -81,7 +84,7 @@ class FilterServiceTest {
         // given
         val manifests = listOf(
             createManifest("m1"),
-            createManifest("m2")
+            createManifest("m2"),
         )
 
         // when
@@ -89,7 +92,8 @@ class FilterServiceTest {
 
         // then
         assertThat(result).hasSize(2)
-        assertThat(result).extracting("id")
+        assertThat(result)
+            .extracting("id")
             .containsExactlyInAnyOrder("m1", "m2")
     }
 

@@ -1,8 +1,8 @@
 package cz.cleanship.aitools.engine.data
 
 import cz.cleanship.aitools.engine.models.AgentManifest
-import cz.cleanship.aitools.engine.models.InnerFeatureContext
 import cz.cleanship.aitools.engine.models.FeatureManifest
+import cz.cleanship.aitools.engine.models.InnerFeatureContext
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.PromptOutput
@@ -10,13 +10,13 @@ import cz.cleanship.aitools.engine.models.PromptVariable
 import cz.cleanship.aitools.engine.models.RulesetManifest
 import cz.cleanship.aitools.engine.models.Version
 
-
 val ruleset = RulesetManifest(
     id = "test-ruleset",
-    description = """
+    description =
+        """
         Multiline
         description
-    """.trimIndent(),
+        """.trimIndent(),
     rules = listOf(
         "Rule number one.",
         "Rule number two.",
@@ -27,7 +27,8 @@ val ruleset = RulesetManifest(
     ),
 )
 
-val expectedRuleset = """
+val expectedRuleset =
+    """
     # test-ruleset
     
     Multiline
@@ -39,7 +40,7 @@ val expectedRuleset = """
     - Rule number two.
     - Rule number three.
 
-""".trimIndent()
+    """.trimIndent()
 
 val rulesets = mapOf(
     ruleset.id to ruleset,
@@ -47,20 +48,23 @@ val rulesets = mapOf(
 
 val agent = AgentManifest(
     id = "test-agent",
-    description = """
+    description =
+        """
         Multiline
         description
-    """.trimIndent(),
+        """.trimIndent(),
     rulesets = listOf("test-ruleset"),
     rules = listOf("rule1", "rule2"),
-    persona = """
+    persona =
+        """
         Multiline
         persona
-            """.trimIndent(),
-    prompt = """
+        """.trimIndent(),
+    prompt =
+        """
         Multiline
         system prompt
-    """.trimIndent(),
+        """.trimIndent(),
     constraints = listOf("Constraint one.", "Constraint two."),
     metadata = ManifestMetadata(
         version = Version("1.2.3"),
@@ -69,7 +73,8 @@ val agent = AgentManifest(
     ),
 )
 
-val expectedAgent = """
+val expectedAgent =
+    """
     # test-agent
 
     Multiline
@@ -98,34 +103,42 @@ val expectedAgent = """
     - Constraint one.
     - Constraint two.
     
-""".trimIndent()
+    """.trimIndent()
 
 val prompt = PromptManifest(
     id = "id#1",
-    description = """
-                Multiline
-                description#1
-            """.trimIndent(),
+    description =
+        """
+        Multiline
+        description#1
+        """.trimIndent(),
     variables = listOf(
         PromptVariable(
-            name = "var1", required = true, description = """
-                    Multiline
-                    description#2
-                """.trimIndent()
+            name = "var1",
+            required = true,
+            description =
+                """
+                Multiline
+                description#2
+                """.trimIndent(),
         ),
         PromptVariable(
-            name = "var2", required = false, description = """
-                    Multiline
-                    description#3
-                """.trimIndent()
+            name = "var2",
+            required = false,
+            description =
+                """
+                Multiline
+                description#3
+                """.trimIndent(),
         ),
     ),
     rulesets = listOf("test-ruleset"),
     rules = listOf("rule1", "rule2"),
-    content = """
-                Multiline
-                content#3
-            """.trimIndent(),
+    content =
+        """
+        Multiline
+        content#3
+        """.trimIndent(),
     outputs = PromptOutput(format = "format1", examples = listOf("example1", "example2")),
     metadata = ManifestMetadata(
         version = Version("1.2.3"),
@@ -134,7 +147,8 @@ val prompt = PromptManifest(
     ),
 )
 
-val expectedPrompt = """
+val expectedPrompt =
+    """
     # id#1
     
     Multiline
@@ -160,23 +174,26 @@ val expectedPrompt = """
     Multiline
     content#3
     
-""".trimIndent()
+    """.trimIndent()
 
 val feature = FeatureManifest(
     id = "id#1",
-    description = """
+    description =
+        """
         Multiline
         description
-    """.trimIndent(),
+        """.trimIndent(),
     context = InnerFeatureContext(
-        overview = """
+        overview =
+            """
             Multiline
             overview
-        """.trimIndent(),
-        architecture = """
+            """.trimIndent(),
+        architecture =
+            """
             Multiline
             architecture
-        """.trimIndent(),
+            """.trimIndent(),
         dependencies = listOf(
             "Dependency#1",
             "Dependency#2",
@@ -186,10 +203,11 @@ val feature = FeatureManifest(
             "File#2",
         ),
     ),
-    prompt = """
+    prompt =
+        """
         Multiline
         prompt
-    """.trimIndent(),
+        """.trimIndent(),
     acceptanceCriteria = listOf(
         "Acceptance criteria#1",
         "Acceptance criteria#2",
@@ -205,7 +223,8 @@ val feature = FeatureManifest(
     ),
 )
 
-val expectedFeature = """
+val expectedFeature =
+    """
     # id#1
     
     Multiline
@@ -248,4 +267,4 @@ val expectedFeature = """
     - Constraint#1
     - Constraint#2
     
-""".trimIndent()
+    """.trimIndent()

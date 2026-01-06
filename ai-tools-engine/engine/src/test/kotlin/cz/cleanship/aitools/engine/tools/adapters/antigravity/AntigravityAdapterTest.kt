@@ -66,7 +66,6 @@ class AntigravityAdapterTest {
         assertThat(rulesDir.resolve("agent-${agent.id}.md").readText()).isEqualTo(withManualHeader(expectedAgent))
     }
 
-
     @Test
     fun `should output a feature`() {
         // given
@@ -84,7 +83,7 @@ class AntigravityAdapterTest {
             |
             |$expectedFeature
             |
-        """.trimMargin()
+            """.trimMargin(),
         )
     }
 

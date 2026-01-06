@@ -2,7 +2,6 @@ package cz.cleanship.aitools.engine.tools.adapters.claude
 
 import cz.cleanship.aitools.engine.data.agent
 import cz.cleanship.aitools.engine.data.expectedAgent
-import cz.cleanship.aitools.engine.data.expectedFeature
 import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt

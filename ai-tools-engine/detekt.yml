@@ -22,6 +22,8 @@ style:
     active: false
   ReturnCount: # fully idiotic for e.g., compareTo
     active: false
+  UseCheckOrError: # does not work properly with ?: operator
+    active: false
 
 naming:
   TopLevelPropertyNaming:
@@ -35,4 +37,8 @@ formatting:
   NoWildcardImports:
     active: false
   ArgumentListWrapping:
+    active: false
+  Wrapping: # useless for simple inline lambdas
+    active: false
+  Indentation: # fucking annoying for multiline strings
     active: false

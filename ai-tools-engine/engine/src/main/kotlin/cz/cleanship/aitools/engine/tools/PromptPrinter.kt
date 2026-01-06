@@ -17,7 +17,7 @@ class PromptPrinter(
             prompt.variables.map {
                 val required = if (it.required) " (required)" else ""
                 "`{{${it.name}}}`$required: ${it.description}"
-            }
+            },
         )
 
         val matchedRulesets = rulesetResolver.resolve(prompt.rulesets, rulesets)

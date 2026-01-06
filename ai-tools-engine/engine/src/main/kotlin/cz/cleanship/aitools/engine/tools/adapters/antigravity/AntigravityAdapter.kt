@@ -20,13 +20,13 @@ class AntigravityAdapter(
     ) {
         it.appendText(
             """
-                ---
-                trigger: always_on
-                glob:
-                description: ${globalContext.project.description.replace("\n", " ")}
-                ---
-                
-            """.trimIndent()
+            ---
+            trigger: always_on
+            glob:
+            description: ${globalContext.project.description.replace("\n", " ")}
+            ---
+            
+            """.trimIndent(),
         )
         printers.globalFilePrinter.print(globalContext, it)
     }
@@ -53,11 +53,11 @@ class AntigravityAdapter(
     ) {
         it.appendText(
             """
-                ---
-                description: ${featureContext.feature.description.replace("\n", " ")}
-                ---
-                
-            """.trimIndent()
+            ---
+            description: ${featureContext.feature.description.replace("\n", " ")}
+            ---
+            
+            """.trimIndent(),
         )
         printers.featurePrinter.print(featureContext, it)
     }
@@ -69,11 +69,12 @@ class AntigravityAdapter(
     private fun workflowsDir(projectDir: File) = agentDir(projectDir).resolve("workflows")
 
     companion object {
-        private val ruleHeader = """
+        private val ruleHeader =
+            """
             ---
             trigger: manual
             ---
             
-        """.trimIndent()
+            """.trimIndent()
     }
 }

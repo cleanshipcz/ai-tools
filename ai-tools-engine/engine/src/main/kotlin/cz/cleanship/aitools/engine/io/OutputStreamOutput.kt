@@ -5,7 +5,7 @@ import java.io.OutputStream
 import java.io.OutputStreamWriter
 
 class OutputStreamOutput(
-    outputStream: OutputStream
+    outputStream: OutputStream,
 ) : Output {
 
     private val writer = BufferedWriter(OutputStreamWriter(outputStream))
