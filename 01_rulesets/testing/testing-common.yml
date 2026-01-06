@@ -9,7 +9,6 @@ rules:
   - "Follow GWT pattern: Given (setup), When (execute), Then (verify)."
   - "Separate GWT sections with comments: given, when, then. All subcomment in the given section must be prefixed with - (can be hierarchical) and start with a lower-case."
   - "Tests must be deterministic - no flaky tests allowed."
-  - "Each test should test one thing; avoid multiple assertions on unrelated behavior."
   - "Ensure tests assert behavior, not implementation details."
   - "Avoid flakiness (no real time, sleeps, random unless seeded)."
   - "If coverage tooling exists, run it and prioritize untested meaningful branches."

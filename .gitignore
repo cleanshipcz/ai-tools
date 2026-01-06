@@ -69,3 +69,6 @@ temp/
 AGENTS.md
 .recipe-docs/
 .recipe-logs/
+
+# Local configuration
+config.local.yml

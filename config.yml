@@ -1,0 +1,9 @@
+locations:
+  agents:
+    - "04_agents"
+  prompts:
+    - "03_prompts"
+  rulesets:
+    - "01_rulesets"
+  projects:
+    - "06_projects"

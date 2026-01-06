@@ -6,6 +6,7 @@ import cz.cleanship.aitools.engine.services.LoaderService
 import cz.cleanship.aitools.engine.services.Locations
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.adapters.antigravity.AntigravityAdapter
@@ -43,6 +44,7 @@ class ToolsEngine(
 
             val destination = File(project.manifest.deploy.directory).absoluteFile
             for (adapter in tools) {
+                adapter.export(destination, GlobalContext(project.manifest))
                 project.agents.values.forEach {
                     adapter.export(destination, AgentContext(it, project.rulesets))
                 }
