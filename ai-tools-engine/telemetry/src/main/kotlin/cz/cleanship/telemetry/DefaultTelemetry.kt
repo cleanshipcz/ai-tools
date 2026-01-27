@@ -1,5 +1,6 @@
 package cz.cleanship.telemetry
 
+import cz.cleanship.telemetry.logging.SpanAttributesContext
 import cz.cleanship.telemetry.support.LocalInMemorySpanExporter
 import io.micrometer.core.instrument.Clock
 import io.micrometer.core.instrument.Gauge
@@ -239,8 +240,10 @@ class DefaultTelemetry(
         try {
             val scope = otelSpan.makeCurrent()
             try {
-                // Propagate the CURRENT OTel context (which includes this span) across coroutines
-                return withContext(Context.current().asContextElement()) {
+                // Merge span attributes with parent context (new attributes take priority)
+                val contextWithAttributes = SpanAttributesContext.withAttributes(Context.current(), attributes)
+                // Propagate the context (which includes this span and merged attributes) across coroutines
+                return withContext(contextWithAttributes.asContextElement()) {
                     try {
                         block(TelemetrySpanImpl(otelSpan))
                     } catch (e: Exception) {
