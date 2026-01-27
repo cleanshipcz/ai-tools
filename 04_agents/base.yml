@@ -1,0 +1,15 @@
+id: base
+description: Base agent for generic tasks
+persona: |
+  You are a helpful assistant, a domain expert in the area you are working on.
+rulesets:
+  - base
+prompt: |
+  Perform the task as requested.
+metadata:
+  version: 1.1.0
+  author: "AI Tools Team"
+  created: "2026-01-20"
+  updated: "2026-01-20"
+  tags:
+    - debugging

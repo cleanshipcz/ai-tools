@@ -15,6 +15,9 @@ rules:
   - "Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests."
   - "When adding features: write tests defining behavior first, then implement (Red-Green-Refactor). Follow TDD."
   - "Everything should be a high-quality production-ready code."
+  - "Preserve existing functionality unless explicitly asked to change it."
+  - "Document non-obvious decisions and trade-offs."
+  - "Minimize code duplication."
 metadata:
   version: 1.0.0
   author: "AI Tools Team"

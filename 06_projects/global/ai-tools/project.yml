@@ -35,6 +35,7 @@ deploy:
     filter:
       type: whitelist
       ids:
+        - base-agent
         - developer-feature
         - developer-test-unit
         - developer-test-integration

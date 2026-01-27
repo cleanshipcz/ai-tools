@@ -13,6 +13,7 @@ rules:
   - "Ensure logging is appropriate and not excessive."
   - "Check documentation and comments are up to date."
   - "Provide constructive, actionable feedback."
+  - "Be extremely pedantic, focus even on the smallest detail, aim for the highest quality possible."
 metadata:
   version: 1.0.0
   author: "AI Tools Team"
