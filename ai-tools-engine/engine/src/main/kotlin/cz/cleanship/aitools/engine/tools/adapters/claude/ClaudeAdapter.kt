@@ -19,28 +19,40 @@ class ClaudeAdapter(
     override val toolType: ToolType = ToolType.CLAUDE
 
     override fun prepare(projectDir: File, project: ProjectManifest) {
-        TODO("Not yet implemented")
-    }
-
-    init {
-        TODO("Not implemented yet")
+        if (project.deploy.replace) {
+            claudeDir(projectDir).deleteRecursively()
+        }
     }
 
     override fun export(projectDir: File, globalContext: GlobalContext) {
-        TODO("Not yet implemented")
+        exportService.export(
+            globalContext.project,
+            projectDir.resolve("CLAUDE.md"),
+        ) {
+            printers.globalFilePrinter.print(globalContext, it)
+        }
     }
 
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
-        claudeDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md"),
+        claudeDir(projectDir).resolve("commands").resolve("${promptContext.prompt.id}.md"),
     ) {
         printers.promptPrinter.print(promptContext, it)
     }
 
     override fun export(projectDir: File, agentContext: AgentContext) = exportService.export(
         agentContext.agent,
-        claudeDir(projectDir).resolve("agent-${agentContext.agent.id}.md"),
+        claudeDir(projectDir).resolve("agents").resolve("${agentContext.agent.id}.md"),
     ) {
+        it.appendText(
+            """
+            ---
+            name: ${agentContext.agent.id}
+            description: ${agentContext.agent.description.replace("\n", " ")}
+            ---
+            
+            """.trimIndent(),
+        )
         printers.agentPrinter.print(agentContext, it)
     }
 

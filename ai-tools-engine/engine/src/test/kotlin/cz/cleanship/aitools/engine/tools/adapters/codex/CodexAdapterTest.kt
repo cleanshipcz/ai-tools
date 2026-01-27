@@ -6,19 +6,26 @@ import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.models.ManifestMetadata
+import cz.cleanship.aitools.engine.models.ProjectContext
+import cz.cleanship.aitools.engine.models.ProjectDeploy
+import cz.cleanship.aitools.engine.models.ProjectDocumentation
+import cz.cleanship.aitools.engine.models.ProjectManifest
+import cz.cleanship.aitools.engine.models.Version
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
+import io.mockk.every
+import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Path
 
-@Disabled
 class CodexAdapterTest {
 
     @TempDir
@@ -35,6 +42,31 @@ class CodexAdapterTest {
     }
 
     @Test
+    fun `should output project context to AGENTS dot md`() {
+        // given
+        val project = ProjectManifest(
+            id = "test-project",
+            description = "Test Project",
+            metadata = ManifestMetadata(version = Version("1.0.0")),
+            context = ProjectContext(
+                rules = listOf("Rule one."),
+                overview = "Overview",
+                documentation = ProjectDocumentation(readme = "README.md"),
+            ),
+            deploy = ProjectDeploy(directory = tempDir.toString()),
+        )
+
+        // when
+        adapter.export(tempDir.toFile(), GlobalContext(project))
+
+        // then
+        val content = tempDir.resolve("AGENTS.md").toFile().readText()
+        assertThat(content).contains("# test-project")
+        assertThat(content).contains("Test Project")
+        assertThat(content).contains("## Rules")
+    }
+
+    @Test
     fun `should output a prompt`() {
         // given
         val prompt = PromptContext(prompt, rulesets)
@@ -43,11 +75,15 @@ class CodexAdapterTest {
         adapter.export(tempDir.toFile(), prompt)
 
         // then
-        assertThat(targetDir.resolve("prompt-${prompt.prompt.id}.md").readText().trim()).isEqualTo(expectedPrompt.trim())
+        val content = targetDir.resolve("skills/prompt-${prompt.prompt.id}/SKILL.md").readText().trim()
+        assertThat(content).startsWith("---")
+        assertThat(content).contains("name: ${prompt.prompt.id}")
+        assertThat(content).contains("description: ${prompt.prompt.description.replace("\n", " ")}")
+        assertThat(content).contains(expectedPrompt.trim())
     }
 
     @Test
-    fun `should output an agent`() {
+    fun `should output an agent skill`() {
         // given
         val agent = agent
 
@@ -55,7 +91,11 @@ class CodexAdapterTest {
         adapter.export(tempDir.toFile(), AgentContext(agent, rulesets))
 
         // then
-        assertThat(targetDir.resolve("agent-${agent.id}.md").readText().trim()).isEqualTo(expectedAgent.trim())
+        val content = targetDir.resolve("skills/agent-${agent.id}/SKILL.md").readText().trim()
+        assertThat(content).startsWith("---")
+        assertThat(content).contains("name: ${agent.id}")
+        assertThat(content).contains("description: ${agent.description.replace("\n", " ")}")
+        assertThat(content).contains(expectedAgent.trim())
     }
 
     @Test
@@ -68,5 +108,46 @@ class CodexAdapterTest {
 
         // then
         assertThat(targetDir.resolve("features/feature-${feature.id}.md").readText()).contains(feature.description)
+    }
+
+    @Test
+    fun `prepare should delete codex directory when replace is true`() {
+        // given
+        val projectDir = tempDir.toFile()
+        val codexDir = projectDir.resolve(".codex")
+        codexDir.mkdirs()
+        File(codexDir, "some-file.txt").writeText("content")
+
+        val manifest = mockk<ProjectManifest>()
+        val deploy = mockk<ProjectDeploy>()
+        every { manifest.deploy } returns deploy
+        every { deploy.replace } returns true
+
+        // when
+        adapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(codexDir).doesNotExist()
+    }
+
+    @Test
+    fun `prepare should keep codex directory when replace is false`() {
+        // given
+        val projectDir = tempDir.toFile()
+        val codexDir = projectDir.resolve(".codex")
+        codexDir.mkdirs()
+        File(codexDir, "some-file.txt").writeText("content")
+
+        val manifest = mockk<ProjectManifest>()
+        val deploy = mockk<ProjectDeploy>()
+        every { manifest.deploy } returns deploy
+        every { deploy.replace } returns false
+
+        // when
+        adapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(codexDir).exists()
+        assertThat(File(codexDir, "some-file.txt")).exists()
     }
 }

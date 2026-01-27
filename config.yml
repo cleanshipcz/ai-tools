@@ -12,3 +12,6 @@ tools:
   - windsurf
   - antigravity
   - github_copilot
+  - claude
+  - codex
+  - cursor

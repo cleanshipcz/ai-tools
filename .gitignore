@@ -69,6 +69,8 @@ temp/
 AGENTS.md
 .recipe-docs/
 .recipe-logs/
+.codex/
+CLAUDE.md
 
 # Local configuration
 config.local.yml

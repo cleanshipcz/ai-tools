@@ -6,19 +6,26 @@ import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.models.ManifestMetadata
+import cz.cleanship.aitools.engine.models.ProjectContext
+import cz.cleanship.aitools.engine.models.ProjectDeploy
+import cz.cleanship.aitools.engine.models.ProjectDocumentation
+import cz.cleanship.aitools.engine.models.ProjectManifest
+import cz.cleanship.aitools.engine.models.Version
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
+import io.mockk.every
+import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Path
 
-@Disabled
 class CursorAdapterTest {
 
     @TempDir
@@ -35,6 +42,33 @@ class CursorAdapterTest {
     }
 
     @Test
+    fun `should output project context rule`() {
+        // given
+        val project = ProjectManifest(
+            id = "test-project",
+            description = "Test Project",
+            metadata = ManifestMetadata(version = Version("1.0.0")),
+            context = ProjectContext(
+                rules = listOf("Rule one."),
+                overview = "Overview",
+                documentation = ProjectDocumentation(readme = "README.md"),
+            ),
+            deploy = ProjectDeploy(directory = tempDir.toString()),
+        )
+
+        // when
+        adapter.export(tempDir.toFile(), GlobalContext(project))
+
+        // then
+        val content = targetDir.resolve("rules/project.mdc").readText().trim()
+        assertThat(content).startsWith("---")
+        assertThat(content).contains("description: Test Project")
+        assertThat(content).contains("globs: \"**/*\"")
+        assertThat(content).contains("alwaysApply: true")
+        assertThat(content).contains("# test-project")
+    }
+
+    @Test
     fun `should output a prompt`() {
         // given
         val prompt = PromptContext(prompt, rulesets)
@@ -43,7 +77,7 @@ class CursorAdapterTest {
         adapter.export(tempDir.toFile(), prompt)
 
         // then
-        assertThat(targetDir.resolve("prompts/prompt-${prompt.prompt.id}.md").readText().trim()).isEqualTo(expectedPrompt.trim())
+        assertThat(targetDir.resolve("commands/prompt-${prompt.prompt.id}.md").readText().trim()).isEqualTo(expectedPrompt.trim())
     }
 
     @Test
@@ -73,5 +107,46 @@ class CursorAdapterTest {
 
         // then
         assertThat(targetDir.resolve("features/feature-${feature.id}.md").readText()).contains(feature.description)
+    }
+
+    @Test
+    fun `prepare should delete cursor directory when replace is true`() {
+        // given
+        val projectDir = tempDir.toFile()
+        val cursorDir = projectDir.resolve(".cursor")
+        cursorDir.mkdirs()
+        File(cursorDir, "some-file.txt").writeText("content")
+
+        val manifest = mockk<ProjectManifest>()
+        val deploy = mockk<ProjectDeploy>()
+        every { manifest.deploy } returns deploy
+        every { deploy.replace } returns true
+
+        // when
+        adapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(cursorDir).doesNotExist()
+    }
+
+    @Test
+    fun `prepare should keep cursor directory when replace is false`() {
+        // given
+        val projectDir = tempDir.toFile()
+        val cursorDir = projectDir.resolve(".cursor")
+        cursorDir.mkdirs()
+        File(cursorDir, "some-file.txt").writeText("content")
+
+        val manifest = mockk<ProjectManifest>()
+        val deploy = mockk<ProjectDeploy>()
+        every { manifest.deploy } returns deploy
+        every { deploy.replace } returns false
+
+        // when
+        adapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(cursorDir).exists()
+        assertThat(File(cursorDir, "some-file.txt")).exists()
     }
 }

@@ -19,20 +19,33 @@ class CursorAdapter(
     override val toolType: ToolType = ToolType.CURSOR
 
     override fun prepare(projectDir: File, project: ProjectManifest) {
-        TODO("Not yet implemented")
-    }
-
-    init {
-        TODO("Not implemented yet")
+        if (project.deploy.replace) {
+            cursorDir(projectDir).deleteRecursively()
+        }
     }
 
     override fun export(projectDir: File, globalContext: GlobalContext) {
-        TODO("Not yet implemented")
+        exportService.export(
+            globalContext.project,
+            cursorDir(projectDir).resolve("rules").resolve("project.mdc"),
+        ) {
+            it.appendText(
+                """
+                ---
+                description: ${globalContext.project.description.replace("\n", " ")}
+                globs: "**/*"
+                alwaysApply: true
+                ---
+                
+                """.trimIndent(),
+            )
+            printers.globalFilePrinter.print(globalContext, it)
+        }
     }
 
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
-        cursorDir(projectDir).resolve("prompts").resolve("prompt-${promptContext.prompt.id}.md"),
+        cursorDir(projectDir).resolve("commands").resolve("prompt-${promptContext.prompt.id}.md"),
     ) {
         printers.promptPrinter.print(promptContext, it)
     }

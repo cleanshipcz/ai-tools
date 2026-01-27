@@ -19,28 +19,49 @@ class CodexAdapter(
     override val toolType: ToolType = ToolType.CODEX
 
     override fun prepare(projectDir: File, project: ProjectManifest) {
-        TODO("Not yet implemented")
-    }
-
-    init {
-        TODO("Not implemented yet")
+        if (project.deploy.replace) {
+            codexDir(projectDir).deleteRecursively()
+        }
     }
 
     override fun export(projectDir: File, globalContext: GlobalContext) {
-        TODO("Not yet implemented")
+        exportService.export(
+            globalContext.project,
+            projectDir.resolve("AGENTS.md"),
+        ) {
+            printers.globalFilePrinter.print(globalContext, it)
+        }
     }
 
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
-        codexDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md"),
+        skillsDir(projectDir).resolve("prompt-${promptContext.prompt.id}").resolve("SKILL.md"),
     ) {
+        it.appendText(
+            """
+            ---
+            name: ${promptContext.prompt.id}
+            description: ${promptContext.prompt.description.replace("\n", " ")}
+            ---
+            
+            """.trimIndent(),
+        )
         printers.promptPrinter.print(promptContext, it)
     }
 
     override fun export(projectDir: File, agentContext: AgentContext) = exportService.export(
         agentContext.agent,
-        codexDir(projectDir).resolve("agent-${agentContext.agent.id}.md"),
+        skillsDir(projectDir).resolve("agent-${agentContext.agent.id}").resolve("SKILL.md"),
     ) {
+        it.appendText(
+            """
+            ---
+            name: ${agentContext.agent.id}
+            description: ${agentContext.agent.description.replace("\n", " ")}
+            ---
+            
+            """.trimIndent(),
+        )
         printers.agentPrinter.print(agentContext, it)
     }
 
@@ -61,4 +82,6 @@ class CodexAdapter(
     }
 
     private fun codexDir(projectDir: File) = projectDir.resolve(".codex")
+
+    private fun skillsDir(projectDir: File) = codexDir(projectDir).resolve("skills")
 }
