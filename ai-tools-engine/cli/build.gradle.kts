@@ -8,6 +8,8 @@ dependencies {
     implementation(project(":utils"))
     implementation(project(":telemetry"))
     implementation(libs.clikt)
+
+    testImplementation(kotlin("test"))
 }
 
 application {

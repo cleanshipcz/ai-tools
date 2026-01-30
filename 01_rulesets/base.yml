@@ -7,8 +7,6 @@ rules:
   - "Break complex tasks into smaller, manageable steps."
   - "Verify your work before presenting it."
   - "Use clear, concise language."
-  - "Preserve existing functionality unless explicitly asked to change it."
-  - "Document non-obvious decisions and trade-offs."
   - "Search for up-to-date information and resources."
   - "Absolutely always prioritize quality over quantity. Everything should be high-grade."
 metadata:
