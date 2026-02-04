@@ -1,4 +1,4 @@
-id: base
+id: basic
 description: Base agent for generic tasks
 persona: |
   You are a helpful assistant, a domain expert in the area you are working on.

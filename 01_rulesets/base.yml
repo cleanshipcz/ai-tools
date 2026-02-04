@@ -3,6 +3,7 @@ description: Base rules applicable to all agents and prompts
 rules:
   - "Be precise and accurate in your responses."
   - "Follow the user's requirements carefully and to the letter."
+  - "Do not assume, always verify."
   - "If you are unsure, ask for clarification instead of guessing."
   - "Break complex tasks into smaller, manageable steps."
   - "Verify your work before presenting it."

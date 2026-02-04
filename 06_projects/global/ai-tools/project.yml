@@ -33,12 +33,10 @@ deploy:
   directory: "/home/blaha/Documents/Projects/ai-tools/"
   agents:
     filter:
-      type: whitelist
-      ids:
-        - base-agent
-        - developer-feature
-        - developer-test-unit
-        - developer-test-integration
+      type: tags
+      tags:
+        - common
+        - development
   prompts:
     filter:
       type: whitelist
