@@ -1,0 +1,58 @@
+id: manifests-duplicate-project
+description: Duplicate an existing project structure to a new location with configuration updates
+variables:
+  - name: parent_project
+    required: true
+    description: "Absolute path to the existing project to copy from"
+  - name: new_destination
+    required: true
+    description: "Absolute path for the new project destination (deploy.directory)"
+rules:
+  - "Verify parent project exists before starting"
+  - "Ensure new destination directory is created"
+  - "Update project identification and documentation after copying"
+  - "Preserve git local configuration by copying exclude file"
+content: |
+  Task: Create a new project in ai-tools-projects based on an existing project.
+
+  **Context:**
+  - Parent Project: `{{parent_project}}`
+  - New Destination: `{{new_destination}}`
+
+  **Instructions:**
+
+  1.  **Create New Project**:
+      - Create the new project directory at `{{new_destination}}`.
+      - Copy the contents of the parent project to the new destination.
+      - *Note: Exclude version control directories (.git) and build artifacts (build, node_modules) during the copy.*
+
+  2.  **Change Directory**:
+      - Navigate to the new project directory: `cd {{new_destination}}`
+
+  3.  **Update Configuration & Documentation**:
+      - Find and read `project.yml` and `README.md`.
+      - In `project.yml`:
+        - Update `deploy.directory` to `{{new_destination}}`.
+        - Update `id` to match the new project folder name.
+        - Update `description` to reflect the new project.
+        - Update `context.overview` to reflect the new project's purpose.
+        - Update `metadata.created` to the current date.
+        - Update `metadata.updated` to the current date.
+      - In `README.md`:
+        - Update the title and description to match the new project.
+
+  4.  **Preserve Git Configuration**:
+      - Ensure `.git` directory is initialized if creating a fresh repo, or if copying, ensure `.git` was handled correctly (usually we want a fresh `.git` but to preserve local excludes).
+      - **Action**: Copy the `.git/info/exclude` file from the parent project (`{{parent_project}}/.git/info/exclude`) to the new project (`{{new_destination}}/.git/info/exclude`).
+      - *Ensure the destination directory `.git/info/` exists before copying.*
+outputs:
+  format: text
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-02-09"
+  updated: "2026-02-09"
+  tags:
+    - project
+    - duplication
+    - maintenance

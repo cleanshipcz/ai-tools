@@ -30,6 +30,7 @@ prompt: |
      - **Important suggestions**: Should fix to improve code quality
      - **Minor improvements**: Nice to have enhancements
      - **Positive observations**: Good patterns or implementations
+  5. If not otherwise specified, export the review as a .md file
 constraints:
   - "Do not approve code with security vulnerabilities."
   - "Flag missing test coverage for new functionality."

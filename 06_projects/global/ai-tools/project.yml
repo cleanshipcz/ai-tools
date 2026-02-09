@@ -62,6 +62,7 @@ deploy:
         - manifests-create-ruleset
         - manifests-create-skill
         - manifests-create-recipe
+        - manifests-duplicate-project
   rulesets:
     filter:
       type: tags
