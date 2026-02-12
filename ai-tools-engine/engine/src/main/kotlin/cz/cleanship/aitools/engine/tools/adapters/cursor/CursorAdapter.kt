@@ -57,9 +57,7 @@ class CursorAdapter(
         it.appendText(
             """
             ---
-            description: ${agentContext.agent.description.replace("\n", " ")}
-            globs: "**/*"
-            alwaysApply: true
+            alwaysApply: false
             ---
             
             """.trimIndent(),

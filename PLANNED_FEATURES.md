@@ -21,6 +21,9 @@
   - archetype would be a parent of a project to reuse common configuration
   - archetype would be defined in a similar way as project.yml
   - project.yml in the new project would then just reference the archetype and override what is needed
+- issues:
+  - would require project manifests to have optional fields because they can be filled by archetypes
+  - for proper validation then a custom validation would be required while the fields are still optional -> leads to separating IO model and internal model -> can do in later stage once it settles, for now use the copy prompt
 
 ## Prompts
 

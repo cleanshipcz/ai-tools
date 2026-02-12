@@ -11,18 +11,34 @@ A framework-agnostic telemetry facade for Kotlin apps. It hides vendor SDKs (Ope
 
 ## Table of contents
 
-- [Gradle](#gradle)
-- [Quick start](#quick-start)
-- [Usage patterns and examples](#usage-patterns-and-examples)
-- [Trace context: trace_id vs span_id and propagation](#trace-context-trace_id-vs-span_id-and-propagation)
-- [Configuration](#configuration-env-or--d-system-properties)
-- [Exporter selection and typical setups](#exporter-selection-and-typical-setups)
-- [What prints to STDOUT vs what is sent](#what-prints-to-stdout-vs-what-is-sent)
-- [Structured JSON logging (Logback)](#structured-json-logging-logback)
-- [Using the sample Logback config](#using-the-sample-logback-config)
-- [Extending and customizing logging](#extending-and-customizing-logging)
-- [Gotchas](#gotchas)
-- [Testing](#testing)
+- [Telemetry Module](#telemetry-module)
+  - [Features](#features)
+  - [Table of contents](#table-of-contents)
+  - [Gradle](#gradle)
+  - [Quick start](#quick-start)
+  - [Usage patterns and examples](#usage-patterns-and-examples)
+    - [1) Request handling: trace + metrics + structured logs](#1-request-handling-trace--metrics--structured-logs)
+    - [2) External call: CLIENT span + latency metric](#2-external-call-client-span--latency-metric)
+    - [3) Error logging inside spans](#3-error-logging-inside-spans)
+    - [4) Async/coroutines propagation](#4-asynccoroutines-propagation)
+    - [5) Optional: map-style logging helpers (SLF4J 2.x)](#5-optional-map-style-logging-helpers-slf4j-2x)
+    - [6) Framework endpoints: expose Prometheus](#6-framework-endpoints-expose-prometheus)
+    - [7) Recommended label hygiene for metrics](#7-recommended-label-hygiene-for-metrics)
+    - [Metric naming and label requirements (strict)](#metric-naming-and-label-requirements-strict)
+  - [Trace context: trace\_id vs span\_id and propagation](#trace-context-trace_id-vs-span_id-and-propagation)
+  - [Configuration (env or -D system properties)](#configuration-env-or--d-system-properties)
+  - [Exporter selection and typical setups](#exporter-selection-and-typical-setups)
+  - [What prints to STDOUT vs what is sent](#what-prints-to-stdout-vs-what-is-sent)
+  - [Structured JSON logging (Logback)](#structured-json-logging-logback)
+    - [Log output format](#log-output-format)
+    - [Option A: Provider-based (recommended)](#option-a-provider-based-recommended)
+    - [Option B: MDC-based (alternative)](#option-b-mdc-based-alternative)
+    - [Using the sample Logback config](#using-the-sample-logback-config)
+  - [Extending and customizing logging](#extending-and-customizing-logging)
+    - [A) MDC (Mapped Diagnostic Context)](#a-mdc-mapped-diagnostic-context)
+    - [B) Custom JSON providers](#b-custom-json-providers)
+  - [Gotchas](#gotchas)
+  - [Testing](#testing)
 
 ## Gradle
 
@@ -294,6 +310,7 @@ Notes
 - TELEMETRY_EXPORTER_METRICS / -Dtelemetry.metrics.exporter: comma-separated list of `none` | `prometheus` | `otlp` |
   `logging`
 - TELEMETRY_OTLP_ENDPOINT / -Dtelemetry.otlp.endpoint (default: none; example: `http://localhost:4318`)
+- LOG_FORMAT / -DLOG_FORMAT: `JSON` (default) | `TEXT`. Controls the log output format — see [Log output format](#log-output-format).
   Notes:
 - Multiple exporters can be enabled simultaneously by comma-separating values.
 - See “Exporter selection and typical setups” below for concrete configurations.
@@ -358,7 +375,29 @@ Prometheus endpoint examples: see "Usage patterns and examples" → "Framework e
 
 ## Structured JSON logging (Logback)
 
-Choose one of the following approaches:
+### Log output format
+
+The default configuration supports two log output modes, selectable at startup via the `LOG_FORMAT` environment variable (or `-DLOG_FORMAT` system property):
+
+| Value  | Description                                      | Use case                    |
+| ------ | ------------------------------------------------ | --------------------------- |
+| `JSON` | Structured JSON with trace correlation (default) | Production, log aggregation |
+| `TEXT` | Human-readable colored plain text                | Local debugging             |
+
+Examples:
+
+```bash
+# Production (default) — structured JSON
+./gradlew run
+
+# Local debugging — human-readable
+LOG_FORMAT=TEXT ./gradlew run
+
+# Or via JVM system property
+./gradlew run -DLOG_FORMAT=TEXT
+```
+
+Choose one of the following approaches for trace correlation:
 
 ### Option A: Provider-based (recommended)
 
@@ -368,7 +407,9 @@ Choose one of the following approaches:
 ```xml
 
 <configuration>
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <variable name="LOG_FORMAT" value="${LOG_FORMAT:-JSON}" />
+
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
             <providers>
                 <timestamp/>
@@ -376,12 +417,20 @@ Choose one of the following approaches:
                 <threadName/>
                 <logLevel/>
                 <message/>
+                <stackTrace/>
                 <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
             </providers>
         </encoder>
     </appender>
+
+    <appender name="TEXT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%logger{36}) - %msg%n%ex</pattern>
+        </encoder>
+    </appender>
+
     <root level="INFO">
-        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="${LOG_FORMAT}" />
     </root>
 </configuration>
 ```
@@ -410,6 +459,7 @@ log.atInfo().addKeyValue("user", 42).addKeyValue("order", 123).log("Processed or
                 <threadName/>
                 <logLevel/>
                 <message/>
+                <stackTrace/>
                 <mdc/>
             </providers>
         </encoder>
@@ -424,7 +474,7 @@ log.atInfo().addKeyValue("user", 42).addKeyValue("order", 123).log("Processed or
 
 1. Copy `telemetry/logback.sample.xml` into your application as `src/main/resources/logback.xml`.
 
-2. Start your app. Logs will be JSON on STDOUT and include `trace_id`/`span_id` when emitted inside `telemetry.inSpan { ... }`.
+2. Start your app. Logs will be JSON on STDOUT by default and include `trace_id`/`span_id` when emitted inside `telemetry.inSpan { ... }`. Set `LOG_FORMAT=TEXT` for human-readable output during debugging.
 
 ## Extending and customizing logging
 
@@ -502,6 +552,7 @@ Register it in Logback alongside `TraceJsonProvider`:
     <threadName/>
     <logLevel/>
     <message/>
+    <stackTrace/>
     <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
     <provider class="com.example.logging.EnvJsonProvider"/>
     <!-- or <mdc/> if you rely on MDC -->

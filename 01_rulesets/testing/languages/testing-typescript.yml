@@ -1,0 +1,17 @@
+id: testing-language-typescript
+description: TypeScript testing standards and best practices
+rules:
+  - "Use describe() for grouping tests, not nested describe() calls."
+  - "Use test() for individual test cases, not nested test() calls."
+  - "Use beforeEach() for setup, not nested beforeEach() calls."
+  - "Use afterEach() for cleanup, not nested afterEach() calls."
+  - "Use beforeAll() for setup, not nested beforeAll() calls."
+  - "Use afterAll() for cleanup, not nested afterAll() calls."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  tags:
+    - typescript
+    - testing
+    - style

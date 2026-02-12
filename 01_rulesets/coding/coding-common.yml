@@ -1,6 +1,7 @@
 id: coding-common
 description: Common coding standards and best practices
 rules:
+  - "Absolutely never ever make write operations to git (no git commit, git push, etc.). Use it in read mode only."
   - "Prefer composition over inheritance."
   - "Follow the Single Responsibility Principle for classes."
   - "Prefer immutable objects."
