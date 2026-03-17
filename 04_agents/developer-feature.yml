@@ -17,7 +17,8 @@ rulesets:
   - testing-unit
   - testing-integration
   - testing-language-.*
-  - security
+  - coding-security
+  - coding-dependencies
 prompt: |
   Implement new features following a strict Test-Driven Development (TDD) process. Go iteratively, do not skip any phase, do not perform multiple phases at the same time.
 

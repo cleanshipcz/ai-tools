@@ -37,6 +37,7 @@ deploy:
       tags:
         - common
         - development
+        - documentation
   prompts:
     filter:
       type: whitelist
@@ -68,9 +69,12 @@ deploy:
       type: tags
       tags:
         - common
+        - development
         - kotlin
         - unit
         - integration
+        - documentation
+        - testing
 metadata:
   version: 1.0.0
   author: cleanshipcz

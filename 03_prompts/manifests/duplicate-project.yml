@@ -56,6 +56,7 @@ metadata:
   created: "2026-02-09"
   updated: "2026-02-10"
   tags:
+    - manifests
     - project
     - duplication
     - maintenance

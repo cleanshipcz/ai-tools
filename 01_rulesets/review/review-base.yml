@@ -1,0 +1,23 @@
+id: review-base
+description: Core review principles applicable to all review types - structured feedback, severity levels, and constructive communication
+rules:
+  - "Provide constructive, actionable feedback with specific suggestions."
+  - "Classify findings by severity: critical (must fix), important (should fix), minor (nice to have)."
+  - "Include positive observations - highlight good patterns and implementations."
+  - "Reference specific lines, files, or sections when providing feedback."
+  - "Explain the why behind each finding, not just the what."
+  - "Suggest concrete alternatives or improvements, not just criticism."
+  - "Be extremely pedantic - focus even on the smallest detail, aim for the highest quality possible."
+  - "Verify claims against actual code or documentation before reporting."
+  - "Prioritize findings by impact - address highest-risk items first."
+  - "If not otherwise specified, export the review as a .md file."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-13"
+  tags:
+    - common
+    - review
+    - development
+    - quality
+    - foundation

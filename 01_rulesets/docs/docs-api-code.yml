@@ -1,5 +1,5 @@
-id: docs-api
-description: Rules for documenting code, APIs, functions, classes, and technical implementation details
+id: docs-api-code
+description: Rules for documenting code-level APIs including functions, classes, methods, and modules
 rules:
   - "Document all public APIs, functions, classes, and methods."
   - "Include parameter types, return types, and possible exceptions."
@@ -12,11 +12,6 @@ rules:
   - "Explain time and space complexity for algorithms."
   - "Use appropriate doc comment format (JSDoc, JavaDoc, docstrings, etc.)."
   - "Document class invariants and contract conditions."
-  - "Include example responses for API endpoints."
-  - "Document authentication and authorization requirements."
-  - "Specify rate limits, quotas, and usage constraints."
-  - "Include versioning information for APIs."
-  - "Document deprecated features with migration guidance."
   - "Use inline comments for complex logic within implementations."
   - "Document configuration options and environment variables."
 metadata:
@@ -26,6 +21,6 @@ metadata:
   tags:
     - common
     - documentation
-    - api
+    - docs
     - code
     - technical

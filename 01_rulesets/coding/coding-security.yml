@@ -1,5 +1,5 @@
-id: security
-description: Security-focused rules and guardrails
+id: coding-security
+description: Security-focused coding rules and guardrails
 rules:
   - "Never log or expose sensitive data (passwords, tokens, API keys)."
   - "Validate and sanitize all user inputs."
@@ -14,10 +14,13 @@ rules:
   - "Store secrets in secure vaults, not in code or config files."
   - "Implement proper CSRF protection for web applications."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2025-01-01"
+  updated: "2026-03-13"
   tags:
     - common
+    - development
+    - coding
     - security
     - safety

@@ -1,0 +1,24 @@
+id: docs-api-rest
+description: Rules for documenting HTTP/REST API endpoints, request/response schemas, and service contracts
+rules:
+  - "Include example requests and responses for each endpoint."
+  - "Document authentication and authorization requirements."
+  - "Specify rate limits, quotas, and usage constraints."
+  - "Include versioning information for APIs."
+  - "Document deprecated endpoints with migration guidance."
+  - "Define request and response schemas with field descriptions."
+  - "Document all possible error codes and their meanings."
+  - "Reference or maintain OpenAPI/Swagger specifications where applicable."
+  - "Specify supported content types and serialization formats."
+  - "Document query parameters, path parameters, and request headers."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-17"
+  tags:
+    - common
+    - documentation
+    - docs
+    - api
+    - rest
+    - http

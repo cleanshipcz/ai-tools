@@ -1,0 +1,25 @@
+id: review-plan
+description: Plan review rules for evaluating feasibility, completeness, risk assessment, and scope of implementation plans
+rules:
+  - "Verify all requirements are addressed in the plan."
+  - "Assess feasibility - are proposed solutions technically achievable?"
+  - "Identify missing dependencies between tasks or components."
+  - "Check for scope creep - does the plan stay focused on stated objectives?"
+  - "Evaluate risk identification and mitigation strategies."
+  - "Verify rollback and failure recovery strategies are defined."
+  - "Check that acceptance criteria are specific, measurable, and testable."
+  - "Identify assumptions that need validation before implementation."
+  - "Assess whether the plan considers backward compatibility and migration."
+  - "Check for missing non-functional requirements (performance, security, observability)."
+  - "Evaluate sequencing - are tasks ordered to minimize blocking and risk?"
+  - "Verify the plan addresses testing strategy at appropriate levels."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-13"
+  tags:
+    - review
+    - development
+    - plan
+    - feasibility
+    - risk

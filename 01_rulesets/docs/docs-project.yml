@@ -1,18 +1,17 @@
 id: docs-project
 description: Rules for project-level documentation including README, guides, tutorials, and architecture docs
 rules:
-  - "README must include: overview, installation, usage, configuration, contributing."
+  - "README should include relevant sections from: overview, installation, usage, configuration, and contributing."
   - "Provide step-by-step installation instructions with all prerequisites."
   - "Include quick-start guide to get users productive immediately."
   - "Document project structure and key directories."
   - "Explain the purpose and scope of the project clearly."
-  - "Include badges for build status, coverage, version, license."
   - "Provide examples of common use cases and workflows."
   - "Document all configuration options and environment setup."
   - "Include contribution guidelines (code style, PR process, testing)."
   - "Maintain a changelog documenting version history."
   - "Write tutorials as step-by-step guides with clear outcomes."
-  - "Separate 'How-to Guides' (tasks) from 'Tutorials' (learning)."
+  - "Distinguish between task-oriented how-to guides and learning-oriented tutorials."
   - "Include architecture documentation for system design."
   - "Document deployment process and requirements."
   - "Provide troubleshooting guide for common issues."
@@ -20,6 +19,7 @@ rules:
   - "Document licensing and legal requirements."
   - "Keep README concise; link to detailed docs in separate files."
   - "Use screenshots or demos where they add value."
+  - "Include diagrams (Mermaid) where they clarify architecture or complex concepts."
 metadata:
   version: 1.0.0
   author: "AI Tools Team"
@@ -27,6 +27,7 @@ metadata:
   tags:
     - common
     - documentation
+    - docs
     - project
     - guides
     - readme

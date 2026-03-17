@@ -6,15 +6,14 @@ rules:
   - "Provide concrete, working examples to illustrate concepts."
   - "Structure content logically with clear headings and hierarchy."
   - "Make documentation scannable with bullet points, tables, and code blocks."
-  - "Keep documentation up-to-date with the code it describes."
-  - "Verify accuracy against actual implementation before documenting."
+  - "Keep documentation accurate and up-to-date by verifying against actual implementation."
   - "Use consistent terminology throughout documentation."
   - "Include prerequisites and assumptions upfront."
   - "Document edge cases, limitations, and known issues."
   - "Add troubleshooting sections for common problems."
   - "Prefer referencing existing documentation over duplicating content."
   - "Use proper markdown formatting for readability."
-  - "Include diagrams (Mermaid) where they clarify complex concepts."
+  - "Write one sentence per line in markdown for cleaner diffs and easier reviews."
   - "Link to related documentation for additional context."
   - "Start with a clear introduction explaining purpose and scope."
   - "Follow existing documentation style and conventions in the project."
@@ -25,5 +24,6 @@ metadata:
   tags:
     - common
     - documentation
+    - docs
     - writing
     - foundation
