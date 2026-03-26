@@ -1,0 +1,27 @@
+id: testing-language-python
+description: Python testing standards using pytest
+rules:
+  # Framework & naming
+  - "Use pytest as the test framework. Do not use unittest-style classes unless extending existing test suites."
+  - "Name test files test_<module>.py and test functions test_<behavior_under_test>."
+  - "Place tests in a tests/ directory mirroring the source structure."
+  # Fixtures
+  - "Use function-scope fixtures by default. Only widen scope (session, module) when setup is genuinely expensive."
+  - "Place shared fixtures in conftest.py at the appropriate directory level. Keep test-specific fixtures in the test file."
+  - "Use factory fixtures (functions that return objects) for complex test data instead of deeply nested fixture chains."
+  # Assertions & mocking
+  - "Use plain assert statements. Pytest rewrites them to provide detailed failure messages — no matcher library needed."
+  - "Use monkeypatch for simple patching (env vars, attributes, dict entries). Use unittest.mock.patch for complex scenarios (multiple calls, side effects, call assertions)."
+  - "Mock at the boundary (HTTP calls, databases, file I/O), not internal functions. Prefer fakes or in-memory implementations where available."
+  # Organization
+  - "Use @pytest.mark.parametrize for testing multiple inputs with the same logic. Keep parameter lists readable — extract to variables if longer than 3 cases."
+  - "Mark slow or integration tests with custom markers (@pytest.mark.slow, @pytest.mark.integration) so they can be excluded from fast runs."
+  - "Use pytest-asyncio with @pytest.mark.asyncio for async test functions when testing async code."
+  # Coverage
+  - "Run coverage with --cov and --cov-fail-under=90 in CI."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-19"
+  tags:
+    - python

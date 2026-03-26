@@ -7,6 +7,7 @@ rules:
   - "Adopt JUnit5 + MockK + AssertJ for testing as per project policy."
   - "Use sealed classes for restricted class hierarchies."
   - "Prefer extension functions over utility classes."
+  - "Maintain standard naming for tests: ClassName -> ClassNameTest."
   - "Use scope functions (let, run, apply, also, with) appropriately."
   - "Follow Kotlin coding conventions for naming and formatting."
   - "Use data classes for value objects."
@@ -17,5 +18,3 @@ metadata:
   created: "2025-01-01"
   tags:
     - kotlin
-    - coding
-    - style

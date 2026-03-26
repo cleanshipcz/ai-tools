@@ -110,6 +110,20 @@ Create `~/openclaw/Dockerfile`:
 
 ``` dockerfile
 ARG OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest
+
+# --- Stage 1: compile blogwatcher for arm64 ---
+FROM golang:latest AS blogwatcher-builder
+RUN CGO_ENABLED=0 go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@latest
+
+# --- Stage: compile whisper.cpp (lightweight local transcription) ---
+FROM debian:bookworm-slim AS whisper-builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  cmake build-essential git ca-certificates \
+  && git clone --depth 1 https://github.com/ggerganov/whisper.cpp /tmp/whisper.cpp \
+  && cd /tmp/whisper.cpp \
+  && cmake -B build \
+  && cmake --build build --config Release -j$(nproc)
+
 FROM ${OPENCLAW_IMAGE}
 
 USER root
@@ -124,6 +138,7 @@ RUN apt-get update && \
       poppler-utils \
       jq \
       ffmpeg \
+      curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
@@ -134,13 +149,32 @@ RUN echo "alias ll='ls -la'" >> /etc/bash.bashrc
 RUN echo "alias claudedanger='claude --dangerously-skip-permissions'" >> /etc/bash.bashrc
 
 # Make openclaw CLI available on PATH
-RUN ln -s /app/openclaw.mjs /usr/local/bin/openclaw
+RUN [ -e /usr/local/bin/openclaw ] || ln -s /app/openclaw.mjs /usr/local/bin/openclaw
 
 # Install tools
 RUN npm -g install \
    clawhub \
-   blogwatcher \
    @google/gemini-cli
+
+COPY --from=blogwatcher-builder /go/bin/blogwatcher /usr/local/bin/blogwatcher
+
+# whisper.cpp (binary + tiny model for voice transcription)
+COPY --from=whisper-builder /tmp/whisper.cpp/build/bin/whisper-cli /usr/local/bin/whisper-cli
+RUN curl -L https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin \
+  -o /opt/whisper-tiny.bin
+ENV WHISPER_CPP_MODEL=/opt/whisper-tiny.bin
+
+# Browser (Chromium + Xvfb for headless browsing)
+RUN apt-get update && apt-get install -y --no-install-recommends xvfb \
+  && mkdir -p /home/node/.cache/ms-playwright \
+  && PLAYWRIGHT_BROWSERS_PATH=/home/node/.cache/ms-playwright \
+   node /app/node_modules/playwright-core/cli.js install --with-deps chromium \
+  && chown -R node:node /home/node/.cache/ms-playwright \
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ensure cache exists and node owns it
+RUN mkdir -p /home/node/.cache \
+    && chown -R node:node /home/node/.cache
 
 USER node
 
@@ -185,7 +219,7 @@ services:
       interval: 60s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 120s
 ```
 
 ------------------------------------------------------------------------

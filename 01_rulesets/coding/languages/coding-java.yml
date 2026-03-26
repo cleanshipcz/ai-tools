@@ -20,6 +20,7 @@ rules:
   - "Use JUnit 5 for testing with descriptive test names."
   - "Prefer constructor injection for dependency injection."
   - "Handle exceptions appropriately; don't catch Exception or Throwable."
+  - "Maintain standard naming for tests: ClassName -> ClassNameTest."
   - "Use sealed classes/interfaces (Java 17+) for restricted hierarchies."
   - "Leverage pattern matching (Java 16+) for instanceof checks."
 metadata:
@@ -28,5 +29,3 @@ metadata:
   created: "2025-11-15"
   tags:
     - java
-    - coding
-    - style
