@@ -13,6 +13,7 @@ rulesets:
   - testing-integration
   - testing-language-.*
   - coding-security
+  - security-language-.*
   - coding-dependencies
 prompt: |
   Implement new features following strict Test-Driven Development (TDD).

@@ -1,0 +1,29 @@
+id: coding-language-ansible
+description: Ansible best practices for playbooks, roles, inventory, and task design
+rules:
+  - "Use native Ansible modules instead of shell/command when a module exists for the task."
+  - "All tasks must be idempotent — running a playbook twice must produce the same result."
+  - "Always name every task, play, and block with a descriptive human-readable name."
+  - "Use FQCN (Fully Qualified Collection Name) for all modules (e.g., ansible.builtin.copy, not copy)."
+  - "Tag all tasks meaningfully to enable selective execution (e.g., deploy, config, restart)."
+  - "Use handlers for service restarts and reloads — never restart directly in a task."
+  - "Use notify to trigger handlers and ensure handlers are flushed when order matters (meta: flush_handlers)."
+  - "Follow standard role directory structure: tasks/, handlers/, defaults/, vars/, templates/, files/, meta/."
+  - "Put role defaults in defaults/main.yml (overridable) and internal constants in vars/main.yml (not overridable)."
+  - "Use block/rescue/always for error handling instead of ignore_errors where possible."
+  - "Prefer ansible.builtin.template over ansible.builtin.copy when files contain any dynamic content."
+  - "Use become explicitly per task or block rather than globally at play level."
+  - "Register task results and use when/changed_when/failed_when for precise conditional logic."
+  - "Use ansible.builtin.assert to validate preconditions before executing destructive tasks."
+  - "Group related tasks using block with a descriptive name."
+  - "Keep playbooks thin — orchestration only. Put logic in roles."
+  - "Use inventory group_vars and host_vars for environment-specific configuration, not inline vars."
+  - "Prefix role variables with the role name to avoid namespace collisions (e.g., apache_port, not port)."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - ansible
+    - infrastructure
+    - devops

@@ -9,7 +9,6 @@ rulesets:
   - base
   - analysis-base
   - coding-common
-  - coding-language-.*
 prompt: |
   Analyze the project to discover new feature opportunities.
 

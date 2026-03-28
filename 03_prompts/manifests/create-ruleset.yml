@@ -1,45 +1,72 @@
 id: manifests-create-ruleset
-description: Clarify coding standards and create a simple ruleset.yml manifest
+description: Clarify coding standards and create a ruleset.yml manifest aligned with the Kotlin engine
 variables:
   - name: user_description
     required: true
     description: "Brief description of the coding standards or rules needed"
+rulesets:
+  - authoring-yaml
+  - authoring-manifests
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"
-  - "Keep rules specific and actionable"
+  - "Keep rules specific and actionable — each rule should be independently verifiable"
   - "Group rules by category for clarity"
   - "Focus on WHAT to do, not extensive HOW"
+  - "One concern per ruleset (Single Responsibility)"
 content: |
   The user wants to create a ruleset based on this description:
 
   {{user_description}}
 
-  **Your job is to clarify and translate:**
+  **Your job is to clarify and translate into a valid ruleset manifest.**
 
-  1. **Ask clarifying questions:**
-     - What domain does this ruleset cover? (language, framework, security, style, etc.)
-     - What specific coding standards should be enforced?
-     - Are these rules from a standard? (PEP 8, ESLint, etc.)
-     - Any must-follow vs nice-to-have rules?
+  ## Step 1: Ask clarifying questions
 
-  2. **Suggest structure:**
-     - Propose a kebab-case ID (e.g., coding-python, security-baseline)
-     - Identify 2-4 rule categories
-     - Recommend 10-20 total rules
+  - What domain does this ruleset cover? (language, framework, security, style, testing, etc.)
+  - What specific coding standards should be enforced?
+  - Are these rules from a standard? (PEP 8, ESLint, Kotlin style guide, etc.)
+  - Any must-follow vs nice-to-have rules?
 
-  3. **Create simple ruleset.yml with:**
-     - id, version (1.0.0), description (1 sentence)
-     - tags: [language/framework, category]
-     - rules: Array of 10-20 specific, actionable rules
-     - metadata: author, dates
+  ## Step 2: Suggest structure
 
-  **Keep focused, allow detail:**
-  - Rules should be specific and actionable
-  - Recommend 1-2 sentences per rule; allow more for complex rules
-  - Group related rules together
-  - Simple rulesets: ~50-80 lines; Comprehensive ones: as needed
+  - Propose a kebab-case ID following domain prefix conventions:
+    - `coding-*` for language/framework rules
+    - `testing-*` for testing standards
+    - `review-*` for code review guidelines
+    - `security-*` for security rules
+  - Identify 2-4 rule categories
+  - Recommend 5-20 total rules
 
-  **Example:**
+  ## Step 3: Create ruleset.yml matching the Kotlin engine contract
+
+  The manifest MUST have these fields (required by RulesetManifest.kt):
+
+  ```yaml
+  id: domain-topic
+  description: One-sentence purpose of this ruleset (10-500 chars)
+  rules:
+    - "Specific, actionable rule with clear guidance"
+    - "Each rule independently verifiable"
+    - "Use imperative voice: Do X, Use Y, Avoid Z"
+  metadata:
+    version: 1.0.0
+    author: "AI Tools Team"
+    created: "YYYY-MM-DD"
+    tags: [domain, category]
+  ```
+
+  **Fields NOT supported by engine:** `extends`, `overrides`, `tags` (use metadata.tags instead), `version` (use metadata.version)
+
+  ## Best practices
+
+  - **Single Responsibility:** One concern per ruleset. Don't mix security rules with naming conventions.
+  - **5-20 rules per ruleset.** Too few is pointless, too many is unmanageable.
+  - **Rules must be specific and actionable.** "Use parameterized queries for all DB calls" not "Write secure code."
+  - **Compose via agents.** Agents reference multiple rulesets — that's how rules get combined.
+  - **Prefix IDs by domain** to enable wildcard matching in agents (e.g., `coding-language-.*`).
+  - File location: `01_rulesets/<id>.yml` (use subdirectories for organization)
+
+  ## Example
 
   User: "Python coding standards"
 
@@ -51,19 +78,24 @@ content: |
 
   User: "Yes PEP 8, type hints required, Google docstrings, prefer dataclasses"
 
-  You: "Perfect! I'll create 'coding-python' with:
+  You: "I'll create `coding-language-python` with:
   - PEP 8 formatting rules
   - Type hint requirements
   - Google-style docstrings
   - Dataclass usage patterns
-  Sound good?"
+  ~15 rules total. Sound good?"
+
+  After confirmation, remind the user to validate:
+  ```bash
+  ./gradlew clean build
+  ```
 outputs:
   format: yaml
 metadata:
-  version: 2.0.0
+  version: 3.0.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2025-11-16"
+  updated: "2026-03-28"
   tags:
     - manifests
     - rulesets

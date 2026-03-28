@@ -1,0 +1,22 @@
+id: security-language-typescript
+description: TypeScript-specific security rules for XSS, injection, prototype pollution, and web application safety
+rules:
+  - "Never use eval or Function() constructor with untrusted input — they enable arbitrary code execution."
+  - "Escape all user-generated content before inserting into the DOM — use framework-provided sanitization (React JSX, Angular DomSanitizer) instead of innerHTML."
+  - "Use parameterized queries or ORM methods for all database operations — never interpolate user input into SQL or NoSQL query strings."
+  - "Implement CSRF protection for state-changing endpoints — use anti-CSRF tokens or SameSite cookie attributes."
+  - "Implement rate limiting on public API endpoints to prevent brute-force and denial-of-service attacks."
+  - "Guard against prototype pollution — validate JSON keys before merging into objects, avoid recursive Object.assign or spread on untrusted data."
+  - "Set Content-Security-Policy headers to restrict script sources and prevent inline script execution."
+  - "Validate and sanitize URL parameters and redirect targets — never redirect to user-controlled URLs without allowlisting."
+  - "Use HttpOnly, Secure, and SameSite flags on cookies containing session tokens or sensitive data."
+  - "Avoid exposing detailed error messages or stack traces to clients — log server-side, return generic errors."
+  - "Use crypto.randomUUID() or crypto.getRandomValues() instead of Math.random() for security-sensitive values."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - security
+    - typescript
+    - web

@@ -1,0 +1,21 @@
+id: testing-language-ansible
+description: Ansible-specific testing standards for playbook and role verification
+rules:
+  - "Use Molecule for role testing — follow the create/converge/verify/destroy lifecycle."
+  - "Run ansible-lint as a static analysis gate before any manual or integration testing."
+  - "Verify idempotency by running the playbook twice and asserting zero changes on the second run."
+  - "Use --check --diff mode to validate playbook behavior without applying changes."
+  - "Test against isolated inventory (local VMs, containers, or mock hosts) — never test against production hosts."
+  - "Use Testinfra or similar infrastructure assertion frameworks to verify the final state (services running, ports open, files present with correct permissions)."
+  - "Test variable precedence by overriding defaults at group_vars and host_vars levels and verifying correct resolution."
+  - "Test handler execution by verifying that notified handlers run exactly once and in the correct order."
+  - "Test failure scenarios using block/rescue to verify error handling behaves as expected."
+  - "Validate that tags work correctly by running with --tags and --skip-tags and asserting the expected subset of tasks executes."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - testing
+    - ansible
+    - infrastructure

@@ -1,0 +1,28 @@
+id: authoring-manifests
+description: Standards for creating ai-tools YAML manifests that align with the Kotlin engine data models
+rules:
+  - "The Kotlin engine data models (AgentManifest.kt, RulesetManifest.kt, etc.) are the source of truth — never generate fields the engine does not support."
+  - "Use kebab-case for all manifest IDs, matching the pattern ^[a-z0-9]+(-[a-z0-9]+)*$."
+  - "Use snake_case for all variable names in prompt manifests."
+  - "Version lives in metadata.version (not top-level), using semver format starting at 1.0.0."
+  - "Descriptions must be 10-500 characters, specific to the manifest's purpose."
+  - "Always include complete metadata: version, author, created date, and tags."
+  - "Follow ID naming conventions by type: role-specialization for agents, domain-topic for rulesets, verb-tool for skills, category-action for prompts."
+  - "For agent manifests: persona defines WHO (identity, 3-5 sentences), prompt defines WHAT/HOW (structured phases with deliverables), constraints define guardrails (NEVER/ALWAYS statements)."
+  - "For ruleset manifests: one concern per ruleset (Single Responsibility). Target 5-20 specific, actionable, independently verifiable rules."
+  - "For prompt manifests: use Mustache syntax ({{variable}}) for template interpolation. Content is required."
+  - "Compose existing rulesets in agents rather than duplicating rules inline. Use wildcard patterns (e.g., coding-language-.*) for language-specific rulesets."
+  - "Always include the base ruleset when composing rulesets for agents."
+  - "Place manifest files in the correct directory: 01_rulesets/ for rulesets, 02_skills/ for skills, 03_prompts/<category>/ for prompts, 04_agents/ for agents, 05_recipes/ for recipes, 06_projects/ for projects."
+  - "Before creating a manifest, check for existing manifests that could be extended or composed rather than creating duplicates."
+  - "After creating or modifying manifests, validate with ./gradlew clean build (Kotlin engine) to confirm compatibility."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - authoring
+    - manifests
+    - conventions
+    - validation
+    - manifests

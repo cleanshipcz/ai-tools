@@ -1,0 +1,16 @@
+id: security-language-jinja2
+description: Jinja2-specific security rules for template injection, autoescape, and sandboxing
+rules:
+  - "Enable autoescape for any Jinja2 templates rendering user-provided content to prevent cross-site scripting."
+  - "Use Jinja2 SandboxedEnvironment when rendering templates from untrusted sources to restrict access to dangerous attributes and methods."
+  - "Never pass unsanitized user input as a template string — render user data as variables, not as part of the template itself."
+  - "Restrict template access to sensitive Python objects — do not expose os, sys, subprocess, or file-handling modules in the template context."
+  - "Use the | e (escape) filter explicitly when autoescape is disabled and output may contain user content."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - security
+    - jinja2
+    - templating

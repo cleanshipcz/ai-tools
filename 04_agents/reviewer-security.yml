@@ -9,6 +9,7 @@ rulesets:
   - review-base
   - review-security
   - coding-security
+  - security-language-.*
   - coding-language-.*
 prompt: |
   Conduct a security-focused review of the provided code.

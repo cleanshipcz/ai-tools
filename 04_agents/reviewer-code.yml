@@ -9,6 +9,7 @@ rulesets:
   - review-base
   - review-code
   - coding-language-.*
+  - security-language-.*
   - coding-dependencies
 prompt: |
   Conduct a thorough review of the provided code changes.

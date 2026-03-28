@@ -9,6 +9,7 @@ rulesets:
   - analysis-base
   - coding-common
   - coding-language-.*
+  - security-language-.*
 prompt: |
   Diagnose the reported bug and identify its root cause.
 

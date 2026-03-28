@@ -2,31 +2,25 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/cleanshipcz/ai-tools/schemas/feature.schema.json",
   "title": "Feature Manifest",
-  "description": "Schema for feature-specific context and snippets",
+  "description": "Schema for feature-specific context and instructions. Aligned with FeatureManifest.kt data class.",
   "type": "object",
-  "required": ["id", "version", "name", "description"],
+  "required": ["id", "description", "prompt", "metadata"],
   "properties": {
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
       "description": "Unique kebab-case identifier for the feature"
     },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Semantic version (semver) of the feature"
-    },
-    "name": {
-      "type": "string",
-      "minLength": 3,
-      "maxLength": 100,
-      "description": "Human-readable feature name"
-    },
     "description": {
       "type": "string",
       "minLength": 10,
       "maxLength": 500,
       "description": "Brief description of the feature"
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Feature implementation instructions and context"
     },
     "context": {
       "type": "object",
@@ -45,134 +39,60 @@
             "type": "string"
           },
           "description": "Feature dependencies (other features, libraries)"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Relevant file paths for this feature"
         }
       },
       "description": "Contextual information about the feature"
     },
-    "files": {
-      "type": "object",
-      "properties": {
-        "patterns": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "File path patterns (globs) to include"
-        }
-      },
-      "description": "Files related to this feature"
-    },
-    "conventions": {
+    "acceptance_criteria": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Feature-specific conventions and patterns"
+      "description": "List of acceptance criteria the feature must satisfy"
     },
-    "model": {
-      "type": "string",
-      "enum": [
-        "claude-sonnet-4.5",
-        "claude-sonnet-4",
-        "claude-haiku-4.5",
-        "gpt-5",
-        "gpt-5.1",
-        "gpt-5.1-codex-mini",
-        "gpt-5.1-codex"
-      ],
-      "description": "Default model for this feature (highest priority, overrides project, agent, and prompt defaults)"
-    },
-    "recipe": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-          "description": "Recipe ID to bind to this feature"
-        },
-        "context": {
-          "type": "object",
-          "description": "Feature-specific context to pass to the recipe as variables",
-          "properties": {
-            "feature_description": {
-              "type": "string",
-              "description": "Detailed feature description for the recipe"
-            },
-            "acceptance_criteria": {
-              "type": "string",
-              "description": "Acceptance criteria for the feature"
-            },
-            "bug_description": {
-              "type": "string",
-              "description": "Bug description (for bug-fix workflow)"
-            },
-            "reproduction_steps": {
-              "type": "string",
-              "description": "Bug reproduction steps (for bug-fix workflow)"
-            }
-          },
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "tools": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": ["claude-code", "copilot-cli", "cursor", "github-copilot", "windsurf"]
-          },
-          "description": "Tools to generate feature-bound recipe scripts for"
-        }
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
       },
-      "required": ["id"],
-      "description": "Recipe binding configuration for automated workflows"
+      "description": "Hard boundaries and limitations for the feature"
     },
     "metadata": {
       "type": "object",
+      "required": ["version"],
       "properties": {
-        "status": {
+        "version": {
           "type": "string",
-          "enum": ["draft", "active", "deprecated", "archived"],
-          "description": "Feature status"
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Semantic version (semver), start at 1.0.0"
         },
-        "owner": {
-          "type": "string",
-          "description": "Feature owner or team"
+        "author": {
+          "type": "string"
         },
         "created": {
-          "oneOf": [
-            {
-              "type": "string",
-              "format": "date"
-            },
-            {
-              "type": "object"
-            }
-          ],
-          "description": "Creation date"
+          "type": "string",
+          "format": "date"
         },
         "updated": {
-          "oneOf": [
-            {
-              "type": "string",
-              "format": "date"
-            },
-            {
-              "type": "object"
-            }
-          ],
-          "description": "Last update date"
+          "type": "string",
+          "format": "date"
         },
         "tags": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Tags for categorization"
+          "uniqueItems": true
         }
       },
-      "description": "Feature metadata"
+      "description": "Feature metadata including version, author, dates, and tags"
     }
-  },
-  "additionalProperties": false
+  }
 }

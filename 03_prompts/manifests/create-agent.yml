@@ -1,51 +1,88 @@
 id: manifests-create-agent
-description: Clarify agent requirements and create a simple agent.yml manifest
+description: Clarify agent requirements and create an agent.yml manifest aligned with the Kotlin engine
 variables:
   - name: user_description
     required: true
     description: "Brief description of what the agent should do"
+rulesets:
+  - authoring-yaml
+  - authoring-manifests
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"
   - "Recommend simple, focused definitions; allow complexity when justified"
   - "Suggest appropriate rulesets based on domain"
   - "Use conversational tone to understand intent"
-  - "Recommend concise system prompts (3-5 sentences); allow detail for specialized agents"
+  - "Always include base ruleset"
+  - "Persona = WHO (3-5 sentences), Prompt = WHAT/HOW (structured phases), Constraints = guardrails (NEVER/ALWAYS)"
 content: |
   The user wants to create an agent based on this description:
 
   {{user_description}}
 
-  **Your job is to clarify and translate:**
+  **Your job is to clarify and translate into a valid agent manifest.**
 
-  1. **Ask clarifying questions:**
-     - What is this agent's main purpose? (in 1-2 sentences)
-     - What domain does it work in? (coding, docs, security, planning, etc.)
-     - What programming languages apply? (if coding-related)
-     - Does it need any special capabilities? (git, filesystem, docker, etc.)
-     - Should it be precise or creative? (helps set temperature)
-     - Any specific tools/skills it needs? (search-repo, run-tests, etc.)
-     - What should it NOT do? (constraints)
+  ## Step 1: Ask clarifying questions
 
-  2. **Suggest structure:**
-     - Propose a kebab-case ID
-     - Suggest relevant rulesets (base, coding-*, security, reviewer, etc.)
-     - Recommend temperature (0.3 for precise, 0.7 for balanced, 1.0 for creative)
+  - What is this agent's main purpose? (in 1-2 sentences)
+  - What domain does it work in? (coding, docs, security, planning, analysis, review, etc.)
+  - What programming languages apply? (if coding-related)
+  - Should it be precise or creative? (helps set temperature)
+  - What should it NOT do? (constraints)
 
-  3. **Create simple agent.yml with:**
-     - id, version (1.0.0), purpose (clear 1-2 sentence statement)
-     - rulesets: [base, ...relevant ones]
-     - capabilities: [...if needed]
-     - defaults: { temperature: X }
-     - prompt: { system: "Brief persona describing role and approach" }
-     - constraints: [3-5 key boundaries]
-     - metadata: author, dates, tags
+  ## Step 2: Suggest structure
 
-  **Start simple, allow detail:**
-  - System prompt: Recommend 3-5 sentences; allow more for specialized agents
-  - Constraints: Recommend 3-5 bullet points; add more if domain requires it
-  - Simple agents: ~50-80 lines; Complex agents: as needed
+  - Propose a kebab-case ID following the pattern: `role-specialization` (e.g., reviewer-code, analyst-bug, developer-feature)
+  - Suggest relevant rulesets (always include `base`, then domain-specific ones)
+  - Available ruleset prefixes: `coding-*`, `testing-*`, `review-*`, `security-*`
+  - Use wildcard patterns like `coding-language-.*` for language-specific rules
 
-  **Example conversation:**
+  ## Step 3: Create agent.yml matching the Kotlin engine contract
+
+  The manifest MUST have these fields (all required by AgentManifest.kt):
+
+  ```yaml
+  id: kebab-case-name
+  description: Clear purpose statement (10-500 chars)
+  persona: |
+    WHO the agent is. Role, expertise, approach.
+    3-5 sentences for simple agents; more for specialized ones.
+  rulesets:
+    - base
+    - coding-common
+    - coding-language-.*    # wildcard patterns supported
+  prompt: |
+    WHAT the agent does and HOW. Structured process:
+
+    PROCESS (DO THIS IN ORDER)
+    Phase 1: ...
+    Phase 2: ...
+
+    DELIVERABLES
+    1. ...
+  constraints:
+    - "NEVER do X"
+    - "Always verify Y before Z"
+  metadata:
+    version: 1.0.0
+    author: "AI Tools Team"
+    created: "YYYY-MM-DD"
+    tags: [domain, role]
+  ```
+
+  **Optional fields:** `rules` (inline rules, prefer rulesets instead)
+
+  **Fields NOT supported by engine:** `capabilities`, `defaults`, `tools`, `purpose`, `prompt.system`, `prompt.user_template`
+
+  ## Best practices
+
+  - **persona** = identity (WHO). Keep it focused on role and expertise.
+  - **prompt** = process (WHAT/HOW). Use structured phases with clear deliverables.
+  - **constraints** = guardrails. Use NEVER/ALWAYS phrasing. 3-7 items.
+  - **rulesets** = compose existing rules. Never duplicate rules that exist in a ruleset.
+  - Keep agents focused on ONE role. Split broad agents into specialized ones.
+  - File location: `04_agents/<id>.yml`
+
+  ## Example conversation
 
   User: "I need an agent that reviews security issues"
 
@@ -53,27 +90,28 @@ content: |
   - Should it focus on code vulnerabilities, or also infrastructure/config?
   - Any specific languages? (Python, TypeScript, etc.)
   - Should it be strict (flag everything) or balanced?
-  - Does it need git access to check commit history?"
+  - Any specific things it should never approve?"
 
-  User: "Code vulns in TypeScript, strict approach, no git needed"
+  User: "Code vulns in TypeScript, strict approach"
 
-  You: "Perfect! I'll create 'security-reviewer' with:
-  - Purpose: Review TypeScript code for security vulnerabilities
-  - Rulesets: base, coding-typescript, security
-  - Temperature: 0.2 (very precise)
-  - Constraints: Never approve code with known CVEs, etc.
+  You: "I'll create `reviewer-security-ts` with:
+  - Persona: Senior security engineer specializing in TypeScript
+  - Rulesets: base, coding-common, coding-language-.*, coding-security
+  - Process: Analyze → Classify severity → Report findings
+  - Constraints: Never approve code with known CVE patterns
   Sound good?"
 
-  User: "Yes"
-
-  You: [Creates simple ~60 line agent.yml]
+  After confirmation, remind the user to validate:
+  ```bash
+  ./gradlew clean build
+  ```
 outputs:
   format: yaml
 metadata:
-  version: 2.0.0
+  version: 3.0.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2025-11-16"
+  updated: "2026-03-28"
   tags:
     - manifests
     - agents

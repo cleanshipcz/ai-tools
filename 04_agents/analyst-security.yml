@@ -9,6 +9,7 @@ rulesets:
   - analysis-base
   - coding-common
   - coding-security
+  - security-language-.*
   - coding-language-.*
 prompt: |
   Perform a security analysis for the requested scope.

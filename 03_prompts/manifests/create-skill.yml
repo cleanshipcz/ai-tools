@@ -1,9 +1,12 @@
 id: manifests-create-skill
-description: Clarify tool/command requirements and create a simple skill.yml manifest
+description: Clarify tool/command requirements and create a skill.yml manifest
 variables:
   - name: user_description
     required: true
     description: "Brief description of the tool or command to integrate"
+rulesets:
+  - authoring-yaml
+  - authoring-manifests
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"
   - "Keep skill definitions simple and focused"
@@ -14,34 +17,77 @@ content: |
 
   {{user_description}}
 
-  **Your job is to clarify and translate:**
+  **Your job is to clarify and translate into a valid skill manifest.**
 
-  1. **Ask clarifying questions:**
-     - What command or tool does this integrate? (pytest, eslint, docker, etc.)
-     - What does it do in one sentence?
-     - What are the key parameters/flags?
-     - Any environment requirements? (Python installed, Docker running, etc.)
-     - Is this an MCP tool or shell command?
+  **Note:** Skills do not currently have a Kotlin engine model — they are processed by
+  the TypeScript CLI and transformed into SKILL.md files for Claude Code. The schema
+  at `10_schemas/skill.schema.json` is the validation authority.
 
-  2. **Suggest structure:**
-     - Propose a kebab-case ID (e.g., run-pytest, lint-typescript)
-     - Identify command pattern
-     - Note any required tools/dependencies
+  ## Step 1: Ask clarifying questions
 
-  3. **Create simple skill.yml with:**
-     - id, version (1.0.0), description (1 sentence)
-     - tags: [tool name, category]
-     - command: The actual command to run
-     - environment: [required tools/env vars if any]
-     - usage: Brief usage example
-     - metadata: author, dates
+  - What command or tool does this integrate? (pytest, eslint, docker, gradle, etc.)
+  - What does it do in one sentence?
+  - What are the key parameters/flags?
+  - Any environment requirements? (Python installed, Docker running, etc.)
+  - Is this an MCP tool reference or a shell command?
 
-  **Keep focused:**
-  - One command per skill (primary focus)
-  - Simple parameter documentation
-  - Simple skills: ~30-50 lines; Complex integrations: as needed
+  ## Step 2: Suggest structure
 
-  **Example:**
+  - Propose a kebab-case ID following verb-tool pattern: `run-pytest`, `lint-typescript`, `search-repo`
+  - Identify the command pattern
+  - Note required tools/dependencies
+
+  ## Step 3: Create skill.yml
+
+  ```yaml
+  id: verb-tool-name
+  version: 1.0.0
+  description: What this skill does in one sentence (10-500 chars)
+
+  # Shell command execution
+  command:
+    program: 'tool-name'
+    args: ['--flag', 'value']
+    cwd: '.'
+    env:                      # Optional env vars
+      KEY: 'value'
+
+  # OR MCP tool reference (mutually exclusive with command)
+  # mcp_tool: 'server:tool-name'
+
+  inputs:
+    - name: parameter_name
+      type: string            # string|number|boolean|file|directory
+      required: true
+      description: 'What this parameter controls'
+
+  outputs:
+    stdout: true
+    stderr: true
+    exit_code: true
+    files:                    # Optional output files
+      - 'report.json'
+
+  constraints:
+    - 'Tool X must be installed'
+
+  timeout_sec: 300
+
+  metadata:
+    author: "AI Tools Team"
+    created: "YYYY-MM-DD"
+  ```
+
+  ## Best practices
+
+  - **One command per skill.** Don't combine lint + test + build.
+  - **Define inputs/outputs** explicitly for composability in recipes.
+  - **Set reasonable timeouts** (default 300s, increase for builds).
+  - **Document constraints/prerequisites** so agents know what's needed.
+  - **Use verb-noun ID pattern:** `run-*`, `lint-*`, `search-*`, `build-*`
+  - File location: `02_skills/<id>.yml`
+
+  ## Example
 
   User: "Run pytest with coverage"
 
@@ -52,18 +98,19 @@ content: |
 
   User: "Always with coverage, HTML report in .coverage/"
 
-  You: "Perfect! I'll create 'run-pytest' with:
+  You: "I'll create `run-pytest-coverage` with:
   - Command: pytest --cov --cov-report=html:.coverage/
-  - Environment: Python + pytest installed
-  - Usage example included
+  - Inputs: test path (optional)
+  - Outputs: stdout, exit_code, .coverage/ files
+  - Constraint: Python + pytest + pytest-cov installed
   Sound good?"
 outputs:
   format: yaml
 metadata:
-  version: 2.0.0
+  version: 3.0.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2025-11-16"
+  updated: "2026-03-28"
   tags:
     - manifests
     - skills

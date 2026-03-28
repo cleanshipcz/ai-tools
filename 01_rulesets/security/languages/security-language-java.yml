@@ -1,0 +1,21 @@
+id: security-language-java
+description: Java-specific security rules for SQL injection, serialization, reflection, and exception handling
+rules:
+  - "Use parameterized queries (PreparedStatement) for all database operations — never concatenate user input into SQL strings."
+  - "Never deserialize untrusted data with Java's native ObjectInputStream — use safe alternatives (JSON, protobuf) or strict type filtering."
+  - "Do not expose stack traces or internal error details to end users — log them server-side, return generic error messages."
+  - "Avoid using reflection on untrusted input — Class.forName() and Method.invoke() with user-controlled arguments enable arbitrary code execution."
+  - "Use SecurityManager or module system boundaries to restrict access to sensitive APIs where applicable."
+  - "Validate and restrict file paths to prevent path traversal — canonicalize paths and check they remain within expected directories."
+  - "Use java.security.SecureRandom instead of java.util.Random for any security-sensitive randomness."
+  - "Mark sensitive fields as transient to prevent accidental serialization of credentials or keys."
+  - "Avoid ProcessBuilder with unsanitized input — use argument arrays, never shell-interpolated strings."
+  - "Set restrictive Content-Type headers and validate MIME types for file uploads to prevent content-type confusion attacks."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - security
+    - java
+    - jvm

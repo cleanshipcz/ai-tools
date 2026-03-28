@@ -1,0 +1,25 @@
+id: authoring-yaml
+description: YAML authoring standards for consistent, readable, and well-structured YAML files
+rules:
+  - "Use 2-space indentation consistently throughout the file."
+  - "Use block scalars (|) for multi-line strings such as persona, prompt, and content fields."
+  - "Quote strings that contain special YAML characters (:, #, {, }, [, ], >, |, *, &, !, %, @, `)."
+  - "Do not quote simple strings that don't require quoting."
+  - "Use consistent field ordering: identity fields first (id, description), then type-specific fields, then metadata last."
+  - "No trailing whitespace on any line."
+  - "End files with a single newline character."
+  - "Use lowercase for all YAML keys."
+  - "Use hyphens for list items, not inline flow syntax (prefer '- item' over '[item1, item2]') for lists with more than 3 items."
+  - "Inline flow syntax ([item1, item2]) is acceptable for short lists with 3 or fewer simple items, such as tags."
+  - "Separate top-level sections with a blank line for readability when the file exceeds 20 lines."
+  - "Never use YAML anchors (&) or aliases (*) in manifest files — keep each file self-contained."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - authoring
+    - yaml
+    - formatting
+    - standards
+    - manifests

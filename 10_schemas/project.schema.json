@@ -2,25 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/cleanshipcz/ai-tools/schemas/project.schema.json",
   "title": "Project Manifest",
-  "description": "Schema for project-specific configuration manifests",
+  "description": "Schema for project-specific configuration manifests. Aligned with ProjectManifest.kt data class.",
   "type": "object",
-  "required": ["id", "version", "name", "description"],
+  "required": ["id", "description", "metadata", "context", "deploy"],
   "properties": {
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
       "description": "Unique kebab-case identifier for the project"
-    },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Semantic version (semver) of the project configuration"
-    },
-    "name": {
-      "type": "string",
-      "minLength": 3,
-      "maxLength": 100,
-      "description": "Human-readable project name"
     },
     "description": {
       "type": "string",
@@ -30,193 +19,196 @@
     },
     "context": {
       "type": "object",
+      "required": ["documentation"],
       "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Project-specific rules"
+        },
         "overview": {
           "type": "string",
           "description": "Detailed project overview and background"
         },
-        "purpose": {
-          "type": "string",
-          "description": "Primary purpose or goal of the project"
+        "documentation": {
+          "type": "object",
+          "properties": {
+            "readme": {
+              "type": "string",
+              "description": "Path to README file"
+            },
+            "per_topic": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "description": "Categorized documentation references (e.g., main_docs: { prompts: path })"
+            },
+            "additional": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["path"],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "Path to the documentation file"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Description of the documentation"
+                  }
+                }
+              },
+              "description": "Additional documentation items with path and description"
+            }
+          },
+          "description": "Project documentation references"
         }
       },
       "description": "Contextual information about the project"
     },
-    "documentation": {
+    "deploy": {
       "type": "object",
+      "required": ["directory"],
       "properties": {
-        "readme": {
+        "directory": {
           "type": "string",
-          "description": "Path to README file"
+          "description": "Target directory for deployment"
         },
-        "contributing": {
-          "type": "string",
-          "description": "Path to CONTRIBUTING guide"
+        "replace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to replace existing files on deployment"
         },
-        "architecture": {
-          "type": "string",
-          "description": "Path to architecture documentation"
-        },
-        "code_style": {
-          "type": "string",
-          "description": "Path to code style guide"
-        },
-        "api_docs": {
-          "type": "string",
-          "description": "Path to API documentation"
-        },
-        "custom": {
+        "prompts": {
           "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Additional custom documentation references"
-        }
-      },
-      "description": "References to project documentation"
-    },
-    "commands": {
-      "type": "object",
-      "additionalProperties": {
-        "anyOf": [
-          {
-            "type": "string"
-          },
-          {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
+          "properties": {
+            "filter": {
+              "$ref": "#/definitions/projectFilter"
             }
-          }
-        ]
-      },
-      "description": "Common commands organized by category (dev, build, test, etc.)"
-    },
-    "conventions": {
-      "type": "object",
-      "properties": {
-        "naming": {
-          "type": "array",
-          "items": {
-            "type": "string"
           },
-          "description": "Naming conventions"
+          "description": "Prompt filtering configuration"
         },
-        "patterns": {
-          "type": "array",
-          "items": {
-            "type": "string"
+        "agents": {
+          "type": "object",
+          "properties": {
+            "filter": {
+              "$ref": "#/definitions/projectFilter"
+            }
           },
-          "description": "Code patterns and best practices"
+          "description": "Agent filtering configuration"
         },
-        "testing": {
-          "type": "array",
-          "items": {
-            "type": "string"
+        "features": {
+          "type": "object",
+          "properties": {
+            "filter": {
+              "$ref": "#/definitions/projectFilter"
+            }
           },
-          "description": "Testing conventions"
+          "description": "Feature filtering configuration"
         },
-        "structure": {
-          "type": "array",
-          "items": {
-            "type": "string"
+        "rulesets": {
+          "type": "object",
+          "properties": {
+            "filter": {
+              "$ref": "#/definitions/projectFilter"
+            }
           },
-          "description": "Project structure conventions"
-        },
-        "custom": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Custom project-specific conventions"
+          "description": "Ruleset filtering configuration"
         }
       },
-      "description": "Project conventions and standards"
-    },
-    "ai_tools": {
-      "type": "object",
-      "properties": {
-        "model": {
-          "type": "string",
-          "enum": [
-            "claude-sonnet-4.5",
-            "claude-sonnet-4",
-            "claude-haiku-4.5",
-            "gpt-5",
-            "gpt-5.1",
-            "gpt-5.1-codex-mini",
-            "gpt-5.1-codex"
-          ],
-          "description": "Default model for this project (overrides agent default, can be overridden by feature)"
-        },
-        "preferred_agents": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
-          },
-          "description": "Preferred agents to highlight for this project"
-        },
-        "preferred_rulesets": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
-          },
-          "description": "List of preferred ruleset IDs for this project"
-        },
-        "custom_rules": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Project-specific rules for AI tools"
-        }
-      },
-      "description": "AI tool defaults such as model and custom rules (filters live in deploy.yml)"
+      "description": "Deployment configuration"
     },
     "metadata": {
       "type": "object",
+      "required": ["version"],
       "properties": {
-        "repository": {
+        "version": {
           "type": "string",
-          "format": "uri",
-          "description": "Repository URL"
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Semantic version (semver), start at 1.0.0"
         },
-        "maintainers": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "List of maintainer emails or names"
+        "author": {
+          "type": "string"
         },
         "created": {
           "type": "string",
-          "format": "date",
-          "description": "Creation date"
+          "format": "date"
         },
         "updated": {
           "type": "string",
-          "format": "date",
-          "description": "Last update date"
+          "format": "date"
         },
         "tags": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Tags for categorization"
+          "uniqueItems": true
         }
       },
-      "description": "Project metadata"
+      "description": "Project metadata including version, author, dates, and tags"
     }
   },
-  "allOf": [
-    {
-      "not": { "required": ["tech_stack"] }
-    },
-    {
-      "not": { "required": ["tech_stacks"] }
+  "definitions": {
+    "projectFilter": {
+      "description": "Filter configuration using one of three strategies: tags, whitelist, or blacklist",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["tags"],
+          "properties": {
+            "tags": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Filter by matching tags"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["whitelist"],
+          "properties": {
+            "whitelist": {
+              "type": "object",
+              "required": ["ids"],
+              "properties": {
+                "ids": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Only include these IDs"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["blacklist"],
+          "properties": {
+            "blacklist": {
+              "type": "object",
+              "required": ["ids"],
+              "properties": {
+                "ids": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Exclude these IDs"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
     }
-  ]
+  }
 }

@@ -1,0 +1,24 @@
+id: security-language-ansible
+description: Security standards for Ansible vault, secrets, credentials, and privilege escalation
+rules:
+  - "Never store secrets, passwords, or keys in plaintext — use ansible-vault encrypt_string or vault files."
+  - "Use no_log: true on any task that handles passwords, tokens, API keys, or vault content."
+  - "Never commit unencrypted vault files or secret values to version control."
+  - "Use separate vault files per environment (e.g., vault_prod.yml, vault_staging.yml) with distinct vault IDs."
+  - "Use become explicitly and with the minimum required privilege — never use become: true globally without justification."
+  - "Specify become_user explicitly when privilege escalation is needed (do not rely on defaulting to root)."
+  - "Use ansible.builtin.file with explicit mode parameters — never leave file permissions to defaults for sensitive files."
+  - "Set restrictive permissions (0600 or 0640) for any file containing credentials, certificates, or keys."
+  - "Use --check (dry run) before applying changes to production inventories."
+  - "Validate SSL certificates in URI and get_url calls — never use validate_certs: false in production."
+  - "Use limit and tags to scope production runs — never run unscoped playbooks against all production hosts."
+  - "Rotate vault passwords periodically and use vault-id labels to manage multiple vault passwords."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - security
+    - ansible
+    - vault
+    - credentials

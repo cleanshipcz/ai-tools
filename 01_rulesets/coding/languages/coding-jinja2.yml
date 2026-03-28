@@ -1,0 +1,21 @@
+id: coding-language-jinja2
+description: Jinja2 templating standards for Ansible templates and configuration files
+rules:
+  - "Use .j2 extension for all Jinja2 template files."
+  - "Use default filter for all optional variables (e.g., {{ my_var | default('fallback') }})."
+  - "Use mandatory filter for required variables that must be defined (e.g., {{ required_var | mandatory }})."
+  - "Prefer Jinja2 filters over complex logic — use | bool, | int, | to_json, | to_yaml, | regex_replace."
+  - "Keep template logic minimal — complex conditionals belong in tasks or vars, not templates."
+  - "Use consistent whitespace control ({%- -%} or {% %}) to avoid blank lines in output."
+  - "Comment non-obvious template logic with {# Jinja2 comments #}, not rendered output comments."
+  - "Include a managed-by header in generated config files: # Managed by Ansible - do not edit manually."
+  - "Use lookup or vars for dynamic includes rather than hardcoding paths in templates."
+  - "Validate generated config files after templating using ansible.builtin.command or a validate parameter."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - jinja2
+    - ansible
+    - templating

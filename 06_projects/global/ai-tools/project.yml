@@ -75,6 +75,7 @@ deploy:
         - integration
         - documentation
         - testing
+        - manifests
 metadata:
   version: 1.0.0
   author: cleanshipcz

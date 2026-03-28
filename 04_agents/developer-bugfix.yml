@@ -8,6 +8,7 @@ rulesets:
   - base
   - coding-common
   - coding-language-.*
+  - security-language-.*
   - testing-common
   - testing-unit
   - testing-language-.*
