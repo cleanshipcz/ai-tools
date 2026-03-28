@@ -9,12 +9,17 @@ class AgentPrinter(
 ) : Printer<AgentContext> {
 
     override fun print(entity: AgentContext, output: Output): Output {
-        val (agent, rulesets) = entity
+        val (agent, rulesets, allRulesets) = entity
         output.appendTextTopic("# ${agent.id}", agent.description)
 
         output.appendTextTopic("## Persona", agent.persona)
 
-        val matchedRulesets = rulesetResolver.resolve(agent.rulesets, rulesets)
+        val matchedRulesets = rulesetResolver.resolve(
+            patterns = agent.rulesets,
+            available = rulesets,
+            requestedBy = "agent '${agent.id}'",
+            allRulesets = allRulesets,
+        )
         output.appendListTopic("## Rules", matchedRulesets.flatMap { it.rules } + agent.rules)
 
         output.appendTextTopic("## Prompt", agent.prompt)
@@ -28,4 +33,5 @@ class AgentPrinter(
 data class AgentContext(
     val agent: AgentManifest,
     val rulesets: Map<String, RulesetManifest>,
+    val allRulesets: Map<String, RulesetManifest> = rulesets,
 )

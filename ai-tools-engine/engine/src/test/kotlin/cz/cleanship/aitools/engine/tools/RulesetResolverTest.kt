@@ -143,5 +143,126 @@ class RulesetResolverTest {
             }.isInstanceOf(RulesetResolvingException::class.java)
                 .hasMessageContaining("missing-ruleset")
         }
+
+        @Test
+        fun `should include requestedBy in error message`() {
+            // given
+            val rulesets = mapOf(
+                "base" to createRuleset("base"),
+            )
+
+            // when/then
+            assertThatThrownBy {
+                resolver.resolve(listOf("missing"), rulesets, requestedBy = "agent 'developer-feature'")
+            }.isInstanceOf(RulesetResolvingException::class.java)
+                .hasMessageContaining("required by agent 'developer-feature'")
+        }
+
+        @Test
+        fun `should include available rulesets in error message`() {
+            // given
+            val rulesets = mapOf(
+                "base" to createRuleset("base"),
+                "coding-java" to createRuleset("coding-java"),
+            )
+
+            // when/then
+            assertThatThrownBy {
+                resolver.resolve(listOf("missing"), rulesets)
+            }.isInstanceOf(RulesetResolvingException::class.java)
+                .hasMessageContaining("[base, coding-java]")
+        }
+
+        @Test
+        fun `should detect rulesets excluded by project filter`() {
+            // given
+            val filteredRulesets = mapOf(
+                "base" to createRuleset("base"),
+            )
+            val allRulesets = mapOf(
+                "base" to createRuleset("base"),
+                "coding-kotlin" to createRuleset("coding-kotlin"),
+            )
+
+            // when/then
+            assertThatThrownBy {
+                resolver.resolve(
+                    listOf("coding-kotlin"),
+                    filteredRulesets,
+                    requestedBy = "agent 'dev'",
+                    allRulesets = allRulesets,
+                )
+            }.isInstanceOf(RulesetResolvingException::class.java)
+                .hasMessageContaining("excluded by project filter")
+                .hasMessageContaining("coding-kotlin")
+        }
+
+        @Test
+        fun `should suggest similar rulesets`() {
+            // given
+            val rulesets = mapOf(
+                "coding-java" to createRuleset("coding-java"),
+                "coding-kotlin" to createRuleset("coding-kotlin"),
+                "testing-java" to createRuleset("testing-java"),
+            )
+
+            // when/then
+            assertThatThrownBy {
+                resolver.resolve(listOf("coding-python"), rulesets)
+            }.isInstanceOf(RulesetResolvingException::class.java)
+                .hasMessageContaining("Similar available: [coding-java, coding-kotlin]")
+        }
+    }
+
+    @Nested
+    inner class Suggestions {
+
+        @Test
+        fun `should find suggestions by substring match`() {
+            // given
+            val availableIds = setOf("coding-java", "coding-kotlin", "testing-java", "base")
+
+            // when
+            val result = resolver.findSuggestions("coding", availableIds)
+
+            // then
+            assertThat(result).containsExactly("coding-java", "coding-kotlin")
+        }
+
+        @Test
+        fun `should find suggestions by part match`() {
+            // given
+            val availableIds = setOf("coding-java", "coding-kotlin", "testing-java", "base")
+
+            // when
+            val result = resolver.findSuggestions("kotlin", availableIds)
+
+            // then
+            assertThat(result).containsExactly("coding-kotlin")
+        }
+
+        @Test
+        fun `should return empty for pure regex patterns`() {
+            // given
+            val availableIds = setOf("coding-java", "base")
+
+            // when
+            val result = resolver.findSuggestions(".*", availableIds)
+
+            // then
+            assertThat(result).isEmpty()
+        }
+
+        @Test
+        fun `should be case insensitive`() {
+            // given
+            val availableIds = setOf("Coding-Java", "base")
+
+            // when
+            val result = resolver.findSuggestions("coding", availableIds)
+
+            // then
+            assertThat(result).containsExactly("Coding-Java")
+        }
     }
 }

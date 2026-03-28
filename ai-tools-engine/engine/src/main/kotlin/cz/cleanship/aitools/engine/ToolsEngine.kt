@@ -2,6 +2,7 @@ package cz.cleanship.aitools.engine
 
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.Project
+import cz.cleanship.aitools.engine.models.RulesetManifest
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
 import cz.cleanship.aitools.engine.tools.AgentContext
@@ -79,14 +80,19 @@ class ToolsEngine(
 
                 val destination = File(project.manifest.deploy.directory).absoluteFile
                 for (adapter in tools) {
-                    exportAdapter(project, adapter, destination)
+                    exportAdapter(project, adapter, destination, allData.rulesets)
                 }
                 LOG.info("Processing project {} completed", project.manifest.id)
             }
         }
     }
 
-    private fun exportAdapter(project: Project, adapter: ToolAdapter, destination: File) {
+    private fun exportAdapter(
+        project: Project,
+        adapter: ToolAdapter,
+        destination: File,
+        allRulesets: Map<String, RulesetManifest>,
+    ) {
         try {
             LOG.info("{}: Processing agent {}", project.manifest.id, adapter.toolType)
             if (project.manifest.deploy.replace) {
@@ -95,16 +101,15 @@ class ToolsEngine(
             adapter.prepare(destination, project.manifest)
             adapter.export(destination, GlobalContext(project.manifest))
             project.agents.values.forEach {
-                adapter.export(destination, AgentContext(it, project.rulesets))
+                adapter.export(destination, AgentContext(it, project.rulesets, allRulesets))
             }
             project.prompts.values.forEach {
-                adapter.export(destination, PromptContext(it, project.rulesets))
+                adapter.export(destination, PromptContext(it, project.rulesets, allRulesets))
             }
             project.features.values.forEach {
                 adapter.export(destination, FeatureContext(it))
             }
         } catch (ex: RulesetResolvingException) {
-            // TODO add context in nested inSpan blocks
             LOG.error("Failed to resolve rulesets for project {}", project.manifest.id, ex)
         }
     }

@@ -9,7 +9,7 @@ class PromptPrinter(
 ) : Printer<PromptContext> {
 
     override fun print(entity: PromptContext, output: Output): Output {
-        val (prompt, rulesets) = entity
+        val (prompt, rulesets, allRulesets) = entity
         output.appendTextTopic("# ${prompt.id}", prompt.description)
 
         output.appendListTopic(
@@ -20,7 +20,12 @@ class PromptPrinter(
             },
         )
 
-        val matchedRulesets = rulesetResolver.resolve(prompt.rulesets, rulesets)
+        val matchedRulesets = rulesetResolver.resolve(
+            patterns = prompt.rulesets,
+            available = rulesets,
+            requestedBy = "prompt '${prompt.id}'",
+            allRulesets = allRulesets,
+        )
         output.appendListTopic("## Rules", matchedRulesets.flatMap { it.rules } + prompt.rules)
 
         output.appendTextTopic("## Prompt", entity.prompt.content)
@@ -32,4 +37,5 @@ class PromptPrinter(
 data class PromptContext(
     val prompt: PromptManifest,
     val rulesets: Map<String, RulesetManifest>,
+    val allRulesets: Map<String, RulesetManifest> = rulesets,
 )
