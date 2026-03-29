@@ -6,6 +6,7 @@ variables:
     description: "Brief description of what the agent should do"
 rulesets:
   - authoring-yaml
+  - authoring-ai
   - authoring-manifests
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"

@@ -9,6 +9,7 @@ variables:
     description: "Project ID where the feature belongs (e.g., ai-tools)"
 rulesets:
   - authoring-yaml
+  - authoring-ai
   - authoring-manifests
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"

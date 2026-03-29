@@ -994,3 +994,136 @@ ai-tools/
   build/                 # Legacy build artifacts
   coverage/              # Test coverage reports
 ```
+
+---
+
+## Kotlin Migration Status (ai-tools-engine)
+
+> Gap analysis comparing this TypeScript build system with the Kotlin rewrite (`ai-tools-engine/`).
+> Last updated: 2026-03-28
+
+### Summary
+
+| Status | Count | Percentage |
+|--------|-------|------------|
+| Implemented | 28 | 27% |
+| Partial | 10 | 10% |
+| Missing | 65 | 63% |
+| **Total** | **103** | |
+
+### Feature Matrix
+
+#### Manifest Types
+
+| Feature | TS | Kotlin | Status |
+|---------|:--:|:------:|--------|
+| Ruleset manifest (id, description, rules, metadata) | Yes | Yes | ✅ |
+| Ruleset `extends` (inheritance with cycle detection) | Yes | No | ❌ |
+| Ruleset `tags` (language-aware filtering) | Yes | No | ❌ |
+| Agent manifest (id, description, persona, prompt, rulesets, rules, constraints) | Yes | Yes | ✅ |
+| Agent `defaults` (model, temperature, max_tokens, style) | Yes | No | ❌ |
+| Agent `capabilities`, `tools` fields | Yes | No | ❌ |
+| Agent `prompt.system` / `prompt.user_template` separation | Yes | No | ❌ |
+| Prompt manifest (id, description, content, variables, rules, rulesets) | Yes | Yes | ✅ |
+| Prompt `system` / `user` separation | Yes | No | ❌ |
+| Prompt variable substitution (`{{var}}`, conditional `{{#var}}...{{/var}}`) | Yes | No | ❌ |
+| Prompt `shared/` subdirectory skip | Yes | No | ❌ |
+| Skill manifest | Yes | No | ❌ |
+| Recipe manifest | Yes | No | ❌ |
+| Project manifest (basic) | Yes | Yes | 🔶 |
+| Project `tech_stacks` (multi-stack) | Yes | No | ❌ |
+| Project `conventions` | Yes | No | ❌ |
+| Project `agents`/`prompts`/`rulesets` include/exclude (regex) | Yes | Partial (tag/whitelist/blacklist) | 🔶 |
+| Project `documentation` | Yes | Yes | ✅ |
+| Feature manifest (basic) | Yes | Yes | 🔶 |
+| Feature `model`, `files.patterns`, `recipe` binding | Yes | No | ❌ |
+| Deploy config as separate manifest (`deploy.yml`) | Yes | No (inline in project) | 🔶 |
+| Eval suite manifest | Yes | No | ❌ |
+
+#### CLI Commands
+
+| Feature | TS | Kotlin | Status |
+|---------|:--:|:------:|--------|
+| CLI framework | Commander.js | Clikt | ✅ |
+| `build` (global adapter generation) | Yes | No | ❌ |
+| `generate [project] [--all]` | Yes | Partial | 🔶 |
+| `deploy project` / `deploy all` / `deploy rollback` | Yes | No | ❌ |
+| `validate` (schema + rules) | Yes | No | ❌ |
+| `eval [--suite]` | Yes | No | ❌ |
+| `diff --before --after` | Yes | No | ❌ |
+| `clean` | Yes | No | ❌ |
+| `create` / `init` / `list` / `external` | Yes | No | ❌ |
+| `docs generate` | Yes | No | ❌ |
+| `prompts library` / `prompts html` / `prompts use` | Yes | No | ❌ |
+| `recipes list` / `recipes run` / `recipes generate` | Yes | No | ❌ |
+| `--dry-run`, `--force`, `--interactive` options | Yes | No | ❌ |
+
+#### Output Targets (Tool Adapters)
+
+| Feature | TS | Kotlin | Status |
+|---------|:--:|:------:|--------|
+| Windsurf adapter | Yes | Yes | ✅ |
+| Claude Code adapter | Yes | Yes | ✅ |
+| Cursor adapter | Yes | Yes | ✅ |
+| GitHub Copilot adapter | Yes | Yes | ✅ |
+| Codex adapter | Yes | Yes | ✅ |
+| Copilot CLI adapter | Yes | No | ❌ |
+| Antigravity adapter (Kotlin-only) | No | Yes | ✅ |
+| Recipe script generation (all adapters) | Yes | No | ❌ |
+| Skill export (Claude adapter) | Yes | No | ❌ |
+
+#### Build Pipeline & Resolver
+
+| Feature | TS | Kotlin | Status |
+|---------|:--:|:------:|--------|
+| Global build (all adapters) | Yes | No | ❌ |
+| Staging area (`.output/`) | Yes | No (direct write) | ❌ |
+| Ruleset inheritance resolution (recursive, cycle detection) | Yes | No | ❌ |
+| Ruleset regex pattern matching | Yes | Yes | ✅ |
+| Language-aware ruleset filtering | Yes | No | ❌ |
+| Agent resolution per-stack (suffix `-<stackName>`) | Yes | No | ❌ |
+| Model resolution hierarchy | Yes | No | ❌ |
+
+#### Validation
+
+| Feature | TS | Kotlin | Status |
+|---------|:--:|:------:|--------|
+| JSON schema validation | Yes | No | ❌ |
+| ID uniqueness check | Yes | No | ❌ |
+| Kebab-case enforcement | Yes | No | ❌ |
+| Reference integrity | Yes | No | ❌ |
+| Security scanning (API keys, passwords, tokens) | Yes | No | ❌ |
+
+#### Deployment
+
+| Feature | TS | Kotlin | Status |
+|---------|:--:|:------:|--------|
+| Deploy pipeline (generate → verify → backup → copy) | Yes | No | ❌ |
+| Backup system (10 most recent per project) | Yes | No | ❌ |
+| Auto-commit after deploy | Yes | No | ❌ |
+| Dry-run mode | Yes | No | ❌ |
+
+### Kotlin-Only Features (not in TypeScript)
+
+| Feature | Description |
+|---------|-------------|
+| **Antigravity adapter** | New tool adapter for `.agent/` directory structure |
+| **HTTP Server (Ktor)** | REST API server module (`/`, `/health` endpoints) |
+| **Telemetry module** | OpenTelemetry-based tracing with span support |
+| **Structured logging** | SLF4J with trace/span context |
+| **Multi-module Gradle** | Separate `engine`, `cli`, `server`, `telemetry`, `utils` modules |
+| **Sealed class filters** | Type-safe filter variants (ByTags, ByWhitelistedIds, ByBlacklistedIds) |
+
+### Implementation Priority
+
+| Phase | Focus | Key Items |
+|-------|-------|-----------|
+| 1 | Core Model Completeness | Ruleset `extends` + inheritance, language-aware filtering, agent extended fields, skill manifest, multi-stack support |
+| 2 | Deployment Pipeline | Separate deploy config, staging area, backup system, deploy commands |
+| 3 | Validation | Schema validation, uniqueness, kebab-case, reference integrity, security scanning |
+| 4 | Recipe System | Recipe manifest, script generation, adapter export, interactive runner |
+| 5 | CLI Commands | `build`, `create`/`init`, `list`/`external`, `clean`, Copilot CLI adapter |
+| 6 | Docs & Prompts | `docs generate`, prompt library (MD/HTML), `prompts use`, variable substitution |
+| 7 | Advanced | Eval suites, diff command, model resolution hierarchy, config deep merge |
+
+> For the full detailed gap analysis, see [FEATURE_COMPARISON.md](FEATURE_COMPARISON.md).

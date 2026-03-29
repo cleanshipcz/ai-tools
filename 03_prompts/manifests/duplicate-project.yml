@@ -12,6 +12,7 @@ variables:
     description: "Absolute path to the new project manifest directory (default: ai-tools-projects/{{project_destination.last_path_segment}})"
 rulesets:
   - authoring-yaml
+  - authoring-ai
   - authoring-manifests
 rules:
   - "Verify parent project exists before starting"

@@ -36,6 +36,7 @@ deploy:
       type: tags
       tags:
         - common
+        - ai
         - development
         - documentation
   prompts:
@@ -76,6 +77,7 @@ deploy:
         - documentation
         - testing
         - manifests
+        - ai
 metadata:
   version: 1.0.0
   author: cleanshipcz

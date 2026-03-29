@@ -1,0 +1,25 @@
+id: authoring-ai
+description: Rules for writing content that AI agents consume effectively — instructions, configurations, and workflows
+rules:
+  - "State intent before method — lead with WHAT should happen, then HOW to do it."
+  - "Be explicit and unambiguous — never rely on implied context or assumptions an LLM might not share."
+  - "Use structured formats: numbered steps for sequences, bullet points for unordered items, headers for sections."
+  - "Use consistent terminology throughout — pick one term for a concept and never alternate with synonyms."
+  - "Express constraints as MUST, MUST NOT, NEVER, ALWAYS — not vague guidance like 'try to' or 'consider'."
+  - "Specify output format expectations explicitly (format, structure, length) rather than leaving them open-ended."
+  - "Front-load critical information — put the most important instruction or constraint first, not buried in a paragraph."
+  - "Use delimiters and labels to separate distinct sections (e.g., PROCESS, DELIVERABLES, CONSTRAINTS) so agents can parse structure."
+  - "Write one instruction per sentence — compound sentences with multiple directives are easy to partially follow."
+  - "Provide concrete examples for non-obvious expectations — a single example eliminates more ambiguity than a paragraph of explanation."
+  - "Scope each instruction clearly — specify what it applies to (all files, only tests, only production code, only this role)."
+  - "Avoid negation-only rules — pair what NOT to do with what TO DO instead (e.g., 'Do not use shell module — use the native ansible.builtin module instead')."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - authoring
+    - ai
+    - instructions
+    - quality
+    - manifests

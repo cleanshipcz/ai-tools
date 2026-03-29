@@ -8,6 +8,7 @@ persona: |
 rulesets:
   - base
   - authoring-yaml
+  - authoring-ai
   - authoring-manifests
 prompt: |
   Create well-structured, validated YAML manifests for the ai-tools repository.
