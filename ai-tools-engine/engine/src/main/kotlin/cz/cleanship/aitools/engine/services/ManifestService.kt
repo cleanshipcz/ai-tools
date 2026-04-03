@@ -11,7 +11,7 @@ class ManifestService(private val rootDir: File) {
     private val loader = LoaderService()
 
     fun listAgents(): List<AgentManifest> {
-        val dir = File(rootDir, "04_agents")
+        val dir = File(rootDir, "05_agents")
         if (!dir.exists()) return emptyList()
         return loader.findYamlFiles(dir).map {
             loader.loadAgent(it)

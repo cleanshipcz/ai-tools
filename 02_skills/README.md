@@ -427,7 +427,7 @@ command:
 
 ## 🔗 Related
 
-- [Agents](../04_agents/README.md) - Agents that use skills
+- [Agents](../05_agents/README.md) - Agents that use skills
 - [MCP](../07_mcp/README.md) - MCP servers expose skills to agents
 - [Rulesets](../01_rulesets/README.md) - Guidelines for using skills
 

@@ -8,7 +8,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - Validation, doc generation, prompt libraries, skill generation, recipe runners, and utilities (diff/clean/eval) are built-in.
 
 ## High-Level Architecture
-- **Manifests (YAML):** Located under numbered directories (`01_rulesets`, `02_skills`, `03_prompts`, `04_agents`, `08_recipes`, `09_projects`, `07_mcp`).
+- **Manifests (YAML):** Located under numbered directories (`01_rulesets`, `02_skills`, `03_prompts`, `05_agents`, `08_recipes`, `09_projects`, `07_mcp`).
 - **CLI (TypeScript):** Entry `src/cli/index.ts` wiring commander subcommands to services.
 - **Core Services:** Config, loader, resolver, validation, deployment, feature generation, recipe generation, prompt library generation, docs generation, skill generation, diff/clean/eval utilities.
 - **Tool Adapters:** Per-tool generators in `src/tools/` producing staged outputs under `.output/<project>/...`.

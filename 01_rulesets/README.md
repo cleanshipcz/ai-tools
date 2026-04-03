@@ -376,7 +376,7 @@ Each ruleset should focus on ONE concern:
 
 ## 🔗 Related
 
-- [Agents](../04_agents/README.md) - Use rulesets to configure agents
+- [Agents](../05_agents/README.md) - Use rulesets to configure agents
 - [Prompts](../03_prompts/README.md) - Combine with rules for better output
 - [Skills](../02_skills/README.md) - Actions agents can take
 

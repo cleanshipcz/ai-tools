@@ -1,6 +1,6 @@
 locations:
   agents:
-    - "04_agents"
+    - "05_agents"
   prompts:
     - "03_prompts"
   rulesets:

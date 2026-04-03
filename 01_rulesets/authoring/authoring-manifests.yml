@@ -13,7 +13,7 @@ rules:
   - "For prompt manifests: use Mustache syntax ({{variable}}) for template interpolation. Content is required."
   - "Compose existing rulesets in agents rather than duplicating rules inline. Use wildcard patterns (e.g., coding-language-.*) for language-specific rulesets."
   - "Always include the base ruleset when composing rulesets for agents."
-  - "Place manifest files in the correct directory: 01_rulesets/ for rulesets, 02_skills/ for skills, 03_prompts/<category>/ for prompts, 04_agents/ for agents, 08_recipes/ for recipes, 09_projects/ for projects."
+  - "Place manifest files in the correct directory: 01_rulesets/ for rulesets, 02_skills/ for skills, 03_prompts/<category>/ for prompts, 05_agents/ for agents, 08_recipes/ for recipes, 09_projects/ for projects."
   - "Before creating a manifest, check for existing manifests that could be extended or composed rather than creating duplicates."
   - "After creating or modifying manifests, validate with ./gradlew clean build (Kotlin engine) to confirm compatibility."
 metadata:

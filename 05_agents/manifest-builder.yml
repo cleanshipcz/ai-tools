@@ -23,7 +23,7 @@ prompt: |
   Phase 2: Generate the manifest
   - Use the correct field structure per manifest type:
 
-    Agent (AgentManifest.kt → 04_agents/<id>.yml)
+    Agent (AgentManifest.kt → 05_agents/<id>.yml)
       Required: id, description, persona, prompt, metadata
       Optional: rulesets[], rules[], constraints[]
       NOT supported: purpose, capabilities, defaults, tools, prompt.system

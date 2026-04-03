@@ -17,7 +17,7 @@ This repository is the source of truth for prompts, rulesets, agents, skills, re
 - `01_rulesets/` – reusable rule sets
 - `02_skills/` – skill manifests (converted to `SKILL.md`)
 - `03_prompts/` – prompt manifests
-- `04_agents/` – agent manifests
+- `05_agents/` – agent manifests
 - `08_recipes/` – multi-agent workflow recipes
 - `09_projects/` – project manifests (`global/` + `local/` + templates)
 - `07_mcp/` – MCP servers and presets

@@ -131,7 +131,7 @@ Rulesets are collections of rules (coding standards, conventions) that can be co
 
 ### Agents
 
-**Location:** `04_agents/`
+**Location:** `05_agents/`
 **Schema:** `agent.schema.json`
 
 Agents are complete AI assistant personas with purpose, system prompts, rulesets, capabilities, and model defaults.
@@ -726,7 +726,7 @@ The `ValidationService` (`src/core/services/validation.service.ts`) performs com
 
 ### Collected Manifest Sources
 
-- `01_rulesets/`, `02_skills/`, `03_prompts/`, `04_agents/`, `08_recipes/`, `20_evals/suites/`
+- `01_rulesets/`, `02_skills/`, `03_prompts/`, `05_agents/`, `08_recipes/`, `20_evals/suites/`
 - Project manifests from all configured project sources
 - Deploy configs (`deploy.yml`)
 - Feature manifests (`features/*/feature.yml`)
@@ -943,7 +943,7 @@ ai-tools/
   02_skills/             # Skill YAML manifests (executable tools)
   03_prompts/            # Prompt YAML manifests (reusable templates)
     shared/              # Include fragments (not standalone prompts)
-  04_agents/             # Agent YAML manifests (AI personas)
+  05_agents/             # Agent YAML manifests (AI personas)
   08_recipes/            # Recipe YAML manifests (multi-step workflows)
   09_projects/           # Project definitions
     global/              # Shared project configs (committed)

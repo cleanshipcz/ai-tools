@@ -81,7 +81,7 @@ content: |
   - **constraints** = guardrails. Use NEVER/ALWAYS phrasing. 3-7 items.
   - **rulesets** = compose existing rules. Never duplicate rules that exist in a ruleset.
   - Keep agents focused on ONE role. Split broad agents into specialized ones.
-  - File location: `04_agents/<id>.yml`
+  - File location: `05_agents/<id>.yml`
 
   ## Example conversation
 

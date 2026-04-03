@@ -10,7 +10,7 @@ vi.mock('./config.service.js', () => {
     rootDir: '/mock/root',
     dirs: {
       prompts: '03_prompts',
-      agents: '04_agents',
+      agents: '05_agents',
       rulesets: '01_rulesets',
       skills: '02_skills',
       recipes: '08_recipes',
@@ -100,8 +100,8 @@ description: Test Agent
 
     // Mock finding files
     mockLoader.findYamlFiles.mockImplementation(async (path: string) => {
-      if (path.includes('04_agents')) {
-        return ['/mock/root/04_agents/agent.yml'];
+      if (path.includes('05_agents')) {
+        return ['/mock/root/05_agents/agent.yml'];
       }
       return [];
     });
@@ -130,8 +130,8 @@ version: 1.0.0
 
     // Mock finding files
     mockLoader.findYamlFiles.mockImplementation(async (path: string) => {
-      if (path.includes('04_agents')) {
-        return ['/mock/root/04_agents/agent.yml'];
+      if (path.includes('05_agents')) {
+        return ['/mock/root/05_agents/agent.yml'];
       }
       return [];
     });
@@ -156,8 +156,8 @@ version: 1.0.0
 
     // Mock finding files
     mockLoader.findYamlFiles.mockImplementation(async (path: string) => {
-      if (path.includes('04_agents')) {
-        return ['/mock/root/04_agents/agent1.yml', '/mock/root/04_agents/agent2.yml'];
+      if (path.includes('05_agents')) {
+        return ['/mock/root/05_agents/agent1.yml', '/mock/root/05_agents/agent2.yml'];
       }
       return [];
     });
@@ -182,8 +182,8 @@ version: v1.0
 
     // Mock finding files
     mockLoader.findYamlFiles.mockImplementation(async (path: string) => {
-      if (path.includes('04_agents')) {
-        return ['/mock/root/04_agents/agent.yml'];
+      if (path.includes('05_agents')) {
+        return ['/mock/root/05_agents/agent.yml'];
       }
       return [];
     });

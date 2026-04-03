@@ -18,7 +18,7 @@ export class ConfigService {
   public readonly dirs = {
     projects: '09_projects',
     prompts: '03_prompts',
-    agents: '04_agents',
+    agents: '05_agents',
     rulesets: '01_rulesets',
     skills: '02_skills',
     recipes: '08_recipes',
