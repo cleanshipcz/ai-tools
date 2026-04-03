@@ -1,8 +1,7 @@
 id: run-ktlint
-description: Run ktlint for Kotlin code formatting
-triggers:
-  - 'User asks to run ktlint'
-  - 'User asks for Kotlin formatting check'
+description: >-
+  Run ktlint for Kotlin code formatting.
+  Use when user asks to run ktlint or requests a Kotlin formatting check.
 sections:
   - text: |
       Run `./gradlew ktlintCheck` in the project directory.

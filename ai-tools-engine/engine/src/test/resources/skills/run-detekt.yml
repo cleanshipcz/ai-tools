@@ -1,7 +1,5 @@
 id: run-detekt
-description: Run Detekt static analysis for Kotlin
-triggers:
-  - 'User asks to run detekt'
+description: Run Detekt static analysis for Kotlin. Use when user asks to run detekt.
 sections:
   - text: |
       Run `./gradlew detekt` in the project directory.

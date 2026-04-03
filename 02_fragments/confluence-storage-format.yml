@@ -1,0 +1,18 @@
+id: confluence-storage-format
+description: Confluence storage format markup syntax for programmatic page generation
+content: |
+  When generating Confluence content programmatically:
+
+  - Use `<h2>` for section headers
+  - Use `<ac:structured-macro ac:name="code">` for code blocks
+  - Use `<ac:structured-macro ac:name="info">` for info panels
+  - Use `<ac:structured-macro ac:name="warning">` for warning callouts
+  - Tables use standard HTML `<table>`, `<tr>`, `<th>`, `<td>` tags
+metadata:
+  version: 1.0.0
+  author: 'AI Tools Team'
+  created: '2026-04-03'
+  tags:
+    - confluence
+    - formatting
+    - markup

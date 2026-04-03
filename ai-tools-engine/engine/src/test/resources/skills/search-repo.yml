@@ -1,7 +1,5 @@
 id: search-repo
-description: Search repository for code patterns or text
-triggers:
-  - 'User asks to search the codebase'
+description: Search repository for code patterns or text. Use when user asks to search the codebase.
 sections:
   - text: |
       Search the repository using ripgrep or similar fast search tools.

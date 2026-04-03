@@ -1,9 +1,7 @@
 id: run-gradle-tests
-description: Run unit tests with Gradle
-triggers:
-  - 'User asks to run tests'
-  - 'User asks to run Gradle tests'
-  - 'User asks to verify code changes'
+description: >-
+  Run unit tests with Gradle.
+  Use when user asks to run tests, run Gradle tests, or verify code changes.
 sections:
   - text: |
       Run `./gradlew test --info` in the project directory.

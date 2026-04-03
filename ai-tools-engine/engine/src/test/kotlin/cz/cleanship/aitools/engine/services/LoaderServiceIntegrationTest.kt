@@ -183,8 +183,7 @@ class LoaderServiceIntegrationTest {
 
         // then
         assertThat(skill.id).isEqualTo("run-detekt")
-        assertThat(skill.description).isEqualTo("Run Detekt static analysis for Kotlin")
-        assertThat(skill.triggers).containsExactly("User asks to run detekt")
+        assertThat(skill.description).isEqualTo("Run Detekt static analysis for Kotlin. Use when user asks to run detekt.")
         assertThat(skill.sections).hasSize(1)
         assertThat(skill.sections[0]).isInstanceOf(SkillSection.TextSection::class.java)
         val textSection = skill.sections[0] as SkillSection.TextSection
@@ -209,8 +208,7 @@ class LoaderServiceIntegrationTest {
 
         // then
         assertThat(skill.id).isEqualTo("search-repo")
-        assertThat(skill.description).isEqualTo("Search repository for code patterns or text")
-        assertThat(skill.triggers).containsExactly("User asks to search the codebase")
+        assertThat(skill.description).isEqualTo("Search repository for code patterns or text. Use when user asks to search the codebase.")
         assertThat(skill.sections).hasSize(1)
         assertThat(skill.sections[0]).isInstanceOf(SkillSection.TextSection::class.java)
         assertThat(skill.metadata).isEqualTo(
@@ -263,8 +261,7 @@ class LoaderServiceIntegrationTest {
 
         // then
         assertThat(skill.id).isEqualTo("dir-skill")
-        assertThat(skill.description).isEqualTo("A directory-based skill for testing")
-        assertThat(skill.triggers).containsExactly("User asks for dir skill")
+        assertThat(skill.description).isEqualTo("A directory-based skill for testing. Use when user asks for dir skill.")
         assertThat(skill.sections).hasSize(1)
         assertThat(skill.sections[0]).isInstanceOf(SkillSection.TextSection::class.java)
         assertThat(skill.files).hasSize(2)

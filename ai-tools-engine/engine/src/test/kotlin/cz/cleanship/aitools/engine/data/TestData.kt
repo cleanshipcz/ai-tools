@@ -276,10 +276,6 @@ val expectedFeature =
 val textOnlySkill = SkillManifest(
     id = "run-pytest",
     description = "Run Python tests with pytest",
-    triggers = listOf(
-        "User asks to run Python tests",
-        "User asks to run pytest",
-    ),
     sections = listOf(
         SkillSection.TextSection(
             text =
@@ -304,11 +300,6 @@ val expectedTextOnlySkill =
 
     Run Python tests with pytest
 
-    ## When to use
-
-    - User asks to run Python tests
-    - User asks to run pytest
-
     Run `pytest -v --tb=short` in the project directory.
     After running, summarize results: total, passed, failed, skipped.
     If there are failures, show the failing test names and error messages.
@@ -318,7 +309,6 @@ val expectedTextOnlySkill =
 val skillWithRuleset = SkillManifest(
     id = "skill-with-ruleset",
     description = "Skill that includes a ruleset",
-    triggers = listOf("User asks for skill with ruleset"),
     sections = listOf(
         SkillSection.TextSection(text = "## Rules"),
         SkillSection.RulesetSection(ruleset = "test-ruleset"),
@@ -334,10 +324,6 @@ val expectedSkillWithRuleset =
 
     Skill that includes a ruleset
 
-    ## When to use
-
-    - User asks for skill with ruleset
-
     ## Rules
 
     - Rule number one.
@@ -349,7 +335,6 @@ val expectedSkillWithRuleset =
 val skillWithFragment = SkillManifest(
     id = "skill-with-fragment",
     description = "Skill that includes a fragment",
-    triggers = listOf("User asks for skill with fragment"),
     sections = listOf(
         SkillSection.TextSection(text = "## Reference Material"),
         SkillSection.FragmentSection(fragment = "test-fragment"),
@@ -365,10 +350,6 @@ val expectedSkillWithFragment =
 
     Skill that includes a fragment
 
-    ## When to use
-
-    - User asks for skill with fragment
-
     ## Reference Material
 
     This is reference material.
@@ -379,7 +360,6 @@ val expectedSkillWithFragment =
 val skillWithMixedSections = SkillManifest(
     id = "skill-with-mixed-sections",
     description = "Skill with all section types",
-    triggers = listOf("User asks for mixed skill"),
     sections = listOf(
         SkillSection.TextSection(
             text =
@@ -405,10 +385,6 @@ val expectedSkillWithMixedSections =
 
     Skill with all section types
 
-    ## When to use
-
-    - User asks for mixed skill
-
     Use this skill when creating documentation.
 
     ## Conventions
@@ -429,7 +405,6 @@ val expectedSkillWithMixedSections =
 val skillWithFiles = SkillManifest(
     id = "skill-with-files",
     description = "Skill with companion files",
-    triggers = listOf("User asks for skill with files"),
     sections = listOf(
         SkillSection.TextSection(text = "See templates/example.txt for the template."),
     ),

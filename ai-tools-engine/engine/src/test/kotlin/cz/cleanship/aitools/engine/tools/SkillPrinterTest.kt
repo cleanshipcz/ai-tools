@@ -110,7 +110,7 @@ class SkillPrinterTest {
         val content = output.getContent().trimIndent()
         assertThat(content).contains("# ${textOnlySkill.id}")
         assertThat(content).contains(textOnlySkill.description)
-        assertThat(content).contains("## When to use")
+        assertThat(content).doesNotContain("## When to use")
     }
 
     @Test

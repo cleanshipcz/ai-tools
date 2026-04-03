@@ -14,8 +14,6 @@ class SkillPrinter(
 
         output.appendTextTopic("# ${skill.id}", skill.description)
 
-        output.appendListTopic("## When to use", skill.triggers)
-
         val sections = skill.sections
         if (sections.isNotEmpty()) {
             val renderedSections = sections.map { section ->

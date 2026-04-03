@@ -1,8 +1,7 @@
 id: run-pytest
-description: Run Python tests with pytest
-triggers:
-  - 'User asks to run Python tests'
-  - 'User asks to run pytest'
+description: >-
+  Run Python tests with pytest.
+  Use when user asks to run Python tests or run pytest.
 sections:
   - text: |
       Run `pytest -v --tb=short` in the project directory.

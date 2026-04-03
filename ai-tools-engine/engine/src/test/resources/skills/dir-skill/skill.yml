@@ -1,7 +1,5 @@
 id: dir-skill
-description: A directory-based skill for testing
-triggers:
-  - 'User asks for dir skill'
+description: A directory-based skill for testing. Use when user asks for dir skill.
 sections:
   - text: |
       This is a directory-based skill.

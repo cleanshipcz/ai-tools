@@ -1,77 +1,26 @@
 id: confluence-doc
-description: Create and update Confluence documentation
-triggers:
-  - 'User asks to create Confluence documentation'
-  - 'User asks to write a runbook'
-  - 'User asks to create a design document or ADR'
-  - 'User asks to write an incident report'
-  - 'User asks to update a Confluence page'
+description: >-
+  Create and update Confluence documentation — Use when creating or updating pages in Confluence.
 sections:
   - text: |
-      Use this skill when creating or updating documentation in Confluence.
-      Requires Jira/Confluence MCP server to be available.
-      User must have write access to the target Confluence space.
+      ## Confluence Instance
 
-      ## Page Title Conventions
-
-      - Runbooks: `[M7O] Runbook: <Subject>`
-      - Design Docs: `[M7O] Design: <Subject>`
-      - ADRs: `[M7O] ADR-<number>: <Decision Title>`
-      - Incident Reports: `[M7O] Incident <YYYY-MM-DD>: <Brief Title>`
-
-      ## Labels
-
-      Always apply relevant labels to pages:
-
-      | Label       | When to Use                      |
-      |-------------|----------------------------------|
-      | m7o         | All M7O team pages               |
-      | runbook     | Operational runbooks             |
-      | design      | Design documents                 |
-      | adr         | Architecture Decision Records    |
-      | incident    | Incident reports / post-mortems  |
-      | opensearch  | OpenSearch-related content        |
-      | grafana     | Grafana-related content           |
-      | terraform   | Terraform/IaC content             |
-      | monitoring  | General monitoring topics         |
-      | alerting    | Alerting configuration topics     |
-
-      ## Page Placement
-
-      Always place pages under the correct parent:
-      1. Search for the parent page by title using `confluence_search_pages`
-      2. Extract the `id` field from the search result
-      3. Pass it as `parent_page_id` when calling `confluence_create_page`
-
-      WARNING: If `parent_page_id` is omitted or misspelled, the page is created at
-      the space root with no error. Always verify the parameter name.
-
-      ## MCP Tools
-
-      - `confluence_create_page` — create a new page
-      - `confluence_update_page` — update an existing page
-      - `confluence_search_pages` — find existing pages by title/label
-      - `confluence_get_page` — read a page's content
+      - **URL**: `https://confluence.deutsche-boerse.com`
+      - **Space Key**: `XBID` or as specified per request
+      - **Parent Pages**: Follow the existing page tree hierarchy
 
       ## Confluence Storage Format
-
-      - Use `<h2>` for section headers
-      - Use `<ac:structured-macro ac:name="code">` for code blocks
-      - Use `<ac:structured-macro ac:name="info">` for info panels
-      - Use `<ac:structured-macro ac:name="warning">` for warning callouts
-      - Tables use standard HTML `<table>`, `<tr>`, `<th>`, `<td>` tags
-
-      ## Templates
-
-      Use the runbook template (templates/runbook.txt) for operational runbooks.
-      Use the design doc template (templates/design-doc.txt) for design documents and ADRs.
+  - fragment: confluence-storage-format
+  - text: |
+      ## MCP Integration
+  - fragment: confluence-mcp-tools
 files:
   - path: templates/runbook.txt
   - path: templates/design-doc.txt
 metadata:
   version: 1.0.0
-  author: 'AI Tools Team'
-  created: '2025-01-01'
+  author: "AI Tools Team"
+  created: "2025-01-01"
   tags:
     - confluence
     - documentation

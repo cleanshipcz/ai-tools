@@ -14,7 +14,6 @@ data class SkillManifest(
     override val id: String,
     override val description: String,
     override val metadata: ManifestMetadata,
-    val triggers: List<String> = emptyList(),
     val sections: List<SkillSection> = emptyList(),
     val files: List<SkillFile> = emptyList(),
 ) : VersionedManifest
