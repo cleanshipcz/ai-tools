@@ -65,6 +65,12 @@ deploy:
         - manifests-create-skill
         - manifests-create-recipe
         - manifests-duplicate-project
+  skills:
+    filter:
+      type: tags
+      tags:
+        - kotlin
+        - search
   rulesets:
     filter:
       type: tags

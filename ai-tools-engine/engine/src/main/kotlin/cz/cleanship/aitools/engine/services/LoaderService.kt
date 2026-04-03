@@ -11,6 +11,7 @@ import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
+import cz.cleanship.aitools.engine.models.SkillManifest
 import cz.cleanship.aitools.engine.models.VersionedManifest
 import kotlinx.serialization.decodeFromString
 import java.io.File
@@ -30,6 +31,8 @@ class LoaderService {
     fun loadRuleset(file: File): RulesetManifest = yaml.load(file)
 
     fun loadFeature(file: File): FeatureManifest = yaml.load(file)
+
+    fun loadSkill(file: File): SkillManifest = yaml.load(file)
 
     fun loadProject(file: File): ProjectManifest = yaml.load(file)
 
@@ -57,6 +60,7 @@ class LoaderService {
             agents = loadAllFromDirectories(locations.agents, ::loadAgent),
             prompts = loadAllFromDirectories(locations.prompts, ::loadPrompt),
             rulesets = loadAllFromDirectories(locations.rulesets, ::loadRuleset),
+            skills = loadAllFromDirectories(locations.skills, ::loadSkill),
             projects = projectsWithFeatures.map { it.first }.associateBy { it.id },
             features = projectsWithFeatures.associate { it.first to it.second.associateBy { f -> f.id } },
         )

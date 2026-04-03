@@ -1,22 +1,24 @@
 id: run-ktlint
-version: 1.0.0
 description: Run ktlint for Kotlin code formatting
 command:
   program: './gradlew'
   args:
     - 'ktlintCheck'
   cwd: '.'
-constraints:
+triggers:
+  - 'User asks to run ktlint'
+  - 'User asks for Kotlin formatting check'
+prerequisites:
   - 'Requires ktlint to be configured in the project.'
+instructions: |
+  After running ktlint, list formatting violations grouped by file.
+  Suggest running ktlintFormat to auto-fix issues.
 timeout_sec: 300
-outputs:
-  stdout: true
-  stderr: true
-  exit_code: true
-tags:
-  - ktlint
-  - kotlin
-  - formatting
 metadata:
+  version: 1.0.0
   author: 'AI Tools Team'
   created: '2025-01-01'
+  tags:
+    - ktlint
+    - kotlin
+    - formatting

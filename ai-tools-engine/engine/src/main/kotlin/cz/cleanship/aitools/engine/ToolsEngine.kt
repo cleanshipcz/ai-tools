@@ -10,6 +10,7 @@ import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.RulesetResolvingException
+import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.adapters.antigravity.AntigravityAdapter
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
@@ -52,10 +53,11 @@ class ToolsEngine(
             LOG.info("Processing locations {}", locations)
             val allData = loaderService.loadAll(locations)
             LOG.info(
-                "Loaded {} agents, {} prompts, {} rulesets, {} projects",
+                "Loaded {} agents, {} prompts, {} rulesets, {} skills, {} projects",
                 allData.agents.size,
                 allData.prompts.size,
                 allData.rulesets.size,
+                allData.skills.size,
                 allData.projects.size,
             )
 
@@ -76,6 +78,9 @@ class ToolsEngine(
                     rulesets = filterService
                         .filter(allData.rulesets.values, projectManifest.deploy.rulesets.filter)
                         .associateBy { it.id },
+                    skills = filterService
+                        .filter(allData.skills.values, projectManifest.deploy.skills.filter)
+                        .associateBy { it.id },
                 )
 
                 val destination = File(project.manifest.deploy.directory).absoluteFile
@@ -94,7 +99,7 @@ class ToolsEngine(
         allRulesets: Map<String, RulesetManifest>,
     ) {
         try {
-            LOG.info("{}: Processing agent {}", project.manifest.id, adapter.toolType)
+            LOG.info("{}: Exporting via adapter {}", project.manifest.id, adapter.toolType)
             if (project.manifest.deploy.replace) {
                 LOG.warn("{}: Replacing existing agentic files in {}.", project.manifest.id, destination)
             }
@@ -108,6 +113,9 @@ class ToolsEngine(
             }
             project.features.values.forEach {
                 adapter.export(destination, FeatureContext(it))
+            }
+            project.skills.values.forEach {
+                adapter.export(destination, SkillContext(it))
             }
         } catch (ex: RulesetResolvingException) {
             LOG.error("Failed to resolve rulesets for project {}", project.manifest.id, ex)

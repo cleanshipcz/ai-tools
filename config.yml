@@ -5,6 +5,8 @@ locations:
     - "03_prompts"
   rulesets:
     - "01_rulesets"
+  skills:
+    - "02_skills"
   projects:
     - "06_projects"
 

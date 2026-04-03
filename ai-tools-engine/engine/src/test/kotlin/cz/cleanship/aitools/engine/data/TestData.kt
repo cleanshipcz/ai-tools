@@ -8,6 +8,11 @@ import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.PromptOutput
 import cz.cleanship.aitools.engine.models.PromptVariable
 import cz.cleanship.aitools.engine.models.RulesetManifest
+import cz.cleanship.aitools.engine.models.SkillCommand
+import cz.cleanship.aitools.engine.models.SkillInput
+import cz.cleanship.aitools.engine.models.SkillManifest
+import cz.cleanship.aitools.engine.models.SkillOutputFile
+import cz.cleanship.aitools.engine.models.SkillOutputs
 import cz.cleanship.aitools.engine.models.Version
 
 val ruleset = RulesetManifest(
@@ -263,8 +268,127 @@ val expectedFeature =
     - Acceptance criteria#2
     
     ## Constraints
-    
+
     - Constraint#1
     - Constraint#2
-    
+
+    """.trimIndent()
+
+val commandSkill = SkillManifest(
+    id = "run-detekt",
+    description = "Run Detekt static analysis for Kotlin",
+    command = SkillCommand(
+        program = "./gradlew",
+        args = listOf("detekt"),
+        cwd = "subproject",
+        env = mapOf("CI" to "true"),
+    ),
+    triggers = listOf(
+        "User asks to run detekt",
+        "User asks for static analysis on Kotlin code",
+    ),
+    prerequisites = listOf(
+        "Requires Detekt to be configured in the project.",
+    ),
+    instructions = "After running, summarize findings by severity.",
+    timeoutSec = 600,
+    outputs = SkillOutputs(
+        files = listOf(
+            SkillOutputFile(
+                path = "build/reports/detekt/detekt.html",
+                description = "HTML report with detailed findings",
+            ),
+        ),
+    ),
+    metadata = ManifestMetadata(
+        version = Version("1.0.0"),
+        author = "Test Author",
+        created = "2025-01-01",
+        tags = setOf("detekt", "kotlin"),
+    ),
+)
+
+val expectedCommandSkill =
+    """
+    # run-detekt
+
+    Run Detekt static analysis for Kotlin
+
+    ## When to use
+
+    - User asks to run detekt
+    - User asks for static analysis on Kotlin code
+
+    ## Prerequisites
+
+    - Requires Detekt to be configured in the project.
+
+    ## How to use
+
+    Run the following command:
+
+    ```bash
+    ./gradlew detekt
+    ```
+
+    **Working directory:** `subproject`
+
+    **Environment variables:**
+
+    - `CI=true`
+
+    **Timeout:** 600 seconds
+
+    ## Output files
+
+    - `build/reports/detekt/detekt.html`: HTML report with detailed findings
+
+    ## Instructions
+
+    After running, summarize findings by severity.
+
+    """.trimIndent()
+
+val mcpToolSkill = SkillManifest(
+    id = "search-repo",
+    description = "Search repository for code patterns or text",
+    mcpTool = "filesystem:search",
+    inputs = listOf(
+        SkillInput(name = "pattern", type = "string", required = true, description = "Search pattern"),
+        SkillInput(name = "path", type = "directory", required = false, description = "Directory to search in"),
+    ),
+    triggers = listOf("User asks to search the codebase"),
+    prerequisites = listOf("Use ripgrep if available."),
+    timeoutSec = 60,
+    metadata = ManifestMetadata(
+        version = Version("1.0.0"),
+        tags = setOf("search", "filesystem"),
+    ),
+)
+
+val expectedMcpToolSkill =
+    """
+    # search-repo
+
+    Search repository for code patterns or text
+
+    ## When to use
+
+    - User asks to search the codebase
+
+    ## Prerequisites
+
+    - Use ripgrep if available.
+
+    ## How to use
+
+    This skill uses the MCP tool: `filesystem:search`
+
+    ### Inputs
+
+    - `pattern` (string) (required): Search pattern
+    - `path` (directory): Directory to search in
+
+    **Timeout:** 60 seconds
+
     """.trimIndent()

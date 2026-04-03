@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
+import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import java.io.File
 
@@ -79,6 +80,13 @@ class CursorAdapter(
         )
         it.appendLine()
         printers.featurePrinter.print(featureContext, it)
+    }
+
+    override fun export(projectDir: File, skillContext: SkillContext) = exportService.export(
+        skillContext.skill,
+        cursorDir(projectDir).resolve("commands").resolve("skill-${skillContext.skill.id}.md"),
+    ) {
+        printers.skillPrinter.print(skillContext, it)
     }
 
     private fun cursorDir(projectDir: File) = projectDir.resolve(".cursor")

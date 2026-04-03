@@ -1,6 +1,7 @@
 package cz.cleanship.aitools.engine.tools.adapters.windsurf
 
 import cz.cleanship.aitools.engine.data.agent
+import cz.cleanship.aitools.engine.data.commandSkill
 import cz.cleanship.aitools.engine.data.expectedAgent
 import cz.cleanship.aitools.engine.data.expectedFeature
 import cz.cleanship.aitools.engine.data.expectedPrompt
@@ -13,6 +14,7 @@ import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
+import cz.cleanship.aitools.engine.tools.SkillContext
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
@@ -87,6 +89,22 @@ class WindsurfAdapterTest {
             |
             """.trimMargin(),
         )
+    }
+
+    @Test
+    fun `should output a skill`() {
+        // given
+        val skillContext = SkillContext(commandSkill)
+
+        // when
+        adapter.export(tempDir.toFile(), skillContext)
+
+        // then
+        val skillFile = rulesDir.resolve("skill-${commandSkill.id}.md")
+        assertThat(skillFile).exists()
+        val content = skillFile.readText()
+        assertThat(content).startsWith("---\ntrigger: manual\n---")
+        assertThat(content).contains(commandSkill.description)
     }
 
     @Test

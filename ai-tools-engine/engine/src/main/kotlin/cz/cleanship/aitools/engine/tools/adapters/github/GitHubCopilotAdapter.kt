@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
+import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import java.io.File
 
@@ -63,6 +64,14 @@ class GitHubCopilotAdapter(
     ) {
         it.appendText(header)
         printers.featurePrinter.print(featureContext, it)
+    }
+
+    override fun export(projectDir: File, skillContext: SkillContext) = exportService.export(
+        skillContext.skill,
+        promptsDir(projectDir).resolve("skill-${skillContext.skill.id}.prompt.md"),
+    ) {
+        it.appendText(header)
+        printers.skillPrinter.print(skillContext, it)
     }
 
     private fun githubDir(projectDir: File) = projectDir.resolve(".github")

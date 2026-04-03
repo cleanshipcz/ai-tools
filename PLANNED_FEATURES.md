@@ -34,11 +34,16 @@
 
 - add support for MCPs
 
-## Other features NOT NOW
+## Project-specific configuration
 
-- [ ] More tool adapters (Cody, Neovim, JetBrains AI)
-- [ ] Prompt marketplace/sharing platform
-- [ ] Advanced eval metrics (BLEU, ROUGE, custom)
-- [ ] Cost analytics dashboard
-- [ ] Version control integration (Git hooks for prompt changes)
-- [ ] Prompt optimization suggestions (A/B testing automation)
+- add support for project-specific tools (skills, prompts, rulesets, agents)
+- based on structure of the project
+  - project.yml
+  - skills/
+  - prompts/
+  - rulesets/
+  - agents/
+
+## Separate DAO and service layers
+
+- this will allow hierarchical definitions and better validation

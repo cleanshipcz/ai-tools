@@ -12,4 +12,5 @@ data class Locations(
     val projects: List<File>,
     val prompts: List<File>,
     val rulesets: List<File>,
+    val skills: List<File>,
 )

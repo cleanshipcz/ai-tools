@@ -17,4 +17,6 @@ interface ToolAdapter {
     fun export(projectDir: File, agentContext: AgentContext)
 
     fun export(projectDir: File, featureContext: FeatureContext)
+
+    fun export(projectDir: File, skillContext: SkillContext)
 }

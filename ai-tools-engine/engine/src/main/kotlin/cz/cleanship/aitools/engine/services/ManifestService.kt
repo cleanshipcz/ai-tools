@@ -4,6 +4,7 @@ import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.FeatureManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
+import cz.cleanship.aitools.engine.models.SkillManifest
 import java.io.File
 
 class ManifestService(private val rootDir: File) {
@@ -38,6 +39,14 @@ class ManifestService(private val rootDir: File) {
         if (!dir.exists()) return emptyList()
         return loader.findYamlFiles(dir).map {
             loader.loadFeature(it)
+        }
+    }
+
+    fun listSkills(): List<SkillManifest> {
+        val dir = File(rootDir, "02_skills")
+        if (!dir.exists()) return emptyList()
+        return loader.findYamlFiles(dir).map {
+            loader.loadSkill(it)
         }
     }
 }

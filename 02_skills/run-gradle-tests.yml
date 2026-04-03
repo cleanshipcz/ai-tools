@@ -1,5 +1,4 @@
 id: run-gradle-tests
-version: 1.0.0
 description: Run unit tests with Gradle
 command:
   program: './gradlew'
@@ -7,19 +6,23 @@ command:
     - 'test'
     - '--info'
   cwd: '.'
-constraints:
+triggers:
+  - 'User asks to run tests'
+  - 'User asks to run Gradle tests'
+  - 'User asks to verify code changes'
+prerequisites:
   - 'Do not run if repo has no Gradle wrapper.'
   - 'Ensure Java/Kotlin is available.'
+instructions: |
+  After running tests, summarize results: total, passed, failed, skipped.
+  If there are failures, show the failing test names and error messages.
 timeout_sec: 1800
-outputs:
-  stdout: true
-  stderr: true
-  exit_code: true
-tags:
-  - gradle
-  - testing
-  - kotlin
-  - java
 metadata:
+  version: 1.0.0
   author: 'AI Tools Team'
   created: '2025-01-01'
+  tags:
+    - gradle
+    - testing
+    - kotlin
+    - java

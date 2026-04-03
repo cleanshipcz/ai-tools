@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
+import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import java.io.File
 
@@ -70,6 +71,14 @@ class WindsurfAdapter(
             """.trimIndent(),
         )
         printers.featurePrinter.print(featureContext, it)
+    }
+
+    override fun export(projectDir: File, skillContext: SkillContext) = exportService.export(
+        skillContext.skill,
+        rulesDir(projectDir).resolve("skill-${skillContext.skill.id}.md"),
+    ) {
+        it.appendText(manualHeader)
+        printers.skillPrinter.print(skillContext, it)
     }
 
     private fun windsurfDir(projectDir: File) = projectDir.resolve(".windsurf")

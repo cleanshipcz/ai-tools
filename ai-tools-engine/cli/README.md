@@ -20,7 +20,7 @@ Or. e.g.
 
 ```bash
 cd ai-tools-engine
-./gradlew :cli:run -DLOG_FORMAT=TEXT --args="--working-dir /home/blaha/Documents/Projects/ai-tools"
+LOG_FORMAT=TEXT ./gradlew :cli:run --args="--working-dir /home/blaha/Documents/Projects/ai-tools"
 ```
 
 ## Options

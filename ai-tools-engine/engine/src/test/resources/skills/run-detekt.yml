@@ -7,7 +7,6 @@ command:
   cwd: '.'
 triggers:
   - 'User asks to run detekt'
-  - 'User asks for static analysis on Kotlin code'
 prerequisites:
   - 'Requires Detekt to be configured in the project.'
 instructions: |

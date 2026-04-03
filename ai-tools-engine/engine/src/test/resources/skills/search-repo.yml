@@ -10,13 +10,8 @@ inputs:
     type: directory
     required: false
     description: 'Directory to search in (defaults to repo root)'
-  - name: file_pattern
-    type: string
-    required: false
-    description: "File pattern to filter (e.g., '*.py', '*.kt')"
 triggers:
   - 'User asks to search the codebase'
-  - 'User asks to find code patterns'
 prerequisites:
   - 'Use ripgrep or similar fast search tool if available.'
 timeout_sec: 60

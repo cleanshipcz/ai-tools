@@ -4,6 +4,10 @@ import cz.cleanship.aitools.engine.models.InnerFeatureContext
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.PromptOutput
 import cz.cleanship.aitools.engine.models.PromptVariable
+import cz.cleanship.aitools.engine.models.SkillCommand
+import cz.cleanship.aitools.engine.models.SkillInput
+import cz.cleanship.aitools.engine.models.SkillOutputFile
+import cz.cleanship.aitools.engine.models.SkillOutputs
 import cz.cleanship.aitools.engine.models.Version
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -166,6 +170,79 @@ class LoaderServiceIntegrationTest {
                 created = "2025-01-01",
                 updated = "2025-11-16",
                 tags = setOf("foundation", "general"),
+            ),
+        )
+    }
+
+    @Test
+    fun `should deserialize command-based skill correctly`() {
+        // given
+        val file = File(javaClass.getResource("/skills/run-detekt.yml")!!.toURI())
+
+        // when
+        val skill = loaderService.loadSkill(file)
+
+        // then
+        assertThat(skill.id).isEqualTo("run-detekt")
+        assertThat(skill.description).isEqualTo("Run Detekt static analysis for Kotlin")
+        assertThat(skill.command).isEqualTo(
+            SkillCommand(
+                program = "./gradlew",
+                args = listOf("detekt"),
+                cwd = ".",
+            ),
+        )
+        assertThat(skill.mcpTool).isNull()
+        assertThat(skill.triggers).containsExactly("User asks to run detekt")
+        assertThat(skill.prerequisites).containsExactly("Requires Detekt to be configured in the project.")
+        assertThat(skill.instructions).isNotNull()
+        assertThat(skill.timeoutSec).isEqualTo(600)
+        assertThat(skill.outputs).isEqualTo(
+            SkillOutputs(
+                files = listOf(
+                    SkillOutputFile(
+                        path = "build/reports/detekt/detekt.html",
+                        description = "HTML report with detailed findings",
+                    ),
+                ),
+            ),
+        )
+        assertThat(skill.metadata).isEqualTo(
+            ManifestMetadata(
+                version = Version("1.0.0"),
+                author = "AI Tools Team",
+                created = "2025-01-01",
+                tags = setOf("detekt", "kotlin", "lint", "static-analysis"),
+            ),
+        )
+    }
+
+    @Test
+    fun `should deserialize mcp-tool-based skill correctly`() {
+        // given
+        val file = File(javaClass.getResource("/skills/search-repo.yml")!!.toURI())
+
+        // when
+        val skill = loaderService.loadSkill(file)
+
+        // then
+        assertThat(skill.id).isEqualTo("search-repo")
+        assertThat(skill.description).isEqualTo("Search repository for code patterns or text")
+        assertThat(skill.command).isNull()
+        assertThat(skill.mcpTool).isEqualTo("filesystem:search")
+        assertThat(skill.inputs).containsExactly(
+            SkillInput(name = "pattern", type = "string", required = true, description = "Search pattern (regex or plain text)"),
+            SkillInput(name = "path", type = "directory", required = false, description = "Directory to search in (defaults to repo root)"),
+        )
+        assertThat(skill.triggers).containsExactly("User asks to search the codebase")
+        assertThat(skill.prerequisites).containsExactly("Use ripgrep or similar fast search tool if available.")
+        assertThat(skill.timeoutSec).isEqualTo(60)
+        assertThat(skill.metadata).isEqualTo(
+            ManifestMetadata(
+                version = Version("1.0.0"),
+                author = "AI Tools Team",
+                created = "2025-01-01",
+                tags = setOf("search", "filesystem"),
             ),
         )
     }
