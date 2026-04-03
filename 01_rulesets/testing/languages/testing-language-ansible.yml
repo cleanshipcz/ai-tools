@@ -1,21 +1,25 @@
 id: testing-language-ansible
-description: Ansible-specific testing standards for playbook and role verification
+description: Ansible-specific testing standards for collections, roles, playbooks, and infrastructure verification
 rules:
-  - "Use Molecule for role testing — follow the create/converge/verify/destroy lifecycle."
-  - "Run ansible-lint as a static analysis gate before any manual or integration testing."
+  - "Use ansible-test as the primary testing tool for collections and custom modules — it provides sanity, unit, and integration test runners out of the box."
+  - "Run ansible-test sanity as a static analysis gate — it enforces Ansible coding standards and catches issues before runtime."
+  - "Use ansible-test units (pytest-based) for isolated testing of custom modules, plugins, and filter plugins."
+  - "Use ansible-test integration to run actual tasks and verify end-to-end behavior for collection content."
+  - "Use Molecule for role-level testing — follow the create/converge/verify/destroy lifecycle with Docker or Podman for fast feedback."
+  - "Use the Molecule Vagrant driver (VirtualBox/libvirt) when roles require a full VM — kernel modules, systemd services, iptables, NFS, or LVM."
+  - "Run ansible-lint as an additional static analysis layer alongside ansible-test sanity."
   - "Verify idempotency by running the playbook twice and asserting zero changes on the second run."
   - "Use --check --diff mode to validate playbook behavior without applying changes."
-  - "Test against isolated inventory (local VMs, containers, or mock hosts) — never test against production hosts."
-  - "Use Testinfra or similar infrastructure assertion frameworks to verify the final state (services running, ports open, files present with correct permissions)."
+  - "Test against isolated inventory (containers, VMs, or delegated hosts) — never test against production hosts."
+  - "Use Testinfra or similar infrastructure assertion frameworks in Molecule's verify step to assert final state (services running, ports open, files present with correct permissions)."
   - "Test variable precedence by overriding defaults at group_vars and host_vars levels and verifying correct resolution."
   - "Test handler execution by verifying that notified handlers run exactly once and in the correct order."
   - "Test failure scenarios using block/rescue to verify error handling behaves as expected."
   - "Validate that tags work correctly by running with --tags and --skip-tags and asserting the expected subset of tasks executes."
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   author: "AI Tools Team"
   created: "2026-03-28"
+  updated: "2026-03-28"
   tags:
-    - testing
     - ansible
-    - infrastructure

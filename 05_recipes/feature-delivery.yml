@@ -25,7 +25,7 @@ variables:
 
 steps:
   - id: analyze
-    agent: project-planner
+    agent: planner-project
     task: |
       Analyze the following feature request in detail:
 
@@ -48,7 +48,7 @@ steps:
     waitForConfirmation: false
 
   - id: plan
-    agent: project-planner
+    agent: planner-project
     task: |
       Based on the analysis, create a detailed implementation plan for:
 

@@ -18,7 +18,4 @@ metadata:
   author: "AI Tools Team"
   created: "2026-03-28"
   tags:
-    - security
     - ansible
-    - vault
-    - credentials

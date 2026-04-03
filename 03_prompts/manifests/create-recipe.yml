@@ -54,7 +54,7 @@ content: |
 
   steps:
     - id: analyze                   # Unique kebab-case step ID
-      agent: project-planner        # Agent ID to use
+      agent: planner-project        # Agent ID to use
       task: |                       # Task description (required per step)
         Analyze the feature request and identify:
         1. Relevant codebase sections
@@ -121,8 +121,8 @@ content: |
   User: "Yes analysis first, then implement, then review with loop"
 
   You: "I'll create `feature-delivery` with:
-  1. Analyze requirements (project-planner -> analysis.md)
-  2. Create plan (project-planner -> plan.md, includes analysis)
+  1. Analyze requirements (planner-project -> analysis.md)
+  2. Create plan (planner-project -> plan.md, includes analysis)
   3. Implement (developer-feature, includes analysis + plan)
   4. Review (reviewer-code, includes all docs, waitForConfirmation)
   Loop steps 3-4 up to 3 times until approved.

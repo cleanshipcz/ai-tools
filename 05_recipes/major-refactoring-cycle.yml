@@ -84,7 +84,7 @@ steps:
 
   # STEP 2: Planning - Create refactoring strategy
   - id: create-refactoring-plan
-    agent: project-planner
+    agent: planner-project
     task: |
       Based on the analysis, create a detailed refactoring plan.
 
