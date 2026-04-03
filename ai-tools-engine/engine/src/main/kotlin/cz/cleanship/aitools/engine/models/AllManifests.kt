@@ -6,6 +6,7 @@ data class AllManifests(
     val rulesets: Map<String, RulesetManifest>,
     val fragments: Map<String, FragmentManifest>,
     val skills: Map<String, SkillManifest>,
+    val skillSourceDirs: Map<String, java.io.File> = emptyMap(),
     val projects: Map<String, ProjectManifest>,
     val features: Map<ProjectManifest, Map<String, FeatureManifest>>,
 )

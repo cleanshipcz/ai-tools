@@ -82,11 +82,19 @@ class CursorAdapter(
         printers.featurePrinter.print(featureContext, it)
     }
 
-    override fun export(projectDir: File, skillContext: SkillContext) = exportService.export(
-        skillContext.skill,
-        cursorDir(projectDir).resolve("commands").resolve("skill-${skillContext.skill.id}.md"),
-    ) {
-        printers.skillPrinter.print(skillContext, it)
+    override fun export(projectDir: File, skillContext: SkillContext) {
+        val skillId = skillContext.skill.id
+        exportService.export(
+            skillContext.skill,
+            cursorDir(projectDir).resolve("commands").resolve("skill-$skillId.md"),
+        ) {
+            printers.skillPrinter.print(skillContext, it)
+        }
+        exportService.copySkillFiles(
+            skillContext.skill.files,
+            skillContext.sourceDir,
+            cursorDir(projectDir).resolve("commands").resolve("skill-$skillId"),
+        )
     }
 
     private fun cursorDir(projectDir: File) = projectDir.resolve(".cursor")

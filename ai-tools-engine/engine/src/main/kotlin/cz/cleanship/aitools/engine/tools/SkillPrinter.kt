@@ -57,4 +57,5 @@ data class SkillContext(
     val allRulesets: Map<String, RulesetManifest> = availableRulesets,
     val availableFragments: Map<String, FragmentManifest> = emptyMap(),
     val allFragments: Map<String, FragmentManifest> = availableFragments,
+    val sourceDir: java.io.File? = null,
 )

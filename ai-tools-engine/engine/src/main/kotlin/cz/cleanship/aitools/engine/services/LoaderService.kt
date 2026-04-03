@@ -59,15 +59,44 @@ class LoaderService {
             }
             project to features
         }
+        val loadedSkills = loadSkills(locations.skills)
         return AllManifests(
             agents = loadAllFromDirectories(locations.agents, ::loadAgent),
             prompts = loadAllFromDirectories(locations.prompts, ::loadPrompt),
             rulesets = loadAllFromDirectories(locations.rulesets, ::loadRuleset),
             fragments = loadAllFromDirectories(locations.fragments, ::loadFragment),
-            skills = loadAllFromDirectories(locations.skills, ::loadSkill),
+            skills = loadedSkills.first,
+            skillSourceDirs = loadedSkills.second,
             projects = projectsWithFeatures.map { it.first }.associateBy { it.id },
             features = projectsWithFeatures.associate { it.first to it.second.associateBy { f -> f.id } },
         )
+    }
+
+    private fun loadSkills(
+        directories: List<File>,
+    ): Pair<Map<String, SkillManifest>, Map<String, File>> {
+        val skills = mutableMapOf<String, SkillManifest>()
+        val sourceDirs = mutableMapOf<String, File>()
+
+        directories
+            .filter { it.exists() }
+            .mapNotNull { it.listFiles()?.toList() }
+            .flatten()
+            .forEach { entry ->
+                when {
+                    entry.isFile && (entry.extension == "yml" || entry.extension == "yaml") -> {
+                        val skill = loadSkill(entry)
+                        skills[skill.id] = skill
+                    }
+                    entry.isDirectory && File(entry, "skill.yml").exists() -> {
+                        val skill = loadSkill(File(entry, "skill.yml"))
+                        skills[skill.id] = skill
+                        sourceDirs[skill.id] = entry
+                    }
+                }
+            }
+
+        return skills to sourceDirs
     }
 
     private fun <T : VersionedManifest> loadAllFromDirectories(directories: List<File>, loader: (File) -> T, filter: (File) -> Boolean = { true }): Map<String, T> =

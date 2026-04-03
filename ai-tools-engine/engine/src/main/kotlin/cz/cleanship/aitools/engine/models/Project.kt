@@ -8,4 +8,5 @@ data class Project(
     val rulesets: Map<String, RulesetManifest>,
     val fragments: Map<String, FragmentManifest>,
     val skills: Map<String, SkillManifest>,
+    val skillSourceDirs: Map<String, java.io.File> = emptyMap(),
 )

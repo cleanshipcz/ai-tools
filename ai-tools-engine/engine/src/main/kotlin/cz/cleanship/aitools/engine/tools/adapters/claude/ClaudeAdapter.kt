@@ -64,20 +64,24 @@ class ClaudeAdapter(
         printers.featurePrinter.print(featureContext, it)
     }
 
-    override fun export(projectDir: File, skillContext: SkillContext) = exportService.export(
-        skillContext.skill,
-        claudeDir(projectDir).resolve("skills").resolve(skillContext.skill.id).resolve("SKILL.md"),
-    ) {
-        it.appendText(
-            """
-            ---
-            name: ${skillContext.skill.id}
-            description: ${skillContext.skill.description.replace("\n", " ")}
-            ---
+    override fun export(projectDir: File, skillContext: SkillContext) {
+        val skillDir = claudeDir(projectDir).resolve("skills").resolve(skillContext.skill.id)
+        exportService.export(
+            skillContext.skill,
+            skillDir.resolve("SKILL.md"),
+        ) {
+            it.appendText(
+                """
+                ---
+                name: ${skillContext.skill.id}
+                description: ${skillContext.skill.description.replace("\n", " ")}
+                ---
 
-            """.trimIndent(),
-        )
-        printers.skillPrinter.print(skillContext, it)
+                """.trimIndent(),
+            )
+            printers.skillPrinter.print(skillContext, it)
+        }
+        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir)
     }
 
     private fun claudeDir(projectDir: File) = projectDir.resolve(".claude")

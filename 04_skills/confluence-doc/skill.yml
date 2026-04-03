@@ -61,26 +61,13 @@ sections:
       - Use `<ac:structured-macro ac:name="warning">` for warning callouts
       - Tables use standard HTML `<table>`, `<tr>`, `<th>`, `<td>` tags
 
-      ## Runbook Template
+      ## Templates
 
-      Structure runbooks with these sections:
-      1. Overview — What system/process this covers
-      2. Prerequisites — Access, tools, permissions needed
-      3. Steps — Numbered step-by-step procedure
-      4. Verification — How to confirm success
-      5. Rollback — How to undo if something goes wrong
-
-      ## Design Document / ADR Template
-
-      Structure design docs with these sections:
-      1. Status — Draft | Proposed | Accepted | Deprecated
-      2. Context — Why this change is needed
-      3. Decision — What was decided
-      4. Detailed Design — Architecture, configuration, dependencies
-      5. Alternatives Considered — Other options evaluated
-      6. Consequences — Positive impacts and negative risks with mitigations
-      7. Implementation Plan — Phased steps with target dates
-      8. Open Questions — Unresolved items
+      Use the runbook template (templates/runbook.txt) for operational runbooks.
+      Use the design doc template (templates/design-doc.txt) for design documents and ADRs.
+files:
+  - path: templates/runbook.txt
+  - path: templates/design-doc.txt
 metadata:
   version: 1.0.0
   author: 'AI Tools Team'

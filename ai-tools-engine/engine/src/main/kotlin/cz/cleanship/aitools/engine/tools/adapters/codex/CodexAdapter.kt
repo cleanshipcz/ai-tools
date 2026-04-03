@@ -82,20 +82,24 @@ class CodexAdapter(
         printers.featurePrinter.print(featureContext, it)
     }
 
-    override fun export(projectDir: File, skillContext: SkillContext) = exportService.export(
-        skillContext.skill,
-        skillsDir(projectDir).resolve("skill-${skillContext.skill.id}").resolve("SKILL.md"),
-    ) {
-        it.appendText(
-            """
-            ---
-            name: ${skillContext.skill.id}
-            description: ${skillContext.skill.description.replace("\n", " ")}
-            ---
+    override fun export(projectDir: File, skillContext: SkillContext) {
+        val skillDir = skillsDir(projectDir).resolve("skill-${skillContext.skill.id}")
+        exportService.export(
+            skillContext.skill,
+            skillDir.resolve("SKILL.md"),
+        ) {
+            it.appendText(
+                """
+                ---
+                name: ${skillContext.skill.id}
+                description: ${skillContext.skill.description.replace("\n", " ")}
+                ---
 
-            """.trimIndent(),
-        )
-        printers.skillPrinter.print(skillContext, it)
+                """.trimIndent(),
+            )
+            printers.skillPrinter.print(skillContext, it)
+        }
+        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir)
     }
 
     private fun codexDir(projectDir: File) = projectDir.resolve(".codex")

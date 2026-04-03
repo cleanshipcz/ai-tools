@@ -9,6 +9,7 @@ import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.PromptOutput
 import cz.cleanship.aitools.engine.models.PromptVariable
 import cz.cleanship.aitools.engine.models.RulesetManifest
+import cz.cleanship.aitools.engine.models.SkillFile
 import cz.cleanship.aitools.engine.models.SkillManifest
 import cz.cleanship.aitools.engine.models.SkillSection
 import cz.cleanship.aitools.engine.models.Version
@@ -424,6 +425,22 @@ val expectedSkillWithMixedSections =
     Choose the appropriate template based on the document type.
 
     """.trimIndent()
+
+val skillWithFiles = SkillManifest(
+    id = "skill-with-files",
+    description = "Skill with companion files",
+    triggers = listOf("User asks for skill with files"),
+    sections = listOf(
+        SkillSection.TextSection(text = "See templates/example.txt for the template."),
+    ),
+    files = listOf(
+        SkillFile(source = "templates/example.txt", target = "templates/example.txt"),
+        SkillFile(source = "/absolute/shared.txt", target = "references/shared.txt"),
+    ),
+    metadata = ManifestMetadata(
+        version = Version("1.0.0"),
+    ),
+)
 
 val fragment = FragmentManifest(
     id = "test-fragment",

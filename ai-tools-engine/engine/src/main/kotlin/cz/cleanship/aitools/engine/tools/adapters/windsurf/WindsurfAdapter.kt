@@ -73,12 +73,20 @@ class WindsurfAdapter(
         printers.featurePrinter.print(featureContext, it)
     }
 
-    override fun export(projectDir: File, skillContext: SkillContext) = exportService.export(
-        skillContext.skill,
-        rulesDir(projectDir).resolve("skill-${skillContext.skill.id}.md"),
-    ) {
-        it.appendText(manualHeader)
-        printers.skillPrinter.print(skillContext, it)
+    override fun export(projectDir: File, skillContext: SkillContext) {
+        val skillId = skillContext.skill.id
+        exportService.export(
+            skillContext.skill,
+            rulesDir(projectDir).resolve("skill-$skillId.md"),
+        ) {
+            it.appendText(manualHeader)
+            printers.skillPrinter.print(skillContext, it)
+        }
+        exportService.copySkillFiles(
+            skillContext.skill.files,
+            skillContext.sourceDir,
+            rulesDir(projectDir).resolve("skill-$skillId"),
+        )
     }
 
     private fun windsurfDir(projectDir: File) = projectDir.resolve(".windsurf")

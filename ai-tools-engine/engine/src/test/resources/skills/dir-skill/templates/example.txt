@@ -1,0 +1,3 @@
+# Example Template
+
+This is an example template for testing.

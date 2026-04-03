@@ -66,12 +66,20 @@ class GitHubCopilotAdapter(
         printers.featurePrinter.print(featureContext, it)
     }
 
-    override fun export(projectDir: File, skillContext: SkillContext) = exportService.export(
-        skillContext.skill,
-        promptsDir(projectDir).resolve("skill-${skillContext.skill.id}.prompt.md"),
-    ) {
-        it.appendText(header)
-        printers.skillPrinter.print(skillContext, it)
+    override fun export(projectDir: File, skillContext: SkillContext) {
+        val skillId = skillContext.skill.id
+        exportService.export(
+            skillContext.skill,
+            promptsDir(projectDir).resolve("skill-$skillId.prompt.md"),
+        ) {
+            it.appendText(header)
+            printers.skillPrinter.print(skillContext, it)
+        }
+        exportService.copySkillFiles(
+            skillContext.skill.files,
+            skillContext.sourceDir,
+            promptsDir(projectDir).resolve("skill-$skillId"),
+        )
     }
 
     private fun githubDir(projectDir: File) = projectDir.resolve(".github")

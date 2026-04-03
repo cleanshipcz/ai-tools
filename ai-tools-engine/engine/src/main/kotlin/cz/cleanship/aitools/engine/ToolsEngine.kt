@@ -67,6 +67,9 @@ class ToolsEngine(
             for (projectManifest in allData.projects.values) {
                 LOG.info("Processing project {}", projectManifest.id)
                 val projectFeatures = allData.features[projectManifest] ?: emptyMap()
+                val filteredSkills = filterService
+                    .filter(allData.skills.values, projectManifest.deploy.skills.filter)
+                    .associateBy { it.id }
                 val project = Project(
                     projectManifest,
                     features = filterService
@@ -84,9 +87,8 @@ class ToolsEngine(
                     fragments = filterService
                         .filter(allData.fragments.values, projectManifest.deploy.fragments.filter)
                         .associateBy { it.id },
-                    skills = filterService
-                        .filter(allData.skills.values, projectManifest.deploy.skills.filter)
-                        .associateBy { it.id },
+                    skills = filteredSkills,
+                    skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
                 )
 
                 val destination = File(project.manifest.deploy.directory).absoluteFile
@@ -124,7 +126,14 @@ class ToolsEngine(
             project.skills.values.forEach {
                 adapter.export(
                     destination,
-                    SkillContext(it, project.rulesets, allRulesets, project.fragments, allFragments),
+                    SkillContext(
+                        it,
+                        project.rulesets,
+                        allRulesets,
+                        project.fragments,
+                        allFragments,
+                        sourceDir = project.skillSourceDirs[it.id],
+                    ),
                 )
             }
         } catch (ex: RulesetResolvingException) {

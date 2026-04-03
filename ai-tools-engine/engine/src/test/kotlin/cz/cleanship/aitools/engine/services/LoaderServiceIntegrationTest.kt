@@ -1,9 +1,11 @@
 package cz.cleanship.aitools.engine.services
 
 import cz.cleanship.aitools.engine.models.InnerFeatureContext
+import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.PromptOutput
 import cz.cleanship.aitools.engine.models.PromptVariable
+import cz.cleanship.aitools.engine.models.SkillFile
 import cz.cleanship.aitools.engine.models.SkillSection
 import cz.cleanship.aitools.engine.models.Version
 import org.assertj.core.api.Assertions.assertThat
@@ -249,6 +251,57 @@ class LoaderServiceIntegrationTest {
                 tags = setOf("confluence", "formatting"),
             ),
         )
+    }
+
+    @Test
+    fun `should deserialize directory-based skill with files`() {
+        // given
+        val file = File(javaClass.getResource("/skills/dir-skill/skill.yml")!!.toURI())
+
+        // when
+        val skill = loaderService.loadSkill(file)
+
+        // then
+        assertThat(skill.id).isEqualTo("dir-skill")
+        assertThat(skill.description).isEqualTo("A directory-based skill for testing")
+        assertThat(skill.triggers).containsExactly("User asks for dir skill")
+        assertThat(skill.sections).hasSize(1)
+        assertThat(skill.sections[0]).isInstanceOf(SkillSection.TextSection::class.java)
+        assertThat(skill.files).hasSize(2)
+        // Short form: source == target
+        assertThat(skill.files[0]).isEqualTo(SkillFile(source = "templates/example.txt", target = "templates/example.txt"))
+        // Long form: explicit source and target
+        assertThat(skill.files[1]).isEqualTo(
+            SkillFile(source = "/absolute/path/to/shared.txt", target = "references/shared.txt"),
+        )
+    }
+
+    @Test
+    fun `should load directory-based skills via loadAll`() {
+        // given
+        val skillsDir = File(javaClass.getResource("/skills")!!.toURI())
+        val locations = Locations(
+            agents = emptyList(),
+            prompts = emptyList(),
+            rulesets = emptyList(),
+            fragments = emptyList(),
+            skills = listOf(skillsDir),
+            projects = emptyList(),
+        )
+
+        // when
+        val allManifests = loaderService.loadAll(locations)
+
+        // then
+        // Should load both standalone .yml skills and directory-based skills
+        assertThat(allManifests.skills).containsKey("run-detekt")
+        assertThat(allManifests.skills).containsKey("search-repo")
+        assertThat(allManifests.skills).containsKey("dir-skill")
+        // Directory-based skill should have a source dir entry
+        assertThat(allManifests.skillSourceDirs).containsKey("dir-skill")
+        assertThat(allManifests.skillSourceDirs["dir-skill"]!!.name).isEqualTo("dir-skill")
+        // Standalone skills should NOT have source dir entries
+        assertThat(allManifests.skillSourceDirs).doesNotContainKey("run-detekt")
     }
 
     @Test
