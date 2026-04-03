@@ -10,18 +10,18 @@ export interface AppConfig {
 
 export class ConfigService {
   private static instance: ConfigService;
-  
+
   public readonly rootDir: string;
   private configCache: AppConfig | null = null;
-  
+
   // Directory names
   public readonly dirs = {
-    projects: '06_projects',
+    projects: '09_projects',
     prompts: '03_prompts',
     agents: '04_agents',
     rulesets: '01_rulesets',
     skills: '02_skills',
-    recipes: '05_recipes',
+    recipes: '08_recipes',
     schemas: '10_schemas',
     scripts: '11_scripts',
     templates: '12_templates',
@@ -73,31 +73,31 @@ export class ConfigService {
     const config = await this.loadConfig();
     const defaultSources = [
       this.getPath(this.dirs.projects, 'global'),
-      this.getPath(this.dirs.projects, 'local')
+      this.getPath(this.dirs.projects, 'local'),
     ];
 
     const configuredSources = config.project_sources || [];
-    
+
     // Resolve configured sources
-    const resolvedConfiguredSources = configuredSources.map(source => {
+    const resolvedConfiguredSources = configuredSources.map((source) => {
       if (isAbsolute(source)) return source;
       return resolve(this.rootDir, source);
     });
 
     // Combine and deduplicate
-    // We put configured sources LAST so they can override? 
+    // We put configured sources LAST so they can override?
     // Or FIRST? The legacy script merged them.
     // Legacy script: "Both lists are merged (config + local), duplicates removed"
-    // And defaults were: ['./06_projects/global', './06_projects/local']
-    
+    // And defaults were: ['./09_projects/global', './09_projects/local']
+
     // If config has project_sources, it REPLACES the default in the merged config object?
     // Legacy mergeConfig:
     // if (Array.isArray(base) && Array.isArray(override)) { return [...base, ...override] }
-    
+
     // So if config.yml has defaults, and config.local.yml has extras, they are combined.
     // But if config.yml doesn't have defaults explicitly listed, they might be missing if we don't add them.
     // The legacy script had DEFAULT_PROJECT_SOURCES constant.
-    
+
     const allSources = [...defaultSources, ...resolvedConfiguredSources];
     return Array.from(new Set(allSources));
   }
@@ -113,12 +113,12 @@ export class ConfigService {
 
     try {
       const content = await readFile(configPath, 'utf-8');
-      baseConfig = loadYaml(content) as AppConfig || {};
+      baseConfig = (loadYaml(content) as AppConfig) || {};
     } catch {}
 
     try {
       const content = await readFile(localConfigPath, 'utf-8');
-      localConfig = loadYaml(content) as AppConfig || {};
+      localConfig = (loadYaml(content) as AppConfig) || {};
     } catch {}
 
     this.configCache = this.mergeConfig(baseConfig, localConfig);
@@ -150,4 +150,3 @@ export class ConfigService {
     return override;
   }
 }
-

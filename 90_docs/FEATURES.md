@@ -205,7 +205,7 @@ Skills are transformed into Anthropic-compatible `SKILL.md` files by the `SkillS
 
 ### Recipes
 
-**Location:** `05_recipes/`
+**Location:** `08_recipes/`
 **Schema:** `recipe.schema.json`
 
 Recipes are multi-step automated workflows that chain agent tasks, support loops, conditions, and conversation continuity.
@@ -726,7 +726,7 @@ The `ValidationService` (`src/core/services/validation.service.ts`) performs com
 
 ### Collected Manifest Sources
 
-- `01_rulesets/`, `02_skills/`, `03_prompts/`, `04_agents/`, `05_recipes/`, `20_evals/suites/`
+- `01_rulesets/`, `02_skills/`, `03_prompts/`, `04_agents/`, `08_recipes/`, `20_evals/suites/`
 - Project manifests from all configured project sources
 - Deploy configs (`deploy.yml`)
 - Feature manifests (`features/*/feature.yml`)
@@ -944,7 +944,7 @@ ai-tools/
   03_prompts/            # Prompt YAML manifests (reusable templates)
     shared/              # Include fragments (not standalone prompts)
   04_agents/             # Agent YAML manifests (AI personas)
-  05_recipes/            # Recipe YAML manifests (multi-step workflows)
+  08_recipes/            # Recipe YAML manifests (multi-step workflows)
   09_projects/           # Project definitions
     global/              # Shared project configs (committed)
       template/          # Template for new projects

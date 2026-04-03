@@ -13,12 +13,12 @@ vi.mock('./config.service.js', () => {
       agents: '04_agents',
       rulesets: '01_rulesets',
       skills: '02_skills',
-      recipes: '05_recipes',
+      recipes: '08_recipes',
       schemas: '10_schemas',
       evals: '20_evals',
     },
     getPath: vi.fn((...parts) => join('/mock/root', ...parts)),
-    getProjectSources: vi.fn().mockResolvedValue(['/mock/root/06_projects/global']),
+    getProjectSources: vi.fn().mockResolvedValue(['/mock/root/09_projects/global']),
   };
   return {
     ConfigService: {
@@ -69,9 +69,9 @@ describe('ValidationService', () => {
 
   it('should fail when schema loading fails', async () => {
     (readFile as any).mockRejectedValueOnce(new Error('File not found'));
-    
+
     const result = await service.validateAll();
-    
+
     expect(result.success).toBe(false);
     expect(result.errors).toContainEqual(expect.stringContaining('Failed to load schema'));
   });
@@ -227,8 +227,8 @@ mode: local
     });
 
     mockLoader.findYamlFiles.mockImplementation(async (path: string) => {
-      if (path.includes('06_projects')) {
-        return ['/mock/root/06_projects/global/sample/deploy.yml'];
+      if (path.includes('09_projects')) {
+        return ['/mock/root/09_projects/global/sample/deploy.yml'];
       }
       return [];
     });

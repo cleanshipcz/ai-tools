@@ -8,7 +8,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - Validation, doc generation, prompt libraries, skill generation, recipe runners, and utilities (diff/clean/eval) are built-in.
 
 ## High-Level Architecture
-- **Manifests (YAML):** Located under numbered directories (`01_rulesets`, `02_skills`, `03_prompts`, `04_agents`, `05_recipes`, `09_projects`, `07_mcp`).
+- **Manifests (YAML):** Located under numbered directories (`01_rulesets`, `02_skills`, `03_prompts`, `04_agents`, `08_recipes`, `09_projects`, `07_mcp`).
 - **CLI (TypeScript):** Entry `src/cli/index.ts` wiring commander subcommands to services.
 - **Core Services:** Config, loader, resolver, validation, deployment, feature generation, recipe generation, prompt library generation, docs generation, skill generation, diff/clean/eval utilities.
 - **Tool Adapters:** Per-tool generators in `src/tools/` producing staged outputs under `.output/<project>/...`.
@@ -52,7 +52,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - **PromptService:** Builds Markdown and HTML prompt libraries, interactive prompt filler (`use`), groups by category inferred from path, supports variable substitution.
 - **SkillService:** Converts `02_skills` YAML into Anthropic `SKILL.md` folders under `adapters/claude-code/skills`, with inputs/outputs/env/timeout notes.
 - **FeatureService:** Loads feature manifests under a project, resolves model priority (feature > project > agent), generates per-tool feature outputs, merges Windsurf workflows into main output during deploy, binds features to recipes.
-- **RecipeService / RecipeRunnerService:** Loads recipes (`05_recipes`), filters by tool, generates `.cs.recipes/*.sh` scripts per tool and per tech stack suffix, supports interactive run with tool selection (claude-code/copilot-cli/cursor), supports loops/variables/tool options.
+- **RecipeService / RecipeRunnerService:** Loads recipes (`08_recipes`), filters by tool, generates `.cs.recipes/*.sh` scripts per tool and per tech stack suffix, supports interactive run with tool selection (claude-code/copilot-cli/cursor), supports loops/variables/tool options.
 - **ExternalProjectService:** Registers external project paths (global/local registries), used by `init`, `deploy`, `list`.
 - **DiffService / CleanService / EvalService:** Utility functions for diffing, cleaning generated files, and running evaluation suites.
 
@@ -86,7 +86,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - Model resolution order: feature → project.ai_tools.model → agent defaults → prompt.
 
 ## Recipe System
-- Recipes defined in `05_recipes/*.yml`; include steps with agents, task text, optional model overrides, variables, conversation strategy, and loops.
+- Recipes defined in `08_recipes/*.yml`; include steps with agents, task text, optional model overrides, variables, conversation strategy, and loops.
 - Script generation targets tool-specific paths:
   - claude-code → `.claude/.cs.recipes/*.sh`
   - copilot-cli → `.cs.recipes/*.sh`

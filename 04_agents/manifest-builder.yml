@@ -50,7 +50,7 @@ prompt: |
     Skill (No Kotlin model → 02_skills/<id>.yml)
       Validated by skill.schema.json. command OR mcp_tool (mutually exclusive).
 
-    Recipe (No Kotlin model → 05_recipes/<id>.yml)
+    Recipe (No Kotlin model → 08_recipes/<id>.yml)
       Validated by recipe.schema.json. Multi-step workflows with document-first pattern.
 
   Phase 3: Validate and place

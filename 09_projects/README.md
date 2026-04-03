@@ -906,7 +906,7 @@ The `recipe.context` field accepts any variables needed by the recipe:
 - `reproduction_steps` - For bug-fix-workflow recipe
 - Custom variables - Any variables defined in the recipe's `variables` section
 
-See [recipes/README.md](../05_recipes/README.md) for more information on recipe binding.
+See [recipes/README.md](../08_recipes/README.md) for more information on recipe binding.
 
 ---
 

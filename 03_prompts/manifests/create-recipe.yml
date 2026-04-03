@@ -128,7 +128,7 @@ content: |
   Loop steps 3-4 up to 3 times until approved.
   Sound good?"
 
-  File location: `05_recipes/<id>.yml`
+  File location: `08_recipes/<id>.yml`
 outputs:
   format: yaml
 metadata:

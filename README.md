@@ -18,7 +18,7 @@ This repository is the source of truth for prompts, rulesets, agents, skills, re
 - `02_skills/` – skill manifests (converted to `SKILL.md`)
 - `03_prompts/` – prompt manifests
 - `04_agents/` – agent manifests
-- `05_recipes/` – multi-agent workflow recipes
+- `08_recipes/` – multi-agent workflow recipes
 - `09_projects/` – project manifests (`global/` + `local/` + templates)
 - `07_mcp/` – MCP servers and presets
 - `10_schemas/` – JSON schemas for validation
@@ -96,6 +96,6 @@ Deploy copies these staged files into the `target` from `deploy.yml` and keeps t
 - Model preference priority: Feature → Project (`ai_tools.model`) → Agent defaults → Prompt.
 
 ## Need Help?
-- Recipe and feature examples live in `05_recipes/` and `09_projects/*/features/`.
+- Recipe and feature examples live in `08_recipes/` and `09_projects/*/features/`.
 - Tool-specific integration details are in `90_docs/TOOLS.md`.
 - Open an issue or discussion in the repo if something looks off.

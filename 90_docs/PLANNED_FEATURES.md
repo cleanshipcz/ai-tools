@@ -65,7 +65,7 @@ Multi-agent recipes enable orchestrating multiple AI agents in sequence to accom
 
 **Generated artifacts:**
 
-- `05_recipes/*.yml` - Recipe manifest definitions
+- `08_recipes/*.yml` - Recipe manifest definitions
 - `10_schemas/recipe.schema.json` - JSON Schema for validation
 - `.output/scripts/*.sh` - Auto-generated executable scripts
 
@@ -87,7 +87,7 @@ FEATURE_DESCRIPTION="Add auth" \
 npm run recipe:run feature-delivery claude-code
 ```
 
-See [`05_recipes/README.md`](../05_recipes/README.md) for complete documentation.
+See [`08_recipes/README.md`](../08_recipes/README.md) for complete documentation.
 
 ### Misc
 
