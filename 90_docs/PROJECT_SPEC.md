@@ -8,7 +8,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - Validation, doc generation, prompt libraries, skill generation, recipe runners, and utilities (diff/clean/eval) are built-in.
 
 ## High-Level Architecture
-- **Manifests (YAML):** Located under numbered directories (`01_rulesets`, `02_skills`, `03_prompts`, `04_agents`, `05_recipes`, `06_projects`, `07_mcp`).
+- **Manifests (YAML):** Located under numbered directories (`01_rulesets`, `02_skills`, `03_prompts`, `04_agents`, `05_recipes`, `09_projects`, `07_mcp`).
 - **CLI (TypeScript):** Entry `src/cli/index.ts` wiring commander subcommands to services.
 - **Core Services:** Config, loader, resolver, validation, deployment, feature generation, recipe generation, prompt library generation, docs generation, skill generation, diff/clean/eval utilities.
 - **Tool Adapters:** Per-tool generators in `src/tools/` producing staged outputs under `.output/<project>/...`.
@@ -30,7 +30,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - Build: `build` → global adapters (non-project-specific) using ToolRegistry.
 - Generate: `generate [--all|<project>]` → stage outputs under `.output/<project>/` for all adapters.
 - Deploy: `deploy project <id>` / `deploy all` → generate + copy to target with backups, feature merge for Windsurf, optional auto-commit.
-- Create: `create <name>` → scaffold managed project from template into `06_projects/local|global`.
+- Create: `create <name>` → scaffold managed project from template into `09_projects/local|global`.
 - Init: `init <path>` → scaffold `.cleanship-ai-tools` in external repo and optionally register.
 - List: `list` → list managed + external projects.
 - External: `external list|add|remove` → manage external project registry.
@@ -44,7 +44,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - Eval: `eval [--suite]` → run evaluation suites if configured.
 
 ## Core Services (behavioral summary)
-- **ConfigService:** Resolves repo root, directory names, config merge (`config.yml` + `config.local.yml`), project sources default to `06_projects/global` and `06_projects/local`, provides path helpers.
+- **ConfigService:** Resolves repo root, directory names, config merge (`config.yml` + `config.local.yml`), project sources default to `09_projects/global` and `09_projects/local`, provides path helpers.
 - **LoaderService:** YAML loading, directory scanning for manifests (used throughout).
 - **ResolverService:** Include/exclude filtering for prompts/agents/rulesets/recipes against project/deploy config and tech stacks; resolves ruleset inheritance.
 - **ValidationService:** Loads JSON Schemas from `10_schemas`, validates manifests, enforces semver and kebab-case IDs, reference checks (rulesets exist, etc.), security regex scan for secrets, includes validation for features/deploy/project references.
@@ -78,7 +78,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - Prompt library generation skips shared snippets and groups by category (first path segment).
 
 ## Feature System
-- Feature manifests live under `06_projects/<scope>/<project>/features/<feature>/feature.yml`.
+- Feature manifests live under `09_projects/<scope>/<project>/features/<feature>/feature.yml`.
 - Generation outputs:
   - GitHub Copilot feature markdown (`feature-<id>.md`).
   - Windsurf workflows with metadata header (auto_execution_mode, description) and feature context sections.
@@ -103,7 +103,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 
 ## Configuration and Sources
 - Config files in `15_config/` (`config.yml`, `config.local.yml`) merged by ConfigService.
-- `project_sources` config augments default sources (`06_projects/global`, `06_projects/local`).
+- `project_sources` config augments default sources (`09_projects/global`, `09_projects/local`).
 - Deploy targets are absolute or relative paths resolved from repo root; `deploy.local.yml` is ignored by validators and merging.
 
 ## Generated Artifacts and Cleanup

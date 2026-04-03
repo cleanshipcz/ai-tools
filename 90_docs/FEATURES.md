@@ -114,15 +114,15 @@ Each manifest type has a corresponding JSON schema in `10_schemas/` and a TypeSc
 
 Rulesets are collections of rules (coding standards, conventions) that can be composed via inheritance.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string (required) | Unique kebab-case identifier |
-| `version` | string | Semver version |
-| `description` | string | Human-readable description |
-| `extends` | string[] | Parent ruleset IDs for inheritance |
-| `tags` | string[] | Tags used for tech-stack filtering (e.g., `kotlin`, `python`) |
-| `rules` | string[] (required) | The actual rule text entries |
-| `metadata` | object | Author, dates, tags |
+| Field         | Type                | Description                                                   |
+| ------------- | ------------------- | ------------------------------------------------------------- |
+| `id`          | string (required)   | Unique kebab-case identifier                                  |
+| `version`     | string              | Semver version                                                |
+| `description` | string              | Human-readable description                                    |
+| `extends`     | string[]            | Parent ruleset IDs for inheritance                            |
+| `tags`        | string[]            | Tags used for tech-stack filtering (e.g., `kotlin`, `python`) |
+| `rules`       | string[] (required) | The actual rule text entries                                  |
+| `metadata`    | object              | Author, dates, tags                                           |
 
 **Key behaviors:**
 - Inheritance via `extends` is resolved recursively with cycle detection (visited set).
@@ -136,22 +136,22 @@ Rulesets are collections of rules (coding standards, conventions) that can be co
 
 Agents are complete AI assistant personas with purpose, system prompts, rulesets, capabilities, and model defaults.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string (required) | Unique kebab-case identifier |
-| `version` | string | Semver version |
-| `purpose` | string (required) | Brief description of the agent's role |
-| `description` | string | Extended description |
-| `rulesets` | string[] | IDs of rulesets to resolve and attach |
-| `prompt.system` | string | System prompt / persona |
-| `prompt.user_template` | string | User prompt template |
-| `defaults.model` | AIModel | Default model (e.g., `claude-sonnet-4`) |
-| `defaults.temperature` | number | Sampling temperature |
-| `defaults.max_tokens` | number | Max output tokens |
-| `defaults.style` | enum | `terse`, `verbose`, `conversational`, `technical` |
-| `capabilities` | string[] | Required capabilities |
-| `tools` | string[] | Tool references |
-| `constraints` | string[] | Operating constraints |
+| Field                  | Type              | Description                                       |
+| ---------------------- | ----------------- | ------------------------------------------------- |
+| `id`                   | string (required) | Unique kebab-case identifier                      |
+| `version`              | string            | Semver version                                    |
+| `purpose`              | string (required) | Brief description of the agent's role             |
+| `description`          | string            | Extended description                              |
+| `rulesets`             | string[]          | IDs of rulesets to resolve and attach             |
+| `prompt.system`        | string            | System prompt / persona                           |
+| `prompt.user_template` | string            | User prompt template                              |
+| `defaults.model`       | AIModel           | Default model (e.g., `claude-sonnet-4`)           |
+| `defaults.temperature` | number            | Sampling temperature                              |
+| `defaults.max_tokens`  | number            | Max output tokens                                 |
+| `defaults.style`       | enum              | `terse`, `verbose`, `conversational`, `technical` |
+| `capabilities`         | string[]          | Required capabilities                             |
+| `tools`                | string[]          | Tool references                                   |
+| `constraints`          | string[]          | Operating constraints                             |
 
 **Supported AIModel values:** `claude-sonnet-4.5`, `claude-sonnet-4`, `claude-haiku-4.5`, `gpt-5`, `gpt-5.1`, `gpt-5.1-codex-mini`, `gpt-5.1-codex`
 
@@ -162,20 +162,20 @@ Agents are complete AI assistant personas with purpose, system prompts, rulesets
 
 Prompts are reusable templates with variable substitution and optional system/user prompt separation.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string (required) | Unique identifier |
-| `version` | string | Semver version |
-| `description` | string (required) | What the prompt does |
-| `content` | string | Main prompt content |
-| `system` | string | System-level prompt |
-| `user` | string | User-level prompt |
-| `model` | AIModel | Suggested model |
-| `includes` | string[] | Paths to included files |
-| `rules` | string[] | Inline guidelines |
-| `variables` | PromptVariable[] | Template variables |
-| `tags` | string[] | Categorization tags |
-| `outputs` | object | Expected output format |
+| Field         | Type              | Description             |
+| ------------- | ----------------- | ----------------------- |
+| `id`          | string (required) | Unique identifier       |
+| `version`     | string            | Semver version          |
+| `description` | string (required) | What the prompt does    |
+| `content`     | string            | Main prompt content     |
+| `system`      | string            | System-level prompt     |
+| `user`        | string            | User-level prompt       |
+| `model`       | AIModel           | Suggested model         |
+| `includes`    | string[]          | Paths to included files |
+| `rules`       | string[]          | Inline guidelines       |
+| `variables`   | PromptVariable[]  | Template variables      |
+| `tags`        | string[]          | Categorization tags     |
+| `outputs`     | object            | Expected output format  |
 
 **Variable substitution:**
 - Simple: `{{variable_name}}` is replaced with the provided value.
@@ -189,17 +189,17 @@ Prompts are reusable templates with variable substitution and optional system/us
 
 Skills represent executable commands or MCP tools with typed inputs, outputs, timeouts, and retry configuration.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string (required) | Unique identifier |
-| `version` | string | Semver version |
-| `description` | string (required) | What the skill does |
-| `command` | object | CLI command definition (`program`, `args`, `cwd`, `env`) |
-| `mcp_tool` | string | MCP tool identifier (alternative to command) |
-| `timeout_sec` | number | Execution timeout |
-| `inputs` | array | Input parameters (`name`, `type`, `required`, `description`) |
-| `outputs` | object | Output specification (`exit_code`, `stdout`, `stderr`, `files`) |
-| `tags` | string[] | Categorization |
+| Field         | Type              | Description                                                     |
+| ------------- | ----------------- | --------------------------------------------------------------- |
+| `id`          | string (required) | Unique identifier                                               |
+| `version`     | string            | Semver version                                                  |
+| `description` | string (required) | What the skill does                                             |
+| `command`     | object            | CLI command definition (`program`, `args`, `cwd`, `env`)        |
+| `mcp_tool`    | string            | MCP tool identifier (alternative to command)                    |
+| `timeout_sec` | number            | Execution timeout                                               |
+| `inputs`      | array             | Input parameters (`name`, `type`, `required`, `description`)    |
+| `outputs`     | object            | Output specification (`exit_code`, `stdout`, `stderr`, `files`) |
+| `tags`        | string[]          | Categorization                                                  |
 
 Skills are transformed into Anthropic-compatible `SKILL.md` files by the `SkillService`.
 
@@ -210,19 +210,19 @@ Skills are transformed into Anthropic-compatible `SKILL.md` files by the `SkillS
 
 Recipes are multi-step automated workflows that chain agent tasks, support loops, conditions, and conversation continuity.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string (required) | Unique identifier |
-| `version` | string (required) | Semver version |
-| `description` | string (required) | What the recipe does |
-| `tags` | string[] | Tags |
-| `tools` | string[] | Supported tools (`claude-code`, `copilot-cli`, `cursor`) |
-| `conversationStrategy` | string | `separate` (default) or `continue` |
-| `toolOptions` | object | Tool-specific options |
-| `variables` | Record<string, string> | Recipe-level variables with `{{var}}` interpolation |
-| `model` | AIModel | Default model for all steps |
-| `steps` | RecipeStep[] (required) | Ordered execution steps |
-| `loop` | object | Loop configuration with `steps`, `maxIterations`, `condition` |
+| Field                  | Type                    | Description                                                   |
+| ---------------------- | ----------------------- | ------------------------------------------------------------- |
+| `id`                   | string (required)       | Unique identifier                                             |
+| `version`              | string (required)       | Semver version                                                |
+| `description`          | string (required)       | What the recipe does                                          |
+| `tags`                 | string[]                | Tags                                                          |
+| `tools`                | string[]                | Supported tools (`claude-code`, `copilot-cli`, `cursor`)      |
+| `conversationStrategy` | string                  | `separate` (default) or `continue`                            |
+| `toolOptions`          | object                  | Tool-specific options                                         |
+| `variables`            | Record<string, string>  | Recipe-level variables with `{{var}}` interpolation           |
+| `model`                | AIModel                 | Default model for all steps                                   |
+| `steps`                | RecipeStep[] (required) | Ordered execution steps                                       |
+| `loop`                 | object                  | Loop configuration with `steps`, `maxIterations`, `condition` |
 
 **RecipeStep fields:**
 - `id`: Step identifier
@@ -243,28 +243,28 @@ Recipes are multi-step automated workflows that chain agent tasks, support loops
 
 ### Projects
 
-**Location:** `06_projects/global/` and `06_projects/local/`
+**Location:** `09_projects/global/` and `09_projects/local/`
 **Schema:** `project.schema.json`
 
 Projects are the central configuration unit that ties together tech stacks, conventions, agent/ruleset/prompt/recipe selection, and deployment targets.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string (required) | Unique kebab-case identifier |
-| `version` | string (required) | Semver version |
-| `name` | string (required) | Display name |
-| `description` | string (required) | Project description |
-| `context` | object | `overview`, `purpose` |
-| `tech_stack` | TechStack | Single tech stack |
-| `tech_stacks` | Record<string, TechStack> | Named tech stacks for multi-stack projects |
-| `documentation` | Record<string, string\|Record> | Documentation links |
-| `commands` | Record<string, string\|Record> | Key commands |
-| `conventions` | object | `naming`, `patterns`, `testing`, `structure`, `custom` arrays |
-| `ai_tools` | AiToolsConfig | `model`, `preferred_agents`, `preferred_rulesets`, `custom_rules` |
-| `agents` | IncludeExcludeConfig | Regex-based include/exclude for agents |
-| `prompts` | IncludeExcludeConfig | Regex-based include/exclude for prompts |
-| `rulesets` | IncludeExcludeConfig | Regex-based include/exclude for rulesets |
-| `recipes` | IncludeExcludeConfig | Regex-based include/exclude for recipes |
+| Field           | Type                           | Description                                                       |
+| --------------- | ------------------------------ | ----------------------------------------------------------------- |
+| `id`            | string (required)              | Unique kebab-case identifier                                      |
+| `version`       | string (required)              | Semver version                                                    |
+| `name`          | string (required)              | Display name                                                      |
+| `description`   | string (required)              | Project description                                               |
+| `context`       | object                         | `overview`, `purpose`                                             |
+| `tech_stack`    | TechStack                      | Single tech stack                                                 |
+| `tech_stacks`   | Record<string, TechStack>      | Named tech stacks for multi-stack projects                        |
+| `documentation` | Record<string, string\|Record> | Documentation links                                               |
+| `commands`      | Record<string, string\|Record> | Key commands                                                      |
+| `conventions`   | object                         | `naming`, `patterns`, `testing`, `structure`, `custom` arrays     |
+| `ai_tools`      | AiToolsConfig                  | `model`, `preferred_agents`, `preferred_rulesets`, `custom_rules` |
+| `agents`        | IncludeExcludeConfig           | Regex-based include/exclude for agents                            |
+| `prompts`       | IncludeExcludeConfig           | Regex-based include/exclude for prompts                           |
+| `rulesets`      | IncludeExcludeConfig           | Regex-based include/exclude for rulesets                          |
+| `recipes`       | IncludeExcludeConfig           | Regex-based include/exclude for recipes                           |
 
 **Multi-stack projects:** When `tech_stacks` is defined (e.g., `frontend`, `backend`), the system generates separate suffixed outputs per stack context. For example, agents get a `-frontend` and `-backend` variant, each with language-specific rulesets resolved for that stack's languages.
 
@@ -272,46 +272,46 @@ Projects are the central configuration unit that ties together tech stacks, conv
 
 ### Features
 
-**Location:** `06_projects/<project>/features/<feature>/feature.yml`
+**Location:** `09_projects/<project>/features/<feature>/feature.yml`
 **Schema:** `feature.schema.json`
 
 Features are project-level scoped contexts representing specific areas of development (e.g., "auth-module", "payment-integration").
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string (required) | Unique identifier |
-| `version` | string (required) | Semver version |
-| `name` | string (required) | Display name |
-| `description` | string (required) | Feature description |
-| `model` | AIModel | Feature-level model override (highest priority) |
-| `context` | object | `overview`, `architecture`, `dependencies` |
-| `files.patterns` | string[] | File glob patterns |
-| `conventions` | string[] | Feature-specific conventions |
-| `recipe` | object | Bound recipe (`id`, `context`, `tools`) |
-| `metadata` | object | `status`, `owner`, `created`, `updated`, `tags` |
+| Field            | Type              | Description                                     |
+| ---------------- | ----------------- | ----------------------------------------------- |
+| `id`             | string (required) | Unique identifier                               |
+| `version`        | string (required) | Semver version                                  |
+| `name`           | string (required) | Display name                                    |
+| `description`    | string (required) | Feature description                             |
+| `model`          | AIModel           | Feature-level model override (highest priority) |
+| `context`        | object            | `overview`, `architecture`, `dependencies`      |
+| `files.patterns` | string[]          | File glob patterns                              |
+| `conventions`    | string[]          | Feature-specific conventions                    |
+| `recipe`         | object            | Bound recipe (`id`, `context`, `tools`)         |
+| `metadata`       | object            | `status`, `owner`, `created`, `updated`, `tags` |
 
 **Validation:** Feature manifests are checked recursively for backtick characters, which cause bash command substitution errors in generated scripts.
 
 ### Deploy Configs
 
-**Location:** `06_projects/<project>/deploy.yml` (with optional `deploy.local.yml` overlay)
+**Location:** `09_projects/<project>/deploy.yml` (with optional `deploy.local.yml` overlay)
 **Schema:** `deploy.schema.json`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `target` | string (required) | Target directory path |
-| `tools` | string[] (required) | Which tools to deploy (`windsurf`, `cursor`, `claude-code`, `github-copilot`, `copilot-cli`) |
-| `mode` | enum (required) | `local` or `manual` |
-| `auto_commit` | boolean | Auto-commit after deploy (local mode) |
-| `git_branch` | string | Branch for deployment |
-| `backup` | boolean | Enable backup (default: true) |
-| `ai_tools` | AiToolsConfig | Override project AI settings |
-| `agents` | IncludeExcludeConfig | Override agent filters |
-| `prompts` | IncludeExcludeConfig | Override prompt filters |
-| `rulesets` | IncludeExcludeConfig | Override ruleset filters |
-| `recipes` | IncludeExcludeConfig | Override recipe filters |
-| `tech_stack` | TechStack | Override tech stack |
-| `tech_stacks` | Record<string, TechStack> | Override tech stacks |
+| Field         | Type                      | Description                                                                                  |
+| ------------- | ------------------------- | -------------------------------------------------------------------------------------------- |
+| `target`      | string (required)         | Target directory path                                                                        |
+| `tools`       | string[] (required)       | Which tools to deploy (`windsurf`, `cursor`, `claude-code`, `github-copilot`, `copilot-cli`) |
+| `mode`        | enum (required)           | `local` or `manual`                                                                          |
+| `auto_commit` | boolean                   | Auto-commit after deploy (local mode)                                                        |
+| `git_branch`  | string                    | Branch for deployment                                                                        |
+| `backup`      | boolean                   | Enable backup (default: true)                                                                |
+| `ai_tools`    | AiToolsConfig             | Override project AI settings                                                                 |
+| `agents`      | IncludeExcludeConfig      | Override agent filters                                                                       |
+| `prompts`     | IncludeExcludeConfig      | Override prompt filters                                                                      |
+| `rulesets`    | IncludeExcludeConfig      | Override ruleset filters                                                                     |
+| `recipes`     | IncludeExcludeConfig      | Override recipe filters                                                                      |
+| `tech_stack`  | TechStack                 | Override tech stack                                                                          |
+| `tech_stacks` | Record<string, TechStack> | Override tech stacks                                                                         |
 
 Deploy config values take precedence over project manifest values via `applyDeployConfig()`. Local overrides (`deploy.local.yml`) are merged on top, enabling per-developer customization without modifying committed files.
 
@@ -320,14 +320,14 @@ Deploy config values take precedence over project manifest values via `applyDepl
 **Location:** `20_evals/suites/`
 **Schema:** `eval.schema.json`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `suite` | string (required) | Suite name |
-| `version` | string | Semver version |
-| `description` | string | Suite description |
-| `targets` | array (required) | `type`, `id`, `dataset`, `config` |
-| `checks` | array | Named checks with `type` |
-| `budgets` | object | `max_tokens`, `max_cost_usd`, `max_duration_sec` |
+| Field         | Type              | Description                                      |
+| ------------- | ----------------- | ------------------------------------------------ |
+| `suite`       | string (required) | Suite name                                       |
+| `version`     | string            | Semver version                                   |
+| `description` | string            | Suite description                                |
+| `targets`     | array (required)  | `type`, `id`, `dataset`, `config`                |
+| `checks`      | array             | Named checks with `type`                         |
+| `budgets`     | object            | `max_tokens`, `max_cost_usd`, `max_duration_sec` |
 
 Eval execution is currently a structural check (verifying datasets exist) with placeholder logic for actual AI evaluation.
 
@@ -477,7 +477,7 @@ npm run project:external -- add /path/to/project --alias my-proj --global
 npm run project:external -- remove my-proj
 ```
 
-External projects are tracked in `06_projects/projects.global.yml` and `06_projects/projects.local.yml`.
+External projects are tracked in `09_projects/projects.global.yml` and `09_projects/projects.local.yml`.
 
 ### `features generate <project-id>`
 
@@ -749,8 +749,8 @@ Deep merge with array deduplication: arrays are concatenated and deduplicated; o
 ### Project Sources
 
 Default project sources:
-1. `06_projects/global/`
-2. `06_projects/local/`
+1. `09_projects/global/`
+2. `09_projects/local/`
 
 Additional sources from `config.yml` `project_sources` array (supports absolute and relative paths).
 
@@ -767,8 +767,8 @@ The `ExternalProjectService` manages projects that live outside the ai-tools rep
 
 ### Registry Files
 
-- `06_projects/projects.global.yml` -- Global external project registry.
-- `06_projects/projects.local.yml` -- Local external project registry.
+- `09_projects/projects.global.yml` -- Global external project registry.
+- `09_projects/projects.local.yml` -- Local external project registry.
 
 ### External Project Record
 
@@ -857,12 +857,12 @@ The `FeatureService` generates tool-specific feature documentation from `feature
 
 ### Per-Tool Output
 
-| Tool | Output Format | Location |
-|------|--------------|----------|
-| GitHub Copilot | Markdown (`.md` and `.instructions.md`) | `.github/instructions/` |
-| Windsurf | Markdown with YAML frontmatter (`auto_execution_mode: 3`) | `.windsurf/workflows/` |
-| Claude Code | Markdown | Feature output directory |
-| Cursor | JSON (`features.json`) | Feature output directory |
+| Tool           | Output Format                                             | Location                 |
+| -------------- | --------------------------------------------------------- | ------------------------ |
+| GitHub Copilot | Markdown (`.md` and `.instructions.md`)                   | `.github/instructions/`  |
+| Windsurf       | Markdown with YAML frontmatter (`auto_execution_mode: 3`) | `.windsurf/workflows/`   |
+| Claude Code    | Markdown                                                  | Feature output directory |
+| Cursor         | JSON (`features.json`)                                    | Feature output directory |
 
 ### Feature Content
 
@@ -887,14 +887,14 @@ During deployment, Windsurf feature workflows are merged from the features outpu
 
 ### Tool-to-Directory Mapping
 
-| Tool | Target Directory |
-|------|-----------------|
-| `windsurf` | `.windsurf/` |
-| `cursor` | `.cursor/` |
-| `claude-code` | `.claude/` |
-| `github-copilot` | `.github/` |
-| `copilot-cli` | `AGENTS.md`, `.cs.recipes/` (project root) |
-| `codex` | `AGENTS.md` (project root), `~/.codex/prompts` (home) |
+| Tool             | Target Directory                                      |
+| ---------------- | ----------------------------------------------------- |
+| `windsurf`       | `.windsurf/`                                          |
+| `cursor`         | `.cursor/`                                            |
+| `claude-code`    | `.claude/`                                            |
+| `github-copilot` | `.github/`                                            |
+| `copilot-cli`    | `AGENTS.md`, `.cs.recipes/` (project root)            |
+| `codex`          | `AGENTS.md` (project root), `~/.codex/prompts` (home) |
 
 ### Backup System
 
@@ -918,20 +918,20 @@ During deployment, Windsurf feature workflows are merged from the features outpu
 
 ### Existing Test Files
 
-| Test | Location |
-|------|----------|
-| Generate command | `src/cli/commands/generate.test.ts` |
-| Deploy command | `src/cli/commands/deploy.test.ts` |
-| Cursor adapter | `src/tools/cursor/adapter.test.ts` |
-| Codex adapter | `src/tools/codex/adapter.test.ts` |
-| Windsurf backup adapter | `src/tools/windsurf/backup/adapter.test.ts` |
-| Claude backup adapter | `src/tools/claude/backup/adapter.test.ts` |
-| GitHub Copilot backend adapter | `src/tools/github-copilot/backend/adapter.test.ts` |
-| Validation service | `src/core/services/validation.service.test.ts` |
-| Eval service | `src/core/services/eval.service.test.ts` |
-| Resolver patterns | `src/core/services/resolver.service.patterns.test.ts` |
-| Resolver reload | `src/core/services/resolver.service.reload.test.ts` |
-| Deploy schema regex | `src/core/schemas/deploy.schema.regex-only.test.ts` |
+| Test                           | Location                                              |
+| ------------------------------ | ----------------------------------------------------- |
+| Generate command               | `src/cli/commands/generate.test.ts`                   |
+| Deploy command                 | `src/cli/commands/deploy.test.ts`                     |
+| Cursor adapter                 | `src/tools/cursor/adapter.test.ts`                    |
+| Codex adapter                  | `src/tools/codex/adapter.test.ts`                     |
+| Windsurf backup adapter        | `src/tools/windsurf/backup/adapter.test.ts`           |
+| Claude backup adapter          | `src/tools/claude/backup/adapter.test.ts`             |
+| GitHub Copilot backend adapter | `src/tools/github-copilot/backend/adapter.test.ts`    |
+| Validation service             | `src/core/services/validation.service.test.ts`        |
+| Eval service                   | `src/core/services/eval.service.test.ts`              |
+| Resolver patterns              | `src/core/services/resolver.service.patterns.test.ts` |
+| Resolver reload                | `src/core/services/resolver.service.reload.test.ts`   |
+| Deploy schema regex            | `src/core/schemas/deploy.schema.regex-only.test.ts`   |
 
 ---
 
@@ -945,7 +945,7 @@ ai-tools/
     shared/              # Include fragments (not standalone prompts)
   04_agents/             # Agent YAML manifests (AI personas)
   05_recipes/            # Recipe YAML manifests (multi-step workflows)
-  06_projects/           # Project definitions
+  09_projects/           # Project definitions
     global/              # Shared project configs (committed)
       template/          # Template for new projects
     local/               # Per-developer projects (gitignored)
@@ -1004,126 +1004,126 @@ ai-tools/
 
 ### Summary
 
-| Status | Count | Percentage |
-|--------|-------|------------|
-| Implemented | 28 | 27% |
-| Partial | 10 | 10% |
-| Missing | 65 | 63% |
-| **Total** | **103** | |
+| Status      | Count   | Percentage |
+| ----------- | ------- | ---------- |
+| Implemented | 28      | 27%        |
+| Partial     | 10      | 10%        |
+| Missing     | 65      | 63%        |
+| **Total**   | **103** |            |
 
 ### Feature Matrix
 
 #### Manifest Types
 
-| Feature | TS | Kotlin | Status |
-|---------|:--:|:------:|--------|
-| Ruleset manifest (id, description, rules, metadata) | Yes | Yes | ✅ |
-| Ruleset `extends` (inheritance with cycle detection) | Yes | No | ❌ |
-| Ruleset `tags` (language-aware filtering) | Yes | No | ❌ |
-| Agent manifest (id, description, persona, prompt, rulesets, rules, constraints) | Yes | Yes | ✅ |
-| Agent `defaults` (model, temperature, max_tokens, style) | Yes | No | ❌ |
-| Agent `capabilities`, `tools` fields | Yes | No | ❌ |
-| Agent `prompt.system` / `prompt.user_template` separation | Yes | No | ❌ |
-| Prompt manifest (id, description, content, variables, rules, rulesets) | Yes | Yes | ✅ |
-| Prompt `system` / `user` separation | Yes | No | ❌ |
-| Prompt variable substitution (`{{var}}`, conditional `{{#var}}...{{/var}}`) | Yes | No | ❌ |
-| Prompt `shared/` subdirectory skip | Yes | No | ❌ |
-| Skill manifest | Yes | No | ❌ |
-| Recipe manifest | Yes | No | ❌ |
-| Project manifest (basic) | Yes | Yes | 🔶 |
-| Project `tech_stacks` (multi-stack) | Yes | No | ❌ |
-| Project `conventions` | Yes | No | ❌ |
-| Project `agents`/`prompts`/`rulesets` include/exclude (regex) | Yes | Partial (tag/whitelist/blacklist) | 🔶 |
-| Project `documentation` | Yes | Yes | ✅ |
-| Feature manifest (basic) | Yes | Yes | 🔶 |
-| Feature `model`, `files.patterns`, `recipe` binding | Yes | No | ❌ |
-| Deploy config as separate manifest (`deploy.yml`) | Yes | No (inline in project) | 🔶 |
-| Eval suite manifest | Yes | No | ❌ |
+| Feature                                                                         |  TS   |              Kotlin               | Status |
+| ------------------------------------------------------------------------------- | :---: | :-------------------------------: | ------ |
+| Ruleset manifest (id, description, rules, metadata)                             |  Yes  |                Yes                | ✅      |
+| Ruleset `extends` (inheritance with cycle detection)                            |  Yes  |                No                 | ❌      |
+| Ruleset `tags` (language-aware filtering)                                       |  Yes  |                No                 | ❌      |
+| Agent manifest (id, description, persona, prompt, rulesets, rules, constraints) |  Yes  |                Yes                | ✅      |
+| Agent `defaults` (model, temperature, max_tokens, style)                        |  Yes  |                No                 | ❌      |
+| Agent `capabilities`, `tools` fields                                            |  Yes  |                No                 | ❌      |
+| Agent `prompt.system` / `prompt.user_template` separation                       |  Yes  |                No                 | ❌      |
+| Prompt manifest (id, description, content, variables, rules, rulesets)          |  Yes  |                Yes                | ✅      |
+| Prompt `system` / `user` separation                                             |  Yes  |                No                 | ❌      |
+| Prompt variable substitution (`{{var}}`, conditional `{{#var}}...{{/var}}`)     |  Yes  |                No                 | ❌      |
+| Prompt `shared/` subdirectory skip                                              |  Yes  |                No                 | ❌      |
+| Skill manifest                                                                  |  Yes  |                No                 | ❌      |
+| Recipe manifest                                                                 |  Yes  |                No                 | ❌      |
+| Project manifest (basic)                                                        |  Yes  |                Yes                | 🔶      |
+| Project `tech_stacks` (multi-stack)                                             |  Yes  |                No                 | ❌      |
+| Project `conventions`                                                           |  Yes  |                No                 | ❌      |
+| Project `agents`/`prompts`/`rulesets` include/exclude (regex)                   |  Yes  | Partial (tag/whitelist/blacklist) | 🔶      |
+| Project `documentation`                                                         |  Yes  |                Yes                | ✅      |
+| Feature manifest (basic)                                                        |  Yes  |                Yes                | 🔶      |
+| Feature `model`, `files.patterns`, `recipe` binding                             |  Yes  |                No                 | ❌      |
+| Deploy config as separate manifest (`deploy.yml`)                               |  Yes  |      No (inline in project)       | 🔶      |
+| Eval suite manifest                                                             |  Yes  |                No                 | ❌      |
 
 #### CLI Commands
 
-| Feature | TS | Kotlin | Status |
-|---------|:--:|:------:|--------|
-| CLI framework | Commander.js | Clikt | ✅ |
-| `build` (global adapter generation) | Yes | No | ❌ |
-| `generate [project] [--all]` | Yes | Partial | 🔶 |
-| `deploy project` / `deploy all` / `deploy rollback` | Yes | No | ❌ |
-| `validate` (schema + rules) | Yes | No | ❌ |
-| `eval [--suite]` | Yes | No | ❌ |
-| `diff --before --after` | Yes | No | ❌ |
-| `clean` | Yes | No | ❌ |
-| `create` / `init` / `list` / `external` | Yes | No | ❌ |
-| `docs generate` | Yes | No | ❌ |
-| `prompts library` / `prompts html` / `prompts use` | Yes | No | ❌ |
-| `recipes list` / `recipes run` / `recipes generate` | Yes | No | ❌ |
-| `--dry-run`, `--force`, `--interactive` options | Yes | No | ❌ |
+| Feature                                             |      TS      | Kotlin  | Status |
+| --------------------------------------------------- | :----------: | :-----: | ------ |
+| CLI framework                                       | Commander.js |  Clikt  | ✅      |
+| `build` (global adapter generation)                 |     Yes      |   No    | ❌      |
+| `generate [project] [--all]`                        |     Yes      | Partial | 🔶      |
+| `deploy project` / `deploy all` / `deploy rollback` |     Yes      |   No    | ❌      |
+| `validate` (schema + rules)                         |     Yes      |   No    | ❌      |
+| `eval [--suite]`                                    |     Yes      |   No    | ❌      |
+| `diff --before --after`                             |     Yes      |   No    | ❌      |
+| `clean`                                             |     Yes      |   No    | ❌      |
+| `create` / `init` / `list` / `external`             |     Yes      |   No    | ❌      |
+| `docs generate`                                     |     Yes      |   No    | ❌      |
+| `prompts library` / `prompts html` / `prompts use`  |     Yes      |   No    | ❌      |
+| `recipes list` / `recipes run` / `recipes generate` |     Yes      |   No    | ❌      |
+| `--dry-run`, `--force`, `--interactive` options     |     Yes      |   No    | ❌      |
 
 #### Output Targets (Tool Adapters)
 
-| Feature | TS | Kotlin | Status |
-|---------|:--:|:------:|--------|
-| Windsurf adapter | Yes | Yes | ✅ |
-| Claude Code adapter | Yes | Yes | ✅ |
-| Cursor adapter | Yes | Yes | ✅ |
-| GitHub Copilot adapter | Yes | Yes | ✅ |
-| Codex adapter | Yes | Yes | ✅ |
-| Copilot CLI adapter | Yes | No | ❌ |
-| Antigravity adapter (Kotlin-only) | No | Yes | ✅ |
-| Recipe script generation (all adapters) | Yes | No | ❌ |
-| Skill export (Claude adapter) | Yes | No | ❌ |
+| Feature                                 |  TS   | Kotlin | Status |
+| --------------------------------------- | :---: | :----: | ------ |
+| Windsurf adapter                        |  Yes  |  Yes   | ✅      |
+| Claude Code adapter                     |  Yes  |  Yes   | ✅      |
+| Cursor adapter                          |  Yes  |  Yes   | ✅      |
+| GitHub Copilot adapter                  |  Yes  |  Yes   | ✅      |
+| Codex adapter                           |  Yes  |  Yes   | ✅      |
+| Copilot CLI adapter                     |  Yes  |   No   | ❌      |
+| Antigravity adapter (Kotlin-only)       |  No   |  Yes   | ✅      |
+| Recipe script generation (all adapters) |  Yes  |   No   | ❌      |
+| Skill export (Claude adapter)           |  Yes  |   No   | ❌      |
 
 #### Build Pipeline & Resolver
 
-| Feature | TS | Kotlin | Status |
-|---------|:--:|:------:|--------|
-| Global build (all adapters) | Yes | No | ❌ |
-| Staging area (`.output/`) | Yes | No (direct write) | ❌ |
-| Ruleset inheritance resolution (recursive, cycle detection) | Yes | No | ❌ |
-| Ruleset regex pattern matching | Yes | Yes | ✅ |
-| Language-aware ruleset filtering | Yes | No | ❌ |
-| Agent resolution per-stack (suffix `-<stackName>`) | Yes | No | ❌ |
-| Model resolution hierarchy | Yes | No | ❌ |
+| Feature                                                     |  TS   |      Kotlin       | Status |
+| ----------------------------------------------------------- | :---: | :---------------: | ------ |
+| Global build (all adapters)                                 |  Yes  |        No         | ❌      |
+| Staging area (`.output/`)                                   |  Yes  | No (direct write) | ❌      |
+| Ruleset inheritance resolution (recursive, cycle detection) |  Yes  |        No         | ❌      |
+| Ruleset regex pattern matching                              |  Yes  |        Yes        | ✅      |
+| Language-aware ruleset filtering                            |  Yes  |        No         | ❌      |
+| Agent resolution per-stack (suffix `-<stackName>`)          |  Yes  |        No         | ❌      |
+| Model resolution hierarchy                                  |  Yes  |        No         | ❌      |
 
 #### Validation
 
-| Feature | TS | Kotlin | Status |
-|---------|:--:|:------:|--------|
-| JSON schema validation | Yes | No | ❌ |
-| ID uniqueness check | Yes | No | ❌ |
-| Kebab-case enforcement | Yes | No | ❌ |
-| Reference integrity | Yes | No | ❌ |
-| Security scanning (API keys, passwords, tokens) | Yes | No | ❌ |
+| Feature                                         |  TS   | Kotlin | Status |
+| ----------------------------------------------- | :---: | :----: | ------ |
+| JSON schema validation                          |  Yes  |   No   | ❌      |
+| ID uniqueness check                             |  Yes  |   No   | ❌      |
+| Kebab-case enforcement                          |  Yes  |   No   | ❌      |
+| Reference integrity                             |  Yes  |   No   | ❌      |
+| Security scanning (API keys, passwords, tokens) |  Yes  |   No   | ❌      |
 
 #### Deployment
 
-| Feature | TS | Kotlin | Status |
-|---------|:--:|:------:|--------|
-| Deploy pipeline (generate → verify → backup → copy) | Yes | No | ❌ |
-| Backup system (10 most recent per project) | Yes | No | ❌ |
-| Auto-commit after deploy | Yes | No | ❌ |
-| Dry-run mode | Yes | No | ❌ |
+| Feature                                             |  TS   | Kotlin | Status |
+| --------------------------------------------------- | :---: | :----: | ------ |
+| Deploy pipeline (generate → verify → backup → copy) |  Yes  |   No   | ❌      |
+| Backup system (10 most recent per project)          |  Yes  |   No   | ❌      |
+| Auto-commit after deploy                            |  Yes  |   No   | ❌      |
+| Dry-run mode                                        |  Yes  |   No   | ❌      |
 
 ### Kotlin-Only Features (not in TypeScript)
 
-| Feature | Description |
-|---------|-------------|
-| **Antigravity adapter** | New tool adapter for `.agent/` directory structure |
-| **HTTP Server (Ktor)** | REST API server module (`/`, `/health` endpoints) |
-| **Telemetry module** | OpenTelemetry-based tracing with span support |
-| **Structured logging** | SLF4J with trace/span context |
-| **Multi-module Gradle** | Separate `engine`, `cli`, `server`, `telemetry`, `utils` modules |
+| Feature                  | Description                                                            |
+| ------------------------ | ---------------------------------------------------------------------- |
+| **Antigravity adapter**  | New tool adapter for `.agent/` directory structure                     |
+| **HTTP Server (Ktor)**   | REST API server module (`/`, `/health` endpoints)                      |
+| **Telemetry module**     | OpenTelemetry-based tracing with span support                          |
+| **Structured logging**   | SLF4J with trace/span context                                          |
+| **Multi-module Gradle**  | Separate `engine`, `cli`, `server`, `telemetry`, `utils` modules       |
 | **Sealed class filters** | Type-safe filter variants (ByTags, ByWhitelistedIds, ByBlacklistedIds) |
 
 ### Implementation Priority
 
-| Phase | Focus | Key Items |
-|-------|-------|-----------|
-| 1 | Core Model Completeness | Ruleset `extends` + inheritance, language-aware filtering, agent extended fields, skill manifest, multi-stack support |
-| 2 | Deployment Pipeline | Separate deploy config, staging area, backup system, deploy commands |
-| 3 | Validation | Schema validation, uniqueness, kebab-case, reference integrity, security scanning |
-| 4 | Recipe System | Recipe manifest, script generation, adapter export, interactive runner |
-| 5 | CLI Commands | `build`, `create`/`init`, `list`/`external`, `clean`, Copilot CLI adapter |
-| 6 | Docs & Prompts | `docs generate`, prompt library (MD/HTML), `prompts use`, variable substitution |
-| 7 | Advanced | Eval suites, diff command, model resolution hierarchy, config deep merge |
+| Phase | Focus                   | Key Items                                                                                                             |
+| ----- | ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| 1     | Core Model Completeness | Ruleset `extends` + inheritance, language-aware filtering, agent extended fields, skill manifest, multi-stack support |
+| 2     | Deployment Pipeline     | Separate deploy config, staging area, backup system, deploy commands                                                  |
+| 3     | Validation              | Schema validation, uniqueness, kebab-case, reference integrity, security scanning                                     |
+| 4     | Recipe System           | Recipe manifest, script generation, adapter export, interactive runner                                                |
+| 5     | CLI Commands            | `build`, `create`/`init`, `list`/`external`, `clean`, Copilot CLI adapter                                             |
+| 6     | Docs & Prompts          | `docs generate`, prompt library (MD/HTML), `prompts use`, variable substitution                                       |
+| 7     | Advanced                | Eval suites, diff command, model resolution hierarchy, config deep merge                                              |
 
 > For the full detailed gap analysis, see [FEATURE_COMPARISON.md](FEATURE_COMPARISON.md).

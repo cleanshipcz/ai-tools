@@ -130,8 +130,8 @@ The system searches for projects in directories defined in configuration files. 
 
 ```yaml
 project_sources:
-  - ./06_projects/global # Versioned, shared projects
-  - ./06_projects/local # Local, gitignored projects
+  - ./09_projects/global # Versioned, shared projects
+  - ./09_projects/local # Local, gitignored projects
 ```
 
 **Adding Personal Sources (`config.local.yml`):**
@@ -160,8 +160,8 @@ If `config.yml` has:
 
 ```yaml
 project_sources:
-  - ./06_projects/global
-  - ./06_projects/local
+  - ./09_projects/global
+  - ./09_projects/local
 ```
 
 And `config.local.yml` has:
@@ -176,15 +176,15 @@ project_sources:
 
 ```yaml
 project_sources:
-  - ./06_projects/global
-  - ./06_projects/local
+  - ./09_projects/global
+  - ./09_projects/local
   - /home/user/my-projects
   - ../external-projects
 ```
 
 **Path Types:**
 
-- **Relative**: Resolved relative to repository root (e.g., `./06_projects/global`)
+- **Relative**: Resolved relative to repository root (e.g., `./09_projects/global`)
 - **Absolute**: Full file system paths (e.g., `/home/user/projects`)
 
 **Commands Using Configuration:**
@@ -1370,7 +1370,7 @@ jobs:
 - [PLAN.md](../PLAN.md) - Implementation plan
 - [README.md](../README.md) - Main repository README
 - [schemas/project.schema.json](../schemas/project.schema.json) - Schema reference
-- [projects/global/example-ecommerce/](../06_projects/global/example-ecommerce/) - Complete example
+- [projects/global/example-ecommerce/](../09_projects/global/example-ecommerce/) - Complete example
 
 ---
 

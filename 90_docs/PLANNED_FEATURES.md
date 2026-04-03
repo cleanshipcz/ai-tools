@@ -9,7 +9,7 @@
 
 ### Large features (v1.1.0)
 
-- ✅ Feature-specific context system in `06_projects/<global|local>/project-name/features/feature-name`
+- ✅ Feature-specific context system in `09_projects/<global|local>/project-name/features/feature-name`
 - ✅ Feature manifests with snippets and conventions
 - ✅ Generates feature-specific context for all tools (GitHub Copilot, Windsurf, Claude Code, Cursor)
 - ✅ Feature generation integrated into project generation workflow

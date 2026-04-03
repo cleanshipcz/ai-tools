@@ -8,7 +8,7 @@ locations:
   skills:
     - "02_skills"
   projects:
-    - "06_projects"
+    - "09_projects"
 
 tools:
   - windsurf

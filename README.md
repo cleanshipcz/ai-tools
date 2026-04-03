@@ -19,7 +19,7 @@ This repository is the source of truth for prompts, rulesets, agents, skills, re
 - `03_prompts/` – prompt manifests
 - `04_agents/` – agent manifests
 - `05_recipes/` – multi-agent workflow recipes
-- `06_projects/` – project manifests (`global/` + `local/` + templates)
+- `09_projects/` – project manifests (`global/` + `local/` + templates)
 - `07_mcp/` – MCP servers and presets
 - `10_schemas/` – JSON schemas for validation
 - `12_templates/` – scaffolding used by project commands
@@ -43,7 +43,7 @@ This repository is the source of truth for prompts, rulesets, agents, skills, re
 - Create managed project: `npm run project:create my-app -- --local -d "My app"`  
 - Initialize external project: `npm run project:init /path/to/app --alias my-app`
 
-5) Edit `06_projects/.../project.yml` and `deploy.yml` (set `target`, `tools`, filters)
+5) Edit `09_projects/.../project.yml` and `deploy.yml` (set `target`, `tools`, filters)
 
 6) Generate and deploy  
 `npm run project:deploy my-app`  
@@ -79,23 +79,23 @@ Recipes are emitted to `.cs.recipes/` inside each tool’s output directory so y
 - Testing: `npm test`, `npm run test:watch`, `npm run test:coverage`.
 
 ## Tool Output (generated per project)
-| Tool | Staged Output (under `.output/<project>`) | Contains |
-| ---- | ----------------------------------------- | -------- |
-| Windsurf | `.windsurf/` | Project context, agent/prompt rules, recipes, feature workflows |
-| Cursor | `.cursor/` | `recipes.json`, `project-rules.json`, recipes |
-| Claude Code | `.claude/` | Prompts (JSON), skills, agents, project context, recipes |
-| GitHub Copilot | `.github/` | `instructions.md`, prompt/agent markdown, recipes |
-| Copilot CLI | `AGENTS.md` + `.cs.recipes/` | Agent catalog plus runnable recipes |
-| Codex | `AGENTS.md` + `.codex/prompts/` | Agent catalog and prompts (deploy copies prompts to `~/.codex/prompts`) |
+| Tool           | Staged Output (under `.output/<project>`) | Contains                                                                |
+| -------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
+| Windsurf       | `.windsurf/`                              | Project context, agent/prompt rules, recipes, feature workflows         |
+| Cursor         | `.cursor/`                                | `recipes.json`, `project-rules.json`, recipes                           |
+| Claude Code    | `.claude/`                                | Prompts (JSON), skills, agents, project context, recipes                |
+| GitHub Copilot | `.github/`                                | `instructions.md`, prompt/agent markdown, recipes                       |
+| Copilot CLI    | `AGENTS.md` + `.cs.recipes/`              | Agent catalog plus runnable recipes                                     |
+| Codex          | `AGENTS.md` + `.codex/prompts/`           | Agent catalog and prompts (deploy copies prompts to `~/.codex/prompts`) |
 
 Deploy copies these staged files into the `target` from `deploy.yml` and keeps timestamped backups in `.backups/<project>/`.
 
 ## Configuration Notes
 - Repo-level config: `15_config/config.yml` (override with `config.local.yml`).
-- Project sources: defaults to `06_projects/global` and `06_projects/local`; add more via `project_sources` in config.
+- Project sources: defaults to `09_projects/global` and `09_projects/local`; add more via `project_sources` in config.
 - Model preference priority: Feature → Project (`ai_tools.model`) → Agent defaults → Prompt.
 
 ## Need Help?
-- Recipe and feature examples live in `05_recipes/` and `06_projects/*/features/`.
+- Recipe and feature examples live in `05_recipes/` and `09_projects/*/features/`.
 - Tool-specific integration details are in `90_docs/TOOLS.md`.
 - Open an issue or discussion in the repo if something looks off.

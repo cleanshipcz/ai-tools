@@ -114,7 +114,7 @@ content: |
   ./gradlew clean build
   ```
 
-  File location: `06_projects/<scope>/<project>/features/<id>.yml`
+  File location: `09_projects/<scope>/<project>/features/<id>.yml`
 outputs:
   format: yaml
 metadata:
