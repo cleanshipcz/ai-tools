@@ -12,7 +12,7 @@ vi.mock('./config.service.js', () => {
       prompts: '03_prompts',
       agents: '05_agents',
       rulesets: '01_rulesets',
-      skills: '02_skills',
+      skills: '04_skills',
       recipes: '08_recipes',
       schemas: '10_schemas',
       evals: '20_evals',

@@ -6,7 +6,7 @@ locations:
   rulesets:
     - "01_rulesets"
   skills:
-    - "02_skills"
+    - "04_skills"
   projects:
     - "09_projects"
 

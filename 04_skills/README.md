@@ -90,7 +90,7 @@ npm run skills
 
 The build process:
 
-1. Reads YAML manifests from `02_skills/*.yml`
+1. Reads YAML manifests from `04_skills/*.yml`
 2. Validates against JSON Schema
 3. Generates tool-specific configs (Windsurf, Cursor)
 4. Generates Anthropic SKILL.md files with:

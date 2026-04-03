@@ -367,7 +367,7 @@ includes:
 ## 🔗 Related
 
 - [Agents](../05_agents/README.md) - Agents that use MCP capabilities
-- [Skills](../02_skills/README.md) - Skills can be exposed via MCP
+- [Skills](../04_skills/README.md) - Skills can be exposed via MCP
 - [Security](../90_docs/SECURITY.md) - Security best practices
 
 ## 🐛 Troubleshooting

@@ -95,7 +95,7 @@ See [`08_recipes/README.md`](../08_recipes/README.md) for complete documentation
 - [x] switch --no-confirm to --interactive for step-by-step with confirmation (by default doesn't require confirmation)
 - [x] For all recipes, the first step needs to be: analysis of the relevant content with output to a document, then detailed plan of the change with output to a document; these documents then need to be included in context and maintained
 - [x] Organization agent -> good in organizing files, folders, documents, topics, etc.
-- [x] Organize this repository -> add enumerated prefix for folders (e.g. 01_rulesets, 02_skills, ..., 90_docs)
+- [x] Organize this repository -> add enumerated prefix for folders (e.g. 01_rulesets, 04_skills, ..., 90_docs)
 
 ## Other features NOT NOW
 

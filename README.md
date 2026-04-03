@@ -15,7 +15,7 @@ This repository is the source of truth for prompts, rulesets, agents, skills, re
 
 ## Repository Layout
 - `01_rulesets/` – reusable rule sets
-- `02_skills/` – skill manifests (converted to `SKILL.md`)
+- `04_skills/` – skill manifests (converted to `SKILL.md`)
 - `03_prompts/` – prompt manifests
 - `05_agents/` – agent manifests
 - `08_recipes/` – multi-agent workflow recipes
@@ -69,7 +69,7 @@ Use `--dry-run`, `--force`, or `--interactive` to control deployment. Outputs ar
 Recipes are emitted to `.cs.recipes/` inside each tool’s output directory so you can execute them directly from your project.
 
 ## Skills and Docs
-- Skills: `npm run skills generate` converts `02_skills` into Anthropic `SKILL.md` folders under `adapters/claude-code/skills`.
+- Skills: `npm run skills generate` converts `04_skills` into Anthropic `SKILL.md` folders under `adapters/claude-code/skills`.
 - Docs: `npm run docs generate` builds `docs/AGENTS.md` from manifests.
 
 ## Utilities

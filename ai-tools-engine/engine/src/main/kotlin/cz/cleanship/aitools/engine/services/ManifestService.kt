@@ -43,7 +43,7 @@ class ManifestService(private val rootDir: File) {
     }
 
     fun listSkills(): List<SkillManifest> {
-        val dir = File(rootDir, "02_skills")
+        val dir = File(rootDir, "04_skills")
         if (!dir.exists()) return emptyList()
         return loader.findYamlFiles(dir).map {
             loader.loadSkill(it)

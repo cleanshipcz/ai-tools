@@ -86,7 +86,7 @@ content: |
   - **Set reasonable timeouts** (default 300s, increase for builds).
   - **Document constraints/prerequisites** so agents know what's needed.
   - **Use verb-noun ID pattern:** `run-*`, `lint-*`, `search-*`, `build-*`
-  - File location: `02_skills/<id>.yml`
+  - File location: `04_skills/<id>.yml`
 
   ## Example
 

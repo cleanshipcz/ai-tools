@@ -184,7 +184,7 @@ Prompts are reusable templates with variable substitution and optional system/us
 
 ### Skills
 
-**Location:** `02_skills/`
+**Location:** `04_skills/`
 **Schema:** `skill.schema.json`
 
 Skills represent executable commands or MCP tools with typed inputs, outputs, timeouts, and retry configuration.
@@ -726,7 +726,7 @@ The `ValidationService` (`src/core/services/validation.service.ts`) performs com
 
 ### Collected Manifest Sources
 
-- `01_rulesets/`, `02_skills/`, `03_prompts/`, `05_agents/`, `08_recipes/`, `20_evals/suites/`
+- `01_rulesets/`, `04_skills/`, `03_prompts/`, `05_agents/`, `08_recipes/`, `20_evals/suites/`
 - Project manifests from all configured project sources
 - Deploy configs (`deploy.yml`)
 - Feature manifests (`features/*/feature.yml`)
@@ -940,7 +940,7 @@ During deployment, Windsurf feature workflows are merged from the features outpu
 ```
 ai-tools/
   01_rulesets/           # Ruleset YAML manifests (coding standards)
-  02_skills/             # Skill YAML manifests (executable tools)
+  04_skills/             # Skill YAML manifests (executable tools)
   03_prompts/            # Prompt YAML manifests (reusable templates)
     shared/              # Include fragments (not standalone prompts)
   05_agents/             # Agent YAML manifests (AI personas)

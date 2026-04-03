@@ -47,7 +47,7 @@ prompt: |
       Required: id, description, metadata, context (with documentation), deploy (with directory)
       NOT supported: name, version, commands, conventions, ai_tools
 
-    Skill (No Kotlin model → 02_skills/<id>.yml)
+    Skill (No Kotlin model → 04_skills/<id>.yml)
       Validated by skill.schema.json. command OR mcp_tool (mutually exclusive).
 
     Recipe (No Kotlin model → 08_recipes/<id>.yml)

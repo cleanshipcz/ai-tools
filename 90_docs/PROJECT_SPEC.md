@@ -8,7 +8,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - Validation, doc generation, prompt libraries, skill generation, recipe runners, and utilities (diff/clean/eval) are built-in.
 
 ## High-Level Architecture
-- **Manifests (YAML):** Located under numbered directories (`01_rulesets`, `02_skills`, `03_prompts`, `05_agents`, `08_recipes`, `09_projects`, `07_mcp`).
+- **Manifests (YAML):** Located under numbered directories (`01_rulesets`, `04_skills`, `03_prompts`, `05_agents`, `08_recipes`, `09_projects`, `07_mcp`).
 - **CLI (TypeScript):** Entry `src/cli/index.ts` wiring commander subcommands to services.
 - **Core Services:** Config, loader, resolver, validation, deployment, feature generation, recipe generation, prompt library generation, docs generation, skill generation, diff/clean/eval utilities.
 - **Tool Adapters:** Per-tool generators in `src/tools/` producing staged outputs under `.output/<project>/...`.
@@ -50,7 +50,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 - **ValidationService:** Loads JSON Schemas from `10_schemas`, validates manifests, enforces semver and kebab-case IDs, reference checks (rulesets exist, etc.), security regex scan for secrets, includes validation for features/deploy/project references.
 - **DocsService:** Generates `docs/AGENTS.md` from loaded agents/prompts/skills.
 - **PromptService:** Builds Markdown and HTML prompt libraries, interactive prompt filler (`use`), groups by category inferred from path, supports variable substitution.
-- **SkillService:** Converts `02_skills` YAML into Anthropic `SKILL.md` folders under `adapters/claude-code/skills`, with inputs/outputs/env/timeout notes.
+- **SkillService:** Converts `04_skills` YAML into Anthropic `SKILL.md` folders under `adapters/claude-code/skills`, with inputs/outputs/env/timeout notes.
 - **FeatureService:** Loads feature manifests under a project, resolves model priority (feature > project > agent), generates per-tool feature outputs, merges Windsurf workflows into main output during deploy, binds features to recipes.
 - **RecipeService / RecipeRunnerService:** Loads recipes (`08_recipes`), filters by tool, generates `.cs.recipes/*.sh` scripts per tool and per tech stack suffix, supports interactive run with tool selection (claude-code/copilot-cli/cursor), supports loops/variables/tool options.
 - **ExternalProjectService:** Registers external project paths (global/local registries), used by `init`, `deploy`, `list`.
@@ -59,7 +59,7 @@ Comprehensive description of the AI Tools repository as it exists today. Use thi
 ## Tool Adapters (staged outputs)
 - **WindsurfAdapter:** `.windsurf/` with `project-context.md`, agent rules (resolved rulesets), prompt rules (path-aware filenames), stack-specific suffixes, recipes via `.cs.recipes/`, feature workflows merged during deploy.
 - **CursorAdapter:** `.cursor/recipes.json` (agents as recipes), `.cursor/project-rules.json` (conventions + ai_tools rules), `.cs.recipes/`.
-- **ClaudeAdapter (claude-code):** `.claude/` with prompts as JSON (path-derived IDs), skills copied from `02_skills`, agents as markdown with resolved rules, `project-context.json`, `.cs.recipes/`.
+- **ClaudeAdapter (claude-code):** `.claude/` with prompts as JSON (path-derived IDs), skills copied from `04_skills`, agents as markdown with resolved rules, `project-context.json`, `.cs.recipes/`.
 - **GitHubCopilotAdapter:** `.github/` with `instructions.md` (agents + project context), prompts and agents as markdown, `.cs.recipes/`.
 - **CopilotCLIAdapter:** Root `AGENTS.md` (agents + project context + rules), `.cs.recipes/`.
 - **CodexAdapter:** Root `AGENTS.md` and `.codex/prompts/`; deploy copies prompts to `~/.codex/prompts`.
