@@ -48,6 +48,7 @@ class DefaultToolsApplicationRunnerTest {
                 projects = listOf(File("projects")),
                 prompts = listOf(File("prompts")),
                 rulesets = listOf(File("rulesets")),
+                fragments = listOf(File("fragments")),
                 skills = listOf(File("skills")),
             )
             val config = EngineConfig(
@@ -87,6 +88,7 @@ class DefaultToolsApplicationRunnerTest {
                 projects = emptyList(),
                 prompts = emptyList(),
                 rulesets = emptyList(),
+                fragments = emptyList(),
                 skills = emptyList(),
             )
             val config = EngineConfig(

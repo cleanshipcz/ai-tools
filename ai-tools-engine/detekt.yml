@@ -25,6 +25,10 @@ style:
   UseCheckOrError: # does not work properly with ?: operator
     active: false
 
+complexity:
+  TooManyFunctions:
+    thresholdInClasses: 15
+
 naming:
   TopLevelPropertyNaming:
     active: false

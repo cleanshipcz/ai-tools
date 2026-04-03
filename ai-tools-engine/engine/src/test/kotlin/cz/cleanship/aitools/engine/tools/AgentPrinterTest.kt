@@ -1,7 +1,10 @@
 package cz.cleanship.aitools.engine.tools
 
 import cz.cleanship.aitools.engine.data.agent
+import cz.cleanship.aitools.engine.data.agentWithFragments
 import cz.cleanship.aitools.engine.data.expectedAgent
+import cz.cleanship.aitools.engine.data.expectedAgentWithFragments
+import cz.cleanship.aitools.engine.data.fragments
 import cz.cleanship.aitools.engine.data.rulesets
 import cz.cleanship.aitools.engine.utils.StringOutput
 import org.assertj.core.api.Assertions.assertThat
@@ -22,5 +25,20 @@ class AgentPrinterTest {
 
         // then
         assertThat(output.getContent().trimIndent()).isEqualTo(expectedAgent)
+    }
+
+    @Test
+    fun `should print agent manifest with fragments`() {
+        // given
+        val context = AgentContext(agentWithFragments, rulesets, fragments = fragments)
+        val output = StringOutput()
+
+        // when
+        output.use {
+            AgentPrinter().print(context, it)
+        }
+
+        // then
+        assertThat(output.getContent().trimIndent()).isEqualTo(expectedAgentWithFragments)
     }
 }

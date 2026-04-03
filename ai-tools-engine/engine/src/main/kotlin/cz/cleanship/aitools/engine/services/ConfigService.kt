@@ -39,6 +39,7 @@ class ConfigService {
                 projects = resolvePaths(workingDirectory, locations.projects),
                 prompts = resolvePaths(workingDirectory, locations.prompts),
                 rulesets = resolvePaths(workingDirectory, locations.rulesets),
+                fragments = resolvePaths(workingDirectory, locations.fragments),
                 skills = resolvePaths(workingDirectory, locations.skills),
             ),
             tools = tools,
@@ -71,6 +72,7 @@ class ConfigService {
             projects = local.projects ?: default.projects,
             prompts = local.prompts ?: default.prompts,
             rulesets = local.rulesets ?: default.rulesets,
+            fragments = local.fragments ?: default.fragments,
             skills = local.skills ?: default.skills,
         )
     }

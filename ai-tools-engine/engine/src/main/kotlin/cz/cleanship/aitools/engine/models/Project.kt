@@ -6,5 +6,6 @@ data class Project(
     val agents: Map<String, AgentManifest>,
     val prompts: Map<String, PromptManifest>,
     val rulesets: Map<String, RulesetManifest>,
+    val fragments: Map<String, FragmentManifest>,
     val skills: Map<String, SkillManifest>,
 )

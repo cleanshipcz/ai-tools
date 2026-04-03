@@ -1,9 +1,12 @@
 package cz.cleanship.aitools.engine.tools
 
 import cz.cleanship.aitools.engine.io.Output
+import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.SkillManifest
 
-class SkillPrinter : Printer<SkillContext> {
+class SkillPrinter(
+    private val fragmentResolver: FragmentResolver = FragmentResolver(),
+) : Printer<SkillContext> {
     override fun print(entity: SkillContext, output: Output): Output {
         val skill = entity.skill
 
@@ -41,6 +44,20 @@ class SkillPrinter : Printer<SkillContext> {
         }
 
         output.appendTextTopic("## Instructions", skill.instructions)
+
+        val matchedFragments = fragmentResolver.resolve(
+            patterns = skill.fragments,
+            available = entity.fragments,
+            requestedBy = "skill '${skill.id}'",
+            allFragments = entity.allFragments,
+        )
+        if (matchedFragments.isNotEmpty()) {
+            output.appendLine("## Fragments")
+            output.appendLine()
+            for (fragment in matchedFragments) {
+                output.appendTextTopic("### ${fragment.id}", fragment.content)
+            }
+        }
 
         return output
     }
@@ -95,4 +112,6 @@ class SkillPrinter : Printer<SkillContext> {
 
 data class SkillContext(
     val skill: SkillManifest,
+    val fragments: Map<String, FragmentManifest> = emptyMap(),
+    val allFragments: Map<String, FragmentManifest> = fragments,
 )

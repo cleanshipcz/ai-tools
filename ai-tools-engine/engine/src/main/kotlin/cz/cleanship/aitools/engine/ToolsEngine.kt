@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine
 
+import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.Project
 import cz.cleanship.aitools.engine.models.RulesetManifest
@@ -7,6 +8,7 @@ import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.FragmentResolvingException
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.RulesetResolvingException
@@ -53,10 +55,11 @@ class ToolsEngine(
             LOG.info("Processing locations {}", locations)
             val allData = loaderService.loadAll(locations)
             LOG.info(
-                "Loaded {} agents, {} prompts, {} rulesets, {} skills, {} projects",
+                "Loaded {} agents, {} prompts, {} rulesets, {} fragments, {} skills, {} projects",
                 allData.agents.size,
                 allData.prompts.size,
                 allData.rulesets.size,
+                allData.fragments.size,
                 allData.skills.size,
                 allData.projects.size,
             )
@@ -78,6 +81,9 @@ class ToolsEngine(
                     rulesets = filterService
                         .filter(allData.rulesets.values, projectManifest.deploy.rulesets.filter)
                         .associateBy { it.id },
+                    fragments = filterService
+                        .filter(allData.fragments.values, projectManifest.deploy.fragments.filter)
+                        .associateBy { it.id },
                     skills = filterService
                         .filter(allData.skills.values, projectManifest.deploy.skills.filter)
                         .associateBy { it.id },
@@ -85,7 +91,7 @@ class ToolsEngine(
 
                 val destination = File(project.manifest.deploy.directory).absoluteFile
                 for (adapter in tools) {
-                    exportAdapter(project, adapter, destination, allData.rulesets)
+                    exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments)
                 }
                 LOG.info("Processing project {} completed", project.manifest.id)
             }
@@ -97,6 +103,7 @@ class ToolsEngine(
         adapter: ToolAdapter,
         destination: File,
         allRulesets: Map<String, RulesetManifest>,
+        allFragments: Map<String, FragmentManifest>,
     ) {
         try {
             LOG.info("{}: Exporting via adapter {}", project.manifest.id, adapter.toolType)
@@ -106,19 +113,21 @@ class ToolsEngine(
             adapter.prepare(destination, project.manifest)
             adapter.export(destination, GlobalContext(project.manifest))
             project.agents.values.forEach {
-                adapter.export(destination, AgentContext(it, project.rulesets, allRulesets))
+                adapter.export(destination, AgentContext(it, project.rulesets, allRulesets, project.fragments, allFragments))
             }
             project.prompts.values.forEach {
-                adapter.export(destination, PromptContext(it, project.rulesets, allRulesets))
+                adapter.export(destination, PromptContext(it, project.rulesets, allRulesets, project.fragments, allFragments))
             }
             project.features.values.forEach {
                 adapter.export(destination, FeatureContext(it))
             }
             project.skills.values.forEach {
-                adapter.export(destination, SkillContext(it))
+                adapter.export(destination, SkillContext(it, project.fragments, allFragments))
             }
         } catch (ex: RulesetResolvingException) {
             LOG.error("Failed to resolve rulesets for project {}", project.manifest.id, ex)
+        } catch (ex: FragmentResolvingException) {
+            LOG.error("Failed to resolve fragments for project {}", project.manifest.id, ex)
         }
     }
 

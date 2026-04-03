@@ -2,6 +2,7 @@ package cz.cleanship.aitools.engine.data
 
 import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.FeatureManifest
+import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.InnerFeatureContext
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.PromptManifest
@@ -390,5 +391,124 @@ val expectedMcpToolSkill =
     - `path` (directory): Directory to search in
 
     **Timeout:** 60 seconds
+
+    """.trimIndent()
+
+val fragment = FragmentManifest(
+    id = "test-fragment",
+    description =
+        """
+        Multiline
+        description
+        """.trimIndent(),
+    content =
+        """
+        This is reference material.
+        It can contain any free-form content.
+        """.trimIndent(),
+    metadata = ManifestMetadata(
+        version = Version("1.0.0"),
+        author = "Test Author",
+        created = "2026-04-03",
+    ),
+)
+
+val expectedFragment =
+    """
+    # test-fragment
+
+    Multiline
+    description
+
+    ## Content
+
+    This is reference material.
+    It can contain any free-form content.
+
+    """.trimIndent()
+
+val fragments = mapOf(
+    fragment.id to fragment,
+)
+
+val agentWithFragments = AgentManifest(
+    id = "test-agent-with-fragments",
+    description = "Agent with fragments",
+    rulesets = listOf("test-ruleset"),
+    fragments = listOf("test-fragment"),
+    rules = listOf("rule1"),
+    persona = "Test persona",
+    prompt = "Test prompt",
+    constraints = emptyList(),
+    metadata = ManifestMetadata(
+        version = Version("1.0.0"),
+    ),
+)
+
+val expectedAgentWithFragments =
+    """
+    # test-agent-with-fragments
+
+    Agent with fragments
+
+    ## Persona
+
+    Test persona
+
+    ## Rules
+
+    - Rule number one.
+    - Rule number two.
+    - Rule number three.
+    - rule1
+
+    ## Prompt
+
+    Test prompt
+
+    ## Fragments
+
+    ### test-fragment
+
+    This is reference material.
+    It can contain any free-form content.
+
+    """.trimIndent()
+
+val promptWithFragments = PromptManifest(
+    id = "test-prompt-with-fragments",
+    description = "Prompt with fragments",
+    rulesets = listOf("test-ruleset"),
+    fragments = listOf("test-fragment"),
+    rules = listOf("rule1"),
+    content = "Test content",
+    metadata = ManifestMetadata(
+        version = Version("1.0.0"),
+    ),
+)
+
+val expectedPromptWithFragments =
+    """
+    # test-prompt-with-fragments
+
+    Prompt with fragments
+
+    ## Rules
+
+    - Rule number one.
+    - Rule number two.
+    - Rule number three.
+    - rule1
+
+    ## Prompt
+
+    Test content
+
+    ## Fragments
+
+    ### test-fragment
+
+    This is reference material.
+    It can contain any free-form content.
 
     """.trimIndent()

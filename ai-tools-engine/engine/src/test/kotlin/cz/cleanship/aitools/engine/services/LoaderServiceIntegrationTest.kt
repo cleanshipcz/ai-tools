@@ -248,6 +248,36 @@ class LoaderServiceIntegrationTest {
     }
 
     @Test
+    fun `should deserialize fragment correctly`() {
+        // given
+        val file = File(javaClass.getResource("/fragments/confluence-guide.yml")!!.toURI())
+
+        // when
+        val fragment = loaderService.loadFragment(file)
+
+        // then
+        assertThat(fragment.id).isEqualTo("confluence-guide")
+        assertThat(fragment.description).isEqualTo("Guide for formatting Confluence pages")
+        assertThat(fragment.content.trim()).isEqualTo(
+            """
+            Use headings (h1-h6) to structure content hierarchically.
+            Use tables for structured data comparison.
+            Use code blocks with language hints for code snippets.
+            Use info/warning/note panels for callouts.
+            """.trimIndent(),
+        )
+        assertThat(fragment.metadata).isEqualTo(
+            ManifestMetadata(
+                version = Version("1.0.0"),
+                author = "AI Tools Team",
+                created = "2026-04-03",
+                updated = null,
+                tags = setOf("confluence", "formatting"),
+            ),
+        )
+    }
+
+    @Test
     fun `should deserialize feature correctly`() {
         // given
         val file = File(javaClass.getResource("/features/new-ui.yml")!!.toURI())

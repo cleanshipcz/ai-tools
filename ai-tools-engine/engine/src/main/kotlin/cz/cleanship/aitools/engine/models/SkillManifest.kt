@@ -11,6 +11,7 @@ data class SkillManifest(
     val command: SkillCommand? = null,
     @SerialName("mcp_tool")
     val mcpTool: String? = null,
+    val fragments: List<String> = emptyList(),
     val inputs: List<SkillInput> = emptyList(),
     val triggers: List<String> = emptyList(),
     val prerequisites: List<String> = emptyList(),

@@ -2,6 +2,7 @@ package cz.cleanship.aitools.engine.services
 
 import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.FeatureManifest
+import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
 import cz.cleanship.aitools.engine.models.SkillManifest
@@ -31,6 +32,14 @@ class ManifestService(private val rootDir: File) {
         if (!dir.exists()) return emptyList()
         return loader.findYamlFiles(dir).map {
             loader.loadRuleset(it)
+        }
+    }
+
+    fun listFragments(): List<FragmentManifest> {
+        val dir = File(rootDir, "02_fragments")
+        if (!dir.exists()) return emptyList()
+        return loader.findYamlFiles(dir).map {
+            loader.loadFragment(it)
         }
     }
 

@@ -14,5 +14,6 @@ data class LocationsConfig(
     val projects: List<String>? = null,
     val prompts: List<String>? = null,
     val rulesets: List<String>? = null,
+    val fragments: List<String>? = null,
     val skills: List<String>? = null,
 )

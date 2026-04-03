@@ -7,6 +7,7 @@ import com.charleskorn.kaml.YamlException
 import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.FeatureManifest
+import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
@@ -29,6 +30,8 @@ class LoaderService {
     fun loadPrompt(file: File): PromptManifest = yaml.load(file)
 
     fun loadRuleset(file: File): RulesetManifest = yaml.load(file)
+
+    fun loadFragment(file: File): FragmentManifest = yaml.load(file)
 
     fun loadFeature(file: File): FeatureManifest = yaml.load(file)
 
@@ -60,6 +63,7 @@ class LoaderService {
             agents = loadAllFromDirectories(locations.agents, ::loadAgent),
             prompts = loadAllFromDirectories(locations.prompts, ::loadPrompt),
             rulesets = loadAllFromDirectories(locations.rulesets, ::loadRuleset),
+            fragments = loadAllFromDirectories(locations.fragments, ::loadFragment),
             skills = loadAllFromDirectories(locations.skills, ::loadSkill),
             projects = projectsWithFeatures.map { it.first }.associateBy { it.id },
             features = projectsWithFeatures.associate { it.first to it.second.associateBy { f -> f.id } },

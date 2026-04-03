@@ -5,6 +5,7 @@ object Printers {
     val promptPrinter = PromptPrinter()
     val agentPrinter = AgentPrinter()
     val rulesetPrinter = RulesetPrinter()
+    val fragmentPrinter = FragmentPrinter()
     val featurePrinter = FeaturePrinter()
     val skillPrinter = SkillPrinter()
 }
