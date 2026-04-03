@@ -1,20 +1,11 @@
 id: search-repo
 description: Search repository for code patterns or text
-mcp_tool: 'filesystem:search'
-inputs:
-  - name: pattern
-    type: string
-    required: true
-    description: 'Search pattern (regex or plain text)'
-  - name: path
-    type: directory
-    required: false
-    description: 'Directory to search in (defaults to repo root)'
 triggers:
   - 'User asks to search the codebase'
-prerequisites:
-  - 'Use ripgrep or similar fast search tool if available.'
-timeout_sec: 60
+sections:
+  - text: |
+      Search the repository using ripgrep or similar fast search tools.
+      Use patterns to find code, text, or configuration entries.
 metadata:
   version: 1.0.0
   author: 'AI Tools Team'

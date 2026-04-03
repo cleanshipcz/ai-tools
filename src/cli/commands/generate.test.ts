@@ -35,7 +35,7 @@ describe('generate command (integration)', () => {
     vi.spyOn(ConfigService.prototype, 'getProjectSources').mockResolvedValue([projectsDir]);
     vi.spyOn(ConfigService.prototype, 'getPath').mockImplementation((...parts: string[]) => {
       // Intercept projects and output directories
-      if (parts[0] === '06_projects') {
+      if (parts[0] === '09_projects') {
         return join(projectsDir, ...parts.slice(1));
       }
       if (parts[0] === '.output') {
@@ -97,7 +97,7 @@ tech_stacks:
 
     // 3. Verify Output
     const windsurfRulesDir = join(outputDir, projectId, 'windsurf', '.windsurf', 'rules');
-    
+
     // Check Backend Agent (Python)
     const backendAgentPath = join(windsurfRulesDir, 'agent-feature-builder-backend.md');
     expect(await fs.stat(backendAgentPath)).toBeDefined();
@@ -117,11 +117,17 @@ tech_stacks:
     expect(await fs.stat(globalAgentPath)).toBeDefined();
     const globalContent = await fs.readFile(globalAgentPath, 'utf-8');
     // This is the bug: global agent currently contains ALL rules because no filtering context is provided
-    expect(globalContent).not.toContain('PEP 8'); 
+    expect(globalContent).not.toContain('PEP 8');
     expect(globalContent).not.toContain('strict TypeScript');
 
     // Check GitHub Copilot
-    const githubInstructionsPath = join(outputDir, projectId, 'github-copilot', '.github', 'instructions.md');
+    const githubInstructionsPath = join(
+      outputDir,
+      projectId,
+      'github-copilot',
+      '.github',
+      'instructions.md'
+    );
     expect(await fs.stat(githubInstructionsPath)).toBeDefined();
     const githubContent = await fs.readFile(githubInstructionsPath, 'utf-8');
     // Should contain stack specific sections
@@ -131,7 +137,7 @@ tech_stacks:
     // We need to find the global section "### feature-builder" and check its content
     // This is a bit hard with simple string matching, but let's try to ensure the *first* occurrence (global) doesn't have it.
     // Or simpler: check that "PEP 8" appears in the backend section.
-    
+
     // Check Cursor (Should fail currently as not implemented)
     // Cursor generates recipes.json. We expect it to handle stacks now?
     // The user wants "generic" solution. If generic, Cursor should probably generate something stack specific?

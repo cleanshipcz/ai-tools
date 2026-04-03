@@ -1,23 +1,15 @@
 id: run-detekt
 description: Run Detekt static analysis for Kotlin
-command:
-  program: './gradlew'
-  args:
-    - 'detekt'
-  cwd: '.'
 triggers:
   - 'User asks to run detekt'
   - 'User asks for static analysis on Kotlin code'
-prerequisites:
-  - 'Requires Detekt to be configured in the project.'
-instructions: |
-  After running detekt, summarize findings by severity.
-  If there are critical issues, list them first.
-timeout_sec: 600
-outputs:
-  files:
-    - path: 'build/reports/detekt/detekt.html'
-      description: 'HTML report with detailed findings'
+sections:
+  - text: |
+      Run `./gradlew detekt` in the project directory.
+      After running detekt, summarize findings by severity.
+      If there are critical issues, list them first.
+
+      Output report is at `build/reports/detekt/detekt.html`.
 metadata:
   version: 1.0.0
   author: 'AI Tools Team'

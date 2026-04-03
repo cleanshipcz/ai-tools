@@ -1,13 +1,13 @@
 package cz.cleanship.aitools.engine.tools.adapters.github
 
 import cz.cleanship.aitools.engine.data.agent
-import cz.cleanship.aitools.engine.data.commandSkill
 import cz.cleanship.aitools.engine.data.expectedAgent
 import cz.cleanship.aitools.engine.data.expectedFeature
 import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.data.textOnlySkill
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Printers
@@ -79,17 +79,17 @@ class GitHubCopilotAdapterTest {
     @Test
     fun `should output a skill`() {
         // given
-        val skillContext = SkillContext(commandSkill)
+        val skillContext = SkillContext(textOnlySkill)
 
         // when
         adapter.export(tempDir.toFile(), skillContext)
 
         // then
-        val skillFile = promptsDir.resolve("skill-${commandSkill.id}.prompt.md")
+        val skillFile = promptsDir.resolve("skill-${textOnlySkill.id}.prompt.md")
         assertThat(skillFile).exists()
         val content = skillFile.readText()
         assertThat(content).startsWith("---\napplyTo: \"**/*\"\n---")
-        assertThat(content).contains(commandSkill.description)
+        assertThat(content).contains(textOnlySkill.description)
     }
 
     private fun withApplyToHeader(content: String) = """

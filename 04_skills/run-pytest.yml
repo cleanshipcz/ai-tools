@@ -1,20 +1,13 @@
 id: run-pytest
 description: Run Python tests with pytest
-command:
-  program: 'pytest'
-  args:
-    - '-v'
-    - '--tb=short'
-  cwd: '.'
 triggers:
   - 'User asks to run Python tests'
   - 'User asks to run pytest'
-prerequisites:
-  - 'Requires pytest to be installed.'
-instructions: |
-  After running pytest, summarize results: total, passed, failed, skipped.
-  If there are failures, show the failing test names and error messages.
-timeout_sec: 1800
+sections:
+  - text: |
+      Run `pytest -v --tb=short` in the project directory.
+      After running, summarize results: total, passed, failed, skipped.
+      If there are failures, show the failing test names and error messages.
 metadata:
   version: 1.0.0
   author: 'AI Tools Team'

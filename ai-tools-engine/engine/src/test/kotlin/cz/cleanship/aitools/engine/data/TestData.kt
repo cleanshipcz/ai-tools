@@ -9,11 +9,8 @@ import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.PromptOutput
 import cz.cleanship.aitools.engine.models.PromptVariable
 import cz.cleanship.aitools.engine.models.RulesetManifest
-import cz.cleanship.aitools.engine.models.SkillCommand
-import cz.cleanship.aitools.engine.models.SkillInput
 import cz.cleanship.aitools.engine.models.SkillManifest
-import cz.cleanship.aitools.engine.models.SkillOutputFile
-import cz.cleanship.aitools.engine.models.SkillOutputs
+import cz.cleanship.aitools.engine.models.SkillSection
 import cz.cleanship.aitools.engine.models.Version
 
 val ruleset = RulesetManifest(
@@ -275,122 +272,156 @@ val expectedFeature =
 
     """.trimIndent()
 
-val commandSkill = SkillManifest(
-    id = "run-detekt",
-    description = "Run Detekt static analysis for Kotlin",
-    command = SkillCommand(
-        program = "./gradlew",
-        args = listOf("detekt"),
-        cwd = "subproject",
-        env = mapOf("CI" to "true"),
-    ),
+val textOnlySkill = SkillManifest(
+    id = "run-pytest",
+    description = "Run Python tests with pytest",
     triggers = listOf(
-        "User asks to run detekt",
-        "User asks for static analysis on Kotlin code",
+        "User asks to run Python tests",
+        "User asks to run pytest",
     ),
-    prerequisites = listOf(
-        "Requires Detekt to be configured in the project.",
-    ),
-    instructions = "After running, summarize findings by severity.",
-    timeoutSec = 600,
-    outputs = SkillOutputs(
-        files = listOf(
-            SkillOutputFile(
-                path = "build/reports/detekt/detekt.html",
-                description = "HTML report with detailed findings",
-            ),
+    sections = listOf(
+        SkillSection.TextSection(
+            text =
+                """
+                Run `pytest -v --tb=short` in the project directory.
+                After running, summarize results: total, passed, failed, skipped.
+                If there are failures, show the failing test names and error messages.
+                """.trimIndent(),
         ),
     ),
     metadata = ManifestMetadata(
         version = Version("1.0.0"),
         author = "Test Author",
         created = "2025-01-01",
-        tags = setOf("detekt", "kotlin"),
+        tags = setOf("pytest", "python", "testing"),
     ),
 )
 
-val expectedCommandSkill =
+val expectedTextOnlySkill =
     """
-    # run-detekt
+    # run-pytest
 
-    Run Detekt static analysis for Kotlin
+    Run Python tests with pytest
 
     ## When to use
 
-    - User asks to run detekt
-    - User asks for static analysis on Kotlin code
+    - User asks to run Python tests
+    - User asks to run pytest
 
-    ## Prerequisites
-
-    - Requires Detekt to be configured in the project.
-
-    ## How to use
-
-    Run the following command:
-
-    ```bash
-    ./gradlew detekt
-    ```
-
-    **Working directory:** `subproject`
-
-    **Environment variables:**
-
-    - `CI=true`
-
-    **Timeout:** 600 seconds
-
-    ## Output files
-
-    - `build/reports/detekt/detekt.html`: HTML report with detailed findings
-
-    ## Instructions
-
-    After running, summarize findings by severity.
+    Run `pytest -v --tb=short` in the project directory.
+    After running, summarize results: total, passed, failed, skipped.
+    If there are failures, show the failing test names and error messages.
 
     """.trimIndent()
 
-val mcpToolSkill = SkillManifest(
-    id = "search-repo",
-    description = "Search repository for code patterns or text",
-    mcpTool = "filesystem:search",
-    inputs = listOf(
-        SkillInput(name = "pattern", type = "string", required = true, description = "Search pattern"),
-        SkillInput(name = "path", type = "directory", required = false, description = "Directory to search in"),
+val skillWithRuleset = SkillManifest(
+    id = "skill-with-ruleset",
+    description = "Skill that includes a ruleset",
+    triggers = listOf("User asks for skill with ruleset"),
+    sections = listOf(
+        SkillSection.TextSection(text = "## Rules"),
+        SkillSection.RulesetSection(ruleset = "test-ruleset"),
     ),
-    triggers = listOf("User asks to search the codebase"),
-    prerequisites = listOf("Use ripgrep if available."),
-    timeoutSec = 60,
     metadata = ManifestMetadata(
         version = Version("1.0.0"),
-        tags = setOf("search", "filesystem"),
     ),
 )
 
-val expectedMcpToolSkill =
+val expectedSkillWithRuleset =
     """
-    # search-repo
+    # skill-with-ruleset
 
-    Search repository for code patterns or text
+    Skill that includes a ruleset
 
     ## When to use
 
-    - User asks to search the codebase
+    - User asks for skill with ruleset
 
-    ## Prerequisites
+    ## Rules
 
-    - Use ripgrep if available.
+    - Rule number one.
+    - Rule number two.
+    - Rule number three.
 
-    ## How to use
+    """.trimIndent()
 
-    This skill uses the MCP tool: `filesystem:search`
+val skillWithFragment = SkillManifest(
+    id = "skill-with-fragment",
+    description = "Skill that includes a fragment",
+    triggers = listOf("User asks for skill with fragment"),
+    sections = listOf(
+        SkillSection.TextSection(text = "## Reference Material"),
+        SkillSection.FragmentSection(fragment = "test-fragment"),
+    ),
+    metadata = ManifestMetadata(
+        version = Version("1.0.0"),
+    ),
+)
 
-    ### Inputs
+val expectedSkillWithFragment =
+    """
+    # skill-with-fragment
 
-    - `pattern` (string) (required): Search pattern
-    - `path` (directory): Directory to search in
+    Skill that includes a fragment
 
-    **Timeout:** 60 seconds
+    ## When to use
+
+    - User asks for skill with fragment
+
+    ## Reference Material
+
+    This is reference material.
+    It can contain any free-form content.
+
+    """.trimIndent()
+
+val skillWithMixedSections = SkillManifest(
+    id = "skill-with-mixed-sections",
+    description = "Skill with all section types",
+    triggers = listOf("User asks for mixed skill"),
+    sections = listOf(
+        SkillSection.TextSection(
+            text =
+                """
+                Use this skill when creating documentation.
+
+                ## Conventions
+                """.trimIndent(),
+        ),
+        SkillSection.RulesetSection(ruleset = "test-ruleset"),
+        SkillSection.TextSection(text = "## Reference Material"),
+        SkillSection.FragmentSection(fragment = "test-fragment"),
+        SkillSection.TextSection(text = "Choose the appropriate template based on the document type."),
+    ),
+    metadata = ManifestMetadata(
+        version = Version("1.0.0"),
+    ),
+)
+
+val expectedSkillWithMixedSections =
+    """
+    # skill-with-mixed-sections
+
+    Skill with all section types
+
+    ## When to use
+
+    - User asks for mixed skill
+
+    Use this skill when creating documentation.
+
+    ## Conventions
+
+    - Rule number one.
+    - Rule number two.
+    - Rule number three.
+
+    ## Reference Material
+
+    This is reference material.
+    It can contain any free-form content.
+
+    Choose the appropriate template based on the document type.
 
     """.trimIndent()
 

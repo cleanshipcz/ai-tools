@@ -1,12 +1,12 @@
 package cz.cleanship.aitools.engine.tools.adapters.codex
 
 import cz.cleanship.aitools.engine.data.agent
-import cz.cleanship.aitools.engine.data.commandSkill
 import cz.cleanship.aitools.engine.data.expectedAgent
 import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.data.textOnlySkill
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.ProjectContext
 import cz.cleanship.aitools.engine.models.ProjectDeploy
@@ -115,18 +115,18 @@ class CodexAdapterTest {
     @Test
     fun `should output a skill`() {
         // given
-        val skillContext = SkillContext(commandSkill)
+        val skillContext = SkillContext(textOnlySkill)
 
         // when
         adapter.export(tempDir.toFile(), skillContext)
 
         // then
-        val skillFile = targetDir.resolve("skills/skill-${commandSkill.id}/SKILL.md")
+        val skillFile = targetDir.resolve("skills/skill-${textOnlySkill.id}/SKILL.md")
         assertThat(skillFile).exists()
         val content = skillFile.readText()
         assertThat(content).startsWith("---")
-        assertThat(content).contains("name: ${commandSkill.id}")
-        assertThat(content).contains(commandSkill.description)
+        assertThat(content).contains("name: ${textOnlySkill.id}")
+        assertThat(content).contains(textOnlySkill.description)
     }
 
     @Test

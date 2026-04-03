@@ -11,8 +11,8 @@ content: |
   Use the table of contents macro for pages with more than three sections.
 metadata:
   version: 1.0.0
-  author: 'AI Tools Team'
-  created: '2026-04-03'
+  author: "AI Tools Team"
+  created: "2026-04-03"
   tags:
     - confluence
     - formatting

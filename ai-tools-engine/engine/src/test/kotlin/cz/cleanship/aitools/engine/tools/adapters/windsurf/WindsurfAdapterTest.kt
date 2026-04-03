@@ -1,13 +1,13 @@
 package cz.cleanship.aitools.engine.tools.adapters.windsurf
 
 import cz.cleanship.aitools.engine.data.agent
-import cz.cleanship.aitools.engine.data.commandSkill
 import cz.cleanship.aitools.engine.data.expectedAgent
 import cz.cleanship.aitools.engine.data.expectedFeature
 import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.data.textOnlySkill
 import cz.cleanship.aitools.engine.models.ProjectDeploy
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.tools.AgentContext
@@ -94,17 +94,17 @@ class WindsurfAdapterTest {
     @Test
     fun `should output a skill`() {
         // given
-        val skillContext = SkillContext(commandSkill)
+        val skillContext = SkillContext(textOnlySkill)
 
         // when
         adapter.export(tempDir.toFile(), skillContext)
 
         // then
-        val skillFile = rulesDir.resolve("skill-${commandSkill.id}.md")
+        val skillFile = rulesDir.resolve("skill-${textOnlySkill.id}.md")
         assertThat(skillFile).exists()
         val content = skillFile.readText()
         assertThat(content).startsWith("---\ntrigger: manual\n---")
-        assertThat(content).contains(commandSkill.description)
+        assertThat(content).contains(textOnlySkill.description)
     }
 
     @Test

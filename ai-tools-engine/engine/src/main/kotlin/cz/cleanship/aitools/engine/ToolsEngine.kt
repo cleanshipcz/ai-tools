@@ -122,7 +122,10 @@ class ToolsEngine(
                 adapter.export(destination, FeatureContext(it))
             }
             project.skills.values.forEach {
-                adapter.export(destination, SkillContext(it, project.fragments, allFragments))
+                adapter.export(
+                    destination,
+                    SkillContext(it, project.rulesets, allRulesets, project.fragments, allFragments),
+                )
             }
         } catch (ex: RulesetResolvingException) {
             LOG.error("Failed to resolve rulesets for project {}", project.manifest.id, ex)

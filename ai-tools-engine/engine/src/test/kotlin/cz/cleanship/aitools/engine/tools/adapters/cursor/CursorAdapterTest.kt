@@ -1,12 +1,12 @@
 package cz.cleanship.aitools.engine.tools.adapters.cursor
 
 import cz.cleanship.aitools.engine.data.agent
-import cz.cleanship.aitools.engine.data.commandSkill
 import cz.cleanship.aitools.engine.data.expectedAgent
 import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.data.textOnlySkill
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.ProjectContext
 import cz.cleanship.aitools.engine.models.ProjectDeploy
@@ -112,15 +112,15 @@ class CursorAdapterTest {
     @Test
     fun `should output a skill`() {
         // given
-        val skillContext = SkillContext(commandSkill)
+        val skillContext = SkillContext(textOnlySkill)
 
         // when
         adapter.export(tempDir.toFile(), skillContext)
 
         // then
-        val skillFile = targetDir.resolve("commands/skill-${commandSkill.id}.md")
+        val skillFile = targetDir.resolve("commands/skill-${textOnlySkill.id}.md")
         assertThat(skillFile).exists()
-        assertThat(skillFile.readText()).contains(commandSkill.description)
+        assertThat(skillFile.readText()).contains(textOnlySkill.description)
     }
 
     @Test
