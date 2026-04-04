@@ -90,7 +90,7 @@
           "type": "object",
           "properties": {
             "filter": {
-              "$ref": "#/definitions/projectFilter"
+              "$ref": "#/definitions/filterChain"
             }
           },
           "description": "Prompt filtering configuration"
@@ -99,7 +99,7 @@
           "type": "object",
           "properties": {
             "filter": {
-              "$ref": "#/definitions/projectFilter"
+              "$ref": "#/definitions/filterChain"
             }
           },
           "description": "Agent filtering configuration"
@@ -108,7 +108,7 @@
           "type": "object",
           "properties": {
             "filter": {
-              "$ref": "#/definitions/projectFilter"
+              "$ref": "#/definitions/filterChain"
             }
           },
           "description": "Feature filtering configuration"
@@ -117,10 +117,28 @@
           "type": "object",
           "properties": {
             "filter": {
-              "$ref": "#/definitions/projectFilter"
+              "$ref": "#/definitions/filterChain"
             }
           },
           "description": "Ruleset filtering configuration"
+        },
+        "fragments": {
+          "type": "object",
+          "properties": {
+            "filter": {
+              "$ref": "#/definitions/filterChain"
+            }
+          },
+          "description": "Fragment filtering configuration"
+        },
+        "skills": {
+          "type": "object",
+          "properties": {
+            "filter": {
+              "$ref": "#/definitions/filterChain"
+            }
+          },
+          "description": "Skill filtering configuration"
         }
       },
       "description": "Deployment configuration"
@@ -157,53 +175,51 @@
     }
   },
   "definitions": {
-    "projectFilter": {
-      "description": "Filter configuration using one of three strategies: tags, whitelist, or blacklist",
+    "filterChain": {
+      "description": "Ordered list of filter steps applied sequentially. Tags and whitelist add to the result set, blacklist removes. Order determines conflict resolution.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/filterStep"
+      }
+    },
+    "filterStep": {
+      "description": "A single filter step - tags (add by tag match), whitelist (add by id), or blacklist (remove by id)",
       "oneOf": [
         {
           "type": "object",
-          "required": ["tags"],
+          "required": ["type", "tags"],
           "properties": {
+            "type": { "const": "tags" },
             "tags": {
               "type": "array",
               "items": { "type": "string" },
-              "description": "Filter by matching tags"
+              "description": "Include items matching any of these tags"
             }
           },
           "additionalProperties": false
         },
         {
           "type": "object",
-          "required": ["whitelist"],
+          "required": ["type", "ids"],
           "properties": {
-            "whitelist": {
-              "type": "object",
-              "required": ["ids"],
-              "properties": {
-                "ids": {
-                  "type": "array",
-                  "items": { "type": "string" },
-                  "description": "Only include these IDs"
-                }
-              }
+            "type": { "const": "whitelist" },
+            "ids": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Include these specific items by ID"
             }
           },
           "additionalProperties": false
         },
         {
           "type": "object",
-          "required": ["blacklist"],
+          "required": ["type", "ids"],
           "properties": {
-            "blacklist": {
-              "type": "object",
-              "required": ["ids"],
-              "properties": {
-                "ids": {
-                  "type": "array",
-                  "items": { "type": "string" },
-                  "description": "Exclude these IDs"
-                }
-              }
+            "type": { "const": "blacklist" },
+            "ids": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Exclude these specific items by ID"
             }
           },
           "additionalProperties": false

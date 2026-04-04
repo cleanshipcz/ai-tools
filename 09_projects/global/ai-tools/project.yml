@@ -33,57 +33,57 @@ deploy:
   directory: "/home/blaha/Documents/Projects/ai-tools/"
   agents:
     filter:
-      type: tags
-      tags:
-        - common
-        - ai
-        - development
-        - documentation
+      - type: tags
+        tags:
+          - common
+          - ai
+          - development
+          - documentation
   prompts:
     filter:
-      type: whitelist
-      ids:
-        - refactor-extract-method
-        - refactor-simplify-conditionals
-        - refactor-remove-duplication
-        - refactor-improve-naming
-        - refactor-add-error-handling
-        - docs-document-api
-        - docs-write-readme
-        - docs-create-tutorial
-        - ocs-summarize-pr
-        - planning-design-architecture
-        - planning-create-implementation-plan
-        - planning-tech-decision-record
-        - qa-write-tests
-        - qa-setup-test-infrastructure
-        - manifests-create-prompt
-        - manifests-create-agent
-        - manifests-create-project
-        - manifests-create-feature
-        - manifests-create-ruleset
-        - manifests-create-skill
-        - manifests-create-recipe
-        - manifests-duplicate-project
+      - type: whitelist
+        ids:
+          - refactor-extract-method
+          - refactor-simplify-conditionals
+          - refactor-remove-duplication
+          - refactor-improve-naming
+          - refactor-add-error-handling
+          - docs-document-api
+          - docs-write-readme
+          - docs-create-tutorial
+          - ocs-summarize-pr
+          - planning-design-architecture
+          - planning-create-implementation-plan
+          - planning-tech-decision-record
+          - qa-write-tests
+          - qa-setup-test-infrastructure
+          - manifests-create-prompt
+          - manifests-create-agent
+          - manifests-create-project
+          - manifests-create-feature
+          - manifests-create-ruleset
+          - manifests-create-skill
+          - manifests-create-recipe
+          - manifests-duplicate-project
   skills:
     filter:
-      type: tags
-      tags:
-        - kotlin
-        - search
+      - type: tags
+        tags:
+          - kotlin
+          - search
   rulesets:
     filter:
-      type: tags
-      tags:
-        - common
-        - development
-        - kotlin
-        - unit
-        - integration
-        - documentation
-        - testing
-        - manifests
-        - ai
+      - type: tags
+        tags:
+          - common
+          - development
+          - kotlin
+          - unit
+          - integration
+          - documentation
+          - testing
+          - manifests
+          - ai
 metadata:
   version: 1.0.0
   author: cleanshipcz

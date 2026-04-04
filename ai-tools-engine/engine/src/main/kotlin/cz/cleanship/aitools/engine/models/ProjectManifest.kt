@@ -47,32 +47,32 @@ data class ProjectDeploy(
 
 @Serializable
 data class ProjectPrompts(
-    val filter: ProjectFilter? = null,
+    val filter: List<ProjectFilter> = emptyList(),
 )
 
 @Serializable
 data class ProjectAgents(
-    val filter: ProjectFilter? = null,
+    val filter: List<ProjectFilter> = emptyList(),
 )
 
 @Serializable
 data class ProjectFeatures(
-    val filter: ProjectFilter? = null,
+    val filter: List<ProjectFilter> = emptyList(),
 )
 
 @Serializable
 data class ProjectRulesets(
-    val filter: ProjectFilter? = null,
+    val filter: List<ProjectFilter> = emptyList(),
 )
 
 @Serializable
 data class ProjectFragments(
-    val filter: ProjectFilter? = null,
+    val filter: List<ProjectFilter> = emptyList(),
 )
 
 @Serializable
 data class ProjectSkills(
-    val filter: ProjectFilter? = null,
+    val filter: List<ProjectFilter> = emptyList(),
 )
 
 @Serializable
