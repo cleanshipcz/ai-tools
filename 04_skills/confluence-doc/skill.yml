@@ -23,6 +23,7 @@ metadata:
   created: "2025-01-01"
   tags:
     - confluence
+    - atlassian
     - documentation
     - runbook
     - design-doc

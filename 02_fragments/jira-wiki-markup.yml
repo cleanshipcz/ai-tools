@@ -1,0 +1,27 @@
+id: jira-wiki-markup
+description: Jira wiki markup syntax cheatsheet for writing ticket descriptions and comments
+content: |
+  Jira uses **wiki markup**, not Markdown:
+
+  | Element | Syntax |
+  |---------|--------|
+  | Heading 3 | `h3. Section Title` |
+  | Heading 4 | `h4. Sub-section` |
+  | Bold | `*bold text*` |
+  | Italic | `_italic text_` |
+  | Bold italic | `+*bold italic*+` |
+  | Bullet list | ` * item` (leading space + asterisk) |
+  | Numbered list | ` # item` |
+  | Link | `[label\|https://url]` |
+  | Code block | `{code}...{code}` |
+  | Quote | `{quote}...{quote}` |
+  | Color | `{color:#FF0000}text{color}` |
+  | Strikethrough | `-text-` |
+metadata:
+  version: 1.0.0
+  author: 'AI Tools Team'
+  created: '2026-04-06'
+  tags:
+    - jira
+    - markup
+    - formatting

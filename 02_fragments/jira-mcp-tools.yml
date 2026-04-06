@@ -1,0 +1,120 @@
+id: jira-mcp-tools
+description: Jira MCP tool usage patterns, parameter conventions, and examples for the dbgAtlassian MCP server
+content: |
+  Jira interaction is via the **dbgAtlassian** MCP server (`mcp_dbgAtlassian_*` tools).
+
+  ### Available Tools
+
+  | MCP Tool | Description |
+  |----------|-------------|
+  | `search_issues` | Search using JQL |
+  | `get_issue` | Get full issue details (incl. comments) |
+  | `create_issue` | Create a new issue |
+  | `update_issue` | Update issue fields |
+  | `add_comment` | Post a comment (Jira Wiki Markup) |
+  | `get_transitions` | Get available status transitions |
+  | `transition_issue` | Transition to a new status |
+  | `list_projects` | List accessible projects |
+  | `jira_add_attachment` | Attach a file to an issue |
+
+  ### Parameter Conventions (Critical)
+
+  #### `labels`
+  - **Format: comma-separated string** — NOT a JSON array.
+  - Correct: `"Documentation,Training"`
+  - Wrong: `["Documentation", "Training"]` — produces mangled label names with `[`, `"`, `]` characters.
+
+  #### `components`
+  - **Format: comma-separated string** — e.g. `"OpenSearch,Grafana"`.
+
+  #### `epic_key` (linking to an Epic)
+  - Use the `epic_key` parameter in **both** `create_issue` and `update_issue`.
+  - Correct: pass `epic_key = "M7O-1331"` directly.
+  - Wrong: `epic_link` is not a valid parameter — it is silently ignored.
+
+  #### `epic_name` (creating an Epic)
+  - Required when `issue_type = "Epic"`. The short name displayed on the board.
+  - If omitted for Epics, defaults to the summary.
+
+  #### `fields` (filtering response fields)
+  - `get_issue`: pass a list of field names (e.g. `["summary", "status", "customfield_10650"]`) to get raw field values. Pass `["*all"]` for everything. Omit for the default formatted representation.
+  - `search_issues`: pass a comma-separated string (e.g. `"summary,status,labels"`). Defaults to standard fields.
+
+  #### `custom_fields` (advanced)
+  - Available on `create_issue` and `update_issue`.
+  - A dict of additional fields merged into the API payload. Overrides named params if keys overlap.
+
+  #### `story_points` (update_issue only)
+  - Use `-1` to keep existing (default), `0` to clear, or a positive number to set.
+
+  #### `transition_issue`
+  - Uses **`status`** parameter with the target status name (case-insensitive).
+  - The server auto-matches the status name to the correct transition — no need to look up transition IDs.
+
+  ### Examples
+
+  #### Search issues
+  ```
+  search_issues(
+    jql = "project = M7O AND status = Open ORDER BY created DESC",
+    max_results = 5,
+    fields = "summary,status,priority,labels"
+  )
+  ```
+
+  #### Get issue with specific fields
+  ```
+  get_issue(
+    issue_key = "M7O-1386",
+    fields = ["summary", "status", "customfield_10650"]
+  )
+  ```
+
+  #### Create a Task under an Epic
+  ```
+  create_issue(
+    project_key = "M7O",
+    summary     = "Build alert templates for etcd component",
+    issue_type  = "Task",
+    priority    = "Minor",
+    labels      = "Alerting,Grafana",
+    epic_key    = "M7O-1345",
+    description = "h3. Current situation\r\nNo alert templates for etcd.\r\nh3. Desired change\r\nCreate etcd alert template.\r\nh3. Acceptance Criteria\r\n * Alert template created"
+  )
+  ```
+
+  #### Update an issue (set epic link, labels, components, story points)
+  ```
+  update_issue(
+    issue_key    = "M7O-1386",
+    labels       = "Dashboard,Grafana",
+    components   = "Grafana,OpenSearch",
+    epic_key     = "M7O-1345",
+    assignee     = "et916",
+    story_points = 3
+  )
+  ```
+
+  #### Post a comment (Jira Wiki Markup)
+  ```
+  add_comment(
+    issue_key = "M7O-1386",
+    body      = "h3. Implementation Complete\n*Files changed:* 45 new template files\n*Branch:* {{M7O-1345/yaml-driven-alert-templating}}"
+  )
+  ```
+
+  #### Transition an issue
+  ```
+  transition_issue(
+    issue_key = "M7O-1386",
+    status    = "Done"
+  )
+  ```
+metadata:
+  version: 1.0.0
+  author: 'AI Tools Team'
+  created: '2026-04-06'
+  tags:
+    - jira
+    - mcp
+    - atlassian

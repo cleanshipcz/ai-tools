@@ -1,0 +1,5 @@
+<One paragraph describing the Epic goal and scope.>
+
+Relevant links:
+ * [Design document|<url>]
+ * [Related JIRA Epic|<url>]

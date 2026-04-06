@@ -1,0 +1,174 @@
+id: jira-ticket
+description: >-
+  Create, draft, and update Jira tickets for the XP project with proper templates, labels, and components.
+  Use when creating a new Jira ticket, drafting a ticket description from a problem statement,
+  reviewing or improving an existing ticket, or formatting content in Jira wiki markup.
+sections:
+  - text: |
+      ## Project Context
+
+      - **Project key**: `XP`
+
+      ### Jira Instances
+
+      | Instance | URL | Scope |
+      |----------|-----|-------|
+      | **Jira (Energy DBG)** | `https://jira.deutsche-boerse.com` | Deutsche Börse Group teams — general Energy projects |
+
+      ## Issue Types
+
+      | Type | When to Use |
+      |------|-------------|
+      | `Task` | Default for all work items — features, improvements, investigations, chores |
+      | `Epic` | Groups of related Tasks around a larger goal or technology area |
+      | `Initiative` | Strategic, cross-Epic objectives (e.g., a yearly target) |
+      | `Problem` | Triggered by a monitoring alert / production incident callout |
+      | `Bug` | Regression or broken behaviour (rarely used; prefer `Task` with context) |
+
+      > Tasks make up ~92% of all XP tickets. Use `Task` unless you have a clear reason to choose another type.
+
+      ## Priority
+
+      | Priority | Usage |
+      |----------|-------|
+      | `Minor` | Default — improvements, non-urgent work (~74% of tickets) |
+      | `Major` | Significant impact on product / team velocity (~20% of tickets) |
+      | `Critical` | Production-affecting issues requiring immediate attention (~2%) |
+
+      Default to **Minor** unless the requester specifies higher urgency.
+
+      ## Summary (Title) Conventions
+
+      - Write the summary as a short, clear **action or outcome statement** in plain English.
+      - **No ticket numbers** or assignee names in the summary.
+      - Optionally prefix with a overall topic or technology area, but keep it concise (e.g. FB4IDA - <summary> or Grafana - <summary>).
+      - Keep summaries under **80 characters**.
+
+      **Good examples:**
+      ```
+      Binary API - POC - xbid-test - Introduce binary API to the xbid-test project
+      Grafana - Create alerting dashboard for RIF latency
+      FB4IDA - model - IDA Bidding Zone
+      FB4IDA - mapping - Flow calculations on IDA borders
+      TODO: Add specific examples of good summaries here.
+      ```
+
+      ## Description Templates
+
+      Use the templates from the `templates/` directory:
+
+      - **Task** → [templates/task.txt](templates/task.txt) — Use for all new Tasks (standard 3-section template)
+      - **Problem** → [templates/problem.txt](templates/problem.txt) — For alert callouts (auto-generated or manual)
+      - **Epic** → [templates/epic.txt](templates/epic.txt) — Free-form paragraph describing goal and scope
+
+      ### Template Rules — MANDATORY
+
+      > **This template structure is non-negotiable.** Every Task ticket MUST follow this exact structure. Do NOT skip sections, reorder them, or use alternative formats.
+
+      1. **Always** start the description with `+*Please fill this info accordingly:*+`
+      2. **Always** include all three sections for Tasks in this exact order:
+         - `h3. Current situation` — Describe the current state as facts, not opinions.
+         - `h3. Desired change` — Describe the desired outcome, not a list of sub-tasks.
+         - `h3. Acceptance Criteria` — Bullet-pointed (`*`), concrete, and verifiable items.
+      3. **Never** omit any section — all three are required even if brief.
+      4. **Never** merge sections or use different headings (e.g., do not use "Goal" instead of "Desired change").
+      5. Use `h3.` for section headings (not `h2.` or `##`).
+      6. Write in **Jira wiki markup** (not Markdown): `h3.`, `h4.`, `*bold*`, `_italic_`, `[link|url]`.
+      7. For **Problem** tickets, use the Problem template (`templates/problem.txt`) — never the Task template.
+      8. For **Epic** tickets, use the Epic template (`templates/epic.txt`) — a free-form paragraph.
+
+      ### Initiative
+
+      One or two sentences summarising the strategic objective. Epics will be linked as children.
+
+      ## Labels
+
+      Labels are free-form tags. **Always set at least one Label** when creating a ticket. Use existing labels — do not invent new ones unless no existing label fits.
+
+      | Category | Labels (most-used first) |
+      |----------|--------------------------|
+      | Topic | `flowbased`, `binary-api`, `IDA` |
+      | Type | `CR`, `investigation`, `improvement`, `CustomerRequest`, `tech-debt`, `analysis` |
+
+      ### Label rules
+
+      - Apply **1–5 labels** per ticket (at least 1, typically 2–3).
+      - Apply a **topic** label when it can be derived from the context or the epic.
+      - Apply a **type** label when the ticket content matches a known type.
+      - Do not invent new labels unless no existing label fits.
+
+      ## Status Workflow
+
+      ```
+      Backlog → To Do → In Progress → Review → To Test → Testing → Done
+                        ↓
+                        Waiting   (blocked on external dependency)
+      All → Done
+      Done → Backlog
+      ```
+
+      - New tickets should be created in **`Backlog`** state.
+      - `To Do` indicates the ticket has been groomed and is ready for sprint.
+      - `Waiting` indicates a dependency blocker — add a comment explaining what is being waited on.
+
+      ## Field Checklist for New Tickets
+
+      | Field | Required | Notes |
+      |-------|----------|-------|
+      | `Summary` | Yes | Clear, concise, ≤80 chars |
+      | `Issue Type` | Yes | Default: `Task` |
+      | `Priority` | Yes | Default: `Minor` |
+      | `Description` | Yes | **Must** use the matching template — see Template Rules |
+      | `Labels` | Yes | **Must** set ≥1 label — see Labels section |
+      | `Assignment Group` | Yes | **Must** always set via `custom_fields`. See field-defaults.json for field ID. Value is `{"value": "DEV"}` unless told otherwise. |
+      | `Environment` | Optional | If needed, set via `custom_fields`. See field-defaults.json for field ID. Value is `{"value": "<env>"}`. |
+      | `Assignee` | Recommended | Leave unassigned if unknown |
+      | `Reporter` | Yes | The person raising the ticket |
+      | `Epic Link` | Recommended | Link to parent Epic if applicable |
+
+      > **Important:** Every new ticket MUST have Labels and Assignment Group set. Never create a ticket without them.
+
+      ## Jira Wiki Markup
+  - fragment: jira-wiki-markup
+  - text: |
+      ## Field Defaults
+
+      See [field-defaults.json](field-defaults.json) for default values used when creating tickets programmatically via MCP.
+
+      ## MCP Integration
+  - fragment: jira-mcp-tools
+  - text: |
+      ### Issue Type Names (XP Project)
+
+      The server uses **type names** (not IDs):
+
+      | Type | When to Use |
+      |------|-------------|
+      | `Task` | **Default** — features, improvements, chores (~92% of tickets) |
+      | `Bug` | Regressions, broken behaviour |
+      | `Epic` | Groups of related Tasks |
+      | `Story` | User stories |
+      | `Sub-task` | Child of a Task or Story |
+
+      ### Status Transitions — Common XP Flows
+
+      | Transition | Typical Use |
+      |------------|------------|
+      | To Do → In Progress | Start work |
+      | In Progress → Review | Put work to review |
+      | Open → Closed | Close without work |
+
+      > Use `get_transitions(issue_key = "XP-XXXX")` to see available transitions for the issue's current state.
+files:
+  - path: templates/task.txt
+  - path: templates/problem.txt
+  - path: templates/epic.txt
+  - path: field-defaults.json
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-04-06"
+  tags:
+    - jira
+    - ticket
+    - atlassian
