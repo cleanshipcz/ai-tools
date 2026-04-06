@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/github/github-mcp-server/internal/githubapp"
 	"github.com/github/github-mcp-server/pkg/errors"
 	"github.com/github/github-mcp-server/pkg/github"
 	"github.com/github/github-mcp-server/pkg/http/transport"
@@ -109,11 +110,6 @@ func NewStdioMCPServer(ctx context.Context, cfg github.MCPServerConfig) (*mcp.Se
 		return nil, fmt.Errorf("failed to parse API host: %w", err)
 	}
 
-	clients, err := createGitHubClients(cfg, apiHost)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GitHub clients: %w", err)
-	}
-
 	// Create feature checker
 	featureChecker := createFeatureChecker(cfg.EnabledFeatures)
 
@@ -122,20 +118,69 @@ func NewStdioMCPServer(ctx context.Context, cfg github.MCPServerConfig) (*mcp.Se
 	if err != nil {
 		return nil, fmt.Errorf("failed to create observability exporters: %w", err)
 	}
-	deps := github.NewBaseDeps(
-		clients.rest,
-		clients.gql,
-		clients.raw,
-		clients.repoAccess,
-		cfg.Translator,
-		github.FeatureFlags{
-			LockdownMode: cfg.LockdownMode,
-			InsidersMode: cfg.InsidersMode,
-		},
-		cfg.ContentWindowSize,
-		featureChecker,
-		obs,
-	)
+
+	var deps github.ToolDependencies
+	var clients *githubClients // only set for PAT mode (needed for user-agent middleware)
+
+	if cfg.AppAuth != nil || len(cfg.AppOrgConfigs) > 0 {
+		// GitHub App auth mode: use AppDeps with dynamic token source
+		restURL, restErr := apiHost.BaseRESTURL(ctx)
+		if restErr != nil {
+			return nil, fmt.Errorf("failed to get base REST URL: %w", restErr)
+		}
+
+		tokenSource := githubapp.BuildTokenSource(
+			cfg.AppAuth,
+			cfg.AppOrgConfigs,
+			restURL.String(),
+		)
+
+		var repoAccessOpts []lockdown.RepoAccessOption
+		if cfg.LockdownMode {
+			repoAccessOpts = []lockdown.RepoAccessOption{
+				lockdown.WithLogger(cfg.Logger.With("component", "lockdown")),
+			}
+			if cfg.RepoAccessTTL != nil {
+				repoAccessOpts = append(repoAccessOpts, lockdown.WithTTL(*cfg.RepoAccessTTL))
+			}
+		}
+
+		deps = NewAppDeps(
+			tokenSource,
+			apiHost,
+			cfg.Version,
+			cfg.LockdownMode,
+			cfg.InsidersMode,
+			repoAccessOpts,
+			cfg.Translator,
+			cfg.ContentWindowSize,
+			featureChecker,
+			obs,
+		)
+	} else {
+		// PAT auth mode: use BaseDeps with pre-built clients
+		var clientErr error
+		clients, clientErr = createGitHubClients(cfg, apiHost)
+		if clientErr != nil {
+			return nil, fmt.Errorf("failed to create GitHub clients: %w", clientErr)
+		}
+
+		deps = github.NewBaseDeps(
+			clients.rest,
+			clients.gql,
+			clients.raw,
+			clients.repoAccess,
+			cfg.Translator,
+			github.FeatureFlags{
+				LockdownMode: cfg.LockdownMode,
+				InsidersMode: cfg.InsidersMode,
+			},
+			cfg.ContentWindowSize,
+			featureChecker,
+			obs,
+		)
+	}
+
 	// Build and register the tool/resource/prompt inventory
 	inventoryBuilder := github.NewInventory(cfg.Translator).
 		WithDeprecatedAliases(github.DeprecatedToolAliases).
@@ -169,7 +214,13 @@ func NewStdioMCPServer(ctx context.Context, cfg github.MCPServerConfig) (*mcp.Se
 		github.RegisterUIResources(ghServer)
 	}
 
-	ghServer.AddReceivingMiddleware(addUserAgentsMiddleware(cfg, clients.rest, clients.gqlHTTP))
+	if cfg.AppAuth != nil || len(cfg.AppOrgConfigs) > 0 {
+		// In app auth mode, register owner injection middleware for multi-org token routing
+		ghServer.AddReceivingMiddleware(ownerInjectionMiddleware)
+	} else {
+		// In PAT mode, register user-agent middleware that updates shared clients
+		ghServer.AddReceivingMiddleware(addUserAgentsMiddleware(cfg, clients.rest, clients.gqlHTTP))
+	}
 
 	return ghServer, nil
 }
@@ -229,6 +280,15 @@ type StdioServerConfig struct {
 
 	// RepoAccessCacheTTL overrides the default TTL for repository access cache entries.
 	RepoAccessCacheTTL *time.Duration
+
+	// AppAuth holds default GitHub App authentication config.
+	// When set, the server uses GitHub App installation tokens instead of a PAT.
+	// Mutually exclusive with Token.
+	AppAuth *githubapp.AppConfig
+
+	// AppOrgConfigs holds per-org GitHub App credentials.
+	// Each org can have its own GitHub App with separate app ID, key, and installation ID.
+	AppOrgConfigs []githubapp.OrgAppConfig
 }
 
 // RunStdioServer is not concurrent safe.
@@ -253,7 +313,11 @@ func RunStdioServer(cfg StdioServerConfig) error {
 		slogHandler = slog.NewTextHandler(logOutput, &slog.HandlerOptions{Level: slog.LevelInfo})
 	}
 	logger := slog.New(slogHandler)
-	logger.Info("starting server", "version", cfg.Version, "host", cfg.Host, "dynamicToolsets", cfg.DynamicToolsets, "readOnly", cfg.ReadOnly, "lockdownEnabled", cfg.LockdownMode)
+	authMode := "pat"
+	if cfg.AppAuth != nil {
+		authMode = "github-app"
+	}
+	logger.Info("starting server", "version", cfg.Version, "host", cfg.Host, "authMode", authMode, "dynamicToolsets", cfg.DynamicToolsets, "readOnly", cfg.ReadOnly, "lockdownEnabled", cfg.LockdownMode)
 
 	// Fetch token scopes for scope-based tool filtering (PAT tokens only)
 	// Only classic PATs (ghp_ prefix) return OAuth scopes via X-OAuth-Scopes header.
@@ -272,22 +336,24 @@ func RunStdioServer(cfg StdioServerConfig) error {
 	}
 
 	ghServer, err := NewStdioMCPServer(ctx, github.MCPServerConfig{
-		Version:           cfg.Version,
-		Host:              cfg.Host,
-		Token:             cfg.Token,
-		EnabledToolsets:   cfg.EnabledToolsets,
-		EnabledTools:      cfg.EnabledTools,
-		EnabledFeatures:   cfg.EnabledFeatures,
-		DynamicToolsets:   cfg.DynamicToolsets,
-		ReadOnly:          cfg.ReadOnly,
-		Translator:        t,
-		ContentWindowSize: cfg.ContentWindowSize,
-		LockdownMode:      cfg.LockdownMode,
-		InsidersMode:      cfg.InsidersMode,
-		ExcludeTools:      cfg.ExcludeTools,
-		Logger:            logger,
-		RepoAccessTTL:     cfg.RepoAccessCacheTTL,
-		TokenScopes:       tokenScopes,
+		Version:             cfg.Version,
+		Host:                cfg.Host,
+		Token:               cfg.Token,
+		EnabledToolsets:      cfg.EnabledToolsets,
+		EnabledTools:         cfg.EnabledTools,
+		EnabledFeatures:     cfg.EnabledFeatures,
+		DynamicToolsets:      cfg.DynamicToolsets,
+		ReadOnly:             cfg.ReadOnly,
+		Translator:           t,
+		ContentWindowSize:    cfg.ContentWindowSize,
+		LockdownMode:         cfg.LockdownMode,
+		InsidersMode:         cfg.InsidersMode,
+		ExcludeTools:         cfg.ExcludeTools,
+		Logger:               logger,
+		RepoAccessTTL:        cfg.RepoAccessCacheTTL,
+		TokenScopes:          tokenScopes,
+		AppAuth:              cfg.AppAuth,
+		AppOrgConfigs:        cfg.AppOrgConfigs,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %w", err)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/github/github-mcp-server/internal/githubapp"
 	gherrors "github.com/github/github-mcp-server/pkg/errors"
 	"github.com/github/github-mcp-server/pkg/inventory"
 	"github.com/github/github-mcp-server/pkg/octicons"
@@ -71,6 +72,14 @@ type MCPServerConfig struct {
 	// When non-nil, tools requiring scopes not in this list will be hidden.
 	// This is used for PAT scope filtering where we can't issue scope challenges.
 	TokenScopes []string
+
+	// AppAuth holds default GitHub App authentication config.
+	// When non-nil, the server uses GitHub App installation tokens instead of a PAT.
+	AppAuth *githubapp.AppConfig
+
+	// AppOrgConfigs holds per-org GitHub App credentials.
+	// Each org can have its own GitHub App with separate app ID, key, and installation ID.
+	AppOrgConfigs []githubapp.OrgAppConfig
 
 	// Additional server options to apply
 	ServerOptions []MCPServerOption
