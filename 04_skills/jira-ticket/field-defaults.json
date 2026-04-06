@@ -25,30 +25,5 @@
   },
   "standard_fields_note": {
     "fixVersions": "Standard Jira field (not a custom field). Use via custom_fields: {\"fixVersions\": [{\"name\": \"5.1.x\"}]}"
-  },
-  "issue_type_distribution": {
-    "Task": "~92%",
-    "Epic": "~5%",
-    "Bug": "<1%"
-  },
-  "priority_distribution": {
-    "Minor": "~74%",
-    "Major": "~20%",
-    "Critical": "~2%"
-  },
-  "common_labels": {
-    "topic": [
-      "flowbased",
-      "binary-api",
-      "IDA"
-    ],
-    "type": [
-      "CR",
-      "investigation",
-      "improvement",
-      "CustomerRequest",
-      "tech-debt",
-      "analysis"
-    ]
   }
 }

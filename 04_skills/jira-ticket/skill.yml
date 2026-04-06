@@ -65,17 +65,16 @@ sections:
 
       > **This template structure is non-negotiable.** Every Task ticket MUST follow this exact structure. Do NOT skip sections, reorder them, or use alternative formats.
 
-      1. **Always** start the description with `+*Please fill this info accordingly:*+`
-      2. **Always** include all three sections for Tasks in this exact order:
+      1. **Always** include all three sections for Tasks in this exact order:
          - `h3. Current situation` — Describe the current state as facts, not opinions.
          - `h3. Desired change` — Describe the desired outcome, not a list of sub-tasks.
          - `h3. Acceptance Criteria` — Bullet-pointed (`*`), concrete, and verifiable items.
-      3. **Never** omit any section — all three are required even if brief.
-      4. **Never** merge sections or use different headings (e.g., do not use "Goal" instead of "Desired change").
-      5. Use `h3.` for section headings (not `h2.` or `##`).
-      6. Write in **Jira wiki markup** (not Markdown): `h3.`, `h4.`, `*bold*`, `_italic_`, `[link|url]`.
-      7. For **Problem** tickets, use the Problem template (`templates/problem.txt`) — never the Task template.
-      8. For **Epic** tickets, use the Epic template (`templates/epic.txt`) — a free-form paragraph.
+      2. **Never** omit any section — all three are required even if brief.
+      3. **Never** merge sections or use different headings (e.g., do not use "Goal" instead of "Desired change").
+      4. Use `h3.` for section headings (not `h2.` or `##`).
+      5. Write in **Jira wiki markup** (not Markdown): `h3.`, `h4.`, `*bold*`, `_italic_`, `[link|url]`.
+      6. For **Problem** tickets, use the Problem template (`templates/problem.txt`) — never the Task template.
+      7. For **Epic** tickets, use the Epic template (`templates/epic.txt`) — a free-form paragraph.
 
       ### Initiative
 
@@ -89,6 +88,7 @@ sections:
       |----------|--------------------------|
       | Topic | `flowbased`, `binary-api`, `IDA` |
       | Type | `CR`, `investigation`, `improvement`, `CustomerRequest`, `tech-debt`, `analysis` |
+      | Category | `backend`, `frontend`, `documentation` |
 
       ### Label rules
 
