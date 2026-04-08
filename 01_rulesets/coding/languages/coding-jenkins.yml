@@ -1,0 +1,26 @@
+id: coding-language-jenkins
+description: Jenkins pipeline best practices for Jenkinsfile authoring, shared libraries, stage design, and maintainability across declarative and scripted pipelines
+rules:
+  - "Prefer declarative pipeline syntax over scripted pipelines — only drop into a script block when dynamic DSL or complex control flow is unavoidable."
+  - "Always pin agent with an explicit label (e.g., agent { label 'gke-standard-8c-16g' }) — never use agent any in production pipelines."
+  - "Set options { timestamps(); timeout(time: N, unit: 'MINUTES') } on every pipeline to bound runtime and produce readable logs."
+  - "Wrap every long-running stage in its own timeout block so a single hung step cannot exhaust the pipeline-level timeout."
+  - "Declare all tool versions (JDK, Maven, Node, etc.) as named constants at the top of the Jenkinsfile, not inline inside stages."
+  - "Extract repeated logic, notification helpers, and custom steps into a Jenkins shared library under vars/ or src/ — never copy-paste Groovy between Jenkinsfiles."
+  - "Name every stage with a human-readable description that reflects its purpose (e.g., stage('Run OWASP dependency check'))."
+  - "Use the parameters block to declare all user-provided inputs with explicit types, defaults, and descriptions — never read undocumented build parameters via params.FOO."
+  - "Define environment variables in the environment block at pipeline or stage level rather than exporting them inside sh steps."
+  - "Use post { always / success / failure / unstable / fixed } blocks for cleanup and notifications instead of duplicating logic across stages."
+  - "Call cleanWs() in post { success } (or post { always } when artifacts are archived first) to prevent workspace bloat on shared agents."
+  - "Use parallel for independent stages to reduce wall-clock time, and collectEntries when the parallel branches are generated from a collection."
+  - "Keep sh steps short — move multi-line shell logic into a versioned script file in the repository and invoke it from the pipeline."
+  - "Use single-quoted strings for sh step bodies when no Groovy interpolation is needed, to avoid accidental Groovy variable expansion of secrets or paths."
+  - "Use withMaven, withCredentials, and other withXxx wrappers for scoped configuration — never configure tools or credentials globally at the pipeline level."
+  - "Pin shared library versions with @Library('my-lib@1.2.3') — never consume a shared library from a floating branch like master or develop in production pipelines."
+  - "Validate Jenkinsfile syntax with the declarative linter (jenkins-cli declarative-linter) as part of the pre-merge check for the pipeline repository."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-04-08"
+  tags:
+    - jenkins

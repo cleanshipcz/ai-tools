@@ -1,0 +1,21 @@
+id: testing-language-jenkins
+description: Jenkins pipeline testing standards covering static validation, shared library unit tests, integration tests, and safe rollout of Jenkinsfile changes
+rules:
+  - "Validate every Jenkinsfile with the Jenkins declarative linter (jenkins-cli declarative-linter) as a mandatory pre-merge gate."
+  - "Run groovy-lint (npm-groovy-lint) against Jenkinsfiles and shared library sources to catch style issues and common mistakes before code review."
+  - "Unit-test shared library classes and global variables with JenkinsPipelineUnit — stub out Jenkins DSL steps and assert the pipeline call tree."
+  - "Use Jenkins Test Harness (JenkinsRule) for integration tests of custom steps, plugins, and shared library behavior that cannot be covered by JenkinsPipelineUnit."
+  - "Place shared library unit tests under test/ with the same package layout as src/ and run them with Gradle or Maven in CI."
+  - "Exercise pipeline logic with the Replay feature in a non-production Jenkins instance before merging Jenkinsfile changes."
+  - "Promote pipeline changes through a dedicated test Jenkins controller (or a feature-branch multibranch job) before applying them to production jobs."
+  - "Assert pipeline outcomes (SUCCESS, UNSTABLE, FAILURE) and post-action side effects explicitly in integration tests — never rely solely on build status."
+  - "Test error paths by injecting failures (failing sh steps, thrown exceptions) and asserting that post { failure } and post { unstable } handlers run as expected."
+  - "Test parallel stages by verifying that each branch runs independently and that failures in one branch do not silently skip cleanup in others."
+  - "Pin the Jenkins core and plugin versions used in the test harness to match the production controller so tests reproduce real behavior."
+  - "Run linter, unit, and integration tests on every pull request that modifies a Jenkinsfile or shared library file — never merge pipeline changes without CI verification."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-04-08"
+  tags:
+    - jenkins
