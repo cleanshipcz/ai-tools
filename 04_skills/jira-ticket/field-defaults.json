@@ -20,8 +20,8 @@
     "story_points": "customfield_10052",
     "rank": "customfield_10054",
     "sprint": "customfield_10055",
-    "assignment_group": "customfield_13157",
-    "environment": "customfield_14051"
+    "assignment_group": "customfield_14051",
+    "environment": "customfield_13157"
   },
   "standard_fields_note": {
     "fixVersions": "Standard Jira field (not a custom field). Use via custom_fields: {\"fixVersions\": [{\"name\": \"5.1.x\"}]}"

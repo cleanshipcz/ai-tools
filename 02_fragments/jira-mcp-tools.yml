@@ -16,6 +16,10 @@ content: |
   | `transition_issue` | Transition to a new status |
   | `list_projects` | List accessible projects |
   | `jira_add_attachment` | Attach a file to an issue |
+  | `link_issues` | Create a link between two issues (Blocks, Duplicate, Relates, Causes, etc.) |
+  | `get_issue_links` | Get all links for an issue with direction, type, and linked issue details |
+  | `get_issue_link_types` | Discover all available link types on the Jira instance |
+  | `delete_issue_link` | Remove an existing issue link by its link ID |
 
   ### Parameter Conventions (Critical)
 
@@ -50,6 +54,20 @@ content: |
   #### `transition_issue`
   - Uses **`status`** parameter with the target status name (case-insensitive).
   - The server auto-matches the status name to the correct transition — no need to look up transition IDs.
+
+  #### `link_issues`
+  - **`inward_issue`** (required): The source issue key (e.g. `"XP-100"`).
+  - **`outward_issue`** (required): The target issue key (e.g. `"XP-200"`).
+  - **`link_type`** (optional, default `"Relates"`): Link type name — e.g. `"Blocks"`, `"Duplicate"`, `"Relates"`, `"Causes"`.
+  - **`comment`** (optional): A comment to attach to the link.
+  - Direction matters: for `"Blocks"`, `inward_issue` blocks `outward_issue`.
+  - Use `get_issue_link_types` to discover available link types on the instance.
+
+  #### `get_issue_links`
+  - **`issue_key`** (required): Returns all inward and outward links with link type, direction label, linked issue key/summary/status/priority, and `link_id`.
+
+  #### `delete_issue_link`
+  - **`link_id`** (required): The numeric link ID obtained from `get_issue_links`.
 
   ### Examples
 
@@ -109,6 +127,32 @@ content: |
     issue_key = "M7O-1386",
     status    = "Done"
   )
+  ```
+
+  #### Link two issues
+  ```
+  link_issues(
+    inward_issue  = "XP-100",
+    outward_issue = "XP-200",
+    link_type     = "Blocks",
+    comment       = "XP-100 must be completed before XP-200 can start"
+  )
+  ```
+
+  #### Get all links for an issue
+  ```
+  get_issue_links(issue_key = "XP-100")
+  ```
+
+  #### Discover available link types
+  ```
+  get_issue_link_types()
+  ```
+
+  #### Remove a link
+  ```
+  # First get the link_id from get_issue_links, then:
+  delete_issue_link(link_id = "12345")
   ```
 metadata:
   version: 1.0.0

@@ -1,8 +1,8 @@
 id: jira-ticket
 description: >-
-  Create, draft, and update Jira tickets for the XP project with proper templates, labels, and components.
+  Create, draft, update, and link Jira tickets for the XP project with proper templates, labels, and components.
   Use when creating a new Jira ticket, drafting a ticket description from a problem statement,
-  reviewing or improving an existing ticket, or formatting content in Jira wiki markup.
+  reviewing or improving an existing ticket, linking related issues, or formatting content in Jira wiki markup.
 sections:
   - text: |
       ## Project Context
@@ -110,6 +110,26 @@ sections:
       - New tickets should be created in **`Backlog`** state.
       - `To Do` indicates the ticket has been groomed and is ready for sprint.
       - `Waiting` indicates a dependency blocker — add a comment explaining what is being waited on.
+
+      ## Issue Linking
+
+      Use issue links to express relationships between tickets. Links are directional — the meaning depends on which issue is inward vs. outward.
+
+      | Link Type | Inward (source) | Outward (target) | When to Use |
+      |-----------|-----------------|-------------------|-------------|
+      | `Blocks` | blocks | is blocked by | Target cannot proceed until source is done |
+      | `Relates` | relates to | relates to | General relationship (default) |
+      | `Duplicate` | duplicates | is duplicated by | Same issue reported twice |
+      | `Causes` | causes | is caused by | Root-cause relationship |
+
+      ### Linking Guidelines
+
+      - **Always link related tickets** when creating a new ticket that depends on, blocks, or duplicates another.
+      - Use `get_issue_link_types` to discover available link types on the instance — the table above shows common ones.
+      - Use `get_issue_links` to review existing links before adding new ones to avoid duplicates.
+      - To remove an incorrect link, get the `link_id` from `get_issue_links` and use `delete_issue_link`.
+      - Add a `comment` when creating a link to explain the relationship if it is not obvious from the issue summaries.
+      - **Direction matters**: for `"Blocks"`, `inward_issue` blocks `outward_issue` — get the direction right.
 
       ## Field Checklist for New Tickets
 
