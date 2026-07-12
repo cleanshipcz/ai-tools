@@ -17,7 +17,7 @@ rules:
   - "Leverage records (Java 14+) for data carrier classes."
   - "Use var (Java 10+) judiciously where type is obvious."
   - "Follow Java code formatting standards (Google Style or similar)."
-  - "Use JUnit 5 for testing with descriptive test names."
+  - "Use JUnit 6 for testing with descriptive test names."
   - "Prefer constructor injection for dependency injection."
   - "Handle exceptions appropriately; don't catch Exception or Throwable."
   - "Maintain standard naming for tests: ClassName -> ClassNameTest."

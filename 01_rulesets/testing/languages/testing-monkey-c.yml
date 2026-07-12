@@ -1,0 +1,18 @@
+id: testing-language-monkey-c
+description: Monkey C testing standards and best practices for Garmin Connect IQ development
+rules:
+  - "Write unit tests with the built-in Run No Evil framework: annotate test functions with (:test), accept a Logger parameter, and return a Boolean result."
+  - "Use Test.assertEqualMessage and Test.assertMessage variants with descriptive messages instead of bare Test.assert calls."
+  - "Exclude test code from release builds by keeping the (:test) annotation on all test functions and helpers."
+  - "Run tests in the simulator via monkeydo with the -t flag (or 'Run Tests' in the IDE) against every target device product before release."
+  - "Maintain standard naming for tests: ClassName -> ClassNameTest, with one test module per production class."
+  - "Keep test logic device-independent; verify device-specific behavior (screen shapes, memory limits) by running the suite across multiple simulator targets."
+  - "Use Logger.debug output sparingly in tests; a failing assertion message must be sufficient to diagnose the failure."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-07-12"
+  tags:
+    - monkey-c
+    - garmin
+    - connect-iq

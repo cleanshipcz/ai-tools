@@ -1,0 +1,26 @@
+id: coding-language-monkey-c
+description: Monkey C coding standards and best practices for Garmin Connect IQ development
+rules:
+  - "Follow Monkey C naming conventions: PascalCase for classes and modules, camelCase for functions/variables, UPPER_SNAKE_CASE for constants, underscore prefix (_field) for private members."
+  - "Enable strict type checking (typeCheckLevel = 3 in monkey.jungle) and annotate all function parameters and return values with Monkey Types (function foo(x as Number) as Void)."
+  - "Check device capabilities with 'has' before calling optional Toybox APIs (e.g., if (Toybox has :SensorHistory))."
+  - "Avoid circular object references; Monkey C uses reference counting and circular references leak memory — use WeakReference where back-references are needed."
+  - "Minimize memory footprint: avoid large arrays and dictionaries, prefer primitive types, and stay within the device's memory budget (as low as ~32KB on older watches)."
+  - "Never allocate objects inside onUpdate() or compute() loops; pre-allocate in initialize() or onLayout() instead."
+  - "Define user-facing strings, layouts, bitmaps, and fonts in Rez resources instead of hardcoding them; support localization via resource overrides."
+  - "Use excludeAnnotations with (:debug), (:release), and (:test) annotations to strip debug and test code from release builds."
+  - "Use 'import' statements (SDK 4.x+) for type names; fall back to 'using Toybox.X as Y' only when supporting older SDKs."
+  - "Pass callbacks as method symbols (method(:onTimerFired)) rather than raw symbols."
+  - "Use enum for fixed sets of related constants and const for standalone values."
+  - "Handle nullable values explicitly with null checks before use; strict type checking treats X? and X as distinct types."
+  - "Persist small data with Application.Storage and user settings with Application.Properties; never store large objects."
+  - "Guard battery life: use the coarsest sensor/GPS update rate the feature allows and prefer onPartialUpdate for low-power watch face updates."
+  - "Declare the minimum required permissions in manifest.xml and target only the device products the app actually supports."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-07-12"
+  tags:
+    - monkey-c
+    - garmin
+    - connect-iq
