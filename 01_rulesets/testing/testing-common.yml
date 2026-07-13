@@ -1,0 +1,39 @@
+id: testing-common
+description: Common testing standards and best practices
+rules:
+  # Test Coverage Requirements
+  - "Aim for 90%+ code coverage on new code; never decrease existing coverage."
+  - "Test files should mirror the structure of source files for easy navigation."
+  # Test Quality Standards
+  - 'Use descriptive test names: "should [expected behavior] when [condition]".'
+  - "Follow GWT pattern: Given (setup), When (execute), Then (verify)."
+  - "Separate GWT sections with comments: given, when, then. All subcomment in the given section must be prefixed with - (can be hierarchical) and start with a lower-case."
+  - "Tests must be deterministic - no flaky tests allowed."
+  - "Ensure tests assert behavior, not implementation details."
+  - "Avoid flakiness (no real time, sleeps, random unless seeded)."
+  - "If coverage tooling exists, run it and prioritize untested meaningful branches."
+  - "Prefer table-driven/parameterized tests where appropriate."
+  - "Verify exceptions with specific types/messages where stable."
+  - "For async code, use the framework’s async test support and assert awaited outcomes."
+  - "If the class depends on time/randomness, inject or mock a clock/random provider."
+  # Documentation via Tests
+  - "Tests serve as executable documentation; make them readable by humans."
+  - "Include example usage in test names and setup code."
+  - "Comment complex test setup to explain what is being tested and why."
+  - "Organize tests by feature/scenario using describe/context blocks."
+  # Anti-Patterns to Avoid
+  - 'Never say "tests will be added later" - add them NOW or mark work as incomplete.'
+  - "Never suggest manual testing as a substitute for automated tests."
+  - "Never skip tests due to time pressure - this creates technical debt."
+  - "Never rely on console.log or manual inspection for verification."
+  - "Never commit code that breaks existing tests without fixing them."
+  - "Never write tests that depend on execution order or external state."
+  - "Never disable existing tests."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  tags:
+    - common
+    - testing
+    - style

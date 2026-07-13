@@ -63,7 +63,7 @@ npm run use-prompt manifests/create-feature
 
 **Purpose:** Generate an agent.yml manifest defining an AI agent
 
-**Use When:** Creating a new AI agent with specific expertise, rulepacks, and behavioral constraints.
+**Use When:** Creating a new AI agent with specific expertise, rulesets, and behavioral constraints.
 
 **Example Usage:**
 
@@ -76,7 +76,7 @@ npm run use-prompt manifests/create-agent
 - `agent_id` (required): Kebab-case agent identifier
 - `purpose` (required): Agent's purpose (10-500 chars)
 - `persona`: Detailed persona and expertise
-- `rulepacks`: Rulepack IDs to include
+- `rulesets`: Ruleset IDs to include
 - `capabilities`: Required MCP capabilities
 - `temperature`: Temperature setting (0.0-2.0)
 - `tools`: Tool/skill IDs the agent can use
@@ -106,24 +106,24 @@ npm run use-prompt manifests/create-prompt
 
 ---
 
-### create-rulepack
+### create-ruleset
 
-**Purpose:** Generate a rulepack.yml manifest defining coding rules and standards
+**Purpose:** Generate a ruleset.yml manifest defining coding rules and standards
 
 **Use When:** Creating reusable sets of coding rules, best practices, or standards for specific languages or domains.
 
 **Example Usage:**
 
 ```bash
-npm run use-prompt manifests/create-rulepack
+npm run use-prompt manifests/create-ruleset
 ```
 
 **Variables:**
 
-- `rulepack_id` (required): Kebab-case rulepack identifier
-- `description` (required): Rulepack purpose (10-500 chars)
+- `ruleset_id` (required): Kebab-case ruleset identifier
+- `description` (required): Ruleset purpose (10-500 chars)
 - `rules` (required): Description of rules to include
-- `extends`: Parent rulepack IDs to extend
+- `extends`: Parent ruleset IDs to extend
 - `category`: Category (coding, security, testing, documentation)
 - `language`: Programming language if applicable
 
@@ -204,7 +204,7 @@ npm run use-prompt manifests/create-skill
 
 2. Define agent purpose and persona
 
-3. Select appropriate rulepacks
+3. Select appropriate rulesets
 
 4. Save to `agents/<agent-id>.yml`
 
@@ -236,19 +236,19 @@ npm run use-prompt manifests/create-skill
    npm run prompt-library
    ```
 
-### Creating a Rulepack
+### Creating a Ruleset
 
-1. Run the create-rulepack prompt:
+1. Run the create-ruleset prompt:
 
    ```bash
-   npm run use-prompt manifests/create-rulepack
+   npm run use-prompt manifests/create-ruleset
    ```
 
 2. Define the rules and standards
 
-3. Optionally extend existing rulepacks
+3. Optionally extend existing rulesets
 
-4. Save to `rulepacks/<rulepack-id>.yml`
+4. Save to `rulesets/<ruleset-id>.yml`
 
 5. Validate and build:
 

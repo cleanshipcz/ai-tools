@@ -1,0 +1,13 @@
+id: testing-language-jinja2
+description: Jinja2-specific testing standards for template rendering verification
+rules:
+  - "Write test cases that render templates with boundary inputs (empty strings, special characters, undefined optionals) and assert valid output."
+  - "Validate that rendered output produces syntactically correct config files (YAML, INI, JSON, XML) using a parser or linter."
+  - "Test that default() filters handle undefined variables gracefully without rendering errors."
+  - "Test conditional blocks (if/elif/else) with each branch exercised to verify all code paths produce valid output."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - jinja2

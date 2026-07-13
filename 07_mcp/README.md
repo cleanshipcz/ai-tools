@@ -274,9 +274,9 @@ capabilities:
 
 | Preset | filesystem | git | http | shell |
 | ------ | ---------- | --- | ---- | ----- |
-| base   | ✅         | ✅  | ❌   | ❌    |
-| secure | ✅ (RO)    | ✅  | ❌   | ❌    |
-| full   | ✅         | ✅  | ✅   | ⚠️    |
+| base   | ✅          | ✅   | ❌    | ❌     |
+| secure | ✅ (RO)     | ✅   | ❌    | ❌     |
+| full   | ✅          | ✅   | ✅    | ⚠️     |
 
 ## 🔨 Building & Validation
 
@@ -366,8 +366,8 @@ includes:
 
 ## 🔗 Related
 
-- [Agents](../04_agents/README.md) - Agents that use MCP capabilities
-- [Skills](../02_skills/README.md) - Skills can be exposed via MCP
+- [Agents](../05_agents/README.md) - Agents that use MCP capabilities
+- [Skills](../04_skills/README.md) - Skills can be exposed via MCP
 - [Security](../90_docs/SECURITY.md) - Security best practices
 
 ## 🐛 Troubleshooting

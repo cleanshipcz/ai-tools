@@ -1,0 +1,19 @@
+id: security-language-python
+description: Python-specific security rules for code injection, deserialization, subprocess handling, and SQL safety
+rules:
+  - "Never use eval, the exec builtin, or compile() with untrusted input — they enable arbitrary code execution."
+  - "Never deserialize untrusted data with unsafe serializers (pickle, shelve) — use JSON or structured formats with explicit schemas."
+  - "Use parameterized queries for all database operations — never use f-strings or format() in SQL strings."
+  - "Use subprocess with argument lists (subprocess.run(['cmd', 'arg'])), never shell=True with unsanitized input."
+  - "Never use bare except clauses — they silently swallow security-relevant errors (KeyboardInterrupt, SystemExit, permission errors)."
+  - "Validate and restrict file paths to prevent path traversal — use pathlib.Path.resolve() and verify results stay within expected directories."
+  - "Use the secrets module (secrets.token_hex, secrets.token_urlsafe) instead of random for security-sensitive values."
+  - "Pin dependency versions and verify package integrity — use hashes in requirements.txt or a lock file to prevent supply chain attacks."
+  - "Use os.environ or dedicated secret managers for credentials — never hardcode secrets in source or config files."
+  - "Sanitize template rendering input when using Jinja2, Mako, or string.Template outside of a framework's built-in escaping."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - python

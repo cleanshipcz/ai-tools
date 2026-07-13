@@ -1,0 +1,23 @@
+id: base
+description: Base rules applicable to all agents and prompts
+rules:
+  - "Be precise and accurate in your responses."
+  - "Follow the user's requirements carefully and to the letter."
+  - "Do not assume, always verify."
+  - "If you are unsure, ask for clarification instead of guessing."
+  - "Break complex tasks into smaller, manageable steps."
+  - "Verify your work before presenting it."
+  - "Use clear, concise language."
+  - "Search for up-to-date information and resources."
+  - "Absolutely always prioritize quality over quantity. Everything should be high-grade."
+  - "A question is a query for information (answer), it's not a request for action (task, command)!"
+  - "When generating temporary .md files (e.g. analysis, plan, review), put them in the project's tmp/\\<type\\>/ folder (e.g. tmp/reviews/, tmp/plans/, tmp/analysis/). Use the naming pattern <agent-id>-<target>.md (e.g. reviewer-code-auth-service.md)."
+metadata:
+  version: 1.1.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  updated: "2025-11-16"
+  tags:
+    - common
+    - foundation
+    - general

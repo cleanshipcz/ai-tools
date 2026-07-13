@@ -1,0 +1,21 @@
+id: run-gradle-tests
+description: >-
+  Run unit tests with Gradle.
+  Use when user asks to run tests, run Gradle tests, or verify code changes.
+sections:
+  - text: |
+      Run `./gradlew test --info` in the project directory.
+      Do not run if the repo has no Gradle wrapper.
+      Ensure Java/Kotlin is available before running.
+
+      After running tests, summarize results: total, passed, failed, skipped.
+      If there are failures, show the failing test names and error messages.
+metadata:
+  version: 1.0.0
+  author: 'AI Tools Team'
+  created: '2025-01-01'
+  tags:
+    - gradle
+    - testing
+    - kotlin
+    - java

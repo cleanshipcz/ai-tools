@@ -1,0 +1,66 @@
+id: manifests-duplicate-project
+description: Duplicate an existing project structure to a new location with configuration updates
+variables:
+  - name: parent_project
+    required: true
+    description: "Absolute path to the existing project manifest directory to copy from"
+  - name: project_destination
+    required: true
+    description: "Absolute path of the new project (deploy.directory)"
+  - name: manifest_destination
+    required: false
+    description: "Absolute path to the new project manifest directory (default: ai-tools-projects/{{project_destination.last_path_segment}})"
+rulesets:
+  - authoring-yaml
+  - authoring-ai
+  - authoring-manifests
+rules:
+  - "Verify parent project exists before starting"
+  - "Ensure new destination directory is created"
+  - "Update project identification and documentation after copying"
+  - "Preserve git local configuration by copying exclude file"
+content: |
+  Task: Create a new project in ai-tools-projects based on an existing project.
+
+  **Context:**
+  - Parent Project: `{{parent_project}}`
+  - Project Destination: `{{project_destination}}`
+  - Manifest Destination: `{{manifest_destination}}` *(defaults to `ai-tools-projects/projects/{{project_destination.last_path_segment}}`)*
+
+  **Instructions:**
+
+  1.  **Create Manifest Directory**:
+      - Create the manifest directory at `{{manifest_destination}}`.
+      - Copy the contents of the parent project's manifest to the new manifest destination.
+      - *Note: Exclude version control directories (.git) and build artifacts (build, node_modules) during the copy.*
+
+  2.  **Change Directory**:
+      - Navigate to the manifest directory: `cd {{manifest_destination}}`
+
+  3.  **Update Configuration & Documentation**:
+      - Read the `README.md` at `{{project_destination}}` to understand the new project's purpose.
+      - Read the parent project's `project.yml` at `{{parent_project}}/project.yml`.
+      - Find and read the copied `project.yml` in the new manifest directory.
+      - In `project.yml` in the new manifest directory:
+        - Update `deploy.directory` to `{{project_destination}}`.
+        - Update `id` to match the new project folder name.
+        - Update `description` to reflect the new project.
+        - Update `context.overview` to reflect the new project's purpose.
+        - Update `metadata.created` to the current date.
+        - Update `metadata.updated` to the current date.
+
+  4.  **Preserve Git Configuration**:
+      - Copy the `.git/info/exclude` file from the parent project's `deploy.directory` to the new project destination (`{{project_destination}}/.git/info/exclude`).
+      - *Ensure the destination directory `{{project_destination}}/.git/info/` exists before copying.*
+outputs:
+  format: text
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-02-09"
+  updated: "2026-02-10"
+  tags:
+    - manifests
+    - project
+    - duplication
+    - maintenance

@@ -1,0 +1,51 @@
+# [M7O] Runbook: <TITLE>
+
+---
+**Table of Contents**
+
+<!-- confluence macro: toc -->
+<ac:structured-macro ac:name="toc" />
+
+---
+
+## Overview
+
+Brief description of the system, process, or operational procedure this runbook covers.
+
+## Prerequisites
+
+- [ ] Access to <system/tool>
+- [ ] VPN connected
+- [ ] Required permissions: <list>
+
+## Steps
+
+### 1. <First Step Title>
+
+Description of step 1.
+
+```bash
+# Command example
+```
+
+### 2. <Second Step Title>
+
+Description of step 2.
+
+### 3. <Third Step Title>
+
+Description of step 3.
+
+## Verification
+
+How to verify the procedure was successful:
+
+- [ ] Check <metric/dashboard/log>
+- [ ] Confirm <expected state>
+
+## Rollback
+
+If something goes wrong:
+
+1. <Rollback step 1>
+2. <Rollback step 2>

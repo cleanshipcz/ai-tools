@@ -1,0 +1,24 @@
+id: review-code
+description: Code review rules focusing on correctness, performance, maintainability, and best practices
+rules:
+  - "Identify bugs, logic errors, and unhandled edge cases."
+  - "Check for code duplication and recommend refactoring."
+  - "Suggest performance improvements where applicable."
+  - "Ensure error handling is comprehensive and appropriate."
+  - "Check for proper resource cleanup (files, connections, streams)."
+  - "Verify API contracts and backward compatibility."
+  - "Look for hard-coded values that should be configurable."
+  - "Ensure logging is appropriate and not excessive."
+  - "Verify that tests adequately cover new functionality."
+  - "Check that code follows existing project patterns and conventions."
+  - "Flag missing or outdated comments and documentation."
+  - "Evaluate naming clarity for variables, functions, and classes."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-13"
+  tags:
+    - review
+    - development
+    - code
+    - quality

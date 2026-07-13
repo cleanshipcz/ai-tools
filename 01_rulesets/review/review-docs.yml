@@ -1,0 +1,25 @@
+id: review-docs
+description: Documentation review rules for evaluating accuracy, completeness, clarity, and maintainability
+rules:
+  - "Verify documentation accuracy against actual implementation."
+  - "Check for completeness - all public APIs, parameters, and return values documented."
+  - "Ensure examples compile, run, and produce documented output."
+  - "Identify stale documentation that no longer matches current behavior."
+  - "Evaluate clarity - can the target audience understand without ambiguity?"
+  - "Check for consistent terminology and formatting throughout."
+  - "Verify all referenced files, paths, and links are valid."
+  - "Assess structure and organization - logical flow, proper headings, scannable layout."
+  - "Check prerequisites and setup instructions for completeness."
+  - "Identify missing edge cases, error scenarios, or limitations."
+  - "Evaluate whether diagrams and visuals add clarity where needed."
+  - "Check for duplication that could lead to inconsistencies over time."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-13"
+  tags:
+    - review
+    - development
+    - documentation
+    - accuracy
+    - quality

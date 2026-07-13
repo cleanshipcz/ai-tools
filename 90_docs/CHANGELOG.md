@@ -81,7 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Initial repository structure
-- JSON schemas for prompts, agents, rulepacks, skills, and eval suites
+- JSON schemas for prompts, agents, rulesets, skills, and eval suites
 - Example manifests for common use cases
 - Build system to generate tool-specific adapters
 - Validation script with security checks
@@ -90,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Red team test cases
 - GitHub Actions CI/CD pipeline
 
-### Rulepacks
+### Rulesets
 
 - `base`: Foundation rules for all agents
 - `coding-python`: Python-specific coding standards

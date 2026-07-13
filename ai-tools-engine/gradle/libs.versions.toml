@@ -1,0 +1,66 @@
+# Version catalog is a central place for you to declare and version dependencies
+# https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
+# https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
+
+[versions]
+kotlin = "2.2.20"
+kotlinxDatetime = "0.7.1-0.6.x-compat"
+kotlinxSerializationJSON = "1.9.0"
+kotlinxCoroutines = "1.10.2"
+ktlint = "1.7.1"
+ktlintGradle = "13.1.0"
+detekt = "1.23.8"
+opentelemetry = "1.41.0"
+micrometer = "1.13.4"
+logback = "1.5.18"
+logstashEncoder = "7.4"
+micrometerTracing = "1.3.4"
+mockk = "1.13.11"
+assertj = "3.27.6"
+ktor = "3.0.1"
+kaml = "0.61.0"
+junit = "5.11.3"
+clikt = "5.0.2"
+
+[libraries]
+kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+kotlinxSerialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJSON" }
+kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+opentelemetryApi = { module = "io.opentelemetry:opentelemetry-api", version.ref = "opentelemetry" }
+opentelemetrySdk = { module = "io.opentelemetry:opentelemetry-sdk", version.ref = "opentelemetry" }
+opentelemetryExporterOtlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp", version.ref = "opentelemetry" }
+opentelemetryExporterLogging = { module = "io.opentelemetry:opentelemetry-exporter-logging", version.ref = "opentelemetry" }
+opentelemetrySdkTesting = { module = "io.opentelemetry:opentelemetry-sdk-testing", version.ref = "opentelemetry" }
+opentelemetryContext = { module = "io.opentelemetry:opentelemetry-context", version.ref = "opentelemetry" }
+opentelemetryExtensionKotlin = { module = "io.opentelemetry:opentelemetry-extension-kotlin", version.ref = "opentelemetry" }
+micrometerCore = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
+micrometerRegistryPrometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "micrometer" }
+micrometerRegistrySimple = { module = "io.micrometer:micrometer-registry-simple", version.ref = "micrometer" }
+micrometerRegistryOtlp = { module = "io.micrometer:micrometer-registry-otlp", version.ref = "micrometer" }
+logbackClassic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+logstashLogbackEncoder = { module = "net.logstash.logback:logstash-logback-encoder", version.ref = "logstashEncoder" }
+kotlinxCoroutinesTest = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+assertjCore = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+ktorServerCore = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktorServerNetty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+ktorServerContentNegotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktorSerializationKotlinxJson = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktorServerStatusPages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
+kaml = { module = "com.charleskorn.kaml:kaml", version.ref = "kaml" }
+clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
+junitJupiterParams = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit" }
+
+# Libraries can be bundled together for easier import
+[bundles]
+kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerialization", "kotlinxCoroutines"]
+
+[plugins]
+kotlinPluginSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+
+# Plugins defined in this project
+cleanship-kotlin-convention = { id = "cleanship.kotlin.convention" }
+cleanship-kotlin-library = { id = "cleanship.kotlin.library" }

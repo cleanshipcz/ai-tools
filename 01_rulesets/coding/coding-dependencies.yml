@@ -1,0 +1,25 @@
+id: coding-dependencies
+description: Dependency management principles - minimization, proper scoping, and avoiding bloat
+rules:
+  - "Prefer standard library over third-party when feasible."
+  - "Evaluate transitive dependency cost before adding a library."
+  - "Avoid dependencies for trivial functionality you can write in a few lines."
+  - "Use proper dependency scoping (compile, runtime, test, provided/compileOnly)."
+  - "Prefer specific sub-modules over umbrella/starter dependencies (e.g. spring-web over spring-boot-starter-web when only HTTP is needed)."
+  - "Pin versions explicitly, avoid dynamic or floating versions."
+  - "Prefer well-maintained libraries with active communities and security track records."
+  - "Minimize dependency surface area - import only what you need."
+  - "Audit dependency size and impact on build, bundle, and startup time."
+  - "Document why each non-obvious dependency was chosen."
+  - "When multiple libraries offer similar functionality, prefer the one with fewer transitive dependencies."
+  - "Regularly review dependencies for unused or redundant entries."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-13"
+  tags:
+    - coding
+    - development
+    - dependencies
+    - minimization
+    - scoping

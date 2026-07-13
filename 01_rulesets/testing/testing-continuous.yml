@@ -1,0 +1,15 @@
+id: testing-continuous
+description: Continuous integration/continuous delivery (CI/CD) testing standards and best practices
+rules:
+  - "All tests must be runnable via a single command (npm test, pytest, gradle test)."
+  - "Tests must run automatically on every commit via CI/CD pipeline."
+  - "Pull requests cannot be merged until all tests pass."
+  - "Include test results and coverage reports in CI/CD output."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  tags:
+    - testing
+    - ci
+    - cd

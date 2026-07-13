@@ -1,0 +1,17 @@
+id: run-pytest
+description: >-
+  Run Python tests with pytest.
+  Use when user asks to run Python tests or run pytest.
+sections:
+  - text: |
+      Run `pytest -v --tb=short` in the project directory.
+      After running, summarize results: total, passed, failed, skipped.
+      If there are failures, show the failing test names and error messages.
+metadata:
+  version: 1.0.0
+  author: 'AI Tools Team'
+  created: '2025-01-01'
+  tags:
+    - pytest
+    - python
+    - testing

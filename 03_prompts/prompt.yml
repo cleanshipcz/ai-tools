@@ -1,0 +1,39 @@
+id: prompt-optimize
+description: Optimize a prompt to elicit accurate, current, and concise AI responses
+variables:
+  - name: prompt
+    required: true
+    description: "Prompt to be optimized"
+rules:
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Recommend simple, focused definitions; allow complexity when justified"
+  - "Suggest appropriate rulesets based on domain"
+  - "Use conversational tone to understand intent"
+  - "Recommend concise system prompts (3-5 sentences); allow detail for specialized agents"
+content: |
+  Task: Transform this prompt into an optimized version that elicits accurate, current, and concise AI responses.
+
+  Please rewrite the prompt I provide to maximize response quality. The improved prompt should:
+
+  1. Be specific and clear - Remove ambiguity about what constitutes a "high-quality" response
+  2. Define success criteria - Specify exactly what makes an answer good (accuracy, brevity, evidence-based, etc.)
+  3. Set constraints - Explicitly request no filler content, speculation presented as fact, or outdated information
+  4. Encourage verification - Prompt the AI to acknowledge knowledge limitations and suggest when to verify information
+  5. Structure the request - Use formatting that makes requirements scannable
+
+  Original prompt to improve:
+
+  {{prompt}}
+
+  Deliver the rewritten prompt ready to use, followed by a brief explanation of key improvements made.
+outputs:
+  format: md
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-01-18"
+  updated: "2026-01-18"
+  tags:
+    - prompts
+    - ai
+    - agents

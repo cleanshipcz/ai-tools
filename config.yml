@@ -1,0 +1,21 @@
+locations:
+  agents:
+    - "05_agents"
+  prompts:
+    - "03_prompts"
+  rulesets:
+    - "01_rulesets"
+  fragments:
+    - "02_fragments"
+  skills:
+    - "04_skills"
+  projects:
+    - "09_projects"
+
+tools:
+  - windsurf
+  - antigravity
+  - github_copilot
+  - claude
+  - codex
+  - cursor

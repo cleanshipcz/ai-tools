@@ -133,7 +133,7 @@ Pre-defined YAML fixtures are available in `test-utils.ts`:
 
 - `FIXTURES.validPrompt` - Valid prompt manifest
 - `FIXTURES.validAgent` - Valid agent manifest
-- `FIXTURES.validRulepack` - Valid rulepack manifest
+- `FIXTURES.validRuleset` - Valid ruleset manifest
 - `FIXTURES.validSkill` - Valid skill manifest
 - `FIXTURES.validProject` - Valid project manifest
 - `FIXTURES.invalidYaml` - Invalid YAML for error testing

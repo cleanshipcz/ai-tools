@@ -1,0 +1,29 @@
+{
+  "project_key": "XP",
+  "jira_instance": "https://jira.deutsche-boerse.com",
+  "defaults": {
+    "issue_type": "Task",
+    "priority": "Minor",
+    "labels": [],
+    "status": "Backlog"
+  },
+  "issue_type_ids": {
+    "Bug": "1",
+    "Task": "3",
+    "Sub-task": "5",
+    "Epic": "6",
+    "Story": "7"
+  },
+  "custom_field_ids": {
+    "epic_link": "customfield_10650",
+    "epic_name": "customfield_10651",
+    "story_points": "customfield_10052",
+    "rank": "customfield_10054",
+    "sprint": "customfield_10055",
+    "assignment_group": "customfield_14051",
+    "environment": "customfield_13157"
+  },
+  "standard_fields_note": {
+    "fixVersions": "Standard Jira field (not a custom field). Use via custom_fields: {\"fixVersions\": [{\"name\": \"5.1.x\"}]}"
+  }
+}

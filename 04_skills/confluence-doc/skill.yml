@@ -1,0 +1,31 @@
+id: confluence-doc
+description: >-
+  Create and update Confluence documentation — Use when creating or updating pages in Confluence.
+sections:
+  - text: |
+      ## Confluence Instance
+
+      - **URL**: `https://confluence.deutsche-boerse.com`
+      - **Space Key**: `XBID` or as specified per request
+      - **Parent Pages**: Follow the existing page tree hierarchy
+
+      ## Confluence Storage Format
+  - fragment: confluence-storage-format
+  - text: |
+      ## MCP Integration
+  - fragment: confluence-mcp-tools
+files:
+  - path: templates/runbook.txt
+  - path: templates/design-doc.txt
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  tags:
+    - confluence
+    - atlassian
+    - documentation
+    - runbook
+    - design-doc
+    - adr
+    - incident-report

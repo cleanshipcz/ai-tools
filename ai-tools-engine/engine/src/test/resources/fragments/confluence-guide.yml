@@ -1,0 +1,14 @@
+id: confluence-guide
+description: Guide for formatting Confluence pages
+content: |
+  Use headings (h1-h6) to structure content hierarchically.
+  Use tables for structured data comparison.
+  Use code blocks with language hints for code snippets.
+  Use info/warning/note panels for callouts.
+metadata:
+  version: 1.0.0
+  author: 'AI Tools Team'
+  created: '2026-04-03'
+  tags:
+    - confluence
+    - formatting

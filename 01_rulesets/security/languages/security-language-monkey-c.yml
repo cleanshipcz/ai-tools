@@ -1,0 +1,19 @@
+id: security-language-monkey-c
+description: Monkey C security rules for Garmin Connect IQ apps covering network calls, secrets, permissions, and sensitive health/location data
+rules:
+  - "Use HTTPS URLs for all Communications.makeWebRequest calls — Connect IQ apps must never transmit data over plain HTTP."
+  - "Never hardcode API keys, tokens, or secrets in source code or Rez resources — the compiled PRG ships to the device and can be extracted; obtain credentials at runtime via OAuth or the companion app."
+  - "Use Communications.makeOAuthRequest and registerForOAuthMessages for authentication flows instead of collecting or embedding user credentials."
+  - "Treat Application.Storage and Properties as unencrypted — store only short-lived tokens there, never passwords or long-lived secrets."
+  - "Validate untrusted web response payloads before use: check responseCode first, verify types with instanceof before casting dictionary values, and fail closed on unexpected data."
+  - "Request only the manifest.xml permissions the app actually uses (Communications, Positioning, SensorHistory, UserProfile) — each granted permission widens the data exposed to the app."
+  - "Treat Positioning and UserProfile data (location, heart rate, health metrics) as sensitive — transmit it off-device only when the feature requires it and the user has consented."
+  - "Never print tokens, credentials, or personal data via System.println or test Logger output — device logs are readable over USB."
+  - "Validate data received through BluetoothLowEnergy characteristics and Communications.transmit mailbox messages before acting on it — external devices and phone apps are untrusted inputs."
+  - "Do not display sensitive account or health details in glances, complications, or watch faces — they are visible without any unlock interaction."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-07-12"
+  tags:
+    - monkey-c

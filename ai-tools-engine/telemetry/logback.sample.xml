@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!--
+      Dual-mode Logback configuration for SLF4J 2.x + logstash-logback-encoder.
+
+      Two appenders are defined:
+        - JSON  : structured JSON output with OpenTelemetry trace correlation (production default)
+        - TEXT  : human-readable output with colors for local debugging
+
+      Switch between them with the LOG_FORMAT environment variable or -DLOG_FORMAT system property:
+        - LOG_FORMAT=JSON  (default) -> structured JSON
+        - LOG_FORMAT=TEXT            -> human-readable plain text
+    -->
+
+    <variable name="LOG_FORMAT" value="${LOG_FORMAT:-JSON}" />
+
+    <!-- ==================== JSON appender (production) ==================== -->
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp/>
+                <loggerName/>
+                <threadName/>
+                <logLevel/>
+                <message/>
+                <stackTrace/>
+
+                <!-- Write trace_id/span_id from current OpenTelemetry span -->
+                <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
+
+                <!-- If you also want MDC fields on every log, uncomment: -->
+                <!-- <mdc/> -->
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- ==================== TEXT appender (debugging) ==================== -->
+    <appender name="TEXT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%logger{36}) - %msg%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Example of bumping verbosity for your app/package -->
+    <!-- <logger name="com.example" level="DEBUG"/> -->
+
+    <root level="INFO">
+        <appender-ref ref="${LOG_FORMAT}" />
+    </root>
+</configuration>

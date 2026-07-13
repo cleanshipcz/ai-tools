@@ -1,0 +1,107 @@
+package cz.cleanship.aitools.engine.tools.adapters.antigravity
+
+import cz.cleanship.aitools.engine.models.ProjectManifest
+import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.services.ExportService
+import cz.cleanship.aitools.engine.tools.AgentContext
+import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.GlobalContext
+import cz.cleanship.aitools.engine.tools.Printers
+import cz.cleanship.aitools.engine.tools.PromptContext
+import cz.cleanship.aitools.engine.tools.SkillContext
+import cz.cleanship.aitools.engine.tools.ToolAdapter
+import java.io.File
+
+class AntigravityAdapter(
+    private val printers: Printers = Printers,
+    private val exportService: ExportService = ExportService(),
+) : ToolAdapter {
+
+    override val toolType: ToolType = ToolType.ANTIGRAVITY
+
+    override fun prepare(projectDir: File, project: ProjectManifest) {
+        if (project.deploy.replace) {
+            agentDir(projectDir).deleteRecursively()
+        }
+    }
+
+    override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
+        globalContext.project,
+        rulesDir(projectDir).resolve("project.md"),
+    ) {
+        it.appendText(
+            """
+            ---
+            trigger: always_on
+            glob:
+            description: ${globalContext.project.description.replace("\n", " ")}
+            ---
+            
+            """.trimIndent(),
+        )
+        printers.globalFilePrinter.print(globalContext, it)
+    }
+
+    override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
+        promptContext.prompt,
+        rulesDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md"),
+    ) {
+        it.appendText(ruleHeader)
+        printers.promptPrinter.print(promptContext, it)
+    }
+
+    override fun export(projectDir: File, agentContext: AgentContext) = exportService.export(
+        agentContext.agent,
+        rulesDir(projectDir).resolve("agent-${agentContext.agent.id}.md"),
+    ) {
+        it.appendText(ruleHeader)
+        printers.agentPrinter.print(agentContext, it)
+    }
+
+    override fun export(projectDir: File, featureContext: FeatureContext) = exportService.export(
+        featureContext.feature,
+        workflowsDir(projectDir).resolve("feature-${featureContext.feature.id}.md"),
+    ) {
+        it.appendText(
+            """
+            ---
+            description: ${featureContext.feature.description.replace("\n", " ")}
+            ---
+            
+            """.trimIndent(),
+        )
+        printers.featurePrinter.print(featureContext, it)
+    }
+
+    override fun export(projectDir: File, skillContext: SkillContext) {
+        val skillId = skillContext.skill.id
+        exportService.export(
+            skillContext.skill,
+            rulesDir(projectDir).resolve("skill-$skillId.md"),
+        ) {
+            it.appendText(ruleHeader)
+            printers.skillPrinter.print(skillContext, it)
+        }
+        exportService.copySkillFiles(
+            skillContext.skill.files,
+            skillContext.sourceDir,
+            rulesDir(projectDir).resolve("skill-$skillId"),
+        )
+    }
+
+    private fun agentDir(projectDir: File) = projectDir.resolve(".agent")
+
+    private fun rulesDir(projectDir: File) = agentDir(projectDir).resolve("rules")
+
+    private fun workflowsDir(projectDir: File) = agentDir(projectDir).resolve("workflows")
+
+    companion object {
+        private val ruleHeader =
+            """
+            ---
+            trigger: manual
+            ---
+            
+            """.trimIndent()
+    }
+}

@@ -1,0 +1,109 @@
+id: confluence-search
+description: >-
+  Search and retrieve information from Confluence. Use when the user needs to find
+  documentation, runbooks, design docs, or any knowledge buried in Confluence pages.
+  Systematically search, filter, navigate page trees, and extract relevant content.
+sections:
+  - text: |
+      ## Available Tools
+  - fragment: confluence-mcp-tools
+  - text: |
+      ## Search Strategy
+
+      Finding information in Confluence requires a systematic approach. Pages are often
+      deeply nested, inconsistently named, or outdated. Follow this workflow:
+
+      ### 1. Start with CQL Search
+
+      Use `confluence_search_pages` with CQL. Start broad, then narrow down:
+
+      ```
+      # Search by content keyword in a specific space
+      confluence_search_pages(cql='space = "OBSV" AND text ~ "etcd alerting"')
+
+      # Search by title
+      confluence_search_pages(cql='title ~ "runbook" AND space = "OBSV"')
+
+      # Search by label
+      confluence_search_pages(cql='label = "runbook" AND space = "OBSV"')
+
+      # Search across all spaces
+      confluence_search_pages(cql='text ~ "deployment pipeline"')
+
+      # Filter by recency (prefer fresh content)
+      confluence_search_pages(cql='text ~ "monitoring" AND lastModified > "2025-01-01"')
+      ```
+
+      ### 2. Triage Results Using Excerpts
+
+      Search results include an `excerpt` field with a text snippet showing the match context.
+      Use this to quickly evaluate relevance **before** fetching full page content.
+      Results also include `labels` and `last_modified` — prefer newer pages and pages
+      with relevant labels.
+
+      ### 3. Fetch Relevant Pages
+
+      Once you identify promising results, fetch the full content:
+
+      ```
+      # Use export_view for cleaner, easier-to-read HTML
+      confluence_get_page(page_id="116723892", body_format="export_view")
+      ```
+
+      Prefer `body_format="export_view"` over `"storage"` when reading — it produces
+      cleaner HTML without Confluence macros and XML noise.
+
+      ### 4. Navigate Page Trees
+
+      Information is often spread across parent/child pages. When a search hit is a
+      section landing page, explore its children:
+
+      ```
+      confluence_get_child_pages(page_id="116723892")
+      ```
+
+      Then selectively fetch the children that look relevant based on their titles.
+
+      ### 5. Paginate Large Result Sets
+
+      If results are truncated, paginate:
+
+      ```
+      # First page
+      confluence_search_pages(cql='space = "OBSV" AND text ~ "alert"', max_results=25, start=0)
+
+      # Next page
+      confluence_search_pages(cql='space = "OBSV" AND text ~ "alert"', max_results=25, start=25)
+      ```
+
+      ## CQL Quick Reference
+
+      | Operator | Example | Notes |
+      |----------|---------|-------|
+      | `text ~` | `text ~ "deploy"` | Full-text search across page content |
+      | `title ~` | `title ~ "runbook"` | Search in page titles |
+      | `title =` | `title = "Exact Title"` | Exact title match |
+      | `space =` | `space = "OBSV"` | Restrict to a space |
+      | `label =` | `label = "runbook"` | Filter by label |
+      | `type =` | `type = "page"` | Page vs. blogpost |
+      | `ancestor =` | `ancestor = "12345"` | Pages under a parent (recursive) |
+      | `lastModified >` | `lastModified > "2025-01-01"` | Recency filter |
+      | `creator =` | `creator = "username"` | Pages by author |
+      | `AND` / `OR` | Combine clauses | Standard boolean logic |
+
+      ## Tips
+
+      - **Try synonyms** — if "alerting" returns nothing, try "alerts", "monitoring", "notifications"
+      - **Check labels first** — `label = "runbook"` is faster and more precise than `text ~ "runbook"`
+      - **Use space scoping** — always scope to a space when you know it, to avoid noise from unrelated teams
+      - **Watch for staleness** — always check `last_modified` date; Confluence is full of abandoned pages
+      - **Summarize, don't dump** — extract the relevant section and present it concisely; don't paste entire pages
+metadata:
+  version: 1.0.0
+  author: 'AI Tools Team'
+  created: '2026-04-06'
+  tags:
+    - confluence
+    - search
+    - knowledge-retrieval
+    - atlassian

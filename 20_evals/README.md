@@ -1,6 +1,6 @@
 # Evaluation Framework
 
-The evaluation framework validates AI agent behavior through automated tests - ensuring prompts, agents, and rulepacks work as expected before deployment.
+The evaluation framework validates AI agent behavior through automated tests - ensuring prompts, agents, and rulesets work as expected before deployment.
 
 ## 📁 What's Here
 

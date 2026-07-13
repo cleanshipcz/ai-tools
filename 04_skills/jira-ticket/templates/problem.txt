@@ -1,0 +1,15 @@
+h3. Alert Details
+
+Source: <Grafana / OpsGenie>
+Severity: <critical / warning>
+Alert: <alert rule name>
+Environment: <cluster / namespace / host>
+First Fired: <timestamp>
+
+h3. Observed Impact
+
+<Describe what is affected — service, metric, customer impact.>
+
+h3. Resolution
+
+<Document the fix or workaround once resolved.>

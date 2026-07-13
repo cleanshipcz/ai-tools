@@ -1,0 +1,30 @@
+id: coding-common
+description: Common coding standards and best practices
+rules:
+  - "Never make write operations to git (no git commit, git push, etc.) on master, main, develop or acceptance branch."
+  - "Prefer composition over inheritance."
+  - "Follow the Single Responsibility Principle for classes."
+  - "Prefer immutable objects."
+  - "Use enums for fixed sets of constants."
+  - "Prefer constructor injection for dependency injection."
+  - "Handle exceptions appropriately."
+  - "When running inside an IDE, prefer using native read/write tools rather than CLI tools."
+  - "Reflect changes in the relevant documentation."
+  - "Manual testing is for exploration only; regression prevention requires automated tests."
+  - "Test infrastructure must be in place before implementing features."
+  - "All new features MUST include automated tests before implementation is considered complete."
+  - "Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests."
+  - "When adding features: write tests defining behavior first, then implement (Red-Green-Refactor). Follow TDD."
+  - "Everything should be a high-quality production-ready code."
+  - "Preserve existing functionality unless explicitly asked to change it."
+  - "Document non-obvious decisions and trade-offs."
+  - "Minimize code duplication."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  tags:
+    - common
+    - development
+    - coding
+    - style

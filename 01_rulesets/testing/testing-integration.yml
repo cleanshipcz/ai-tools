@@ -1,0 +1,11 @@
+id: testing-integration
+description: Integration testing standards and best practices
+rules:
+  - "Integration tests MUST cover: component interactions, external dependencies, data flow."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  tags:
+    - integration
+    - testing

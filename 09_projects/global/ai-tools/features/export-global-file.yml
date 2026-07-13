@@ -1,0 +1,32 @@
+id: export-global-file
+metadata:
+  version: 1.0.0
+  created: 2026-01-02
+  updated: 2026-01-02
+  tags:
+    - global
+description: "Add a feature that provides export of a project global file based on the project.yml file."
+
+context:
+  overview: |
+    A feature, that allows export of a project global file based on the project.yml file.
+
+  architecture: |
+    engine/src/main/kotlin/cz/cleanship/aitools/engine/tools/ contains the printing logic
+
+constraints:
+  - "Use JUnit 5 + AssertJ for tests"
+  - "Prioritize quality over speed"
+
+prompt: |
+  Add a feature that provides export of a project global file based on the project.yml file.
+  - The global file should be based on the project.yml file
+  - The global file should be named global.yml
+  - The global file should be set to global use based on the given tool
+
+acceptance_criteria:
+  - Code follows project conventions (JUnit 5, AssertJ, GWT pattern)
+  - All existing tests pass
+  - New feature is fully covered with tests
+  - New tests created for the new feature also pass
+  - Documentation updated if needed

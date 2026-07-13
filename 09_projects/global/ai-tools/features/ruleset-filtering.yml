@@ -1,0 +1,48 @@
+id: ruleset-filtering
+metadata:
+  version: 1.0.0
+  created: 2026-01-02
+  updated: 2026-01-02
+  tags:
+    - rulesets
+    - filtering
+description: "Add a feature that allows filtering of rulesets based on tags."
+
+context:
+  overview: |
+    A feature, that allows filtering of rulesets based on tags. This allows users to define a single agent and use it e.g.,
+    with different technologies based on the projects needs such as only kotlin rules for kotlin project, only typescript rules for typescript project, etc.
+
+  architecture: |
+    engine/src/main/kotlin/cz/cleanship/aitools/engine/services/LoaderService.kt contains the loading logic
+    - currently it loads all available rulesets
+    - it needs to load the rulesets files normally and folders differently to support the required feature
+
+    engine/src/main/kotlin/cz/cleanship/aitools/engine/tools/AgentPrinter.kt contains the printing logic
+    - currently it receives all available rulesets and filters them based on what the agent defines\
+    - it needs to filter them also based on the tags provided in the project.yml file
+
+  files:
+    - "engine/src/main/kotlin/cz/cleanship/aitools/engine/services/LoaderService.kt"
+    - "engine/src/main/kotlin/cz/cleanship/aitools/engine/tools/AgentPrinter.kt"
+
+constraints:
+  - "Use JUnit 5 + AssertJ for tests"
+  - "Prioritize quality over speed"
+
+prompt: |
+  Implement a feature, that allows filtering of rulesets based on tags.
+  - A ruleset mentioned can be either a file or a folder
+    - If it is a file, it is a single ruleset and should have a file name with extension (e.g. ruleset.yml), and will be referenced as such
+    - If it is a folder, it is a collection of rulesets and should have a folder name (e.g. ruleset), and will be referenced as such
+  - In case a folder, it can contain multiple ruleset files (e.g. java.yml, kotlin.yml)
+  - From such folder, only rulesets matching the tags should be loaded (e.g. tag: java will load java.yml, tag: kotlin will load kotlin.yml)
+  - Tags are provided from the project.yml file
+
+
+acceptance_criteria:
+  - Code follows project conventions (JUnit 5, AssertJ, GWT pattern)
+  - All existing tests pass
+  - New feature is fully covered with tests
+  - New tests created for the new feature also pass
+  - Documentation updated if needed

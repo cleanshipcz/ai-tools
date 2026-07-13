@@ -1,0 +1,29 @@
+id: new-ui2
+description: Create a new UI for the application
+context:
+  overview: |
+    The goal is to modernize the user interface using React and Tailwind CSS.
+  architecture: |
+    Standard React architecture with functional components and hooks.
+  dependencies:
+    - react
+    - tailwindcss
+  files:
+    - src/App.tsx
+    - src/components/Dashboard.tsx
+prompt: |
+  Follow the design guidelines in the UI kit.
+acceptance_criteria:
+  - "Responsive design (mobile, tablet, desktop)"
+  - "Dark mode support"
+  - "Accessibility (WCAG 2.1 AA)"
+constraints:
+  - "Use functional components"
+  - "No class components"
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  tags:
+    - ui
+    - react

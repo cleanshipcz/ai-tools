@@ -1,0 +1,25 @@
+id: review-architecture
+description: Architecture review rules for evaluating design patterns, coupling, scalability, and structural decisions
+rules:
+  - "Evaluate adherence to SOLID principles and clean architecture."
+  - "Assess coupling between components - flag tight coupling and circular dependencies."
+  - "Check cohesion - ensure modules have a single, clear responsibility."
+  - "Review dependency direction - dependencies should point inward toward the domain."
+  - "Evaluate scalability implications of design decisions."
+  - "Check for proper separation of concerns across layers."
+  - "Assess extensibility - can the design accommodate likely future changes?"
+  - "Review error propagation and failure handling across boundaries."
+  - "Evaluate consistency with existing architectural patterns in the codebase."
+  - "Identify potential bottlenecks in data flow and processing pipelines."
+  - "Check for appropriate use of design patterns - neither over- nor under-engineered."
+  - "Assess observability - logging, metrics, and tracing across components."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-13"
+  tags:
+    - review
+    - development
+    - architecture
+    - design
+    - structure

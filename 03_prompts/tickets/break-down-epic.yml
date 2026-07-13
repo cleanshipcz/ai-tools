@@ -1,22 +1,17 @@
-id: break-down-epic
-version: 1.0.0
+id: tickets-break-down-epic
 description: Break down an epic into smaller, manageable user stories
-tags:
-  - tickets
-  - epic
-  - story-breakdown
 variables:
   - name: epic
     required: true
-    description: 'The epic to break down'
+    description: "The epic to break down"
   - name: constraints
     required: false
-    description: 'Team size, timeline, or other constraints'
+    description: "Team size, timeline, or other constraints"
 rules:
-  - 'Create vertical slices that deliver value independently.'
-  - 'Keep stories small and of similar size.'
-  - 'Identify dependencies between stories.'
-  - 'Prioritize by value and risk.'
+  - "Create vertical slices that deliver value independently."
+  - "Keep stories small and of similar size."
+  - "Identify dependencies between stories."
+  - "Prioritize by value and risk."
 content: |
   Break down this epic into user stories:
 
@@ -72,9 +67,13 @@ content: |
   6. **MVP Definition**: Minimum stories for initial release
 
   7. **Total Estimate**: Sum of all story points
-
 outputs:
   format: markdown
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  tags:
+    - tickets
+    - epic
+    - story-breakdown

@@ -9,7 +9,7 @@
 
 ### Large features (v1.1.0)
 
-- ✅ Feature-specific context system in `06_projects/<global|local>/project-name/features/feature-name`
+- ✅ Feature-specific context system in `09_projects/<global|local>/project-name/features/feature-name`
 - ✅ Feature manifests with snippets and conventions
 - ✅ Generates feature-specific context for all tools (GitHub Copilot, Windsurf, Claude Code, Cursor)
 - ✅ Feature generation integrated into project generation workflow
@@ -65,7 +65,7 @@ Multi-agent recipes enable orchestrating multiple AI agents in sequence to accom
 
 **Generated artifacts:**
 
-- `05_recipes/*.yml` - Recipe manifest definitions
+- `08_recipes/*.yml` - Recipe manifest definitions
 - `10_schemas/recipe.schema.json` - JSON Schema for validation
 - `.output/scripts/*.sh` - Auto-generated executable scripts
 
@@ -87,7 +87,7 @@ FEATURE_DESCRIPTION="Add auth" \
 npm run recipe:run feature-delivery claude-code
 ```
 
-See [`05_recipes/README.md`](../05_recipes/README.md) for complete documentation.
+See [`08_recipes/README.md`](../08_recipes/README.md) for complete documentation.
 
 ### Misc
 
@@ -95,7 +95,7 @@ See [`05_recipes/README.md`](../05_recipes/README.md) for complete documentation
 - [x] switch --no-confirm to --interactive for step-by-step with confirmation (by default doesn't require confirmation)
 - [x] For all recipes, the first step needs to be: analysis of the relevant content with output to a document, then detailed plan of the change with output to a document; these documents then need to be included in context and maintained
 - [x] Organization agent -> good in organizing files, folders, documents, topics, etc.
-- [x] Organize this repository -> add enumerated prefix for folders (e.g. 01_rulepacks, 02_skills, ..., 90_docs)
+- [x] Organize this repository -> add enumerated prefix for folders (e.g. 01_rulesets, 04_skills, ..., 90_docs)
 
 ## Other features NOT NOW
 
@@ -105,3 +105,10 @@ See [`05_recipes/README.md`](../05_recipes/README.md) for complete documentation
 - [ ] Cost analytics dashboard
 - [ ] Version control integration (Git hooks for prompt changes)
 - [ ] Prompt optimization suggestions (A/B testing automation)
+
+## Skills
+
+- support for Anthropic-compatible skills
+- they should be also for OpenAI
+- make it somehow work for other tools as well
+- e.g. add xbid skill, xbid components can also be skill, etc. 

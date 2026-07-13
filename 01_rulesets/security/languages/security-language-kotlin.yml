@@ -1,0 +1,19 @@
+id: security-language-kotlin
+description: Kotlin-specific security rules for JVM concerns, serialization, and null safety as a security boundary
+rules:
+  - "Use parameterized queries for all database operations — never use string interpolation or concatenation in SQL."
+  - "Prefer kotlinx.serialization with explicit serializers over Java's native serialization — avoid deserializing untrusted data."
+  - "Treat null safety as a security boundary — use non-nullable types for security-critical parameters (user IDs, tokens, permissions)."
+  - "Do not expose stack traces or internal error details to end users — log them server-side, return generic error messages."
+  - "Validate and restrict file paths to prevent path traversal — use Path.normalize() and verify the result stays within expected directories."
+  - "Avoid ProcessBuilder with unsanitized input — use argument lists, never shell-interpolated command strings."
+  - "Use java.security.SecureRandom instead of kotlin.random.Random for security-sensitive randomness."
+  - "Use sealed classes for permission models and access control — exhaustive when expressions prevent missing authorization branches."
+  - "Mark sensitive properties with @Transient in serializable classes to prevent accidental exposure."
+  - "Avoid reflection-based access (KClass, KProperty) with user-controlled input — it can bypass visibility and type safety."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-28"
+  tags:
+    - kotlin

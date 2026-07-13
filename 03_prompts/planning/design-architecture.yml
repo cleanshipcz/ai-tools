@@ -1,25 +1,20 @@
-id: design-architecture
-version: 1.0.0
+id: planning-design-architecture
 description: Design system architecture for a new feature or project
-tags:
-  - planning
-  - architecture
-  - design
 variables:
   - name: requirements
     required: true
-    description: 'Feature or project requirements'
+    description: "Feature or project requirements"
   - name: constraints
     required: false
-    description: 'Technical or business constraints'
+    description: "Technical or business constraints"
   - name: existing_system
     required: false
-    description: 'Description of existing system to integrate with'
+    description: "Description of existing system to integrate with"
 rules:
-  - 'Consider scalability and maintainability.'
-  - 'Evaluate multiple alternatives.'
-  - 'Document trade-offs.'
-  - 'Use standard design patterns where appropriate.'
+  - "Consider scalability and maintainability."
+  - "Evaluate multiple alternatives."
+  - "Document trade-offs."
+  - "Use standard design patterns where appropriate."
 content: |
   Design architecture for:
 
@@ -70,9 +65,13 @@ content: |
      - Reliability and availability
 
   8. **Risks and Mitigations**: Potential issues and how to address them
-
 outputs:
   format: markdown
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  tags:
+    - planning
+    - architecture
+    - design

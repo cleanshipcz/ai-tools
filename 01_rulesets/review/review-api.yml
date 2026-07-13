@@ -1,0 +1,26 @@
+id: review-api
+description: API design review rules for evaluating REST conventions, consistency, versioning, and consumer experience
+rules:
+  - "Verify REST conventions - correct HTTP methods, status codes, and resource naming."
+  - "Check consistency across endpoints - naming patterns, pagination, filtering, sorting."
+  - "Evaluate backward compatibility - will changes break existing consumers?"
+  - "Verify proper versioning strategy and deprecation handling."
+  - "Check error response consistency - standard format, meaningful messages, appropriate codes."
+  - "Assess authentication and authorization design across endpoints."
+  - "Evaluate request/response payload design - naming, nesting, types."
+  - "Check for proper use of HTTP headers (content type, caching, CORS)."
+  - "Verify idempotency guarantees for unsafe operations."
+  - "Assess rate limiting and throttling strategy."
+  - "Check for proper HATEOAS or hypermedia links where applicable."
+  - "Evaluate API discoverability and self-documentation (OpenAPI/Swagger)."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-13"
+  tags:
+    - review
+    - development
+    - api
+    - rest
+    - design
+    - contract

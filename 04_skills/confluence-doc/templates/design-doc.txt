@@ -1,0 +1,70 @@
+# [M7O] Design: <TITLE>
+
+---
+**Table of Contents**
+
+<!-- confluence macro: toc -->
+<ac:structured-macro ac:name="toc" />
+
+---
+
+## Status
+
+**Status**: Draft | Proposed | Accepted | Deprecated
+**Author(s)**: <names>
+**Date**: YYYY-MM-DD
+
+## Context
+
+What is the situation that motivates this change? What problem are we solving?
+Reference any relevant Jira tickets: [M7O-XXXX](https://exg-jira2.deutsche-boerse.de/browse/M7O-XXXX)
+
+## Decision
+
+Describe the change or architecture decision being made.
+
+## Detailed Design
+
+### Architecture
+
+Describe the technical approach, components involved, data flows.
+
+### Configuration
+
+Any new configuration, environment variables, Terraform variables, Helm values.
+
+### Dependencies
+
+List upstream and downstream dependencies affected.
+
+## Alternatives Considered
+
+### Option A: <Name>
+
+Description, pros, cons.
+
+### Option B: <Name>
+
+Description, pros, cons.
+
+## Consequences
+
+### Positive
+
+- Benefit 1
+- Benefit 2
+
+### Negative / Risks
+
+- Risk 1 — mitigation
+- Risk 2 — mitigation
+
+## Implementation Plan
+
+1. Phase 1: <description> — target date
+2. Phase 2: <description> — target date
+
+## Open Questions
+
+- [ ] Question 1
+- [ ] Question 2

@@ -1,0 +1,100 @@
+id: ai-tools-project
+description: A unified mono-repository for AI agent configuration - define once in YAML, deploy everywhere
+context:
+  overview: |
+    A comprehensive solution for managing AI agent prompts, rules, skills, and tool configurations.
+    Keep your "source of truth" in small, typed YAML manifests and automatically generate
+    tool-specific artifacts for Windsurf, Claude Code, Cursor, GitHub Copilot, and other AI coding assistants.
+
+    The repository provides a build system that transforms unified YAML manifests into
+    tool-specific formats, ensuring consistency across different AI coding environments.
+    It includes prompts for common tasks, agents for specific roles, rulesets for coding standards,
+    skills for tool integrations, and a project system for per-project configurations.
+  documentation:
+    readme: README.md
+    per_topic:
+      main_docs:
+        prompts: 03_prompts/README.md
+        agents: AGENTS.md
+        skills: 04_skills/README.md
+        projects: 09_projects/README.md
+        recipes: 08_recipes/README.md
+        tools: 90_docs/TOOLS.md
+        user_tools: 90_docs/USER_TOOLS.md
+        testing: 90_docs/TESTING.md
+      development:
+        style_guide: 90_docs/STYLE_GUIDE.md
+        changelog: 90_docs/CHANGELOG.md
+        planned_features: 90_docs/PLANNED_FEATURES.md
+        implementation: IMPLEMENTATION.md
+  rules:
+    - Verify correct output for ai-tools-engine project with running `./gradlew clean build`, focus on running ktlint and detekt
+deploy:
+  directory: "/home/blaha/Documents/Projects/ai-tools/"
+  agents:
+    filter:
+      - type: tags
+        tags:
+          - common
+          - ai
+          - development
+          - documentation
+  prompts:
+    filter:
+      - type: whitelist
+        ids:
+          - refactor-extract-method
+          - refactor-simplify-conditionals
+          - refactor-remove-duplication
+          - refactor-improve-naming
+          - refactor-add-error-handling
+          - docs-document-api
+          - docs-write-readme
+          - docs-create-tutorial
+          - ocs-summarize-pr
+          - planning-design-architecture
+          - planning-create-implementation-plan
+          - planning-tech-decision-record
+          - qa-write-tests
+          - qa-setup-test-infrastructure
+          - manifests-create-prompt
+          - manifests-create-agent
+          - manifests-create-project
+          - manifests-create-feature
+          - manifests-create-ruleset
+          - manifests-create-skill
+          - manifests-create-recipe
+          - manifests-duplicate-project
+  skills:
+    filter:
+      - type: tags
+        tags:
+          - kotlin
+          - search
+  rulesets:
+    filter:
+      - type: tags
+        tags:
+          - common
+          - development
+          - kotlin
+          - unit
+          - integration
+          - documentation
+          - testing
+          - manifests
+          - ai
+metadata:
+  version: 1.0.0
+  author: cleanshipcz
+  created: 2025-11-15
+  updated: 2025-11-16
+  tags:
+    - ai
+    - tooling
+    - configuration
+    - mono-repository
+    - yaml
+    - prompts
+    - agents
+    - code-generation

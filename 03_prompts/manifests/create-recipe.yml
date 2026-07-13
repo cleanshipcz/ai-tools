@@ -1,79 +1,143 @@
-id: create-recipe
-version: 2.0.0
-description: Clarify workflow steps and create a simple recipe.yml manifest
-
-tags:
-  - manifests
-  - recipes
-  - workflows
-  - yaml
-
+id: manifests-create-recipe
+description: Clarify workflow steps and create a recipe.yml manifest validated by recipe.schema.json
 variables:
   - name: user_description
     required: true
-    description: 'Brief description of the workflow or process'
-
+    description: "Brief description of the workflow or process"
+rulesets:
+  - authoring-yaml
+  - authoring-ai
+  - authoring-manifests
 rules:
-  - 'Ask clarifying questions BEFORE generating the manifest'
-  - 'Recommend keeping workflows simple (3-7 steps) but allow complexity when justified'
-  - 'Each step should have one clear purpose'
-  - 'Recommend document-first pattern (analysis → plan → implement) for multi-step workflows'
-
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Recommend keeping workflows simple (3-7 steps) but allow complexity when justified"
+  - "Each step should have one clear purpose"
+  - "Recommend document-first pattern (analysis -> plan -> implement) for multi-step workflows"
+  - "Recipes have NO Kotlin engine model — they are processed by the TypeScript CLI"
+  - "Validate against 10_schemas/recipe.schema.json"
 content: |
   The user wants to create a recipe based on this description:
 
   {{user_description}}
 
-  **Your job is to clarify and translate:**
+  **Your job is to clarify and translate into a valid recipe manifest.**
 
-  1. **Ask clarifying questions:**
-     - What is the overall goal of this workflow?
-     - What are the main steps? (keep it high-level, 3-7 steps)
-     - Which agents should perform each step?
-     - Should steps produce documents for later steps to reference?
-     - Which tools should run this? (copilot-cli, claude-code, cursor)
+  ## Step 1: Ask clarifying questions
 
-  2. **Suggest structure:**
-     - Propose a kebab-case ID (e.g., feature-delivery, code-review-cycle)
-     - Identify main steps (recommend starting with 3-7, can be more if needed)
-     - Assign appropriate agents to steps
-     - Apply document-first pattern if multi-step
+  - What is the overall goal of this workflow?
+  - What are the main steps? (keep it high-level, 3-7 steps)
+  - Which agents should perform each step?
+  - Should steps produce documents for later steps to reference?
+  - Which tools should run this? (claude-code, copilot-cli, cursor)
+  - Any iterative loops needed? (review-refactor cycles)
 
-  3. **Create recipe.yml with:**
-     - id, version (1.0.0), description
-     - tags: [workflow type]
-     - steps: Array of steps, each with agent, prompt, outputDocument
-     - Recommend pattern: analysis.md → plan.md → implementation (include prior docs)
-     - tools: [copilot-cli, claude-code, cursor]
-     - metadata: author, dates
+  ## Step 2: Suggest structure
 
-  **Document-first pattern (recommended for multi-step workflows):**
+  - Propose a kebab-case ID (e.g., feature-delivery, code-review-cycle)
+  - Identify main steps (recommend 3-7)
+  - Assign appropriate agents to each step
+  - Apply document-first pattern if multi-step
+
+  ## Step 3: Create recipe.yml matching recipe.schema.json
+
+  ```yaml
+  id: workflow-name
+  version: 1.0.0                   # Top-level (not in metadata for recipes)
+  description: What this workflow accomplishes (10-500 chars)
+  tags: [workflow, domain]
+  tools: [claude-code, copilot-cli]
+
+  conversationStrategy: separate    # separate (fresh per step) or continue (shared context)
+
+  variables:                        # Global variables for all steps
+    feature_description: '{{FEATURE_DESCRIPTION}}'
+
+  steps:
+    - id: analyze                   # Unique kebab-case step ID
+      agent: planner-project        # Agent ID to use
+      task: |                       # Task description (required per step)
+        Analyze the feature request and identify:
+        1. Relevant codebase sections
+        2. Dependencies and risks
+      outputDocument: '.recipe-docs/analysis.md'
+
+    - id: implement
+      agent: developer-feature
+      task: |
+        Implement the feature based on the analysis.
+      includeDocuments:             # Include prior step outputs
+        - '.recipe-docs/analysis.md'
+      outputDocument: '.recipe-docs/implementation.md'
+
+    - id: review
+      agent: reviewer-code
+      task: |
+        Review the implementation for quality and correctness.
+      includeDocuments:
+        - '.recipe-docs/analysis.md'
+        - '.recipe-docs/implementation.md'
+      waitForConfirmation: true     # Pause for user approval
+
+  # Optional: iterative loop
+  loop:
+    steps: [review, implement]      # Step IDs to loop
+    maxIterations: 3
+    condition:
+      type: user-decision           # user-decision|command|max-iterations
+      prompt: "Is the quality acceptable?"
+
+  # Optional: tool-specific options
+  toolOptions:
+    copilot-cli:
+      allowAllTools: true
+    claude-code:
+      allowedTools: [Bash, Read, Write, Edit]
+
+  metadata:
+    author: "AI Tools Team"
+    created: "YYYY-MM-DD"
+  ```
+
+  **Step fields** (per recipe.schema.json):
+  - Required: `id`, `agent`, `task`
+  - Optional: `prompt` (prompt ID instead of task text), `inputs`, `outputDocument`,
+    `includeDocuments`, `continueConversation`, `waitForConfirmation`, `condition`, `model`
+
+  **Document-first pattern** (recommended for multi-step workflows):
   - Step 1: Analysis (outputDocument: .recipe-docs/analysis.md)
   - Step 2: Planning (outputDocument: .recipe-docs/plan.md, includeDocuments: [analysis.md])
   - Step 3+: Implementation (includeDocuments: [analysis.md, plan.md])
 
-  **Start simple, allow complexity:**
-  - Recommend 3-7 steps for clarity, but allow more if workflow requires it
-  - Each step: agent, prompt/task, output
-  - Simple workflows: ~60-100 lines; Complex workflows: as needed
-
-  **Example:**
+  ## Example conversation
 
   User: "Workflow for delivering a new feature"
 
   You: "Questions:
   - Should it start with analysis/planning?
-  - Need code review step?
-  - Which agents? (feature-builder, code-reviewer, etc.)"
+  - Need a code review step?
+  - Should review loop until approved?
+  - Which tools? (claude-code, copilot-cli?)"
 
-  User: "Yes analysis first, then implement, then review"
+  User: "Yes analysis first, then implement, then review with loop"
 
-  You: "Perfect! I'll create 'feature-delivery' with:
-  1. Analyze requirements (project-planner → analysis.md)
-  2. Create plan (project-planner → plan.md, includes analysis)
-  3. Implement (feature-builder → code, includes analysis + plan)
-  4. Review (code-reviewer → review, includes all docs)
+  You: "I'll create `feature-delivery` with:
+  1. Analyze requirements (planner-project -> analysis.md)
+  2. Create plan (planner-project -> plan.md, includes analysis)
+  3. Implement (developer-feature, includes analysis + plan)
+  4. Review (reviewer-code, includes all docs, waitForConfirmation)
+  Loop steps 3-4 up to 3 times until approved.
   Sound good?"
 
+  File location: `08_recipes/<id>.yml`
 outputs:
   format: yaml
+metadata:
+  version: 3.0.0
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2026-03-28"
+  tags:
+    - manifests
+    - recipes
+    - workflows
+    - yaml

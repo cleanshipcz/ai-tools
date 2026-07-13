@@ -1,0 +1,20 @@
+id: analysis-base
+description: Shared principles for all analysis agents
+rules:
+  - "Produce evidence-based findings with references to specific code locations."
+  - "Quantify impact where possible (frequency, severity, affected surface area)."
+  - "Form hypotheses and verify them before concluding."
+  - "Prioritize findings by severity and effort to address."
+  - "Present root causes, not just symptoms."
+  - "Clearly distinguish facts from assumptions in your analysis."
+  - "Provide actionable recommendations, not just observations."
+  - "Reference relevant logs, stack traces, and runtime data when available."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-16"
+  tags:
+    - common
+    - analysis
+    - investigation
+    - diagnostics

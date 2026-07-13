@@ -1,0 +1,25 @@
+id: review-security
+description: Security audit rules for identifying vulnerabilities, attack surfaces, and compliance gaps
+rules:
+  - "Check for injection vulnerabilities (SQL, command, XSS, template)."
+  - "Verify authentication and authorization are correctly implemented."
+  - "Identify exposed sensitive data (credentials, tokens, PII) in code, logs, or responses."
+  - "Review input validation and sanitization at system boundaries."
+  - "Check for insecure deserialization and unsafe type handling."
+  - "Verify secure communication (TLS, certificate validation)."
+  - "Assess access control and privilege escalation risks."
+  - "Check for insecure cryptographic implementations."
+  - "Review dependency versions for known CVEs."
+  - "Identify CSRF, CORS, and session management issues."
+  - "Verify secrets are not committed to version control."
+  - "Check for proper error handling that does not leak internal details."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-03-13"
+  tags:
+    - review
+    - development
+    - security
+    - audit
+    - vulnerabilities

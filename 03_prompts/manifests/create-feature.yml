@@ -1,94 +1,129 @@
-id: create-feature
-version: 2.0.0
-description: Capture and clarify feature requirements, then create a simple feature.yml manifest
-
-tags:
-  - manifests
-  - features
-  - requirements
-  - yaml
-
+id: manifests-create-feature
+description: Capture and clarify feature requirements, then create a feature.yml manifest aligned with the Kotlin engine
 variables:
   - name: user_description
     required: true
-    description: 'Brief user description of what the feature should do'
-
+    description: "Brief user description of what the feature should do"
   - name: project_id
     required: false
-    description: 'Project ID where the feature belongs (e.g., ai-tools)'
-
+    description: "Project ID where the feature belongs (e.g., ai-tools)"
+rulesets:
+  - authoring-yaml
+  - authoring-ai
+  - authoring-manifests
 rules:
-  - 'Ask clarifying questions BEFORE generating the manifest'
-  - 'Recommend concise descriptions, but allow detail when needed'
-  - 'Do NOT draft the full solution - just capture requirements'
-  - 'Focus on WHAT needs to be done, not HOW to do it'
-  - 'Use conversational tone to understand user intent'
-  - 'Suggest a kebab-case feature ID based on description'
-  - 'Follow the schema (10_schemas/feature.schema.json) for structure'
-
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Recommend concise descriptions, but allow detail when needed"
+  - "Focus on capturing requirements and acceptance criteria"
+  - "Use conversational tone to understand user intent"
+  - "The Kotlin engine (FeatureManifest.kt) is the source of truth for feature.yml structure"
 content: |
   The user wants to create a new feature based on this description:
 
   {{user_description}}
 
-  **Your job is to:**
+  **Your job is to clarify and translate into a valid feature manifest.**
 
-  1. **Understand the requirement** - Ask clarifying questions to ensure mutual understanding:
-     - What is the main goal or purpose of this feature?
-     - Are there any specific constraints or dependencies?
-     - What does success look like? (acceptance criteria in simple terms)
-     - Should this be automated with a recipe? (feature-delivery, bug-fix-workflow, etc.)
-     - Which tools should support this? (copilot-cli, claude-code, cursor, windsurf)
+  ## Step 1: Ask clarifying questions
 
-  2. **Suggest a feature structure:**
-     - Propose a kebab-case ID (e.g., "automated-testing")
-     - Propose a clear, concise name
-     - Draft a brief description (1-2 sentences, max 200 chars)
+  - What is the main goal or purpose of this feature?
+  - Are there any specific constraints or dependencies?
+  - What does success look like? (acceptance criteria)
+  - What architectural context is relevant? (files, layers, patterns)
+  - Any hard constraints on implementation? (must use X, never do Y)
 
-  3. **Create a simple feature.yml** with:
-     - Basic required fields (id, version, name, description)
-     - Simple overview explaining WHAT the feature does
-     - Key files/patterns if known
-     - Basic acceptance criteria (simple bullet points)
-     - Recipe binding if requested
-     - Status: draft, owner, dates, tags
+  ## Step 2: Suggest structure
 
-  **What NOT to do:**
-  - Do NOT write detailed implementation plans
-  - Do NOT create elaborate architecture diagrams
-  - Do NOT write extensive code snippets
-  - Do NOT prescribe HOW things should be built
-  - Do NOT make the manifest huge and overwhelming
+  - Propose a kebab-case ID (e.g., automated-testing, export-global-file)
+  - Draft a brief description (1-2 sentences)
+  - Identify key acceptance criteria
 
-  **Start simple, allow detail:**
-  - The feature.yml is for CAPTURING requirements, not SOLVING them
-  - Implementation agents will use this as INPUT, not as a blueprint
-  - Think of it as a "feature brief" not a "detailed specification"
-  - Recommend 50-100 lines for simple features; allow more for complex ones
+  ## Step 3: Create feature.yml matching FeatureManifest.kt
 
-  **Example conversation flow:**
+  The Kotlin engine requires this structure:
+
+  ```yaml
+  id: feature-name
+  description: What this feature does (10-500 chars)
+
+  context:                          # Optional
+    overview: |
+      What the feature is about and why it matters.
+    architecture: |
+      Relevant architectural details, layers, patterns.
+    dependencies:                   # Optional
+      - "library or feature this depends on"
+    files:                          # Optional
+      - "src/main/kotlin/path/to/relevant/code"
+
+  prompt: |
+    Implementation instructions for the agent working on this feature.
+    This is the WHAT and HOW — specific enough to guide implementation.
+
+    - The feature should do X
+    - It should integrate with Y
+    - Use pattern Z for consistency
+
+  acceptance_criteria:              # Optional
+    - "Specific, verifiable criterion"
+    - "All existing tests pass"
+    - "New feature is fully covered with tests"
+
+  constraints:                      # Optional
+    - "Use JUnit 5 + AssertJ for tests"
+    - "Follow existing code patterns"
+
+  metadata:
+    version: 1.0.0
+    author: "AI Tools Team"
+    created: "YYYY-MM-DD"
+    tags: [feature-domain]
+  ```
+
+  **Fields NOT supported by Kotlin engine:**
+  name, version (top-level), files (top-level object), conventions, model, recipe, status, owner
+
+  ## Key distinction
+
+  - **description** = WHAT the feature is (brief, for humans reading a list)
+  - **prompt** = HOW to implement it (detailed, for the agent doing the work)
+  - **acceptance_criteria** = DONE WHEN (verifiable conditions)
+  - **constraints** = BOUNDARIES (must/must-not rules)
+
+  ## Example conversation
 
   User: "I need automated testing"
 
-  You: "Great! Let me clarify:
-  - What should be tested? (unit tests, integration tests, e2e?)
-  - What framework do you prefer?
-  - Should tests run automatically in CI/CD?
-  - Any specific coverage requirements?"
+  You: "Let me clarify:
+  - What should be tested? (unit, integration, e2e?)
+  - What framework?
+  - Any coverage requirements?
+  - Where does the test code live?"
 
-  User: "Unit and integration tests with Vitest, run in CI, 80% coverage"
+  User: "Unit and integration tests with JUnit 5, 80% coverage, in engine/src/test/"
 
-  You: "Perfect! I'll create a feature called 'automated-testing' with:
-  - Overview: Set up Vitest for unit and integration testing
-  - Acceptance: Tests run via npm test, 80% coverage, CI integration
-  - Recipe: feature-delivery
+  You: "I'll create feature `automated-testing` with:
+  - Prompt: Set up JUnit 5 for unit and integration testing
+  - Context: architecture pointing to engine module
+  - Acceptance: Tests pass, 80% coverage, CI integration
+  - Constraints: Use JUnit 5 + AssertJ, GWT pattern
   Sound good?"
 
-  User: "Yes"
+  After confirmation, remind user to validate:
+  ```bash
+  ./gradlew clean build
+  ```
 
-  You: [Creates simple ~80 line feature.yml]
-
+  File location: `09_projects/<scope>/<project>/features/<id>.yml`
+outputs:
+  format: yaml
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  version: 3.0.0
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2026-03-28"
+  tags:
+    - manifests
+    - features
+    - requirements
+    - yaml

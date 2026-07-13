@@ -12,7 +12,7 @@ _Last updated: 2025-11-15_
 
 ## Agents
 
-Agents are complete AI assistants with specific purposes, configured with rulepacks, tools, and capabilities.
+Agents are complete AI assistants with specific purposes, configured with rulesets, tools, and capabilities.
 
 ### `bug-fixer`
 
@@ -25,7 +25,7 @@ Analyzes error messages, traces, and code to identify root causes
 and propose fixes.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 - `coding-python`
 - `coding-kotlin`
@@ -58,7 +58,7 @@ A senior code reviewer agent that analyzes code changes, identifies issues,
 and provides constructive, actionable feedback.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 - `reviewer`
 - `security`
@@ -92,7 +92,7 @@ including API docs, guides, READMEs, and architecture documentation following be
 practices for technical writing.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 
 **Required Capabilities:**
@@ -123,7 +123,7 @@ Takes requirements, designs the implementation, writes code,
 and creates tests following best practices.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 - `coding-python`
 - `coding-kotlin`
@@ -158,7 +158,7 @@ An agent that reviews Kotlin code for style violations and
 suggests idiomatic improvements.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 - `coding-kotlin`
 
@@ -188,7 +188,7 @@ feature roadmaps, and technical design. Breaks down complex projects into manage
 phases with clear milestones and dependencies.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 
 **Required Capabilities:**
@@ -217,10 +217,10 @@ style: technical
 A specialized agent for crafting well-structured prompts and agent manifests.
 Expert in prompt engineering patterns, agent design, and the ai-tools manifest system.
 Creates atomic, reusable prompts with proper variables, includes, and metadata.
-Designs agents with clear purposes, appropriate rulepacks, and effective system prompts.
+Designs agents with clear purposes, appropriate rulesets, and effective system prompts.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 
 **Required Capabilities:**
@@ -252,7 +252,7 @@ and performs safe, behavior-preserving transformations to enhance maintainabilit
 readability, and performance.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 - `coding-python`
 - `coding-kotlin`
@@ -289,7 +289,7 @@ An agent that helps with test-driven development by writing tests first,
 then guiding implementation to make tests pass.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 - `coding-python`
 - `coding-kotlin`
@@ -322,7 +322,7 @@ epics into stories, defines acceptance criteria, and helps with sprint planning
 and backlog refinement.
 
 
-**Rulepacks:**
+**Rulesets:**
 - `base`
 
 **Required Capabilities:**

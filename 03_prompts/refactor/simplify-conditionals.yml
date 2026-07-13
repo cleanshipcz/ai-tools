@@ -1,25 +1,18 @@
-id: simplify-conditionals
-version: 1.0.0
+id: refactor-simplify-conditionals
 description: Simplify complex conditional logic for better readability
-tags:
-  - refactor
-  - conditionals
-  - complexity
 variables:
   - name: code
     required: true
-    description: 'The code block containing complex conditionals'
+    description: "The code block containing complex conditionals"
   - name: language
     required: true
-    description: 'Programming language of the code'
-includes:
-  - ../shared/constraints.md
+    description: "Programming language of the code"
 rules:
-  - 'Preserve behavior exactly.'
-  - 'Reduce nesting depth where possible.'
-  - 'Use early returns to reduce complexity.'
-  - 'Extract complex conditions into named boolean variables.'
-  - 'Consider guard clauses for error cases.'
+  - "Preserve behavior exactly."
+  - "Reduce nesting depth where possible."
+  - "Use early returns to reduce complexity."
+  - "Extract complex conditions into named boolean variables."
+  - "Consider guard clauses for error cases."
 content: |
   Simplify the following {{language}} conditional logic:
 
@@ -43,5 +36,10 @@ content: |
 outputs:
   format: code
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-15'
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  tags:
+    - refactor
+    - conditionals
+    - complexity

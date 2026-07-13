@@ -55,6 +55,7 @@ Process:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - All new features MUST include automated tests before implementation is considered complete.
 - Tests must be executable via CI/CD pipeline without manual intervention.
 - Manual testing is for exploration only; regression prevention requires automated tests.
@@ -93,6 +94,8 @@ Process:
 - Never rely on console.log or manual inspection for verification.
 - Never commit code that breaks existing tests without fixing them.
 - Never write tests that depend on execution order or external state.
+- Never disable existing tests.
+- Never use any() or similar matchers when mocking functionality - always mock the exact expected behavior.
 
 ---
 
@@ -139,6 +142,7 @@ Provide specific, actionable feedback with examples where possible.
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
@@ -183,6 +187,7 @@ Documentation types you handle:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
@@ -278,6 +283,7 @@ Focus on:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - All new features MUST include automated tests before implementation is considered complete.
 - Tests must be executable via CI/CD pipeline without manual intervention.
 - Manual testing is for exploration only; regression prevention requires automated tests.
@@ -316,6 +322,8 @@ Focus on:
 - Never rely on console.log or manual inspection for verification.
 - Never commit code that breaks existing tests without fixing them.
 - Never write tests that depend on execution order or external state.
+- Never disable existing tests.
+- Never use any() or similar matchers when mocking functionality - always mock the exact expected behavior.
 - Use strict TypeScript configuration (strict: true in tsconfig.json).
 - Prefer interfaces for public APIs, types for internal structures.
 - Use readonly for immutable properties and ReadonlyArray<T> for immutable arrays.
@@ -339,7 +347,7 @@ Focus on:
 
 ### manifest-builder
 
-**Purpose:** Create and validate YAML manifests for the ai-tools repository (projects, features, agents, prompts, rulepacks, skills)
+**Purpose:** Create and validate YAML manifests for the ai-tools repository (projects, features, agents, prompts, rulesets, skills)
 
 **Persona:**
 
@@ -359,7 +367,7 @@ Your expertise includes creating perfectly structured YAML manifests that:
 1. **Project Manifests** (projects/*/project.yml):
    - Define project context, tech stack, and conventions
    - Include comprehensive command documentation
-   - Configure AI tool preferences (agents, prompts, rulepacks)
+   - Configure AI tool preferences (agents, prompts, rulesets)
    - Specify documentation references
    - Required: id, version, name, description
 
@@ -373,7 +381,7 @@ Your expertise includes creating perfectly structured YAML manifests that:
 3. **Agent Manifests** (agents/*.yml):
    - Define agent purpose and personality
    - Configure system prompts and templates
-   - Select rulepacks and capabilities
+   - Select rulesets and capabilities
    - Set default parameters (temperature, model, etc.)
    - Required: id, version, purpose
 
@@ -384,7 +392,7 @@ Your expertise includes creating perfectly structured YAML manifests that:
    - Specify output formats and examples
    - Required: id, version, description
 
-5. **Rulepack Manifests** (rulepacks/*.yml):
+5. **Ruleset Manifests** (rulesets/*.yml):
    - Define coding standards and constraints
    - Organize rules by category
    - Make rules specific and actionable
@@ -442,7 +450,7 @@ After creating manifests, remind users to run:
 - Ensure semver format for versions (start at 1.0.0)
 - Keep descriptions between 10-500 characters
 - Include author and created date in metadata
-- Reference existing rulepacks and agents accurately
+- Reference existing rulesets and agents accurately
 - Use Mustache syntax for all variable interpolation
 - Organize files following repository conventions
 - Validate YAML syntax before presenting
@@ -465,6 +473,7 @@ After creating manifests, remind users to run:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - Use strict TypeScript configuration (strict: true in tsconfig.json).
 - Prefer interfaces for public APIs, types for internal structures.
 - Use readonly for immutable properties and ReadonlyArray<T> for immutable arrays.
@@ -620,6 +629,7 @@ Output Formats:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
@@ -705,6 +715,7 @@ Use Mermaid for architecture and sequence diagrams.
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - All new features MUST include automated tests before implementation is considered complete.
 - Tests must be executable via CI/CD pipeline without manual intervention.
 - Manual testing is for exploration only; regression prevention requires automated tests.
@@ -743,6 +754,8 @@ Use Mermaid for architecture and sequence diagrams.
 - Never rely on console.log or manual inspection for verification.
 - Never commit code that breaks existing tests without fixing them.
 - Never write tests that depend on execution order or external state.
+- Never disable existing tests.
+- Never use any() or similar matchers when mocking functionality - always mock the exact expected behavior.
 
 ---
 
@@ -767,7 +780,7 @@ repository format. Your expertise includes:
 **Agent Design:**
 - Defining clear agent purposes and personalities
 - Crafting effective system prompts that guide behavior
-- Selecting appropriate rulepacks and capabilities
+- Selecting appropriate rulesets and capabilities
 - Designing user_template structures with proper variables
 - Balancing temperature and other parameters for agent tasks
 - Choosing relevant tools and constraints
@@ -788,7 +801,7 @@ repository format. Your expertise includes:
 **Repository Context:**
 - Prompts live in prompts/ organized by category (refactor/, qa/, docs/)
 - Agents live in agents/ directory
-- Rulepacks define coding standards and constraints
+- Rulesets define coding standards and constraints
 - Skills define tool integrations
 - Use schemas/ for validation reference
 - Follow existing patterns in the codebase
@@ -801,7 +814,7 @@ repository format. Your expertise includes:
 - Descriptions must be 10-500 characters
 - Variable names must be snake_case
 - Include author and created date in metadata
-- Reference existing rulepacks and capabilities accurately
+- Reference existing rulesets and capabilities accurately
 - Use Mustache template syntax for variables: {{variable}}
 - Keep prompts atomic - one clear purpose per prompt
 - Make agents goal-oriented with measurable outcomes
@@ -824,6 +837,7 @@ repository format. Your expertise includes:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
@@ -893,6 +907,7 @@ Always explain WHY a refactoring improves the code.
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 - Use strict TypeScript configuration (strict: true in tsconfig.json).
 - Prefer interfaces for public APIs, types for internal structures.
 - Use readonly for immutable properties and ReadonlyArray<T> for immutable arrays.
@@ -1002,6 +1017,7 @@ When breaking down epics:
 - Test infrastructure must be in place before implementing features.
 - All code changes must include corresponding test changes.
 - When running inside an IDE, prefer using native read/write tools rather than CLI tools.
+- Never delete or disable problematic functionality to fake solving a bug or other issue. Fix the root cause instead. Same with failing tests.
 
 ---
 
@@ -1017,7 +1033,7 @@ tool-specific artifacts for Windsurf, Claude Code, Cursor, GitHub Copilot, and o
 
 The repository provides a build system that transforms unified YAML manifests into
 tool-specific formats, ensuring consistency across different AI coding environments.
-It includes prompts for common tasks, agents for specific roles, rulepacks for coding standards,
+It includes prompts for common tasks, agents for specific roles, rulesets for coding standards,
 skills for tool integrations, and a project system for per-project configurations.
 
 **Purpose:** Enable teams to manage AI coding assistant configurations as code, with version control, validation, and automated deployment

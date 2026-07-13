@@ -6,7 +6,7 @@ pnpm-lock.yaml
 
 # Build outputs
 dist/
-adapters/
+/adapters/
 *.tsbuildinfo
 
 # Generated documentation
@@ -15,8 +15,8 @@ PROMPT_LIBRARY.html
 docs/AGENTS.md
 
 # Projects
-06_projects/local/
-06_projects/projects.local.yml
+09_projects/local/
+09_projects/projects.local.yml
 .output/
 
 # Eval reports
@@ -69,3 +69,8 @@ temp/
 AGENTS.md
 .recipe-docs/
 .recipe-logs/
+.codex/
+CLAUDE.md
+
+# Local configuration
+config.local.yml

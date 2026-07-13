@@ -1,0 +1,16 @@
+id: dir-skill
+description: A directory-based skill for testing. Use when user asks for dir skill.
+sections:
+  - text: |
+      This is a directory-based skill.
+      See templates/example.txt for the template.
+files:
+  - path: templates/example.txt
+  - source: /absolute/path/to/shared.txt
+    target: references/shared.txt
+metadata:
+  version: 1.0.0
+  author: 'AI Tools Team'
+  created: '2026-04-03'
+  tags:
+    - test

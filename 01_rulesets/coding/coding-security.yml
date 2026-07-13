@@ -1,0 +1,22 @@
+id: coding-security
+description: Language-agnostic security rules and guardrails applicable to all codebases
+rules:
+  - "Never log or expose sensitive data (passwords, tokens, API keys, PII)."
+  - "Validate and sanitize all inputs at system boundaries (user input, external APIs, file uploads)."
+  - "Use secure random number generators for cryptographic purposes — never use predictable RNGs."
+  - "Implement proper authentication and authorization checks at every entry point."
+  - "Keep dependencies up to date to patch known vulnerabilities."
+  - "Use HTTPS/TLS for all external communications — never transmit sensitive data over plaintext."
+  - "Follow the principle of least privilege for all access controls, permissions, and credentials."
+  - "Store secrets in secure vaults or environment-managed secret stores, never in code or config files."
+metadata:
+  version: 2.0.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  updated: "2026-03-28"
+  tags:
+    - common
+    - development
+    - coding
+    - security
+    - safety

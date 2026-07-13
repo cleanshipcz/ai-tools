@@ -1,0 +1,48 @@
+# Detekt configuration
+# Docs: https://detekt.dev/docs/introduction/configurations/
+# This file overrides the default rule set (buildUponDefaultConfig = true in Gradle)
+# Adjust rules here to fit your team's style. Only a minimal set is customized below.
+
+config:
+  validation: true
+
+build:
+  maxIssues: 0           # fail the build on any finding; set >0 to allow some findings
+  excludeCorrectable: false
+
+# Common rule customizations
+style:
+  MagicNumber:
+    active: false        # allow magic numbers; enable and configure ignoreNumbers if you want stricter checks
+  MaxLineLength:
+    active: false        # do not enforce maximum line length, it's not the 90's anymore
+  WildcardImport:
+    active: false
+  DestructuringDeclarationWithTooManyEntries: # hurts readability when enforced
+    active: false
+  ReturnCount: # fully idiotic for e.g., compareTo
+    active: false
+  UseCheckOrError: # does not work properly with ?: operator
+    active: false
+
+complexity:
+  TooManyFunctions:
+    thresholdInClasses: 15
+
+naming:
+  TopLevelPropertyNaming:
+    active: false
+
+# formatting rules come from detekt-formatting (ktlint)
+# You can toggle individual rules here if needed, e.g.:
+formatting:
+  MaximumLineLength:
+    active: false
+  NoWildcardImports:
+    active: false
+  ArgumentListWrapping:
+    active: false
+  Wrapping: # useless for simple inline lambdas
+    active: false
+  Indentation: # fucking annoying for multiline strings
+    active: false

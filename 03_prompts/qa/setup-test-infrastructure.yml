@@ -1,9 +1,5 @@
-id: setup-test-infrastructure
-version: 1.0.0
+id: qa-setup-test-infrastructure
 description: Set up automated testing infrastructure for a project with test framework, configuration, and examples
-
-category: qa
-
 variables:
   - name: language
     description: Programming language (typescript, python, java, kotlin, javascript)
@@ -14,8 +10,12 @@ variables:
   - name: project_type
     description: Project type (library, web-app, cli, api, monorepo)
     required: false
-
-template: |
+rules:
+  - "Use AAA pattern: Arrange, Act, Assert."
+  - "Run in watch mode for development."
+  - "Generate coverage reports."
+  - "Work in CI/CD environments without manual setup."
+content: |
   Set up automated testing infrastructure for a {{language}} project.
 
   {{#framework}}
@@ -115,15 +115,17 @@ template: |
   5. **CI/CD config** ready to use
 
   Make it production-ready, not a proof-of-concept.
-
-tags:
-  - testing
-  - setup
-  - infrastructure
-  - automation
-  - tdd
-
+outputs:
+  format: markdown
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2025-11-16"
+  tags:
+    - qa
+    - testing
+    - setup
+    - infrastructure
+    - automation
+    - tdd

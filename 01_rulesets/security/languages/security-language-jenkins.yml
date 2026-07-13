@@ -1,0 +1,22 @@
+id: security-language-jenkins
+description: Security standards for Jenkins pipelines covering credentials handling, script sandbox, agent isolation, and safe handling of external input
+rules:
+  - "Never hardcode passwords, tokens, API keys, or credential IDs inline in Jenkinsfiles — always retrieve secrets through the Jenkins Credentials plugin."
+  - "Use withCredentials or the credentials() helper in the environment block to bind secrets to variables that Jenkins automatically masks in build logs."
+  - "Never echo, print, or interpolate secrets directly into sh, bat, or println statements — pass secrets via environment variables only."
+  - "Use single-quoted sh bodies when referencing secret environment variables (e.g., sh 'curl -u $USER:$PASS ...') so Groovy does not interpolate the secret into the command string before it reaches the shell."
+  - "Never disable the Groovy sandbox for pipeline scripts — request script approval for specific signatures instead of running out-of-sandbox."
+  - "Keep all pipeline logic in sandbox-approved code paths; move anything that requires Script Approval into a reviewed shared library rather than inlining it in a Jenkinsfile."
+  - "Run builds on ephemeral or containerized agents (e.g., Kubernetes pods) and never on the Jenkins controller — set agent { label 'some-build-node' }, not agent { label 'master' } or agent any."
+  - "Never run pipeline steps directly on the built-in controller node — the controller must execute no user workload."
+  - "Validate and whitelist all user-provided build parameters before using them in sh, git, or checkout steps to prevent command or URL injection."
+  - "Pin shared libraries and third-party plugins to explicit versions so a compromised upstream branch cannot silently alter pipeline behavior."
+  - "Use credentialsId (not plaintext URLs with embedded tokens) for all git, checkout, and HTTP steps that access private repositories or APIs."
+  - "Restrict which jobs can use sensitive credentials with the Credentials Binding plugin's folder-scoped credentials — never place production secrets in the global credentials store when only one folder needs them."
+  - "Review post { always } and notification helpers for accidental secret leakage — ensure Slack, email, and webhook payloads never include env vars that contain credentials."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-04-08"
+  tags:
+    - jenkins

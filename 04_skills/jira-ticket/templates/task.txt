@@ -1,0 +1,12 @@
+h3. Current situation
+
+<Describe the current state — what exists today, what is the problem or gap.>
+
+h3. Desired change
+
+<Describe what should change — the goal, the new behaviour, or the deliverable.>
+
+h3. Acceptance Criteria
+ * <First verifiable criterion>
+ * <Second verifiable criterion>
+ * <Add more as needed>

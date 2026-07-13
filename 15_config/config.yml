@@ -20,14 +20,14 @@
 # These are shared project locations that all team members should use.
 # Add personal project directories in config.local.yml instead.
 #
-# Default: ['./06_projects/global', './06_projects/local']
+# Default: ['./09_projects/global', './09_projects/local']
 #
 # Examples:
-#   - ./06_projects/global         # Versioned, shared projects
-#   - ./06_projects/local          # Local, gitignored projects
+#   - ./09_projects/global         # Versioned, shared projects
+#   - ./09_projects/local          # Local, gitignored projects
 #   - /absolute/path/to/projects   # Projects in other locations
 #   - ../other-repo/projects       # Projects in sibling repository
 #
 project_sources:
-  - ./06_projects/global
-  - ./06_projects/local
+  - ./09_projects/global
+  - ./09_projects/local

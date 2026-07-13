@@ -1,108 +1,141 @@
-id: create-project
-version: 2.1.0
-description: Clarify project context and create project.yml and deploy.yml manifests
-
-tags:
-  - manifests
-  - projects
-  - configuration
-  - yaml
-
+id: manifests-create-project
+description: Clarify project context and create project.yml manifest aligned with the Kotlin engine
 variables:
   - name: user_description
     required: true
-    description: 'Brief description of the project'
-
+    description: "Brief description of the project"
+rulesets:
+  - authoring-yaml
+  - authoring-ai
+  - authoring-manifests
 rules:
-  - 'Ask clarifying questions BEFORE generating the manifests'
-  - 'ALWAYS create BOTH project.yml AND deploy.yml files'
-  - 'Follow the project schema (10_schemas/project.schema.json)'
-  - 'Follow the deploy schema (10_schemas/deploy.schema.json)'
-  - 'Keep project manifests focused on essential context'
-  - 'Do NOT try to document the entire codebase'
-  - 'Focus on what AI agents & local tools generating files need to know'
-
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Keep project manifests focused on essential context for AI agents"
+  - "Do NOT try to document the entire codebase"
+  - "The Kotlin engine (ProjectManifest.kt) is the source of truth for project.yml structure"
+  - "The TypeScript CLI processes deploy.yml separately — it is NOT part of the Kotlin engine"
 content: |
   The user wants to create a project manifest based on this description:
 
   {{user_description}}
 
-  **Your job is to clarify and translate:**
+  **Your job is to clarify and translate into a valid project manifest.**
 
-  1. **Ask clarifying questions:**
-     - What does this project do? (in 2-3 sentences)
-     - Tech stack? (languages, frameworks, tools)
-     - Key commands? (test, build, run, deploy)
-     - Which agents/prompts should be available?
-     - Any project-specific conventions or rules?
+  ## Step 1: Ask clarifying questions
 
-  2. **Suggest structure:**
-     - Propose a kebab-case ID
-     - Identify 3-5 key technologies
-     - List 5-10 essential commands
-     - Recommend relevant agents
+  - What does this project do? (2-3 sentences)
+  - Where is the project located? (absolute path for deploy.directory)
+  - Key documentation files? (README, architecture docs, etc.)
+  - Any project-specific rules for AI agents?
+  - Which agents/prompts/rulesets should be available? (for filtering)
 
-  3. **Create BOTH files:**
+  ## Step 2: Suggest structure
 
-     **project.yml** (follows 10_schemas/project.schema.json):
-     - id, version (1.0.0), name, description
-     - context: { overview, purpose }
-     - tech_stack: { languages, backend, frontend, infrastructure, tools }
-     - commands: { test, build, run, deploy, etc. }
-     - conventions: { naming, patterns, testing, structure, custom }
-     - ai_tools: { whitelist_agents, whitelist_prompts, whitelist_rulepacks }
-     - documentation: { readme, architecture, api, changelog, custom }
-     - metadata: { author, created, updated, tags }
+  - Propose a kebab-case ID
+  - Identify key documentation references
+  - Recommend filter strategy (tags, whitelist, or blacklist)
 
-     **deploy.yml** (follows 10_schemas/deploy.schema.json):
-     - target: '/absolute/path/to/project' or './' for self-deployment
-     - tools: ['github-copilot', 'windsurf', 'cursor', 'claude-code']
-     - mode: 'local' (auto-deploy) or 'manual' (show instructions)
-     - backup: true (backup existing files before deploying)
-     - auto_commit: false (optional git auto-commit)
+  ## Step 3: Create project.yml matching ProjectManifest.kt
 
-  **Start focused, allow detail:**
-  - Essential context first
-  - Recommend 5-10 key commands; add more if project is complex
-  - Recommend 5-10 conventions; add more for specific domains
-  - Simple projects: ~80-120 lines; Complex projects: as needed
-  - Always ask for project location to populate deploy.yml target
+  The Kotlin engine requires this structure:
 
-  **Example:**
+  ```yaml
+  id: project-name
+  description: What this project does (10-500 chars)
+
+  context:
+    overview: |
+      Detailed project overview for AI agents to understand
+      the project's purpose and architecture.
+    documentation:
+      readme: README.md
+      per_topic:
+        main_docs:
+          architecture: docs/ARCHITECTURE.md
+          api: docs/API.md
+        development:
+          style_guide: STYLE_GUIDE.md
+      additional:
+        - path: CONTRIBUTING.md
+          description: Contribution guidelines
+    rules:
+      - "Project-specific rules for AI agents"
+
+  deploy:
+    directory: "/absolute/path/to/project"
+    replace: false
+    agents:
+      filter:
+        type: tags          # or: type: whitelist / type: blacklist
+        tags: [development, review]
+    prompts:
+      filter:
+        type: whitelist
+        ids: [manifests-create-agent, refactor-improve-naming]
+    rulesets:
+      filter:
+        type: tags
+        tags: [common, development]
+    features:
+      filter:
+        type: whitelist
+        ids: [my-feature]
+
+  metadata:
+    version: 1.0.0
+    author: "AI Tools Team"
+    created: "YYYY-MM-DD"
+    tags: [project-domain, tech-stack]
+  ```
+
+  **Filter types** (sealed class in Kotlin):
+  - `type: tags` + `tags: [...]` — filter by metadata tags
+  - `type: whitelist` + `ids: [...]` — only include these IDs
+  - `type: blacklist` + `ids: [...]` — exclude these IDs
+
+  **Fields NOT supported by Kotlin engine:**
+  name, version (top-level), commands, conventions, ai_tools, context.purpose
+
+  ## Optional: deploy.yml for TypeScript CLI
+
+  The TypeScript CLI uses a separate `deploy.yml` alongside `project.yml` for tool-specific
+  deployment (target, tools, mode, backup, tech_stack, etc.). This is NOT parsed by the
+  Kotlin engine. If the user needs multi-tool deployment, mention they can create a
+  `deploy.yml` in the same directory — refer to `10_schemas/deploy.schema.json` for its structure.
+
+  ## Example conversation
 
   User: "TypeScript CLI tool for code generation"
 
   You: "Questions:
-  - Built with? (Node, Deno, Bun?)
-  - Test framework?
-  - Key commands? (test, build, run?)
-  - Project location? (absolute path for deploy.yml target)
-  - Which AI tools? (github-copilot, windsurf, cursor, claude-code?)
-  - Preferred agents? (feature-builder, code-reviewer?)"
+  - Where is the project located?
+  - Key docs? (README, architecture?)
+  - Any rules AI agents should follow?
+  - Which agents should be available? (all, or specific ones?)"
 
-  User: "Node + TypeScript, Vitest for tests, npm test/build/start, /home/user/projects/my-cli"
+  User: "At /home/user/projects/my-cli, has README.md, prefer TDD agents"
 
-  You: "Perfect! I'll create:
-
-  **project.yml:**
+  You: "I'll create project.yml with:
   - id: my-cli
-  - Tech: typescript, node.js
-  - Commands: test, build, start, lint
-  - Conventions: TypeScript strict mode, test coverage 80%
-  - Agents: feature-builder, code-reviewer, bug-fixer
-
-  **deploy.yml:**
-  - target: /home/user/projects/my-cli
-  - tools: [github-copilot, windsurf, cursor, claude-code]
-  - mode: local
-  - backup: true
-
+  - Overview explaining the CLI purpose
+  - Documentation pointing to README.md
+  - Deploy to /home/user/projects/my-cli
+  - Agent filter: whitelist developer-feature, developer-bugfix, reviewer-code
   Sound good?"
 
+  After confirmation, remind user to validate:
+  ```bash
+  ./gradlew clean build
+  ```
 outputs:
   format: yaml
-
 metadata:
-  author: 'AI Tools Team'
-  created: '2025-11-16'
-  updated: '2025-11-16'
+  version: 3.0.0
+  author: "AI Tools Team"
+  created: "2025-11-16"
+  updated: "2026-03-28"
+  tags:
+    - manifests
+    - projects
+    - configuration
+    - yaml

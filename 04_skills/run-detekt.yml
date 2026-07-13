@@ -1,0 +1,20 @@
+id: run-detekt
+description: >-
+  Run Detekt static analysis for Kotlin.
+  Use when user asks to run detekt or requests static analysis on Kotlin code.
+sections:
+  - text: |
+      Run `./gradlew detekt` in the project directory.
+      After running detekt, summarize findings by severity.
+      If there are critical issues, list them first.
+
+      Output report is at `build/reports/detekt/detekt.html`.
+metadata:
+  version: 1.0.0
+  author: 'AI Tools Team'
+  created: '2025-01-01'
+  tags:
+    - detekt
+    - kotlin
+    - lint
+    - static-analysis

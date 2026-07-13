@@ -1,0 +1,16 @@
+id: testing-unit
+description: Unit testing standards and best practices
+rules:
+  - "Unit tests MUST cover: happy path, edge cases, error conditions, boundary values."
+  - "Mock all external dependencies for unit tests; tests should not require network/database/filesystem access."
+  - "Every public function/method MUST have at least one unit test case."
+  - "Never use any() or similar matchers when mocking functionality - always mock the exact expected behavior."
+  - "When a dependency is mocked, omit explicit interaction verification whenever the test assertions necessarily depend on that mocked call occurring (for example, by depending on its returned value being used). Require explicit verification only when the test could still pass even if the mocked call never happened."
+  - "Prefer shared mock instances over per-test mock creation. Define them before each test execution (use a standard test framework feature for that) to maintain test isolation."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  tags:
+    - unit
+    - testing

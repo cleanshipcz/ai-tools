@@ -1,0 +1,13 @@
+id: coding-refactoring
+description: Refactoring standards and best practices
+rules:
+  - "Follow TDD when refactoring: ensure tests pass before AND after refactoring."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2025-11-15"
+  tags:
+    - development
+    - refactoring
+    - coding
+    - style

@@ -1,0 +1,16 @@
+id: base
+description: Base rules applicable to all agents and prompts
+rules:
+  - "Be precise and accurate in your responses."
+  - "Follow the user's requirements carefully and to the letter."
+  - "If you are unsure, ask for clarification instead of guessing."
+  - "Break complex tasks into smaller, manageable steps."
+  - "Verify your work before presenting it."
+metadata:
+  version: 1.1.0
+  author: "AI Tools Team"
+  created: "2025-01-01"
+  updated: "2025-11-16"
+  tags:
+    - foundation
+    - general

@@ -2,120 +2,63 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/cleanshipcz/ai-tools/schemas/agent.schema.json",
   "title": "Agent Manifest",
-  "description": "Schema for tool-agnostic agent definitions",
+  "description": "Schema for tool-agnostic agent definitions. Aligned with AgentManifest.kt data class.",
   "type": "object",
-  "required": ["id", "version", "purpose"],
+  "required": ["id", "description", "persona", "prompt", "metadata"],
   "properties": {
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-      "description": "Unique kebab-case identifier for the agent"
+      "description": "Unique kebab-case identifier for the agent (e.g., developer-feature, reviewer-code)"
     },
-    "version": {
-      "type": "string",
-      "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "Semantic version (semver) of the agent"
-    },
-    "purpose": {
+    "description": {
       "type": "string",
       "minLength": 10,
       "maxLength": 500,
       "description": "Clear statement of the agent's purpose"
     },
-    "description": {
+    "persona": {
       "type": "string",
-      "description": "Detailed description of the agent"
+      "minLength": 10,
+      "description": "Agent identity: WHO the agent is. Role, expertise, and approach (3-5 sentences)"
     },
-    "rulepacks": {
+    "prompt": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Agent process: WHAT the agent does. Structured steps, phases, and deliverables"
+    },
+    "rulesets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of ruleset IDs to compose. Supports regex patterns (e.g., coding-language-.*)"
+    },
+    "rules": {
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        "minLength": 5,
+        "maxLength": 500
       },
-      "description": "List of rulepack IDs to include"
-    },
-    "capabilities": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "Required capabilities (e.g., mcp:git, mcp:filesystem)"
-    },
-    "defaults": {
-      "type": "object",
-      "properties": {
-        "temperature": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 2
-        },
-        "max_tokens": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "top_p": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
-        "model": {
-          "type": "string",
-          "enum": [
-            "claude-sonnet-4.5",
-            "claude-sonnet-4",
-            "claude-haiku-4.5",
-            "gpt-5",
-            "gpt-5.1",
-            "gpt-5.1-codex-mini",
-            "gpt-5.1-codex"
-          ],
-          "description": "Default model for this agent (overrides prompt default, can be overridden by project or feature)"
-        },
-        "style": {
-          "type": "string",
-          "enum": ["terse", "verbose", "conversational", "technical"]
-        }
-      },
-      "description": "Default parameters for the agent"
-    },
-    "prompt": {
-      "type": "object",
-      "properties": {
-        "system": {
-          "type": "string",
-          "description": "System prompt template"
-        },
-        "user_template": {
-          "type": "string",
-          "description": "User prompt template"
-        },
-        "includes": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Files to include in prompt"
-        }
-      },
-      "description": "Prompt configuration"
-    },
-    "tools": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "List of tool/skill IDs this agent can use"
+      "description": "Inline rules specific to this agent (prefer rulesets for reusable rules)"
     },
     "constraints": {
       "type": "array",
       "items": {
         "type": "string"
       },
-      "description": "Constraints or limitations for this agent"
+      "description": "Hard boundaries the agent must never cross (NEVER/ALWAYS statements)"
     },
     "metadata": {
       "type": "object",
+      "required": ["version"],
       "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Semantic version (semver), start at 1.0.0"
+        },
         "author": {
           "type": "string"
         },
@@ -131,9 +74,11 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "uniqueItems": true
         }
-      }
+      },
+      "description": "Agent metadata including version, author, dates, and tags"
     }
   }
 }
