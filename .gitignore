@@ -61,6 +61,7 @@ temp/
 # Agentic files - they are managed by this project
 .claude
 .cursor
+.github/agents
 .github/instructions
 .github/prompts
 .github/copilot-instructions.md
