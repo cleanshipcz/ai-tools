@@ -47,3 +47,9 @@
 ## Separate DAO and service layers
 
 - this will allow hierarchical definitions and better validation
+
+## Deployment
+
+- deploy local/global skills
+- deploy local/global mcps
+- custom destinations
