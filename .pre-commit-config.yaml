@@ -14,17 +14,16 @@ repos:
         args: ['--fix=lf']
       - id: detect-private-key
 
-  - repo: https://github.com/prettier/prettier
-    rev: v3.2.4
-    hooks:
-      - id: prettier
-        types_or: [javascript, typescript, json, yaml, markdown]
-
-  - repo: local
-    hooks:
-      - id: validate-manifests
-        name: Validate AI manifests
-        entry: npm run validate
-        language: system
-        pass_filenames: false
-        files: \.(yml|yaml)$
+# Two hooks were removed rather than repaired:
+#
+# 1. `validate-manifests` invoked the retired JavaScript CLI. YAML syntax of every staged
+#    manifest is already checked by `check-yaml` above, and deeper schema validation now
+#    requires a JVM/Gradle run, which is far too slow to belong in a pre-commit hook.
+#
+# 2. `prettier` pointed at https://github.com/prettier/prettier, which publishes no
+#    .pre-commit-hooks.yaml, so the hook could never install. The two ways to repair it are
+#    both maintainer decisions: pre-commit/mirrors-prettier is archived and frozen at prettier
+#    3.1.0, and rbubley/mirrors-prettier is an unvetted community fork. Enabling either would
+#    also reformat the 184 tracked YAML manifests that are this project's source of truth.
+#    To restore it deliberately, pick a mirror and narrow `types_or` to the file types you
+#    actually want reformatted.
