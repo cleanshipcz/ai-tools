@@ -76,8 +76,9 @@ references, confirmed by the repo analyst. Everything *around* it had rotted.
   product *is* agent context, a wrong template here produces broken manifests on every run. Templates are now
   derived from the Kotlin models and cross-checked against committed manifests, with non-existent fields called
   out explicitly so they are not reintroduced.
-- `690e38b` `project.yml`: `ocs-summarize-pr` → `docs-summarize-pr` (the typo silently dropped that prompt from
-  every deploy), and the hardcoded `/home/blaha/...` deploy path replaced with `../../`.
+- `project.yml`: `ocs-summarize-pr` → `docs-summarize-pr` (the typo silently dropped that prompt from
+  every deploy), and the hardcoded `/home/blaha/...` deploy path made portable — first as `../../`, later
+  as `"."` once the resolution base was fixed (see §5b).
 - `098ee29` also fixed `03_prompts/manifests/create-project.yml`, which instructed agents to author `deploy.yml`
   files for the retired TypeScript CLI — it would have generated dead config on every run.
 
@@ -94,9 +95,15 @@ references, confirmed by the repo analyst. Everything *around* it had rotted.
 
 ## 4. Verification notes
 
-- `deploy.directory: "../../"` was **verified empirically, not assumed**: running `:cli:run` with no args made
-  the CLI report the absolute path it searched, revealing the run working directory as
-  `<repo>/ai-tools-engine/cli/`. `../../` therefore resolves to the repository root.
+- The deploy path was **verified empirically, not assumed**, at both stages. First, running `:cli:run` with no
+  args made the CLI report the absolute path it searched, revealing the run working directory as
+  `<repo>/ai-tools-engine/cli/`, which is what made `../../` correct at the time. Later, once the resolution base
+  was fixed, `"."` was proved by running the `installDist` binary from several different process working
+  directories including `/`, and confirming the output follows `--working-dir` in every case.
+- **Caveat on the earlier build evidence in this report:** several of the "build green" runs completed in 2-3
+  seconds, i.e. mostly from the Gradle build cache, which is weak evidence that anything actually ran. The final
+  state was re-verified with `--no-build-cache`: 65 of 71 tasks genuinely executed, 255 tests, 0 failures,
+  0 skipped.
 - `.gitignore` rules were checked with `git check-ignore -v` to confirm no tracked source file became ignored
   and that `.delivery/` remains committed.
 - The untracked IDE init script was confirmed still present on disk after untracking.
@@ -197,15 +204,17 @@ No existing test weakened, skipped or deleted. Build green.
 
 ### Accepted from the review, NOT fixed — deliberate
 
-- **`deploy.directory` resolves against the JVM working directory, not `--working-dir`**, while every
-  `locations.*` path resolves against `--working-dir`. Two bases in one config surface. The `../../` value
-  committed here is correct for `:cli:run` (verified empirically) but is launcher-dependent: under `installDist`
-  or `java -jar` from the repo root it would resolve to `/home/blaha/Documents/`, where
-  `GitHubCopilotAdapter` unconditionally `deleteRecursively()`s three directories. Corroborating smell:
-  `<repo>/ai-tools-projects/projects/` exists and is **empty** (0 files), consistent with a relative path being
-  created at a wrong base at some point. The right fix — resolve `deploy.directory` against `--working-dir`, after
-  which `directory: "."` works under any launcher — is a behavioural change to a path that deletes directories,
-  and deserves its own reviewed change rather than being folded in here. **Recommended next.**
+- ~~**`deploy.directory` resolves against the JVM working directory, not `--working-dir`**~~ — **FIXED after
+  this report was first written, at the owner's request.** Recorded here because the reasoning is still useful.
+  Every `locations.*` path resolved against `--working-dir` while `deploy.directory` resolved against the JVM
+  working directory: two bases in one config surface. The `../../` value was correct for `:cli:run` but
+  launcher-dependent — under `installDist` or `java -jar` from the repo root it resolved to
+  `/home/blaha/Documents/`, and `prepare()` deletes directories under whatever it resolves to. Corroborating
+  smell at the time: `<repo>/ai-tools-projects/projects/` exists and is empty, consistent with a relative path
+  created at a wrong base. Both call sites now share one `File.resolveDeclaredPath`, and the manifest moved to
+  `directory: "."`. Absolute values are returned exactly as declared, so no existing project changed behaviour.
+  Proved by running the `installDist` binary from several process working directories, including `/`, and
+  confirming the output follows `--working-dir` and never the process directory.
 - `ATOMIC_MOVE` and `fsync` on the export write; `README.md:111`'s "written atomically" is overbroad because
   `copySkillFiles` uses non-atomic `copyTo`.
 - A JVM kill between temp-file creation and the move strands a `*.tmp` in the output directory.
@@ -258,6 +267,31 @@ Review performed by the lead in place of the missing gate (not a substitute for 
 **Recommendation:** re-run `reviewer-code` over `git diff 0e7293e..HEAD` before merging, focusing on
 `ToolsEngine.kt`'s failure policy and the `prepare` asymmetry noted above.
 
+## 5b. Follow-up work, after the report was first written
+
+The owner reviewed the findings above and asked for three of the deferred items to be done. Each went through a
+developer agent, was verified, and is committed on this branch. Tests went 235 → 255 across them.
+
+1. **Duplicate manifest ids scoped to what they affect.** The loader threw on the first collision, so one bad
+   manifest stopped every project from deploying — inconsistent with the per-manifest isolation used for
+   exports. Two projects sharing an id are now both dropped and every other project still exports; two features
+   of one project sharing an id fail that project only. Duplicates in the global kinds (agents, prompts,
+   rulesets, fragments, skills) still stop the run **deliberately**: `FilterService` returns every manifest when
+   a project declares no filter, and a whitelist naming a missing id yields fewer manifests rather than an
+   error, so dropping a colliding pair would silently export projects without it. Reporting improved regardless
+   — every collision in a run is listed at once. *An earlier draft of this plan preferred the graceful option;
+   the agent checked `FilterService` first and showed it could not be made safe without the resolver refactor
+   that was out of scope. The stricter choice is the correct one.*
+2. **`deploy.directory` resolved against `--working-dir`** — see the struck-through entry in §5.
+3. **`GitHubCopilotAdapter` honours `deploy.replace`.** It cleared three `.github` directories on every export
+   regardless of the flag. One flag now decides for every tool whether a deploy may delete. The original
+   rationale is preserved in the code comment along with the accepted consequence: with `replace: false`,
+   output from a retired naming scheme survives and needs removing by hand.
+
+Also fixed in the same pass, from the review: `deploy.sh` exited 0 even when the engine failed; skill-file
+authoring errors aborted the run instead of being collected; a malformed `version:` produced no filename; and
+`setup.sh`'s INT trap started a second build instead of aborting.
+
 ## 6. Deliberately NOT done — and why
 
 | Item | Reason |
@@ -272,10 +306,11 @@ Review performed by the lead in place of the missing gate (not a substitute for 
 
 ## 7. Recommended next actions
 
-0. **UNBLOCK YOUR DEPLOYS FIRST.** `./deploy.sh` currently exports nothing because two projects in
-   `../ai-tools-projects/projects` share `id: xbid`. Rename one (30 seconds), or ask for the loader failure to be
-   scoped per-project so one duplicate no longer stops the other 25. Until then the branch is correct but your
-   deploy pipeline is stopped. See §5.
+0. ~~**UNBLOCK YOUR DEPLOYS FIRST**~~ — **DONE.** The `xbid` collision was resolved by the owner: `xbid copy`
+   now declares `id: xbid-copy`, so all 26 projects load. Note the consequence — `/Projects/xbid` had been
+   silently losing every config update since 9 April, because `associateBy` was last-wins and `xbid-copy` kept
+   winning. Its next deploy is its first in over three months, and with `replace: true` it clears and
+   regenerates. The loader failure has also been scoped per-project since (§5b).
 1. **Decide what to do about the dormant workflows** (see §5a, correction 1). `sonarcloud.yml` and
    `codeql.yml` have never run because they are not at the repository root. Either move them to
    `.github/workflows/` — after confirming the SonarCloud project and `SONAR_TOKEN` exist, or the result is a
@@ -285,10 +320,16 @@ Review performed by the lead in place of the missing gate (not a substitute for 
    fix is to realign `10_schemas/*.json` with the Kotlin models and wire validation into the Gradle build, so
    it is enforced by the same gate as everything else.
 3. **Decide on `07_mcp/github/`** — keep the vendored fork, convert it to a git submodule, or remove it.
-4. **Schema realignment** — as above, and independently valuable: `skill.schema.json` is actively misleading.
-4. Note the **behaviour change**: a broken ruleset reference now fails the run with a non-zero exit where it
-   previously exited 0. That is the intent, but any automation depending on the old always-succeeds behaviour
-   will now correctly fail.
+4. **`prepare()` swallows cleanup failures** — all six adapters discard the `Boolean` from
+   `deleteRecursively()`, so with `replace: true` a permission error during cleanup is ignored and stale files
+   survive while the run reports success. The last genuinely swallowed failure in the export path.
+5. **Tidy-up left to the owner:** `<repo>/ai-tools-projects/projects/` still exists and is empty — the stray
+   directory that pointed at the wrong-base bug. Nothing creates it now; deleting it is a manual call.
+   Same for the literal `~` directory at the repository root.
+
+Note the **behaviour change** throughout: a broken ruleset reference, a duplicate id, or an unusable skill file
+now fails the run with a non-zero exit where it previously exited 0 or silently dropped work. That is the intent,
+but any automation depending on the old always-succeeds behaviour will now correctly fail.
 
 ## 8. Environment note
 
