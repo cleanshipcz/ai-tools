@@ -315,13 +315,16 @@ class GitHubCopilotAdapterTest {
     }
 
     @ParameterizedTest
-    @CsvSource("true", "false")
-    fun `should always delete the generated directories on prepare`(replace: Boolean) {
+    @CsvSource("true, false", "false, true")
+    fun `should delete the generated directories on prepare only when replace is set`(
+        replace: Boolean,
+        staleFilesKept: Boolean,
+    ) {
         // given
         // - leftovers from earlier exports in every directory this adapter owns
-        writeFile(promptsDir.resolve("stale.prompt.md"))
-        writeFile(instructionsDir.resolve("stale.instructions.md"))
-        writeFile(agentsDir.resolve("stale.agent.md"))
+        val stalePrompt = writeFile(promptsDir.resolve("stale.prompt.md"))
+        val staleInstruction = writeFile(instructionsDir.resolve("stale.instructions.md"))
+        val staleAgent = writeFile(agentsDir.resolve("stale.agent.md"))
         // - files the adapter must never remove
         val copilotInstructions = writeFile(targetDir.resolve("copilot-instructions.md"))
         val workflow = writeFile(targetDir.resolve("workflows/ci.yml"))
@@ -335,9 +338,12 @@ class GitHubCopilotAdapterTest {
         adapter.prepare(tempDir.toFile(), manifest)
 
         // then
-        assertThat(promptsDir).doesNotExist()
-        assertThat(instructionsDir).doesNotExist()
-        assertThat(agentsDir).doesNotExist()
+        assertThat(promptsDir.exists()).isEqualTo(staleFilesKept)
+        assertThat(instructionsDir.exists()).isEqualTo(staleFilesKept)
+        assertThat(agentsDir.exists()).isEqualTo(staleFilesKept)
+        assertThat(stalePrompt.exists()).isEqualTo(staleFilesKept)
+        assertThat(staleInstruction.exists()).isEqualTo(staleFilesKept)
+        assertThat(staleAgent.exists()).isEqualTo(staleFilesKept)
         assertThat(copilotInstructions).exists()
         assertThat(workflow).exists()
     }

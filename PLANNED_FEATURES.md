@@ -66,9 +66,9 @@ Raised by the analysis and code review in `.delivery/project-improvements/`. Not
 - Consequence: a relative `deploy.directory` only means what you expect under `./deploy.sh`, which runs
   `:cli:run`, where Gradle sets the working directory to `ai-tools-engine/cli`. Under `installDist` or
   `java -jar` from the repository root the same value points somewhere else entirely.
-- This matters because `prepare()` deletes directories under whatever it resolves to. `GitHubCopilotAdapter`
-  removes `.github/prompts`, `.github/instructions` and `.github/agents` **unconditionally** - it does not
-  check `deploy.replace` - and the other five adapters remove their own directory when `replace: true`.
+- This matters because `prepare()` **deletes** directories under whatever it resolves to: with `replace: true`
+  every adapter removes its own generated directories, and `GitHubCopilotAdapter` removes three of them
+  (`.github/prompts`, `.github/instructions`, `.github/agents`).
 - Circumstantial evidence it has already happened: `ai-tools-projects/projects/` exists inside this repository
   and is completely empty, which is what a relative path created at the wrong base looks like.
 - Fix: resolve `deploy.directory` against `--working-dir` like every other path, after which `directory: "."`

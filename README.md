@@ -105,7 +105,7 @@ A ruleset or fragment referenced by an agent must itself survive the project's `
 Features live in `features/<feature>.yml` next to `project.yml` and are exported as per-tool workflow or instruction files.
 
 Set `deploy.replace: true` to wipe a tool's output directory before writing.
-Note that the GitHub Copilot adapter always clears `.github/prompts/`, `.github/instructions/`, and `.github/agents/` regardless of this flag, because it owns every file in them.
+Every adapter honours the flag, the GitHub Copilot one included: with `replace: true` it clears `.github/prompts/`, `.github/instructions/`, and `.github/agents/`, which it owns entirely, and with `replace: false` it leaves them alone — so files left there by a retired naming scheme survive and have to be removed by hand.
 
 There is no backup and no auto-commit step.
 Generated files are overwritten in place, though each file is written atomically via a temporary file, so an interrupted run cannot leave a half-written artifact.
