@@ -349,6 +349,73 @@ class LoaderServiceIntegrationTest {
     }
 
     @Nested
+    inner class MalformedVersions {
+
+        @ParameterizedTest
+        @CsvSource("1.0", "v1.0.0", "1.0.0.4", "latest")
+        fun `should fail naming the file when a manifest declares a malformed version`(version: String) {
+            // given
+            val file = writeRuleset("broken.yml", version)
+
+            // when
+            val error = runCatching { loaderService.loadRuleset(file) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(file.absolutePath)
+                .hasMessageContaining(version)
+                .hasMessageContaining("MAJOR.MINOR.PATCH")
+        }
+
+        @Test
+        fun `should fail naming the file when loading every manifest reaches a malformed version`() {
+            // given
+            // - loadAll is what the CLI actually calls, and it must name the file just as the single loader does
+            val file = writeRuleset("broken.yml", "1.0")
+
+            // when
+            val error = runCatching { loaderService.loadAll(rulesetLocations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(file.absolutePath)
+        }
+
+        @Test
+        fun `should load the manifest when the version is well-formed`() {
+            // given
+            val file = writeRuleset("valid.yml", "1.2.3-alpha")
+
+            // when
+            val ruleset = loaderService.loadRuleset(file)
+
+            // then
+            assertThat(ruleset.metadata.version).isEqualTo(Version(1, 2, 3, "alpha"))
+        }
+
+        private fun writeRuleset(fileName: String, version: String): File {
+            val directory = tempDir.resolve("malformed-versions").toFile()
+            directory.mkdirs()
+            val file = directory.resolve(fileName)
+            file.writeText(
+                "id: broken\ndescription: A ruleset\nrules:\n  - A rule.\nmetadata:\n  version: $version\n",
+            )
+            return file
+        }
+
+        private fun rulesetLocations() = Locations(
+            agents = emptyList(),
+            projects = emptyList(),
+            prompts = emptyList(),
+            rulesets = listOf(tempDir.resolve("malformed-versions").toFile()),
+            fragments = emptyList(),
+            skills = emptyList(),
+        )
+    }
+
+    @Nested
     inner class DuplicateManifestIds {
 
         @ParameterizedTest

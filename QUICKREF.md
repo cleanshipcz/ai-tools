@@ -357,7 +357,11 @@ Keep machine-local paths and settings in `config.local.yml`, which is gitignored
 
 **`Unknown key` / `Property 'x' is required`**: the manifest has a field the model does not define, or is missing a required one. Compare against the templates above.
 
+**`Invalid version format`**: `metadata.version` is not `MAJOR.MINOR.PATCH` with an optional `-SUFFIX`. The message names the manifest file that carries it.
+
 **`No rulesets match pattern 'x'`**: the pattern matched nothing. The message lists similar available ids, and flags rulesets excluded by the project's filter.
+
+**`Export failed for N manifest(s)`**: N manifests could not be exported; the list below the headline names each one, together with every tool it failed for. The run still exports everything else before reporting, and exits non-zero.
 
 **Manifest changes do not show up**: check the project's filters in `project.yml`. A manifest with no matching tag and no whitelist entry is silently skipped.
 

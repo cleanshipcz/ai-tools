@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.models.AgentManifest
 import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.FeatureManifest
 import cz.cleanship.aitools.engine.models.FragmentManifest
+import cz.cleanship.aitools.engine.models.InvalidVersionException
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
@@ -44,6 +45,10 @@ class LoaderService {
             return decodeFromString(content)
         } catch (ex: YamlException) {
             throw YamlException("Failed to load ${file.absolutePath}", ex.path, ex)
+        } catch (ex: InvalidVersionException) {
+            // kaml lets a serializer's own failure through untouched, so a malformed 'metadata.version' would
+            // otherwise reach the author as a bare "Invalid version format" naming no file at all.
+            throw ManifestLoadingException(file, ex)
         }
     }
 
@@ -153,6 +158,15 @@ private fun <T : VersionedManifest> List<Pair<File, T>>.associateByUniqueId(): M
     }
     return manifests
 }
+
+/**
+ * Thrown when a manifest file cannot be turned into a model by a failure that carries no file information of its
+ * own. It names the offending file, so the author is told which manifest to fix instead of only what is wrong.
+ */
+class ManifestLoadingException(
+    val file: File,
+    cause: Throwable,
+) : RuntimeException("Failed to load ${file.absolutePath}: ${cause.message}", cause)
 
 /**
  * Thrown when two distinct manifest files of the same kind declare the same id.

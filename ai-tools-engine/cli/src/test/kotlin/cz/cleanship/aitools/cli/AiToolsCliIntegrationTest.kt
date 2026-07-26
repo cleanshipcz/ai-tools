@@ -7,6 +7,7 @@ import cz.cleanship.aitools.engine.ExportFailedException
 import cz.cleanship.aitools.engine.ExportFailure
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
+import cz.cleanship.aitools.engine.services.ManifestLoadingException
 import cz.cleanship.aitools.engine.tools.RulesetResolvingException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -57,6 +58,29 @@ class AiToolsCliIntegrationTest {
             .isInstanceOf(CliktError::class.java)
             .hasMessageContaining("No rulesets match pattern 'missing-ruleset'")
             .hasMessageContaining("agent 'broken-agent'")
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
+    fun `should fail with the file path when a manifest declares a malformed version`() {
+        // given
+        val cli = AiToolsCli(
+            runner = {
+                throw ManifestLoadingException(
+                    file = File("/manifests/broken.yml"),
+                    cause = IllegalArgumentException("Invalid version format: 1.0"),
+                )
+            },
+        )
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessageContaining("broken.yml")
+            .hasMessageContaining("Invalid version format: 1.0")
         assertThat((error as CliktError).statusCode).isNotZero()
     }
 

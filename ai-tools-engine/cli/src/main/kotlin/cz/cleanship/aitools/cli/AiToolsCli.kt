@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
 import cz.cleanship.aitools.engine.ExportFailedException
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
+import cz.cleanship.aitools.engine.services.ManifestLoadingException
 import java.io.FileNotFoundException
 import java.nio.file.Paths
 
@@ -34,6 +35,8 @@ class AiToolsCli(
         } catch (ex: ExportFailedException) {
             throw CliktError(ex.message, ex)
         } catch (ex: DuplicateManifestIdException) {
+            throw CliktError(ex.message, ex)
+        } catch (ex: ManifestLoadingException) {
             throw CliktError(ex.message, ex)
         }
     }
