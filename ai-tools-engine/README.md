@@ -17,7 +17,6 @@ The project is split into focused modules to ensure high maintainability and fle
 - **`:server`**: The "Backend." A Ktor-powered web server that exposes the engine via a REST API. Perfect for the upcoming Web Dashboard.
 - **`:cli`**: The "Utility." A command-line tool powered by Clikt, used by developers for instant manifest validation and local deployment.
 - **`:telemetry`**: Shared telemetry facade for observability (Metrics, Traces, Logging).
-- **`:utils`**: Common utility functions.
 
 ---
 
