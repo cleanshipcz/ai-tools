@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.parse
 import cz.cleanship.aitools.engine.ExportFailedException
 import cz.cleanship.aitools.engine.ExportFailure
+import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
@@ -85,14 +86,47 @@ class AiToolsCliIntegrationTest {
     }
 
     @Test
+    fun `should fail with both file paths when a project was skipped for a duplicate id`() {
+        // given
+        // - the other projects exported fine, so only the duplicate keeps the run from succeeding
+        val firstFile = File("/projects/alpha/project.yml")
+        val secondFile = File("/projects/beta/project.yml")
+        val cli = AiToolsCli(
+            runner = {
+                throw ExportFailedException(
+                    failures = emptyList(),
+                    duplicates = listOf(
+                        DuplicateManifestId(id = "duplicated-id", firstFile = firstFile, secondFile = secondFile),
+                    ),
+                )
+            },
+        )
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessageContaining("duplicated-id")
+            .hasMessageContaining(firstFile.absolutePath)
+            .hasMessageContaining(secondFile.absolutePath)
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
     fun `should fail with both file paths when a duplicate manifest id is loaded`() {
         // given
         val cli = AiToolsCli(
             runner = {
                 throw DuplicateManifestIdException(
-                    id = "duplicated-id",
-                    firstFile = File("/manifests/first.yml"),
-                    secondFile = File("/manifests/second.yml"),
+                    listOf(
+                        DuplicateManifestId(
+                            id = "duplicated-id",
+                            firstFile = File("/manifests/first.yml"),
+                            secondFile = File("/manifests/second.yml"),
+                        ),
+                    ),
                 )
             },
         )

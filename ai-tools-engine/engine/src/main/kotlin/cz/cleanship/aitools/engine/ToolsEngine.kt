@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine
 
+import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.Project
@@ -53,7 +54,14 @@ class ToolsEngine(
      * broken reference in a single run instead of rediscovering them one at a time. Because [ExportService] writes
      * atomically, no half-written artifact is left behind by a manifest that failed.
      *
-     * @throws ExportFailedException if at least one manifest could not be exported
+     * A project whose own id or feature ids collide is not exported at all - see [LoaderService.loadAll] - and is
+     * reported through the same [ExportFailedException], so a single ambiguous id cannot stop the projects that
+     * have nothing to do with it.
+     *
+     * @throws ExportFailedException if at least one manifest could not be exported or at least one project was
+     * left out because its ids collide
+     * @throws cz.cleanship.aitools.engine.services.DuplicateManifestIdException if manifests shared by every
+     * project declare the same id, which no project can be exported around
      */
     fun process(
         locations: Locations,
@@ -76,6 +84,7 @@ class ToolsEngine(
                 allData.skills.size,
                 allData.projects.size,
             )
+            allData.duplicates.forEach { LOG.error("Not exporting the project(s) affected by an ambiguous id. {}", it.message) }
 
             val failures = mutableListOf<ExportFailure>()
             for (projectManifest in allData.projects.values) {
@@ -112,8 +121,8 @@ class ToolsEngine(
                 LOG.info("Processing project {} completed", project.manifest.id)
             }
 
-            if (failures.isNotEmpty()) {
-                throw ExportFailedException(failures)
+            if (failures.isNotEmpty() || allData.duplicates.isNotEmpty()) {
+                throw ExportFailedException(failures, allData.duplicates)
             }
         }
     }
@@ -228,19 +237,28 @@ data class ExportFailure(
 
 /**
  * Thrown by [ToolsEngine.process] once every project has been processed, when at least one manifest failed to
- * export. Carries the original resolver messages so the caller can report every broken reference at once.
+ * export or a project was left unexported because its ids collide. Carries the original resolver messages so the
+ * caller can report every broken reference and every collision at once.
  */
 class ExportFailedException(
     val failures: List<ExportFailure>,
+    val duplicates: List<DuplicateManifestId> = emptyList(),
 ) : RuntimeException(
         buildString {
-            // A broken manifest fails once per adapter, so counting the failures would report a single broken
-            // agent as six problems with the six tools of config.yml. The count is therefore over the distinct
-            // manifests, while the body still lists every adapter that could not export them.
-            val brokenManifests = failures.distinctBy { it.projectId to it.manifest }.size
-            append("Export failed for $brokenManifests manifest(s):")
-            failures.forEach { failure ->
-                append("\n  - [${failure.projectId} | ${failure.toolType} | ${failure.manifest}] ${failure.cause.message}")
+            if (failures.isNotEmpty()) {
+                // A broken manifest fails once per adapter, so counting the failures would report a single broken
+                // agent as six problems with the six tools of config.yml. The count is therefore over the distinct
+                // manifests, while the body still lists every adapter that could not export them.
+                val brokenManifests = failures.distinctBy { it.projectId to it.manifest }.size
+                append("Export failed for $brokenManifests manifest(s):")
+                failures.forEach { failure ->
+                    append("\n  - [${failure.projectId} | ${failure.toolType} | ${failure.manifest}] ${failure.cause.message}")
+                }
+            }
+            if (duplicates.isNotEmpty()) {
+                if (isNotEmpty()) append("\n")
+                append("Skipped the project(s) affected by ${duplicates.size} duplicate manifest id(s):")
+                duplicates.forEach { duplicate -> append("\n  - ${duplicate.message}") }
             }
         },
     )

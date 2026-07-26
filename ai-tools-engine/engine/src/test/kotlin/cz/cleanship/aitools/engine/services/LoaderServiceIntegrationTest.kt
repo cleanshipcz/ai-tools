@@ -457,22 +457,120 @@ class LoaderServiceIntegrationTest {
         }
 
         @Test
-        fun `should fail naming the id and both files when two projects share an id`() {
+        fun `should name every file when three manifests share an id`() {
             // given
-            // - projects live in their own directory, each holding a project.yml
-            val directory = tempDir.resolve("projects").toFile()
-            val firstFile = writeProject(directory.resolve("alpha"), "duplicated-project")
-            val secondFile = writeProject(directory.resolve("beta"), "duplicated-project")
+            // - the third file must not quietly take the place of the pair that was dropped
+            val directory = tempDir.resolve("rulesets").toFile()
+            val firstFile = writeManifest(directory, "first.yml", "rulesets", "duplicated-id")
+            val secondFile = writeManifest(directory, "second.yml", "rulesets", "duplicated-id")
+            val thirdFile = writeManifest(directory, "third.yml", "rulesets", "duplicated-id")
 
             // when
-            val error = runCatching { loaderService.loadAll(locationsFor("projects", directory)) }.exceptionOrNull()
+            val error = runCatching { loaderService.loadAll(locationsFor("rulesets", directory)) }.exceptionOrNull()
 
             // then
             assertThat(error)
                 .isInstanceOf(DuplicateManifestIdException::class.java)
-                .hasMessageContaining("duplicated-project")
                 .hasMessageContaining(firstFile.absolutePath)
                 .hasMessageContaining(secondFile.absolutePath)
+                .hasMessageContaining(thirdFile.absolutePath)
+        }
+
+        @Test
+        fun `should report every duplicate of a single run together`() {
+            // given
+            // - two shared kinds collide and a project collides too, so one run has to name all three
+            val rulesetsDirectory = tempDir.resolve("rulesets").toFile()
+            writeManifest(rulesetsDirectory, "first.yml", "rulesets", "duplicated-ruleset")
+            writeManifest(rulesetsDirectory, "second.yml", "rulesets", "duplicated-ruleset")
+            val fragmentsDirectory = tempDir.resolve("fragments").toFile()
+            writeManifest(fragmentsDirectory, "first.yml", "fragments", "duplicated-fragment")
+            writeManifest(fragmentsDirectory, "second.yml", "fragments", "duplicated-fragment")
+            val projectsDirectory = tempDir.resolve("projects").toFile()
+            writeProject(projectsDirectory.resolve("alpha"), "duplicated-project")
+            writeProject(projectsDirectory.resolve("beta"), "duplicated-project")
+            val locations = Locations(
+                agents = emptyList(),
+                projects = listOf(projectsDirectory),
+                prompts = emptyList(),
+                rulesets = listOf(rulesetsDirectory),
+                fragments = listOf(fragmentsDirectory),
+                skills = emptyList(),
+            )
+
+            // when
+            val error = runCatching { loaderService.loadAll(locations) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(DuplicateManifestIdException::class.java)
+            assertThat((error as DuplicateManifestIdException).duplicates.map { it.id })
+                .containsExactlyInAnyOrder("duplicated-ruleset", "duplicated-fragment", "duplicated-project")
+        }
+
+        @Test
+        fun `should drop both projects and keep the others when two projects share an id`() {
+            // given
+            // - projects live in their own directory, each holding a project.yml
+            val directory = tempDir.resolve("projects").toFile()
+            val alphaFile = writeProject(directory.resolve("alpha"), "duplicated-project")
+            val betaFile = writeProject(directory.resolve("beta"), "duplicated-project")
+            writeProject(directory.resolve("gamma"), "healthy-project")
+
+            // when
+            val allManifests = loaderService.loadAll(locationsFor("projects", directory))
+
+            // then
+            // - neither colliding project can be exported, but the project that shares nothing with them still is
+            assertThat(allManifests.projects).containsOnlyKeys("healthy-project")
+            val duplicate = allManifests.duplicates.single()
+            assertThat(duplicate.id).isEqualTo("duplicated-project")
+            // - which of the two files is found first is up to the filesystem; both of them have to be named
+            assertThat(listOf(duplicate.firstFile, duplicate.secondFile)).containsExactlyInAnyOrder(alphaFile, betaFile)
+            assertThat(duplicate.message)
+                .contains("duplicated-project")
+                .contains(alphaFile.absolutePath)
+                .contains(betaFile.absolutePath)
+        }
+
+        @Test
+        fun `should drop the project and keep the others when two of its features share an id`() {
+            // given
+            // - a project with no feature filter deploys every one of its features, so an ambiguous feature id
+            //   makes that whole project unexportable while its neighbours stay untouched
+            val directory = tempDir.resolve("projects").toFile()
+            writeProject(directory.resolve("alpha"), "alpha-project")
+            val firstFile = writeFeature(directory.resolve("alpha"), "first.yml", "duplicated-feature")
+            val secondFile = writeFeature(directory.resolve("alpha"), "second.yml", "duplicated-feature")
+            writeProject(directory.resolve("beta"), "beta-project")
+
+            // when
+            val allManifests = loaderService.loadAll(locationsFor("projects", directory))
+
+            // then
+            assertThat(allManifests.projects).containsOnlyKeys("beta-project")
+            val duplicate = allManifests.duplicates.single()
+            assertThat(duplicate.id).isEqualTo("duplicated-feature")
+            assertThat(duplicate.message)
+                .contains(firstFile.absolutePath)
+                .contains(secondFile.absolutePath)
+        }
+
+        @Test
+        fun `should report no duplicate when every project has its own ids`() {
+            // given
+            val directory = tempDir.resolve("projects").toFile()
+            writeProject(directory.resolve("alpha"), "alpha-project")
+            writeFeature(directory.resolve("alpha"), "shared.yml", "shared-feature")
+            writeProject(directory.resolve("beta"), "beta-project")
+            // - the very same feature id in another project is scoped to that project, not a collision
+            writeFeature(directory.resolve("beta"), "shared.yml", "shared-feature")
+
+            // when
+            val allManifests = loaderService.loadAll(locationsFor("projects", directory))
+
+            // then
+            assertThat(allManifests.projects).containsOnlyKeys("alpha-project", "beta-project")
+            assertThat(allManifests.duplicates).isEmpty()
         }
 
         @Test
@@ -518,6 +616,12 @@ class LoaderServiceIntegrationTest {
 
         private fun writeSkill(directory: File, fileName: String, id: String): File =
             writeYaml(directory, fileName, "id: $id\ndescription: A skill\nsections:\n  - text: Some text\n")
+
+        private fun writeFeature(projectDirectory: File, fileName: String, id: String): File = writeYaml(
+            projectDirectory.resolve("features"),
+            fileName,
+            "id: $id\ndescription: A feature\nprompt: A feature prompt\n",
+        )
 
         private fun writeProject(directory: File, id: String): File = writeYaml(
             directory,

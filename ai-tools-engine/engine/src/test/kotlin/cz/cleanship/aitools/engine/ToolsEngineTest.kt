@@ -1,6 +1,7 @@
 package cz.cleanship.aitools.engine
 
 import cz.cleanship.aitools.engine.models.Locations
+import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
 import org.assertj.core.api.Assertions.assertThat
@@ -214,6 +215,113 @@ class ToolsEngineTest {
     }
 
     @Nested
+    inner class DuplicateIds {
+
+        @Test
+        fun `should export the unaffected projects when two projects share an id`() {
+            // given
+            // - two project directories declare the same id, next to the healthy project written in setUp
+            val firstDestination = tempDir.resolve("first-destination").toFile()
+            val secondDestination = tempDir.resolve("second-destination").toFile()
+            val firstFile = writeProject("duplicated-a", "duplicated-project", firstDestination)
+            val secondFile = writeProject("duplicated-b", "duplicated-project", secondDestination)
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            // - the project that shares nothing with the collision deployed as usual
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            // - neither colliding project was exported, because neither may be picked as the winner
+            assertThat(firstDestination).doesNotExist()
+            assertThat(secondDestination).doesNotExist()
+            // - and the run still fails, naming the id and both files
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("duplicated-project")
+                .hasMessageContaining(firstFile.absolutePath)
+                .hasMessageContaining(secondFile.absolutePath)
+        }
+
+        @Test
+        fun `should export the unaffected projects when two features of one project share an id`() {
+            // given
+            val featureDestination = tempDir.resolve("feature-destination").toFile()
+            writeProject("feature-project", "feature-project", featureDestination)
+            val firstFile = writeFeature("feature-project", "first.yml", "duplicated-feature")
+            val secondFile = writeFeature("feature-project", "second.yml", "duplicated-feature")
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(featureDestination).doesNotExist()
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("duplicated-feature")
+                .hasMessageContaining(firstFile.absolutePath)
+                .hasMessageContaining(secondFile.absolutePath)
+        }
+
+        @Test
+        fun `should report both the duplicate and the broken references of the same run`() {
+            // given
+            writeAgent("broken-agent", "base")
+            writePrompt("broken-prompt", "missing-ruleset")
+            writeProject("duplicated-a", "duplicated-project", tempDir.resolve("first-destination").toFile())
+            writeProject("duplicated-b", "duplicated-project", tempDir.resolve("second-destination").toFile())
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("No rulesets match pattern 'missing-ruleset'")
+                .hasMessageContaining("duplicated-project")
+            assertThat((error as ExportFailedException).duplicates.map { it.id }).containsExactly("duplicated-project")
+        }
+
+        @Test
+        fun `should export nothing when two rulesets share an id`() {
+            // given
+            // - rulesets are shared by every project, and a project with no ruleset filter deploys all of them,
+            //   so exporting anything would silently ship content that lost one of its two sources
+            writeRuleset("base", fileName = "duplicate-of-base.yml")
+            writeAgent("good-agent", "base")
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(DuplicateManifestIdException::class.java)
+                .hasMessageContaining("base")
+            assertThat(destination).doesNotExist()
+        }
+
+        @Test
+        fun `should export nothing when two agents share an id`() {
+            // given
+            // - a dropped agent would leave every project silently missing an agent it never filtered out
+            writeAgent("good-agent", "base")
+            writeYaml(
+                "agents/copy-of-good-agent.yml",
+                "id: good-agent\ndescription: An agent\nrulesets:\n  - base\n" +
+                    "persona: A persona\nprompt: An agent prompt\n",
+            )
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(DuplicateManifestIdException::class.java)
+            assertThat(destination).doesNotExist()
+        }
+    }
+
+    @Nested
     inner class FailureReport {
 
         @Test
@@ -263,8 +371,8 @@ class ToolsEngineTest {
 
     private fun promptFile(id: String) = destination.resolve(".claude/commands/$id.md")
 
-    private fun writeRuleset(id: String) = writeYaml(
-        "rulesets/$id.yml",
+    private fun writeRuleset(id: String, fileName: String = "$id.yml") = writeYaml(
+        "rulesets/$fileName",
         "id: $id\ndescription: A ruleset\nrules:\n  - A rule from $id.\n",
     )
 
@@ -297,11 +405,20 @@ class ToolsEngineTest {
         return manifest
     }
 
-    private fun writeProject() = writeYaml(
-        "projects/test-project/project.yml",
-        "id: test-project\ndescription: A project\n" +
+    private fun writeProject(
+        directoryName: String = "test-project",
+        id: String = "test-project",
+        exportTo: File = destination,
+    ) = writeYaml(
+        "projects/$directoryName/project.yml",
+        "id: $id\ndescription: A project\n" +
             "context:\n  documentation:\n    readme: README.md\n" +
-            "deploy:\n  directory: \"${destination.absolutePath}\"\n",
+            "deploy:\n  directory: \"${exportTo.absolutePath}\"\n",
+    )
+
+    private fun writeFeature(projectDirectoryName: String, fileName: String, id: String) = writeYaml(
+        "projects/$projectDirectoryName/features/$fileName",
+        "id: $id\ndescription: A feature\nprompt: A feature prompt\n",
     )
 
     private fun writeYaml(relativePath: String, content: String): File {

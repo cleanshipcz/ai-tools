@@ -110,6 +110,16 @@ Note that the GitHub Copilot adapter always clears `.github/prompts/`, `.github/
 There is no backup and no auto-commit step.
 Generated files are overwritten in place, though each file is written atomically via a temporary file, so an interrupted run cannot leave a half-written artifact.
 
+### Duplicate ids
+
+Manifest ids are the primary key of the whole engine, so two files declaring the same id are never resolved by picking a winner.
+One run reports every collision it found, names the id and both files, and exits non-zero.
+
+How much a collision costs depends on the kind of manifest:
+
+- Two projects sharing an id, or two features of the same project sharing an id, cost only the project(s) that carry them. Those projects are not exported, every other project is deployed as usual, and the run still fails at the end.
+- Two agents, prompts, rulesets, fragments, or skills sharing an id stop the whole run before anything is written. They are shared by every project, and a project that does not filter that kind deploys all of it, so dropping the colliding pair would silently ship every project without content it never excluded.
+
 ## Rulesets and Fragments
 
 Agents, prompts, and skills reference rulesets and fragments by **regular expression matched against the manifest `id`**, not by filename:
