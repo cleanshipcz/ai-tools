@@ -8,7 +8,6 @@ dependencies {
     implementation(libs.kaml)
 
     implementation(project(":telemetry"))
-    implementation(project(":utils"))
 
     testImplementation(kotlin("test"))
 }
