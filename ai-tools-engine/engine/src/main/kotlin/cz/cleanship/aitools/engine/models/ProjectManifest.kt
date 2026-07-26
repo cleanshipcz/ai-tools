@@ -33,6 +33,13 @@ data class ProjectDocumentationItem(
     val description: String? = null,
 )
 
+/**
+ * @param directory where the generated artifacts of this project land. A relative value resolves against the
+ * `--working-dir` of the run - the directory holding `config.yml`, the same base its `locations.*` paths use - so
+ * `.` means that directory itself and the value does not shift with the working directory of the JVM process.
+ * An absolute value is used exactly as written, which is what a project outside the manifest repository wants.
+ * @param replace whether a deploy may delete the directories it generates before writing them again
+ */
 @Serializable
 data class ProjectDeploy(
     val directory: String,

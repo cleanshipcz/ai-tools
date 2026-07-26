@@ -31,10 +31,10 @@ context:
     - Verify correct output for ai-tools-engine project with running `./gradlew clean build`, focus on running ktlint and detekt
 deploy:
   # This project deploys onto the ai-tools repository itself.
-  # Relative paths are resolved against the JVM working directory of `:cli:run`,
-  # which Gradle sets to `ai-tools-engine/cli`, so `../../` is the repository root.
+  # Relative paths are resolved against `--working-dir`, which `deploy.sh` sets to
+  # the repository root, so `.` is that root regardless of how the engine is launched.
   # Use an absolute path for any project outside this repository.
-  directory: "../../"
+  directory: "."
   agents:
     filter:
       - type: tags

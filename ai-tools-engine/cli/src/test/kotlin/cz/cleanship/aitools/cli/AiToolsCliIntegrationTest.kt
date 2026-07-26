@@ -36,6 +36,46 @@ class AiToolsCliIntegrationTest {
     }
 
     @Test
+    fun `should resolve relative manifest locations and a relative deploy directory against the working dir`() {
+        // given
+        // - a config declaring its manifest locations relative to --working-dir, as the repository's own does
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              projects:
+                - "projects"
+            tools:
+              - claude
+            """.trimIndent(),
+        )
+        // - a project deploying to a relative directory, which must land on the same base the locations use
+        val projectFile = File(tempDir, "projects/test-project/project.yml")
+        projectFile.parentFile.mkdirs()
+        projectFile.writeText(
+            """
+            id: test-project
+            description: A project
+            metadata:
+              version: 1.0.0
+            context:
+              documentation:
+                readme: README.md
+            deploy:
+              directory: "generated"
+            """.trimIndent(),
+        )
+        val cli = AiToolsCli()
+
+        // when
+        cli.parse(arrayOf("--working-dir", tempDir.absolutePath))
+
+        // then
+        assertThat(File(tempDir, "generated/CLAUDE.md")).exists()
+        // - the working directory of this JVM is a different directory entirely and was left untouched
+        assertThat(File("generated")).doesNotExist()
+    }
+
+    @Test
     fun `should fail with the resolver message when an export fails`() {
         // given
         // - a CliktError makes the command report on stderr and exit with a non-zero status code

@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine
 
+import cz.cleanship.aitools.engine.io.resolveDeclaredPath
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.Locations
@@ -30,7 +31,14 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
 
+/**
+ * @param workingDirectory the `--working-dir` of the run, the directory `config.yml` was read from. A relative
+ * `deploy.directory` resolves against it - see [resolveDeclaredPath] - so it is the same base the `locations.*`
+ * paths of that same `config.yml` already use. It is required rather than defaulted because the adapters delete
+ * under whatever it resolves to, which is not a decision to make by omission.
+ */
 class ToolsEngine(
+    private val workingDirectory: File,
     private val loaderService: LoaderService = LoaderService(),
     private val filterService: FilterService = FilterService(),
     private val tools: List<ToolAdapter> = listOf(
@@ -114,7 +122,7 @@ class ToolsEngine(
                     skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
                 )
 
-                val destination = File(project.manifest.deploy.directory).absoluteFile
+                val destination = workingDirectory.resolveDeclaredPath(project.manifest.deploy.directory)
                 for (adapter in tools) {
                     failures += exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments)
                 }
@@ -142,7 +150,9 @@ class ToolsEngine(
     ): List<ExportFailure> {
         LOG.info("{}: Exporting via adapter {}", project.manifest.id, adapter.toolType)
         if (project.manifest.deploy.replace) {
-            LOG.warn("{}: Replacing existing agentic files in {}.", project.manifest.id, destination)
+            // The path is quoted because a resolved `deploy.directory` can legitimately end in `.`, which reads
+            // as `..` when a sentence-ending period follows it - misleading in a warning about deletion.
+            LOG.warn("{}: Replacing existing agentic files in '{}'.", project.manifest.id, destination)
         }
         adapter.prepare(destination, project.manifest)
 

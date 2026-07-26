@@ -78,7 +78,7 @@ There is no way to deploy a single project from the command line; narrow the `pr
 A project is a directory under a configured `projects` location containing `project.yml`.
 `deploy.directory` sets where its generated files land.
 
-Relative `deploy.directory` values resolve against the JVM working directory of the Gradle `:cli:run` task, which is `ai-tools-engine/cli` — so `../../` means the root of this repository.
+Relative `deploy.directory` values resolve against `--working-dir`, the same base the `locations` paths of `config.yml` use — so `.` means the root of this repository and the value does not change with the launcher.
 Use an absolute path for any project outside this repository.
 
 Filters select which manifests reach a project. Each of `agents`, `prompts`, `rulesets`, `fragments`, `skills`, and `features` accepts a list of filters of type `tags`, `whitelist`, or `blacklist`:
@@ -175,7 +175,7 @@ tools:
 ```
 
 Every entry under `locations` is a list, so you can point at additional directories outside this repository.
-Relative location paths resolve against the working directory; absolute paths are used as given.
+Relative location paths resolve against the working directory; absolute paths are used as given — the same rule a project's `deploy.directory` follows.
 The `tools` list accepts exactly the six keys above, and controls which adapters run.
 
 ## Not Yet Implemented

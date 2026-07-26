@@ -58,23 +58,6 @@
 
 Raised by the analysis and code review in `.delivery/project-improvements/`. Not fixed there, with reasons.
 
-### `deploy.directory` resolves against the wrong base
-
-- `ToolsEngine.kt:108` does `File(deploy.directory).absoluteFile`, which resolves a relative path against the
-  JVM working directory. `ConfigService.resolvePaths` resolves every `locations.*` path against `--working-dir`.
-  Two different bases in the same config file.
-- Consequence: a relative `deploy.directory` only means what you expect under `./deploy.sh`, which runs
-  `:cli:run`, where Gradle sets the working directory to `ai-tools-engine/cli`. Under `installDist` or
-  `java -jar` from the repository root the same value points somewhere else entirely.
-- This matters because `prepare()` **deletes** directories under whatever it resolves to: with `replace: true`
-  every adapter removes its own generated directories, and `GitHubCopilotAdapter` removes three of them
-  (`.github/prompts`, `.github/instructions`, `.github/agents`).
-- Circumstantial evidence it has already happened: `ai-tools-projects/projects/` exists inside this repository
-  and is completely empty, which is what a relative path created at the wrong base looks like.
-- Fix: resolve `deploy.directory` against `--working-dir` like every other path, after which `directory: "."`
-  is correct under any launcher. Deliberately deferred: it changes a path that deletes directories, so it wants
-  its own change and its own review.
-
 ### Manifest validation is not enforced anywhere
 
 - The old npm CI ran `npm run validate`. There is no Gradle equivalent, so nothing validates manifests today.

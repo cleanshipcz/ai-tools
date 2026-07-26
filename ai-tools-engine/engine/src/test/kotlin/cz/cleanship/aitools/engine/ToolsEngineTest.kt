@@ -25,7 +25,7 @@ class ToolsEngineTest {
     fun setUp() {
         workspace = tempDir.resolve("workspace").toFile()
         destination = tempDir.resolve("destination").toFile()
-        engine = ToolsEngine(tools = listOf(ClaudeAdapter()))
+        engine = ToolsEngine(workspace, tools = listOf(ClaudeAdapter()))
         // - a resolvable ruleset and the project that deploys into the destination are always present
         writeRuleset("base")
         writeProject()
@@ -58,6 +58,54 @@ class ToolsEngineTest {
 
             // then
             assertThat(destination.resolve("CLAUDE.md")).exists()
+        }
+    }
+
+    @Nested
+    inner class DeployDirectoryResolution {
+
+        @Test
+        fun `should resolve a relative deploy directory against the working directory`() {
+            // given
+            // - a project deploying to a path relative to the working directory of the run
+            val relativeDestination = "relative-destination"
+            writeProject(deployDirectory = relativeDestination)
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(workspace.resolve(relativeDestination).resolve("CLAUDE.md")).exists()
+            // - and nothing landed relative to the JVM working directory, which is a different base entirely
+            assertThat(File(relativeDestination)).doesNotExist()
+        }
+
+        @Test
+        fun `should resolve a relative deploy directory that climbs out of the working directory`() {
+            // given
+            // - the base of a `..` segment is the working directory, so the project lands next to it
+            writeProject(deployDirectory = "../sibling-destination")
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(tempDir.resolve("sibling-destination").resolve("CLAUDE.md").toFile()).exists()
+        }
+
+        @Test
+        fun `should use an absolute deploy directory as given`() {
+            // given
+            val absoluteDestination = tempDir.resolve("absolute-destination").toFile()
+            writeProject(deployDirectory = absoluteDestination.absolutePath)
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(absoluteDestination.resolve("CLAUDE.md")).exists()
+            // - an absolute destination is never re-based under the working directory
+            assertThat(workspace.walkTopDown().filter { it.name == "CLAUDE.md" }.toList()).isEmpty()
         }
     }
 
@@ -223,8 +271,8 @@ class ToolsEngineTest {
             // - two project directories declare the same id, next to the healthy project written in setUp
             val firstDestination = tempDir.resolve("first-destination").toFile()
             val secondDestination = tempDir.resolve("second-destination").toFile()
-            val firstFile = writeProject("duplicated-a", "duplicated-project", firstDestination)
-            val secondFile = writeProject("duplicated-b", "duplicated-project", secondDestination)
+            val firstFile = writeProject("duplicated-a", "duplicated-project", firstDestination.absolutePath)
+            val secondFile = writeProject("duplicated-b", "duplicated-project", secondDestination.absolutePath)
 
             // when
             val error = runCatching { engine.process(locations()) }.exceptionOrNull()
@@ -247,7 +295,7 @@ class ToolsEngineTest {
         fun `should export the unaffected projects when two features of one project share an id`() {
             // given
             val featureDestination = tempDir.resolve("feature-destination").toFile()
-            writeProject("feature-project", "feature-project", featureDestination)
+            writeProject("feature-project", "feature-project", featureDestination.absolutePath)
             val firstFile = writeFeature("feature-project", "first.yml", "duplicated-feature")
             val secondFile = writeFeature("feature-project", "second.yml", "duplicated-feature")
 
@@ -269,8 +317,8 @@ class ToolsEngineTest {
             // given
             writeAgent("broken-agent", "base")
             writePrompt("broken-prompt", "missing-ruleset")
-            writeProject("duplicated-a", "duplicated-project", tempDir.resolve("first-destination").toFile())
-            writeProject("duplicated-b", "duplicated-project", tempDir.resolve("second-destination").toFile())
+            writeProject("duplicated-a", "duplicated-project", tempDir.resolve("first-destination").toString())
+            writeProject("duplicated-b", "duplicated-project", tempDir.resolve("second-destination").toString())
 
             // when
             val error = runCatching { engine.process(locations()) }.exceptionOrNull()
@@ -328,7 +376,7 @@ class ToolsEngineTest {
         fun `should count a manifest once when it fails for several adapters`() {
             // given
             // - every configured adapter exports the same broken agent, so it fails once per adapter
-            val multiAdapterEngine = ToolsEngine(tools = listOf(ClaudeAdapter(), CursorAdapter()))
+            val multiAdapterEngine = ToolsEngine(workspace, tools = listOf(ClaudeAdapter(), CursorAdapter()))
             writeAgent("broken-agent", "missing-ruleset")
 
             // when
@@ -408,12 +456,12 @@ class ToolsEngineTest {
     private fun writeProject(
         directoryName: String = "test-project",
         id: String = "test-project",
-        exportTo: File = destination,
+        deployDirectory: String = destination.absolutePath,
     ) = writeYaml(
         "projects/$directoryName/project.yml",
         "id: $id\ndescription: A project\n" +
             "context:\n  documentation:\n    readme: README.md\n" +
-            "deploy:\n  directory: \"${exportTo.absolutePath}\"\n",
+            "deploy:\n  directory: \"$deployDirectory\"\n",
     )
 
     private fun writeFeature(projectDirectoryName: String, fileName: String, id: String) = writeYaml(

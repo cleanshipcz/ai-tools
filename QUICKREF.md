@@ -225,7 +225,7 @@ Always put `blacklist` last.
 This is a common cause of a manifest silently disappearing from a deploy.
 It also causes `No rulesets match pattern ... excluded by project filter`: a ruleset an agent references must itself survive the project's `rulesets` filter, or the entire agent fails to export.
 
-Relative `deploy.directory` values resolve against `ai-tools-engine/cli`, the working directory of the Gradle `:cli:run` task, so `../../` is this repository's root.
+Relative `deploy.directory` values resolve against `--working-dir`, which `deploy.sh` sets to this repository's root, so `.` is that root — the same base the `locations` paths of `config.yml` use.
 Prefer an absolute path for anything else.
 
 ## Creating a Feature
