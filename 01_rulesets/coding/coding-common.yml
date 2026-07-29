@@ -2,6 +2,7 @@ id: coding-common
 description: Common coding standards and best practices
 rules:
   - "Never make write operations to git (no git commit, git push, etc.) on master, main, develop or acceptance branch."
+  - "Author git commits as the currently configured git user only. NEVER add Co-Authored-By trailers or any other authorship attribution crediting the AI model or agent."
   - "Prefer composition over inheritance."
   - "Follow the Single Responsibility Principle for classes."
   - "Prefer immutable objects."
@@ -20,9 +21,10 @@ rules:
   - "Document non-obvious decisions and trade-offs."
   - "Minimize code duplication."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2025-11-15"
+  updated: "2026-07-29"
   tags:
     - common
     - development
