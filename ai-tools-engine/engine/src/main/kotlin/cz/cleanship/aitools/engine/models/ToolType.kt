@@ -23,3 +23,11 @@ enum class ToolType {
     @SerialName("codex")
     CODEX,
 }
+
+/**
+ * The spelling a manifest writes this tool as - the value `@SerialName` decodes - so that a message echoing back
+ * something an author typed can use their own word rather than the Kotlin constant. It is read from the serializer
+ * instead of repeated in a second table, which could drift away from the annotations above.
+ */
+val ToolType.serialName: String
+    get() = ToolType.serializer().descriptor.getElementName(ordinal)

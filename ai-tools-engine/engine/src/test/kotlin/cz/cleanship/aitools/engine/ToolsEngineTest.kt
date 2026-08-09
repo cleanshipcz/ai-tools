@@ -180,7 +180,42 @@ class ToolsEngineTest {
             // - the run does not fail over a tool it was simply not asked to build
             assertThat(destination.resolve("CLAUDE.md")).exists()
             assertThat(cursorProjectFile()).doesNotExist()
-            assertThat(warnings()).anyMatch { it.contains("test-project") && it.contains("CURSOR") }
+            // - the warning quotes the tool back in the spelling the manifest uses, so the author can grep for it
+            assertThat(warnings()).anyMatch { it.contains("test-project") && it.contains("cursor") }
+            assertThat(warnings()).noneMatch { it.contains("CURSOR") }
+        }
+
+        @Test
+        fun `should name a repeated unavailable tool only once`() {
+            // given
+            // - the schema asks for unique items, but a manifest that repeats one should not stutter in the warning
+            writeProject(tools = listOf("cursor", "cursor"))
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(warnings()).anyMatch { it.contains("[cursor]") }
+        }
+
+        @Test
+        fun `should restrict one project without affecting another project of the same run`() {
+            // given
+            // - two projects deploy in the same run, only the first one restricts itself
+            val multiAdapterEngine = ToolsEngine(workspace, tools = listOf(ClaudeAdapter(), CursorAdapter()))
+            val unrestrictedDestination = tempDir.resolve("unrestricted-destination").toFile()
+            writeProject(tools = listOf("claude"))
+            writeProject("unrestricted-project", "unrestricted-project", unrestrictedDestination.absolutePath)
+
+            // when
+            multiAdapterEngine.process(locations())
+
+            // then
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(cursorProjectFile()).doesNotExist()
+            // - the restriction of the first project does not leak onto the second one
+            assertThat(unrestrictedDestination.resolve("CLAUDE.md")).exists()
+            assertThat(unrestrictedDestination.resolve(".cursor/rules/project.mdc")).exists()
         }
 
         @Test

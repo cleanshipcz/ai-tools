@@ -1,6 +1,7 @@
 package cz.cleanship.aitools.engine
 
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
+import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.Locations
@@ -8,6 +9,7 @@ import cz.cleanship.aitools.engine.models.Project
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
 import cz.cleanship.aitools.engine.services.SkillFileResolvingException
@@ -98,37 +100,17 @@ class ToolsEngine(
 
             val failures = mutableListOf<ExportFailure>()
             for (projectManifest in allData.projects.values) {
+                // Selecting before the project is assembled keeps a project that exports through no tool out of the
+                // log entirely, rather than bracketing it in the lines that report a deploy which never happened.
+                val adapters = selectAdapters(projectManifest)
+                if (adapters.isEmpty()) continue
                 LOG.info("Processing project {}", projectManifest.id)
-                val projectFeatures = allData.features[projectManifest] ?: emptyMap()
-                val filteredSkills = filterService
-                    .filter(allData.skills.values, projectManifest.deploy.skills.filter)
-                    .associateBy { it.id }
-                val project = Project(
-                    projectManifest,
-                    features = filterService
-                        .filter(projectFeatures.values, projectManifest.deploy.features.filter)
-                        .associateBy { it.id },
-                    agents = filterService
-                        .filter(allData.agents.values, projectManifest.deploy.agents.filter)
-                        .associateBy { it.id },
-                    prompts = filterService
-                        .filter(allData.prompts.values, projectManifest.deploy.prompts.filter)
-                        .associateBy { it.id },
-                    rulesets = filterService
-                        .filter(allData.rulesets.values, projectManifest.deploy.rulesets.filter)
-                        .associateBy { it.id },
-                    fragments = filterService
-                        .filter(allData.fragments.values, projectManifest.deploy.fragments.filter)
-                        .associateBy { it.id },
-                    skills = filteredSkills,
-                    skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
-                )
-
-                val destination = workingDirectory.resolveDeclaredPath(project.manifest.deploy.directory)
-                for (adapter in selectAdapters(project.manifest)) {
+                val project = assembleProject(projectManifest, allData)
+                val destination = workingDirectory.resolveDeclaredPath(projectManifest.deploy.directory)
+                for (adapter in adapters) {
                     failures += exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments)
                 }
-                LOG.info("Processing project {} completed", project.manifest.id)
+                LOG.info("Processing project {} completed", projectManifest.id)
             }
 
             if (failures.isNotEmpty() || allData.duplicates.isNotEmpty()) {
@@ -138,24 +120,58 @@ class ToolsEngine(
     }
 
     /**
-     * Returns the configured adapters that export [project], narrowed to its `deploy.tools` when it declares one.
-     *
-     * A declared tool the run does not configure is warned about rather than failed on: the run-wide `tools` of
-     * `config.yml` decides which adapters exist at all, and a project manifest travels between runs that configure
-     * different sets of them, so the two lists disagreeing is a difference in scope rather than a broken manifest.
-     * Narrowing to nothing is warned about for the same reason it is allowed - a project that exports through no
-     * tool is a deliberate but silent outcome, and a silent one is worth saying out loud.
+     * Builds the project that is exported: every manifest of [allData] that survives the filter [projectManifest]
+     * declares for its kind, indexed by id.
      */
-    private fun selectAdapters(project: ProjectManifest): List<ToolAdapter> {
-        val declared = project.deploy.tools ?: return tools
+    private fun assembleProject(projectManifest: ProjectManifest, allData: AllManifests): Project {
+        val projectFeatures = allData.features[projectManifest] ?: emptyMap()
+        val filteredSkills = filterService
+            .filter(allData.skills.values, projectManifest.deploy.skills.filter)
+            .associateBy { it.id }
+        return Project(
+            projectManifest,
+            features = filterService
+                .filter(projectFeatures.values, projectManifest.deploy.features.filter)
+                .associateBy { it.id },
+            agents = filterService
+                .filter(allData.agents.values, projectManifest.deploy.agents.filter)
+                .associateBy { it.id },
+            prompts = filterService
+                .filter(allData.prompts.values, projectManifest.deploy.prompts.filter)
+                .associateBy { it.id },
+            rulesets = filterService
+                .filter(allData.rulesets.values, projectManifest.deploy.rulesets.filter)
+                .associateBy { it.id },
+            fragments = filterService
+                .filter(allData.fragments.values, projectManifest.deploy.fragments.filter)
+                .associateBy { it.id },
+            skills = filteredSkills,
+            skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
+        )
+    }
+
+    /**
+     * Returns the configured adapters that export [projectManifest], narrowed to its `deploy.tools` when it declares one.
+     *
+     * A declared tool the run does not configure is warned about rather than failed on: the tools configured for the
+     * run decide which adapters exist at all, and a project manifest travels between runs that configure different
+     * sets of them, so the two lists disagreeing is a difference in scope rather than a broken manifest. Narrowing to
+     * nothing is warned about for the same reason it is allowed - a project that exports through no tool is a
+     * deliberate but silent outcome, and a silent one is worth saying out loud.
+     *
+     * The warning quotes the unavailable tools in the spelling a manifest writes them, not as Kotlin constants, so
+     * that an author can search their own YAML for the word the engine just told them about.
+     */
+    private fun selectAdapters(projectManifest: ProjectManifest): List<ToolAdapter> {
+        val declared = projectManifest.deploy.tools?.toSet() ?: return tools
         val configured = tools.mapTo(mutableSetOf()) { it.toolType }
         val unavailable = declared.filterNot { it in configured }
         if (unavailable.isNotEmpty()) {
-            LOG.warn("{}: deploy.tools names {}, which this run does not configure. Skipping.", project.id, unavailable)
+            LOG.warn("{}: deploy.tools names {}, which this run does not configure. Leaving the tool(s) out of this deploy.", projectManifest.id, unavailable.map { it.serialName })
         }
         val selected = tools.filter { it.toolType in declared }
         if (selected.isEmpty()) {
-            LOG.warn("{}: deploy.tools selects none of the configured tools, so the project is not exported.", project.id)
+            LOG.warn("{}: deploy.tools selects none of the configured tools, so the project is not exported.", projectManifest.id)
         }
         return selected
     }

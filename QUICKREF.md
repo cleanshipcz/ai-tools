@@ -184,7 +184,7 @@ context:
 deploy:
   directory: "/absolute/path/to/target"
   replace: false
-  tools: [claude, cursor]      # optional; omit to deploy through every tool config.yml configures
+  # tools: [claude, cursor]    # optional; omitted here so this example deploys through every configured tool
   agents:
     filter:
       - type: tags
@@ -231,15 +231,23 @@ Prefer an absolute path for anything else.
 
 ### Restricting a project to some tools
 
-`deploy.tools` narrows a project to a subset of the tools `config.yml` configures, using the same six keys: `windsurf`, `antigravity`, `github_copilot`, `cursor`, `claude`, `codex`.
+`deploy.tools` narrows a project to a subset of the tools configured for the run, using the same six keys: `windsurf`, `antigravity`, `github_copilot`, `cursor`, `claude`, `codex`.
 It only ever narrows — it cannot add a tool the run does not configure.
+The run's tool list is `tools:` in `config.yml`, unless `config.local.yml` declares its own `tools:`, which replaces that list wholesale rather than merging into it.
 
 - **Omitted** — the project deploys through every configured tool. This is the default.
 - **Listed** — the project deploys through the listed tools only, and the other configured tools skip it.
 - **`tools: []`** — the project deploys through no tool at all. Emptiness restricts to nothing; only omission means "all".
+- **`tools:` with nothing under it** — identical to omitting the key, so the project deploys through every configured tool. Commenting out the last entry under a `tools:` key therefore widens the project back to all tools rather than narrowing it to none.
 
-Naming a tool that `config.yml` does not configure is not an error: the project deploys through the tools both lists agree on, and the engine logs a warning naming the project and the unavailable tool.
+Note that this is the one list in a project manifest whose emptiness *subtracts*: an empty or omitted `filter` lets everything through, but an empty `deploy.tools` lets nothing through.
+
+Naming a tool the run does not configure is not an error: the project deploys through the tools both lists agree on, and the engine logs a warning naming the project and the unavailable tool.
 This keeps one project manifest usable across runs that configure different tools.
+
+Narrowing only stops future writes; it does not retract what the de-selected tools already wrote.
+Artifacts a tool generated before it was de-selected stay in the target directory and must be removed by hand, and `replace: true` does not clean them up either — a de-selected tool never runs, so it never gets the chance to delete its own directory.
+This is deliberate: narrowing is usually what someone does when another workflow takes ownership of that directory, and deleting it from under them would be the more dangerous default.
 
 ## Creating a Feature
 

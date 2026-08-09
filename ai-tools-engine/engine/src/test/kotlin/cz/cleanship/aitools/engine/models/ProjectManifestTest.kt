@@ -90,6 +90,28 @@ class ProjectManifestTest {
     }
 
     @Test
+    fun `should deserialize a valueless tools key as no restriction`() {
+        // a key with nothing under it - what commenting out the last entry leaves behind - is not an empty list,
+        // so it widens the project back to every configured tool instead of restricting it to none
+        val input = """
+            |id: test-project
+            |description: Test Project
+            |metadata:
+            |    version: 1.0.0
+            |context:
+            |    documentation:
+            |        readme: README.md
+            |deploy:
+            |    directory: /tmp/test
+            |    tools:
+        """.trimMargin()
+
+        val result = yaml.decodeFromString(ProjectManifest.serializer(), input)
+
+        assertThat(result.deploy.tools).isNull()
+    }
+
+    @Test
     fun `should deserialize manifest with an empty tools list`() {
         val input = """
             |id: test-project
