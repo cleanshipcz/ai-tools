@@ -93,7 +93,7 @@
             "type": "string",
             "enum": ["windsurf", "antigravity", "github_copilot", "cursor", "claude", "codex"]
           },
-          "description": "Restricts which of the tools configured for the run deploy this project. Omit it to deploy through all configured tools; an empty list deploys through none. A tool that the run does not configure is ignored with a warning."
+          "description": "Restricts which of the tools configured for the run deploy this project. Omit it to deploy through all configured tools; an empty list deploys through none; a 'tools:' key with no value under it counts as omitted. A tool that the run does not configure is ignored with a warning."
         },
         "prompts": {
           "type": "object",

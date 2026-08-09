@@ -199,6 +199,23 @@ class ToolsEngineTest {
         }
 
         @Test
+        fun `should warn once when the run itself configures no tools`() {
+            // given
+            // - an engine with no adapters at all, which is what an emptied `tools:` block of the config produces
+            val toollessEngine = ToolsEngine(workspace, tools = emptyList())
+            // - a second project, so that the warning is proven to name the run once rather than once per project
+            writeProject("second-project", "second-project", tempDir.resolve("second-destination").toString())
+
+            // when
+            toollessEngine.process(locations())
+
+            // then
+            // - the misconfiguration is named instead of every project being skipped in silence, and the run still succeeds
+            assertThat(warnings().filter { it.contains("configures no tools") }).hasSize(1)
+            assertThat(destination).doesNotExist()
+        }
+
+        @Test
         fun `should restrict one project without affecting another project of the same run`() {
             // given
             // - two projects deploy in the same run, only the first one restricts itself

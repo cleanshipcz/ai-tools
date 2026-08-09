@@ -98,6 +98,12 @@ class ToolsEngine(
             )
             allData.duplicates.forEach { LOG.error("Not exporting the project(s) affected by an ambiguous id. {}", it.message) }
 
+            // A run with no adapters exports nothing at all, and every project below is skipped before it reaches a
+            // log line, so the misconfiguration is named here rather than leaving the run silent and successful.
+            if (tools.isEmpty()) {
+                LOG.warn("This run configures no tools, so no project is exported. Declare the tools to build under 'tools:' in config.yml, or in config.local.yml, which replaces that list.")
+            }
+
             val failures = mutableListOf<ExportFailure>()
             for (projectManifest in allData.projects.values) {
                 // Selecting before the project is assembled keeps a project that exports through no tool out of the
