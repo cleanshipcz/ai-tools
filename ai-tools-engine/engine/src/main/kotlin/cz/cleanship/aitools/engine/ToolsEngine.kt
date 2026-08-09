@@ -1,11 +1,18 @@
 package cz.cleanship.aitools.engine
 
+import cz.cleanship.aitools.engine.io.resolveDeclaredPath
+import cz.cleanship.aitools.engine.models.AllManifests
+import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.Project
+import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
+import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
+import cz.cleanship.aitools.engine.services.SkillFileResolvingException
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.FragmentResolvingException
@@ -27,7 +34,14 @@ import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
 
+/**
+ * @param workingDirectory the `--working-dir` of the run, the directory `config.yml` was read from. A relative
+ * `deploy.directory` resolves against it - see [resolveDeclaredPath] - so it is the same base the `locations.*`
+ * paths of that same `config.yml` already use. It is required rather than defaulted because the adapters delete
+ * under whatever it resolves to, which is not a decision to make by omission.
+ */
 class ToolsEngine(
+    private val workingDirectory: File,
     private val loaderService: LoaderService = LoaderService(),
     private val filterService: FilterService = FilterService(),
     private val tools: List<ToolAdapter> = listOf(
@@ -42,6 +56,25 @@ class ToolsEngine(
 
     private val telemetry = Telemetry.create(TelemetryConfig.fromEnvironment())
 
+    /**
+     * Loads every manifest in [locations] and exports each project through every configured adapter, or through the
+     * subset a project narrows itself down to with `deploy.tools` - see [selectAdapters].
+     *
+     * Failure policy: COLLECT-ALL-THEN-FAIL. An unresolvable ruleset or fragment reference fails only the single
+     * manifest that carries it; every remaining manifest, adapter and project is still exported, and all failures
+     * are reported together in one [ExportFailedException] at the very end. A manifest author therefore sees every
+     * broken reference in a single run instead of rediscovering them one at a time. Because [ExportService] writes
+     * atomically, no half-written artifact is left behind by a manifest that failed.
+     *
+     * A project whose own id or feature ids collide is not exported at all - see [LoaderService.loadAll] - and is
+     * reported through the same [ExportFailedException], so a single ambiguous id cannot stop the projects that
+     * have nothing to do with it.
+     *
+     * @throws ExportFailedException if at least one manifest could not be exported or at least one project was
+     * left out because its ids collide
+     * @throws cz.cleanship.aitools.engine.services.DuplicateManifestIdException if manifests shared by every
+     * project declare the same id, which no project can be exported around
+     */
     fun process(
         locations: Locations,
     ) = runBlocking {
@@ -63,87 +96,226 @@ class ToolsEngine(
                 allData.skills.size,
                 allData.projects.size,
             )
+            allData.duplicates.forEach { LOG.error("Not exporting the project(s) affected by an ambiguous id. {}", it.message) }
 
+            // A run with no adapters exports nothing at all, and every project below is skipped before it reaches a
+            // log line, so the misconfiguration is named here rather than leaving the run silent and successful.
+            if (tools.isEmpty()) {
+                LOG.warn("This run configures no tools, so no project is exported. Declare the tools to build under 'tools:' in config.yml, or in config.local.yml, which replaces that list.")
+            }
+
+            val failures = mutableListOf<ExportFailure>()
             for (projectManifest in allData.projects.values) {
+                // Selecting before the project is assembled keeps a project that exports through no tool out of the
+                // log entirely, rather than bracketing it in the lines that report a deploy which never happened.
+                val adapters = selectAdapters(projectManifest)
+                if (adapters.isEmpty()) continue
                 LOG.info("Processing project {}", projectManifest.id)
-                val projectFeatures = allData.features[projectManifest] ?: emptyMap()
-                val filteredSkills = filterService
-                    .filter(allData.skills.values, projectManifest.deploy.skills.filter)
-                    .associateBy { it.id }
-                val project = Project(
-                    projectManifest,
-                    features = filterService
-                        .filter(projectFeatures.values, projectManifest.deploy.features.filter)
-                        .associateBy { it.id },
-                    agents = filterService
-                        .filter(allData.agents.values, projectManifest.deploy.agents.filter)
-                        .associateBy { it.id },
-                    prompts = filterService
-                        .filter(allData.prompts.values, projectManifest.deploy.prompts.filter)
-                        .associateBy { it.id },
-                    rulesets = filterService
-                        .filter(allData.rulesets.values, projectManifest.deploy.rulesets.filter)
-                        .associateBy { it.id },
-                    fragments = filterService
-                        .filter(allData.fragments.values, projectManifest.deploy.fragments.filter)
-                        .associateBy { it.id },
-                    skills = filteredSkills,
-                    skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
-                )
-
-                val destination = File(project.manifest.deploy.directory).absoluteFile
-                for (adapter in tools) {
-                    exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments)
+                val project = assembleProject(projectManifest, allData)
+                val destination = workingDirectory.resolveDeclaredPath(projectManifest.deploy.directory)
+                for (adapter in adapters) {
+                    failures += exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments)
                 }
-                LOG.info("Processing project {} completed", project.manifest.id)
+                LOG.info("Processing project {} completed", projectManifest.id)
+            }
+
+            if (failures.isNotEmpty() || allData.duplicates.isNotEmpty()) {
+                throw ExportFailedException(failures, allData.duplicates)
             }
         }
     }
 
+    /**
+     * Builds the project that is exported: every manifest of [allData] that survives the filter [projectManifest]
+     * declares for its kind, indexed by id.
+     */
+    private fun assembleProject(projectManifest: ProjectManifest, allData: AllManifests): Project {
+        val projectFeatures = allData.features[projectManifest] ?: emptyMap()
+        val filteredSkills = filterService
+            .filter(allData.skills.values, projectManifest.deploy.skills.filter)
+            .associateBy { it.id }
+        return Project(
+            projectManifest,
+            features = filterService
+                .filter(projectFeatures.values, projectManifest.deploy.features.filter)
+                .associateBy { it.id },
+            agents = filterService
+                .filter(allData.agents.values, projectManifest.deploy.agents.filter)
+                .associateBy { it.id },
+            prompts = filterService
+                .filter(allData.prompts.values, projectManifest.deploy.prompts.filter)
+                .associateBy { it.id },
+            rulesets = filterService
+                .filter(allData.rulesets.values, projectManifest.deploy.rulesets.filter)
+                .associateBy { it.id },
+            fragments = filterService
+                .filter(allData.fragments.values, projectManifest.deploy.fragments.filter)
+                .associateBy { it.id },
+            skills = filteredSkills,
+            skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
+        )
+    }
+
+    /**
+     * Returns the configured adapters that export [projectManifest], narrowed to its `deploy.tools` when it declares one.
+     *
+     * A declared tool the run does not configure is warned about rather than failed on: the tools configured for the
+     * run decide which adapters exist at all, and a project manifest travels between runs that configure different
+     * sets of them, so the two lists disagreeing is a difference in scope rather than a broken manifest. Narrowing to
+     * nothing is warned about for the same reason it is allowed - a project that exports through no tool is a
+     * deliberate but silent outcome, and a silent one is worth saying out loud.
+     *
+     * The warning quotes the unavailable tools in the spelling a manifest writes them, not as Kotlin constants, so
+     * that an author can search their own YAML for the word the engine just told them about.
+     */
+    private fun selectAdapters(projectManifest: ProjectManifest): List<ToolAdapter> {
+        val declared = projectManifest.deploy.tools?.toSet() ?: return tools
+        val configured = tools.mapTo(mutableSetOf()) { it.toolType }
+        val unavailable = declared.filterNot { it in configured }
+        if (unavailable.isNotEmpty()) {
+            LOG.warn("{}: deploy.tools names {}, which this run does not configure. Leaving the tool(s) out of this deploy.", projectManifest.id, unavailable.map { it.serialName })
+        }
+        val selected = tools.filter { it.toolType in declared }
+        if (selected.isEmpty()) {
+            LOG.warn("{}: deploy.tools selects none of the configured tools, so the project is not exported.", projectManifest.id)
+        }
+        return selected
+    }
+
+    /**
+     * Exports every manifest of [project] through [adapter], isolating each manifest so that one broken reference
+     * cannot skip the manifests behind it.
+     *
+     * @return the failures collected while exporting, empty when everything was exported
+     */
     private fun exportAdapter(
         project: Project,
         adapter: ToolAdapter,
         destination: File,
         allRulesets: Map<String, RulesetManifest>,
         allFragments: Map<String, FragmentManifest>,
-    ) {
-        try {
-            LOG.info("{}: Exporting via adapter {}", project.manifest.id, adapter.toolType)
-            if (project.manifest.deploy.replace) {
-                LOG.warn("{}: Replacing existing agentic files in {}.", project.manifest.id, destination)
-            }
-            adapter.prepare(destination, project.manifest)
-            adapter.export(destination, GlobalContext(project.manifest))
-            project.agents.values.forEach {
-                adapter.export(destination, AgentContext(it, project.rulesets, allRulesets, project.fragments, allFragments))
-            }
-            project.prompts.values.forEach {
-                adapter.export(destination, PromptContext(it, project.rulesets, allRulesets, project.fragments, allFragments))
-            }
-            project.features.values.forEach {
-                adapter.export(destination, FeatureContext(it))
-            }
-            project.skills.values.forEach {
-                adapter.export(
-                    destination,
-                    SkillContext(
-                        it,
-                        project.rulesets,
-                        allRulesets,
-                        project.fragments,
-                        allFragments,
-                        sourceDir = project.skillSourceDirs[it.id],
-                    ),
+    ): List<ExportFailure> {
+        LOG.info("{}: Exporting via adapter {}", project.manifest.id, adapter.toolType)
+        if (project.manifest.deploy.replace) {
+            // The path is quoted because a resolved `deploy.directory` can legitimately end in `.`, which reads
+            // as `..` when a sentence-ending period follows it - misleading in a warning about deletion.
+            LOG.warn("{}: Replacing existing agentic files in '{}'.", project.manifest.id, destination)
+        }
+        adapter.prepare(destination, project.manifest)
+
+        val exports = buildList<Pair<String, () -> Unit>> {
+            add("project '${project.manifest.id}'" to { adapter.export(destination, GlobalContext(project.manifest)) })
+            project.agents.values.forEach { agent ->
+                add(
+                    "agent '${agent.id}'" to {
+                        adapter.export(destination, AgentContext(agent, project.rulesets, allRulesets, project.fragments, allFragments))
+                    },
                 )
             }
-        } catch (ex: RulesetResolvingException) {
-            LOG.error("Failed to resolve rulesets for project {}", project.manifest.id, ex)
-        } catch (ex: FragmentResolvingException) {
-            LOG.error("Failed to resolve fragments for project {}", project.manifest.id, ex)
+            project.prompts.values.forEach { prompt ->
+                add(
+                    "prompt '${prompt.id}'" to {
+                        adapter.export(destination, PromptContext(prompt, project.rulesets, allRulesets, project.fragments, allFragments))
+                    },
+                )
+            }
+            project.features.values.forEach { feature ->
+                add("feature '${feature.id}'" to { adapter.export(destination, FeatureContext(feature)) })
+            }
+            project.skills.values.forEach { skill ->
+                add(
+                    "skill '${skill.id}'" to {
+                        adapter.export(
+                            destination,
+                            SkillContext(
+                                skill,
+                                project.rulesets,
+                                allRulesets,
+                                project.fragments,
+                                allFragments,
+                                sourceDir = project.skillSourceDirs[skill.id],
+                            ),
+                        )
+                    },
+                )
+            }
         }
+
+        return exports.mapNotNull { (manifest, export) ->
+            exportOrCollectFailure(project.manifest.id, adapter.toolType, manifest, export)
+        }
+    }
+
+    /**
+     * Runs a single [export], turning an authoring error into a reportable [ExportFailure] instead of letting it
+     * abort the remaining exports.
+     *
+     * Only the deliberately named exceptions a manifest author causes are collected: an unresolvable ruleset or
+     * fragment reference, and a companion file a skill manifest declares but does not ship. Everything else -
+     * a programming fault, an out-of-memory error or a permission problem on the output directory - is not an
+     * authoring error, so it is left to propagate and abort the run loudly instead of being reported as one more
+     * broken manifest.
+     *
+     * @return the failure that stopped this manifest, or `null` when it was exported successfully
+     */
+    private fun exportOrCollectFailure(
+        projectId: String,
+        toolType: ToolType,
+        manifest: String,
+        export: () -> Unit,
+    ): ExportFailure? = try {
+        export()
+        null
+    } catch (ex: RulesetResolvingException) {
+        LOG.error("{}: {} could not be exported for {}", projectId, manifest, toolType, ex)
+        ExportFailure(projectId, toolType, manifest, ex)
+    } catch (ex: FragmentResolvingException) {
+        LOG.error("{}: {} could not be exported for {}", projectId, manifest, toolType, ex)
+        ExportFailure(projectId, toolType, manifest, ex)
+    } catch (ex: SkillFileResolvingException) {
+        LOG.error("{}: {} could not be exported for {}", projectId, manifest, toolType, ex)
+        ExportFailure(projectId, toolType, manifest, ex)
     }
 
     companion object {
         private val LOG = LoggerFactory.getLogger(ToolsEngine::class.java)
     }
 }
+
+/**
+ * A single manifest that could not be exported, together with the resolution failure that stopped it.
+ */
+data class ExportFailure(
+    val projectId: String,
+    val toolType: ToolType,
+    val manifest: String,
+    val cause: RuntimeException,
+)
+
+/**
+ * Thrown by [ToolsEngine.process] once every project has been processed, when at least one manifest failed to
+ * export or a project was left unexported because its ids collide. Carries the original resolver messages so the
+ * caller can report every broken reference and every collision at once.
+ */
+class ExportFailedException(
+    val failures: List<ExportFailure>,
+    val duplicates: List<DuplicateManifestId> = emptyList(),
+) : RuntimeException(
+        buildString {
+            if (failures.isNotEmpty()) {
+                // A broken manifest fails once per adapter, so counting the failures would report a single broken
+                // agent as six problems with the six tools of config.yml. The count is therefore over the distinct
+                // manifests, while the body still lists every adapter that could not export them.
+                val brokenManifests = failures.distinctBy { it.projectId to it.manifest }.size
+                append("Export failed for $brokenManifests manifest(s):")
+                failures.forEach { failure ->
+                    append("\n  - [${failure.projectId} | ${failure.toolType} | ${failure.manifest}] ${failure.cause.message}")
+                }
+            }
+            if (duplicates.isNotEmpty()) {
+                if (isNotEmpty()) append("\n")
+                append("Skipped the project(s) affected by ${duplicates.size} duplicate manifest id(s):")
+                duplicates.forEach { duplicate -> append("\n  - ${duplicate.message}") }
+            }
+        },
+    )

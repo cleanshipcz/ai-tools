@@ -10,10 +10,18 @@ import cz.cleanship.aitools.engine.models.SkillSection
 import cz.cleanship.aitools.engine.models.Version
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import java.io.File
+import java.nio.file.Path
 
 class LoaderServiceIntegrationTest {
+
+    @TempDir
+    lateinit var tempDir: Path
 
     private lateinit var loaderService: LoaderService
 
@@ -338,5 +346,315 @@ class LoaderServiceIntegrationTest {
                 tags = setOf("ui", "react"),
             ),
         )
+    }
+
+    @Nested
+    inner class MalformedVersions {
+
+        @ParameterizedTest
+        @CsvSource("1.0", "v1.0.0", "1.0.0.4", "latest")
+        fun `should fail naming the file when a manifest declares a malformed version`(version: String) {
+            // given
+            val file = writeRuleset("broken.yml", version)
+
+            // when
+            val error = runCatching { loaderService.loadRuleset(file) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(file.absolutePath)
+                .hasMessageContaining(version)
+                .hasMessageContaining("MAJOR.MINOR.PATCH")
+        }
+
+        @Test
+        fun `should fail naming the file when loading every manifest reaches a malformed version`() {
+            // given
+            // - loadAll is what the CLI actually calls, and it must name the file just as the single loader does
+            val file = writeRuleset("broken.yml", "1.0")
+
+            // when
+            val error = runCatching { loaderService.loadAll(rulesetLocations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(file.absolutePath)
+        }
+
+        @Test
+        fun `should load the manifest when the version is well-formed`() {
+            // given
+            val file = writeRuleset("valid.yml", "1.2.3-alpha")
+
+            // when
+            val ruleset = loaderService.loadRuleset(file)
+
+            // then
+            assertThat(ruleset.metadata.version).isEqualTo(Version(1, 2, 3, "alpha"))
+        }
+
+        private fun writeRuleset(fileName: String, version: String): File {
+            val directory = tempDir.resolve("malformed-versions").toFile()
+            directory.mkdirs()
+            val file = directory.resolve(fileName)
+            file.writeText(
+                "id: broken\ndescription: A ruleset\nrules:\n  - A rule.\nmetadata:\n  version: $version\n",
+            )
+            return file
+        }
+
+        private fun rulesetLocations() = Locations(
+            agents = emptyList(),
+            projects = emptyList(),
+            prompts = emptyList(),
+            rulesets = listOf(tempDir.resolve("malformed-versions").toFile()),
+            fragments = emptyList(),
+            skills = emptyList(),
+        )
+    }
+
+    @Nested
+    inner class DuplicateManifestIds {
+
+        @ParameterizedTest
+        @CsvSource("agents", "prompts", "rulesets", "fragments")
+        fun `should fail naming the id and both files when two manifests share an id`(kind: String) {
+            // given
+            // - two manifest files in the same location declaring the very same id
+            val directory = tempDir.resolve(kind).toFile()
+            val firstFile = writeManifest(directory, "first.yml", kind, "duplicated-id")
+            val secondFile = writeManifest(directory, "second.yml", kind, "duplicated-id")
+
+            // when
+            val error = runCatching { loaderService.loadAll(locationsFor(kind, directory)) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(DuplicateManifestIdException::class.java)
+                .hasMessageContaining("duplicated-id")
+                .hasMessageContaining(firstFile.absolutePath)
+                .hasMessageContaining(secondFile.absolutePath)
+        }
+
+        @Test
+        fun `should fail naming the id and both files when two skills share an id`() {
+            // given
+            val directory = tempDir.resolve("skills").toFile()
+            val firstFile = writeSkill(directory, "first.yml", "duplicated-skill")
+            val secondFile = writeSkill(directory, "second.yml", "duplicated-skill")
+
+            // when
+            val error = runCatching { loaderService.loadAll(locationsFor("skills", directory)) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(DuplicateManifestIdException::class.java)
+                .hasMessageContaining("duplicated-skill")
+                .hasMessageContaining(firstFile.absolutePath)
+                .hasMessageContaining(secondFile.absolutePath)
+        }
+
+        @Test
+        fun `should name every file when three manifests share an id`() {
+            // given
+            // - the third file must not quietly take the place of the pair that was dropped
+            val directory = tempDir.resolve("rulesets").toFile()
+            val firstFile = writeManifest(directory, "first.yml", "rulesets", "duplicated-id")
+            val secondFile = writeManifest(directory, "second.yml", "rulesets", "duplicated-id")
+            val thirdFile = writeManifest(directory, "third.yml", "rulesets", "duplicated-id")
+
+            // when
+            val error = runCatching { loaderService.loadAll(locationsFor("rulesets", directory)) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(DuplicateManifestIdException::class.java)
+                .hasMessageContaining(firstFile.absolutePath)
+                .hasMessageContaining(secondFile.absolutePath)
+                .hasMessageContaining(thirdFile.absolutePath)
+        }
+
+        @Test
+        fun `should report every duplicate of a single run together`() {
+            // given
+            // - two shared kinds collide and a project collides too, so one run has to name all three
+            val rulesetsDirectory = tempDir.resolve("rulesets").toFile()
+            writeManifest(rulesetsDirectory, "first.yml", "rulesets", "duplicated-ruleset")
+            writeManifest(rulesetsDirectory, "second.yml", "rulesets", "duplicated-ruleset")
+            val fragmentsDirectory = tempDir.resolve("fragments").toFile()
+            writeManifest(fragmentsDirectory, "first.yml", "fragments", "duplicated-fragment")
+            writeManifest(fragmentsDirectory, "second.yml", "fragments", "duplicated-fragment")
+            val projectsDirectory = tempDir.resolve("projects").toFile()
+            writeProject(projectsDirectory.resolve("alpha"), "duplicated-project")
+            writeProject(projectsDirectory.resolve("beta"), "duplicated-project")
+            val locations = Locations(
+                agents = emptyList(),
+                projects = listOf(projectsDirectory),
+                prompts = emptyList(),
+                rulesets = listOf(rulesetsDirectory),
+                fragments = listOf(fragmentsDirectory),
+                skills = emptyList(),
+            )
+
+            // when
+            val error = runCatching { loaderService.loadAll(locations) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(DuplicateManifestIdException::class.java)
+            assertThat((error as DuplicateManifestIdException).duplicates.map { it.id })
+                .containsExactlyInAnyOrder("duplicated-ruleset", "duplicated-fragment", "duplicated-project")
+        }
+
+        @Test
+        fun `should drop both projects and keep the others when two projects share an id`() {
+            // given
+            // - projects live in their own directory, each holding a project.yml
+            val directory = tempDir.resolve("projects").toFile()
+            val alphaFile = writeProject(directory.resolve("alpha"), "duplicated-project")
+            val betaFile = writeProject(directory.resolve("beta"), "duplicated-project")
+            writeProject(directory.resolve("gamma"), "healthy-project")
+
+            // when
+            val allManifests = loaderService.loadAll(locationsFor("projects", directory))
+
+            // then
+            // - neither colliding project can be exported, but the project that shares nothing with them still is
+            assertThat(allManifests.projects).containsOnlyKeys("healthy-project")
+            val duplicate = allManifests.duplicates.single()
+            assertThat(duplicate.id).isEqualTo("duplicated-project")
+            // - which of the two files is found first is up to the filesystem; both of them have to be named
+            assertThat(listOf(duplicate.firstFile, duplicate.secondFile)).containsExactlyInAnyOrder(alphaFile, betaFile)
+            assertThat(duplicate.message)
+                .contains("duplicated-project")
+                .contains(alphaFile.absolutePath)
+                .contains(betaFile.absolutePath)
+        }
+
+        @Test
+        fun `should drop the project and keep the others when two of its features share an id`() {
+            // given
+            // - a project with no feature filter deploys every one of its features, so an ambiguous feature id
+            //   makes that whole project unexportable while its neighbours stay untouched
+            val directory = tempDir.resolve("projects").toFile()
+            writeProject(directory.resolve("alpha"), "alpha-project")
+            val firstFile = writeFeature(directory.resolve("alpha"), "first.yml", "duplicated-feature")
+            val secondFile = writeFeature(directory.resolve("alpha"), "second.yml", "duplicated-feature")
+            writeProject(directory.resolve("beta"), "beta-project")
+
+            // when
+            val allManifests = loaderService.loadAll(locationsFor("projects", directory))
+
+            // then
+            assertThat(allManifests.projects).containsOnlyKeys("beta-project")
+            val duplicate = allManifests.duplicates.single()
+            assertThat(duplicate.id).isEqualTo("duplicated-feature")
+            assertThat(duplicate.message)
+                .contains(firstFile.absolutePath)
+                .contains(secondFile.absolutePath)
+        }
+
+        @Test
+        fun `should report no duplicate when every project has its own ids`() {
+            // given
+            val directory = tempDir.resolve("projects").toFile()
+            writeProject(directory.resolve("alpha"), "alpha-project")
+            writeFeature(directory.resolve("alpha"), "shared.yml", "shared-feature")
+            writeProject(directory.resolve("beta"), "beta-project")
+            // - the very same feature id in another project is scoped to that project, not a collision
+            writeFeature(directory.resolve("beta"), "shared.yml", "shared-feature")
+
+            // when
+            val allManifests = loaderService.loadAll(locationsFor("projects", directory))
+
+            // then
+            assertThat(allManifests.projects).containsOnlyKeys("alpha-project", "beta-project")
+            assertThat(allManifests.duplicates).isEmpty()
+        }
+
+        @Test
+        fun `should load both manifests when ids are unique`() {
+            // given
+            val directory = tempDir.resolve("rulesets").toFile()
+            writeManifest(directory, "first.yml", "rulesets", "first-ruleset")
+            writeManifest(directory, "second.yml", "rulesets", "second-ruleset")
+
+            // when
+            val allManifests = loaderService.loadAll(locationsFor("rulesets", directory))
+
+            // then
+            assertThat(allManifests.rulesets).containsOnlyKeys("first-ruleset", "second-ruleset")
+        }
+
+        @Test
+        fun `should load manifest once when the same directory is listed twice`() {
+            // given
+            // - overlapping locations make findYamlFiles yield the very same file more than once,
+            //   which must not be mistaken for two manifests sharing an id
+            val directory = tempDir.resolve("rulesets").toFile()
+            writeManifest(directory, "only.yml", "rulesets", "only-ruleset")
+            val locations = locationsFor("rulesets", directory).copy(rulesets = listOf(directory, directory))
+
+            // when
+            val allManifests = loaderService.loadAll(locations)
+
+            // then
+            assertThat(allManifests.rulesets).containsOnlyKeys("only-ruleset")
+        }
+
+        private fun writeManifest(directory: File, fileName: String, kind: String, id: String): File {
+            val body = when (kind) {
+                "agents" -> "persona: A persona\nprompt: A prompt\n"
+                "prompts" -> "content: Some content\n"
+                "rulesets" -> "rules:\n  - A rule.\n"
+                "fragments" -> "content: Some content\n"
+                else -> error("Unsupported manifest kind: $kind")
+            }
+            return writeYaml(directory, fileName, "id: $id\ndescription: A manifest\n$body")
+        }
+
+        private fun writeSkill(directory: File, fileName: String, id: String): File =
+            writeYaml(directory, fileName, "id: $id\ndescription: A skill\nsections:\n  - text: Some text\n")
+
+        private fun writeFeature(projectDirectory: File, fileName: String, id: String): File = writeYaml(
+            projectDirectory.resolve("features"),
+            fileName,
+            "id: $id\ndescription: A feature\nprompt: A feature prompt\n",
+        )
+
+        private fun writeProject(directory: File, id: String): File = writeYaml(
+            directory,
+            "project.yml",
+            """
+            id: $id
+            description: A project
+            context:
+              documentation:
+                readme: README.md
+            deploy:
+              directory: "${directory.absolutePath}"
+
+            """.trimIndent(),
+        )
+
+        private fun writeYaml(directory: File, fileName: String, content: String): File {
+            directory.mkdirs()
+            val file = directory.resolve(fileName)
+            file.writeText(content + "metadata:\n  version: 1.0.0\n")
+            return file
+        }
+
+        private fun locationsFor(kind: String, directory: File): Locations {
+            val directories = listOf(directory)
+            return Locations(
+                agents = directories.takeIf { kind == "agents" } ?: emptyList(),
+                projects = directories.takeIf { kind == "projects" } ?: emptyList(),
+                prompts = directories.takeIf { kind == "prompts" } ?: emptyList(),
+                rulesets = directories.takeIf { kind == "rulesets" } ?: emptyList(),
+                fragments = directories.takeIf { kind == "fragments" } ?: emptyList(),
+                skills = directories.takeIf { kind == "skills" } ?: emptyList(),
+            )
+        }
     }
 }

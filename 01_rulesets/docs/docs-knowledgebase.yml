@@ -1,0 +1,18 @@
+id: docs-knowledgebase
+description: Rules for writing knowledgebase articles in team wikis and knowledge platforms
+rules:
+  - "These rules are defaults - explicit user instructions and the target knowledgebase's conventions take precedence."
+  - "Use descriptive, searchable titles that state the topic."
+  - "Lead with what the reader needs to know or do; include why only where it serves the article's purpose."
+  - "Default to portable Markdown; apply platform-specific features only when requested or conventional for the target platform."
+  - "When a page on the topic already exists, propose extending it instead of creating a parallel page."
+  - "Base content on provided sources; mark unverifiable statements as needing input instead of guessing."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-08-04"
+  tags:
+    - common
+    - documentation
+    - knowledgebase
+    - wiki

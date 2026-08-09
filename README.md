@@ -1,101 +1,211 @@
 # AI Tools Repository
 > Manifest-driven generator for AI coding assistant configs
 
-This repository is the source of truth for prompts, rulesets, agents, skills, recipes, and project manifests. The CLI reads the YAML in this repo and produces tool-specific outputs for Windsurf, Cursor, Claude Code, GitHub Copilot, Copilot CLI, and Codex. Deployments copy the generated files into your target project with backups and optional auto-commit.
+This repository is the source of truth for prompts, rulesets, fragments, agents, skills, and project manifests.
+A Kotlin engine (`ai-tools-engine/`) reads the YAML in this repo and writes tool-specific configuration files for Windsurf, Antigravity, Cursor, Claude Code, GitHub Copilot, and Codex directly into each project's deploy directory.
 
 ## What You Get
-- Schema validation for all manifests (`npm run validate`)
-- Global adapter build (`npm run build`) for sharing prompts/agents across tools
-- Project generation and deployment with filtering from `deploy.yml` (includes backup + optional commit)
-- Feature manifests that emit per-tool snippets/workflows and recipe scripts
-- Prompt library generation (Markdown + interactive HTML) and an interactive prompt filler (`npm run use-prompt <id>`)
-- Recipe runner and script generator for multi-agent workflows
-- Anthropic-compatible skill generation (`npm run skills generate`)
-- Docs generator (`npm run docs generate`), diff/clean utilities, and optional eval runner
+- One YAML definition per agent, prompt, ruleset, fragment, and skill, exported to six tools at once
+- Per-project filtering by tag, whitelist, or blacklist, declared in `project.yml`
+- Reusable rulesets and fragments referenced by regex, so one agent can pick up all `coding-language-*` rules at once
+- Feature manifests that emit per-tool feature workflows and instructions
+- Strict manifest parsing: an unknown key or an unresolvable ruleset reference fails the run instead of silently producing a wrong artifact
+
+Several capabilities described in earlier revisions of this README no longer exist.
+See [Not Yet Implemented](#not-yet-implemented) before looking for them.
+
+## Requirements
+- A JDK 17 or newer on `PATH` (the Gradle 9 wrapper needs it to start)
+- Network access on the first build, so Gradle can fetch dependencies and, if you have no local JDK 21, provision the JVM 21 toolchain the engine targets
+- Node/npm only if you want to build the optional `:server` module, whose frontend is built with Vite
 
 ## Repository Layout
-- `01_rulesets/` – reusable rule sets
-- `04_skills/` – skill manifests (converted to `SKILL.md`)
+- `01_rulesets/` – reusable rule sets, referenced by regex on their `id`
+- `02_fragments/` – reusable content blocks shared by agents, prompts, and skills
 - `03_prompts/` – prompt manifests
+- `04_skills/` – skill manifests, as `<id>.yml` or as a directory containing `skill.yml`
 - `05_agents/` – agent manifests
-- `08_recipes/` – multi-agent workflow recipes
-- `09_projects/` – project manifests (`global/` + `local/` + templates)
+- `09_projects/` – project manifests (`global/` and `local/`), each a directory containing `project.yml` and an optional `features/`
+- `ai-tools-engine/` – the Kotlin build engine (Gradle multi-module: `:engine`, `:cli`, `:server`, `:telemetry`)
+- `10_schemas/` – JSON schemas; **stale**, they have drifted from the engine's Kotlin models and are not used for validation
+- `90_docs/` – reference documentation
+- `91_examples/` – worked examples
+
+Source of truth retained, engine support pending:
+
 - `07_mcp/` – MCP servers and presets
-- `10_schemas/` – JSON schemas for validation
-- `12_templates/` – scaffolding used by project commands
-- `15_config/` – repo configuration (`config.yml`, `config.local.yml`)
-- `adapters/` – global build output (`npm run build`)
-- `.output/` – per-project generated output (`project:generate`/`project:deploy`)
-- `.backups/` – deploy backups per project
-- `docs/` / `90_docs/` – generated and reference documentation
+- `08_recipes/` – multi-agent workflow recipes
+- `20_evals/` – evaluation datasets and suites
+- `21_redteam/` – security and jailbreak test cases
+
+The engine does not read any of these four directories.
+They are kept so the content is not lost, and are tracked in [PLANNED_FEATURES.md](PLANNED_FEATURES.md).
+
+Left over from the retired TypeScript CLI and no longer written or read by anything:
+
+- `adapters/`, `.output/`, `.backups/`, `docs/` – old generated output
 
 ## Common Workflow
-1) Install dependencies  
-`npm install`
 
-2) Validate manifests  
-`npm run validate`
+1) First-run setup — checks prerequisites and builds the engine
 
-3) Build global adapters (optional but useful for quick sharing)  
-`npm run build`
+```bash
+./setup.sh
+```
 
-4) Create or register a project  
-- Create managed project: `npm run project:create my-app -- --local -d "My app"`  
-- Initialize external project: `npm run project:init /path/to/app --alias my-app`
+2) Edit manifests, then edit `09_projects/<scope>/<project>/project.yml` to set `deploy.directory` and the filters
 
-5) Edit `09_projects/.../project.yml` and `deploy.yml` (set `target`, `tools`, filters)
+3) Generate and deploy
 
-6) Generate and deploy  
-`npm run project:deploy my-app`  
-Use `--dry-run`, `--force`, or `--interactive` to control deployment. Outputs are staged in `.output/my-app/` and copied to the deploy target with backups in `.backups/my-app/`.
+```bash
+./deploy.sh
+```
+
+`deploy.sh` is a two-line wrapper around the CLI:
+
+```bash
+cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir <repository root>"
+```
+
+The CLI has exactly one option, `--working-dir`, which points at the directory containing `config.yml`.
+There are no subcommands and no other flags.
+
+Every project manifest found under the configured `projects` locations is processed on every run, and each is written to its own `deploy.directory`.
+There is no way to deploy a single project from the command line; narrow the `projects` list in `config.local.yml` instead.
 
 ## Projects, Features, and Deployment
-- `project:deploy <id>`: loads `project.yml` + `deploy.yml`, applies include/exclude filters, generates per-tool outputs, creates backups, merges feature workflows into Windsurf, and optionally commits when `auto_commit` is enabled.
-- `project:deploy all`: deploys every project that has a `deploy.yml` (including registered externals).
-- `project:list`: shows managed + external projects.
-- `project:init`: scaffolds `.cleanship-ai-tools` inside an external repo and optionally registers it.
-- Features: place `features/<feature>/feature.yml` under a project. `project:deploy` (or `npm run features generate <project>`) emits per-tool feature snippets and recipe scripts into `.output/<project>/features/` and merges Windsurf workflows automatically.
 
-## Prompts and Agents
-- Generate libraries: `npm run prompt-library` (Markdown) and `npm run prompt-html` (interactive browser).
-- Interactive fill/copy: `npm run use-prompt <prompt-id>`.
-- Agents, prompts, and rulesets are filtered per project using include/exclude rules in `project.yml` / `deploy.yml`.
+A project is a directory under a configured `projects` location containing `project.yml`.
+`deploy.directory` sets where its generated files land.
 
-## Recipes
-- Discover: `npm run recipe:list`
-- Run interactively: `npm run recipe:run <recipe-id> [claude-code|copilot-cli|cursor]`
-- Generate scripts: `npm run recipe:generate <recipe-id> [tool] [output]`
+Relative `deploy.directory` values resolve against `--working-dir`, the same base the `locations` paths of `config.yml` use — so `.` means the root of this repository and the value does not change with the launcher.
+Use an absolute path for any project outside this repository.
 
-Recipes are emitted to `.cs.recipes/` inside each tool’s output directory so you can execute them directly from your project.
+Filters select which manifests reach a project. Each of `agents`, `prompts`, `rulesets`, `fragments`, `skills`, and `features` accepts a list of filters of type `tags`, `whitelist`, or `blacklist`:
 
-## Skills and Docs
-- Skills: `npm run skills generate` converts `04_skills` into Anthropic `SKILL.md` folders under `adapters/claude-code/skills`.
-- Docs: `npm run docs generate` builds `docs/AGENTS.md` from manifests.
+```yaml
+deploy:
+  directory: "/path/to/your/project"
+  agents:
+    filter:
+      - type: tags
+        tags: [development, documentation]
+  prompts:
+    filter:
+      - type: whitelist
+        ids: [docs-write-readme, qa-write-tests]
+```
 
-## Utilities
-- `npm run diff -- --before <file> --after <file> [--format lines|words]`
-- `npm run clean` removes generated artifacts (`.output`, adapters, prompt libraries, recipe docs/logs).
-- `npm run eval -- --suite <name>` runs evaluation suites when configured.
-- Testing: `npm test`, `npm run test:watch`, `npm run test:coverage`.
+Filters are applied by folding over a selection that starts empty: `tags` and `whitelist` add, `blacklist` subtracts from what has been selected so far.
+A filter list containing only a `blacklist` therefore matches nothing, so `blacklist` must come last.
+An omitted or empty filter lets everything through.
 
-## Tool Output (generated per project)
-| Tool           | Staged Output (under `.output/<project>`) | Contains                                                                |
-| -------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
-| Windsurf       | `.windsurf/`                              | Project context, agent/prompt rules, recipes, feature workflows         |
-| Cursor         | `.cursor/`                                | `recipes.json`, `project-rules.json`, recipes                           |
-| Claude Code    | `.claude/`                                | Prompts (JSON), skills, agents, project context, recipes                |
-| GitHub Copilot | `.github/`                                | `instructions.md`, prompt/agent markdown, recipes                       |
-| Copilot CLI    | `AGENTS.md` + `.cs.recipes/`              | Agent catalog plus runnable recipes                                     |
-| Codex          | `AGENTS.md` + `.codex/prompts/`           | Agent catalog and prompts (deploy copies prompts to `~/.codex/prompts`) |
+A ruleset or fragment referenced by an agent must itself survive the project's `rulesets` / `fragments` filter, otherwise that agent fails to export.
 
-Deploy copies these staged files into the `target` from `deploy.yml` and keeps timestamped backups in `.backups/<project>/`.
+Features live in `features/<feature>.yml` next to `project.yml` and are exported as per-tool workflow or instruction files.
 
-## Configuration Notes
-- Repo-level config: `15_config/config.yml` (override with `config.local.yml`).
-- Project sources: defaults to `09_projects/global` and `09_projects/local`; add more via `project_sources` in config.
-- Model preference priority: Feature → Project (`ai_tools.model`) → Agent defaults → Prompt.
+Set `deploy.replace: true` to wipe a tool's output directory before writing.
+Every adapter honours the flag, the GitHub Copilot one included: with `replace: true` it clears `.github/prompts/`, `.github/instructions/`, and `.github/agents/`, which it owns entirely, and with `replace: false` it leaves them alone — so files left there by a retired naming scheme survive and have to be removed by hand.
+
+There is no backup and no auto-commit step.
+Generated files are overwritten in place, though each file is written atomically via a temporary file, so an interrupted run cannot leave a half-written artifact.
+
+### Duplicate ids
+
+Manifest ids are the primary key of the whole engine, so two files declaring the same id are never resolved by picking a winner.
+One run reports every collision it found, names the id and both files, and exits non-zero.
+
+How much a collision costs depends on the kind of manifest:
+
+- Two projects sharing an id, or two features of the same project sharing an id, cost only the project(s) that carry them. Those projects are not exported, every other project is deployed as usual, and the run still fails at the end.
+- Two agents, prompts, rulesets, fragments, or skills sharing an id stop the whole run before anything is written. They are shared by every project, and a project that does not filter that kind deploys all of it, so dropping the colliding pair would silently ship every project without content it never excluded.
+
+## Rulesets and Fragments
+
+Agents, prompts, and skills reference rulesets and fragments by **regular expression matched against the manifest `id`**, not by filename:
+
+```yaml
+rulesets:
+  - base                  # exact id
+  - coding-language-.*    # every coding-language-* ruleset
+```
+
+Directory nesting under `01_rulesets/` is purely organisational; only `id` matters.
+Filenames need not match the `id` — for example `01_rulesets/coding/languages/coding-kotlin.yml` declares `id: coding-language-kotlin`.
+
+A pattern that matches nothing is an error, and the message tells you whether the ruleset exists but was excluded by the project filter.
+
+## Tool Output
+
+Verified against the adapters in `ai-tools-engine/engine/.../tools/adapters/`. All paths are relative to the project's `deploy.directory`.
+
+| Tool (`config.yml` key) | Output |
+| --- | --- |
+| `claude` | `CLAUDE.md`, `.claude/agents/<id>.md`, `.claude/commands/<prompt-id>.md`, `.claude/skills/<id>/SKILL.md`, `.claude/workflows/feature-<id>.md` |
+| `github_copilot` | `.github/copilot-instructions.md`, `.github/agents/<id>.agent.md`, `.github/prompts/prompt-<id>.prompt.md`, `.github/prompts/skill-<id>.prompt.md`, `.github/instructions/feature-<id>.instructions.md` |
+| `codex` | `AGENTS.md`, `.codex/skills/agent-<id>/SKILL.md`, `.codex/skills/prompt-<id>/SKILL.md`, `.codex/skills/skill-<id>/SKILL.md`, `.codex/features/feature-<id>.md` |
+| `windsurf` | `.windsurf/rules/project.md`, `.windsurf/rules/agent-<id>.md`, `.windsurf/rules/prompt-<id>.md`, `.windsurf/rules/skill-<id>.md`, `.windsurf/workflows/feature-<id>.md` |
+| `antigravity` | `.agent/rules/project.md`, `.agent/rules/agent-<id>.md`, `.agent/rules/prompt-<id>.md`, `.agent/rules/skill-<id>.md`, `.agent/workflows/feature-<id>.md` |
+| `cursor` | `.cursor/rules/project.mdc`, `.cursor/rules/agent-<id>.mdc`, `.cursor/commands/prompt-<id>.md`, `.cursor/commands/skill-<id>.md`, `.cursor/features/feature-<id>.md` |
+
+## Configuration
+
+The engine reads `config.yml` from the directory given by `--working-dir` — the repository root — and merges `config.local.yml` over it if present.
+`config.local.yml` is gitignored and intended for machine-local overrides.
+
+Merging happens per individual key: each of the six entries under `locations`, and the `tools` list, is replaced wholesale when present in `config.local.yml`.
+Lists are never appended to, so a local `projects:` list must repeat any default entry you still want.
+
+```yaml
+locations:
+  agents:    ["05_agents"]
+  prompts:   ["03_prompts"]
+  rulesets:  ["01_rulesets"]
+  fragments: ["02_fragments"]
+  skills:    ["04_skills"]
+  projects:  ["09_projects"]
+
+tools:
+  - windsurf
+  - antigravity
+  - github_copilot
+  - claude
+  - codex
+  - cursor
+```
+
+Every entry under `locations` is a list, so you can point at additional directories outside this repository.
+Relative location paths resolve against the working directory; absolute paths are used as given — the same rule a project's `deploy.directory` follows.
+The `tools` list accepts exactly the six keys above, and controls which adapters run.
+An individual project can narrow itself down to a subset of them with `deploy.tools` in its `project.yml` — see [QUICKREF.md](QUICKREF.md).
+
+## Not Yet Implemented
+
+These were documented previously but have no implementation in the current engine.
+The CLI accepts no subcommands, so there is no command to run for any of them:
+
+- Project scaffolding and registration (`project:create`, `project:init`, `project:list`)
+- Deploying a single named project, dry runs, interactive or forced deploys
+- Standalone manifest validation — manifests are validated only as part of a deploy run, by strict YAML decoding
+- Prompt library generation (`PROMPT_LIBRARY.md` / `.html`) and the interactive prompt filler
+- Recipe listing, running, and script generation
+- Documentation generation
+- Evaluation suite runner
+- `diff` and `clean` utilities
+- MCP server configuration output
+- Deploy backups and auto-commit
+
+The committed `PROMPT_LIBRARY.md`, `PROMPT_LIBRARY.html`, and `docs/AGENTS.md` are artifacts of the retired TypeScript CLI.
+Nothing regenerates or reads them today.
+
+Deployment settings live in the `deploy:` block of `project.yml`.
+The separate `deploy.yml` that the TypeScript CLI used has been removed — the engine never read it.
+
+See [PLANNED_FEATURES.md](PLANNED_FEATURES.md) for what is intended next.
 
 ## Need Help?
-- Recipe and feature examples live in `08_recipes/` and `09_projects/*/features/`.
-- Tool-specific integration details are in `90_docs/TOOLS.md`.
+- Manifest field reference and templates: [QUICKREF.md](QUICKREF.md)
+- Tool-specific integration details: [90_docs/TOOLS.md](90_docs/TOOLS.md)
+- Engine architecture and module layout: [ai-tools-engine/README.md](ai-tools-engine/README.md)
+- Worked examples: [91_examples/](91_examples/)
 - Open an issue or discussion in the repo if something looks off.

@@ -9,4 +9,9 @@ data class AllManifests(
     val skillSourceDirs: Map<String, java.io.File> = emptyMap(),
     val projects: Map<String, ProjectManifest>,
     val features: Map<ProjectManifest, Map<String, FeatureManifest>>,
+    /**
+     * Id collisions that cost only the project(s) they belong to. The affected projects are deliberately absent
+     * from [projects] - they cannot be exported - while every other project is still there to be exported.
+     */
+    val duplicates: List<DuplicateManifestId> = emptyList(),
 )

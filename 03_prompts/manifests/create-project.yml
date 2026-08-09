@@ -13,7 +13,7 @@ rules:
   - "Keep project manifests focused on essential context for AI agents"
   - "Do NOT try to document the entire codebase"
   - "The Kotlin engine (ProjectManifest.kt) is the source of truth for project.yml structure"
-  - "The TypeScript CLI processes deploy.yml separately — it is NOT part of the Kotlin engine"
+  - "All deployment settings live in the deploy: block of project.yml; there is no separate deploy.yml"
 content: |
   The user wants to create a project manifest based on this description:
 
@@ -96,12 +96,12 @@ content: |
   **Fields NOT supported by Kotlin engine:**
   name, version (top-level), commands, conventions, ai_tools, context.purpose
 
-  ## Optional: deploy.yml for TypeScript CLI
+  ## Deployment
 
-  The TypeScript CLI uses a separate `deploy.yml` alongside `project.yml` for tool-specific
-  deployment (target, tools, mode, backup, tech_stack, etc.). This is NOT parsed by the
-  Kotlin engine. If the user needs multi-tool deployment, mention they can create a
-  `deploy.yml` in the same directory — refer to `10_schemas/deploy.schema.json` for its structure.
+  Deployment is configured entirely in the `deploy:` block of `project.yml`: `directory`,
+  optional `replace`, and per-kind `filter` lists for agents, prompts, rulesets, fragments,
+  skills, and features. There is no separate `deploy.yml` — the engine never read one.
+  Which tools are generated is set globally by `tools:` in the root `config.yml`.
 
   ## Example conversation
 

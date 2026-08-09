@@ -5,7 +5,6 @@ rules:
   - "Use block scalars (|) for multi-line strings such as persona, prompt, and content fields."
   - "Quote strings that contain special YAML characters (:, #, {, }, [, ], >, |, *, &, !, %, @, `)."
   - "Do not quote simple strings that don't require quoting."
-  - "Use consistent field ordering: identity fields first (id, description), then type-specific fields, then metadata last."
   - "No trailing whitespace on any line."
   - "End files with a single newline character."
   - "Use lowercase for all YAML keys."

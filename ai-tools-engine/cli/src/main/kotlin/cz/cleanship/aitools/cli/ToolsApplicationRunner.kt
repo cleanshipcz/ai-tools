@@ -20,7 +20,7 @@ class DefaultToolsApplicationRunner(
     override fun run(workingDirectory: File) {
         val config = configService.loadConfig(workingDirectory)
         val toolAdapters = config.tools.map(toolAdapterFactory::create)
-        engineFactory.create(toolAdapters).process(config.locations)
+        engineFactory.create(toolAdapters, workingDirectory).process(config.locations)
     }
 }
 
@@ -37,12 +37,16 @@ fun interface ToolsEngineProcessor {
 }
 
 fun interface ToolsEngineFactory {
-    fun create(tools: List<ToolAdapter>): ToolsEngineProcessor
+    /**
+     * @param workingDirectory the `--working-dir` of the run, which the engine resolves a relative
+     * `deploy.directory` against
+     */
+    fun create(tools: List<ToolAdapter>, workingDirectory: File): ToolsEngineProcessor
 }
 
 class DefaultToolsEngineFactory : ToolsEngineFactory {
-    override fun create(tools: List<ToolAdapter>): ToolsEngineProcessor {
-        val engine = ToolsEngine(tools = tools)
+    override fun create(tools: List<ToolAdapter>, workingDirectory: File): ToolsEngineProcessor {
+        val engine = ToolsEngine(workingDirectory, tools = tools)
         return ToolsEngineProcessor { locations -> engine.process(locations) }
     }
 }
