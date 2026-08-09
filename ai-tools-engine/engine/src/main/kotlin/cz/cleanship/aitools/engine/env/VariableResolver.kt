@@ -44,14 +44,14 @@ fun interface EnvironmentSource {
  * a path quietly holding a literal `${...}` - from ever being deployed to. One pass also cannot loop, not even when a
  * variable refers to itself.
  */
-data class VariableResolver(
-    private val variables: Map<String, String> = emptyMap(),
+class VariableResolver(
+    variables: Map<String, String> = emptyMap(),
     private val environment: EnvironmentSource = EnvironmentSource.PROCESS,
 ) {
 
     /**
-     * The declared variables as they stood when this resolver was built. Copied, so that a map the caller still holds
-     * cannot change what a path resolves to later in the run, while equality keeps comparing what was declared.
+     * The declared variables as they stood when this resolver was built. The map handed in is copied rather than
+     * kept, so that a caller still holding it cannot change what a path resolves to later in the run.
      */
     private val declared = variables.toMap()
 
@@ -74,6 +74,29 @@ data class VariableResolver(
         val leftover = REFERENCE.find(substituted) ?: return substituted
         throw UnexpandedReferenceException(leftover.groupValues[1], substituted, value, origin)
     }
+
+    /**
+     * Two resolvers are equal when they were built from the same variables and read the same environment - that is,
+     * when they substitute every value the same way. Equality is written over the copy taken at construction rather
+     * than over the map that was handed in, so that a caller mutating that map afterwards can neither make two
+     * resolvers that resolve differently compare equal, nor move the hash of one already in a collection.
+     *
+     * [cz.cleanship.aitools.engine.models.EngineConfig] carries a resolver, and a data class that holds one is only
+     * comparable by value as long as this is.
+     */
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is VariableResolver) return false
+        return declared == other.declared && environment == other.environment
+    }
+
+    override fun hashCode(): Int = 31 * declared.hashCode() + environment.hashCode()
+
+    /**
+     * Names the variables without their values: a run declares them to keep machine-specific paths out of the
+     * manifests, and whatever a user puts in one has no business being repeated into a log line.
+     */
+    override fun toString(): String = "VariableResolver(variables=${declared.keys}, environment=$environment)"
 
     companion object {
         private val REFERENCE = Regex("""\$\{([A-Za-z_][A-Za-z0-9_]*)}""")

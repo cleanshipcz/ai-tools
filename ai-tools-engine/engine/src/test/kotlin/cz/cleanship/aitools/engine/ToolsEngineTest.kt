@@ -200,7 +200,7 @@ class ToolsEngineTest {
         }
 
         @Test
-        fun `should deploy no project at all when another project references an undeclared variable`() {
+        fun `should deploy no project at all when a project read later references an undeclared variable`() {
             // given
             // - a deploy may delete before it writes, so a project must not be replaced for a run that cannot finish
             val variableEngine = ToolsEngine(
@@ -208,16 +208,21 @@ class ToolsEngineTest {
                 variables = VariableResolver(emptyMap(), emptyEnvironment),
                 tools = listOf(ClaudeAdapter()),
             )
-            // - one project resolves, a second one does not
+            // - the project that resolves and the one that does not live under separate roots, because manifests
+            //   within one directory are found in whatever order the filesystem lists them, while the roots
+            //   themselves are read in the order they are configured - so this one is provably read first
             writeProject(deployDirectory = destination.absolutePath)
-            writeProject("second-project", "second-project", "\${MISSING_FOLDER}/custom-ai-tools")
+            writeProject("broken-project", "broken-project", "\${MISSING_FOLDER}/custom-ai-tools", root = "late-projects")
+            val twoProjectRoots = locations().copy(
+                projects = listOf(workspace.resolve("projects"), workspace.resolve("late-projects")),
+            )
 
             // when
-            val error = runCatching { variableEngine.process(locations()) }.exceptionOrNull()
+            val error = runCatching { variableEngine.process(twoProjectRoots) }.exceptionOrNull()
 
             // then
             assertThat(error).isInstanceOf(DeployDirectoryResolvingException::class.java)
-            // - the project that could have been deployed was left untouched, whichever order the two were read in
+            // - the project read before the broken one was left untouched, rather than deployed by a run that then failed
             assertThat(destination).doesNotExist()
         }
 
@@ -736,13 +741,18 @@ class ToolsEngineTest {
         return manifest
     }
 
+    /**
+     * @param root the configured `locations.projects` directory to write this project under, which decides when the
+     * loader reads it relative to the projects of another root
+     */
     private fun writeProject(
         directoryName: String = "test-project",
         id: String = "test-project",
         deployDirectory: String = destination.absolutePath,
         tools: List<String>? = null,
+        root: String = "projects",
     ) = writeYaml(
-        "projects/$directoryName/project.yml",
+        "$root/$directoryName/project.yml",
         "id: $id\ndescription: A project\n" +
             "context:\n  documentation:\n    readme: README.md\n" +
             "deploy:\n  directory: \"$deployDirectory\"\n" + toolsDeclaration(tools),

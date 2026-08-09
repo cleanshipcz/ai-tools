@@ -126,6 +126,27 @@ class VariableResolverTest {
         }
 
         @Test
+        fun `should not equal a resolver built from the same map after that map changed`() {
+            // given
+            // - one caller's map, built into a resolver and only then changed
+            val declared = mutableMapOf("ROOT" to "/first")
+            val before = VariableResolver(declared, environment)
+            val hashCodeWhenBuilt = before.hashCode()
+
+            // when
+            declared["ROOT"] = "/second"
+            val after = VariableResolver(declared, environment)
+
+            // then
+            // - the two resolve differently, so comparing them equal would be a lie
+            assertThat(before.substitute("\${ROOT}")).isEqualTo("/first")
+            assertThat(after.substitute("\${ROOT}")).isEqualTo("/second")
+            assertThat(before).isNotEqualTo(after)
+            // - and a resolver keeps the hash it was built with, so a map it no longer shares cannot move it
+            assertThat(before.hashCode()).isEqualTo(hashCodeWhenBuilt)
+        }
+
+        @Test
         fun `should equal a resolver declaring the same variables and reading the same environment`() {
             // given
             // - the configuration of a run carries a resolver, so two configurations declaring the same must compare equal
