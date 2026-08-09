@@ -20,6 +20,7 @@ rules:
   - "Keep README concise; link to detailed docs in separate files."
   - "Use screenshots or demos where they add value."
   - "Include diagrams (Mermaid) where they clarify architecture or complex concepts."
+  - "Keep documentation accurate and up-to-date by verifying against actual implementation."
 metadata:
   version: 1.0.0
   author: "AI Tools Team"

@@ -11,6 +11,7 @@ rules:
   - "Reference or maintain OpenAPI/Swagger specifications where applicable."
   - "Specify supported content types and serialization formats."
   - "Document query parameters, path parameters, and request headers."
+  - "Keep documentation accurate and up-to-date by verifying against actual implementation."
 metadata:
   version: 1.0.0
   author: "AI Tools Team"
