@@ -46,4 +46,66 @@ class ProjectManifestTest {
 
         assertThat(result.deploy.replace).isTrue()
     }
+
+    @Test
+    fun `should deserialize manifest with no tools by default`() {
+        val input = """
+            |id: test-project
+            |description: Test Project
+            |metadata:
+            |    version: 1.0.0
+            |context:
+            |    documentation:
+            |        readme: README.md
+            |deploy:
+            |    directory: /tmp/test
+        """.trimMargin()
+
+        val result = yaml.decodeFromString(ProjectManifest.serializer(), input)
+
+        // an absent list is null rather than empty, because omission means every configured tool while an empty list means none
+        assertThat(result.deploy.tools).isNull()
+    }
+
+    @Test
+    fun `should deserialize manifest with the declared tools`() {
+        val input = """
+            |id: test-project
+            |description: Test Project
+            |metadata:
+            |    version: 1.0.0
+            |context:
+            |    documentation:
+            |        readme: README.md
+            |deploy:
+            |    directory: /tmp/test
+            |    tools:
+            |        - claude
+            |        - github_copilot
+        """.trimMargin()
+
+        val result = yaml.decodeFromString(ProjectManifest.serializer(), input)
+
+        assertThat(result.deploy.tools).containsExactly(ToolType.CLAUDE, ToolType.GITHUB_COPILOT)
+    }
+
+    @Test
+    fun `should deserialize manifest with an empty tools list`() {
+        val input = """
+            |id: test-project
+            |description: Test Project
+            |metadata:
+            |    version: 1.0.0
+            |context:
+            |    documentation:
+            |        readme: README.md
+            |deploy:
+            |    directory: /tmp/test
+            |    tools: []
+        """.trimMargin()
+
+        val result = yaml.decodeFromString(ProjectManifest.serializer(), input)
+
+        assertThat(result.deploy.tools).isEmpty()
+    }
 }

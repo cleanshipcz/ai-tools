@@ -5,6 +5,7 @@ import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.FragmentManifest
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.Project
+import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.services.FilterService
@@ -54,7 +55,8 @@ class ToolsEngine(
     private val telemetry = Telemetry.create(TelemetryConfig.fromEnvironment())
 
     /**
-     * Loads every manifest in [locations] and exports each project through every configured adapter.
+     * Loads every manifest in [locations] and exports each project through every configured adapter, or through the
+     * subset a project narrows itself down to with `deploy.tools` - see [selectAdapters].
      *
      * Failure policy: COLLECT-ALL-THEN-FAIL. An unresolvable ruleset or fragment reference fails only the single
      * manifest that carries it; every remaining manifest, adapter and project is still exported, and all failures
@@ -123,7 +125,7 @@ class ToolsEngine(
                 )
 
                 val destination = workingDirectory.resolveDeclaredPath(project.manifest.deploy.directory)
-                for (adapter in tools) {
+                for (adapter in selectAdapters(project.manifest)) {
                     failures += exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments)
                 }
                 LOG.info("Processing project {} completed", project.manifest.id)
@@ -133,6 +135,29 @@ class ToolsEngine(
                 throw ExportFailedException(failures, allData.duplicates)
             }
         }
+    }
+
+    /**
+     * Returns the configured adapters that export [project], narrowed to its `deploy.tools` when it declares one.
+     *
+     * A declared tool the run does not configure is warned about rather than failed on: the run-wide `tools` of
+     * `config.yml` decides which adapters exist at all, and a project manifest travels between runs that configure
+     * different sets of them, so the two lists disagreeing is a difference in scope rather than a broken manifest.
+     * Narrowing to nothing is warned about for the same reason it is allowed - a project that exports through no
+     * tool is a deliberate but silent outcome, and a silent one is worth saying out loud.
+     */
+    private fun selectAdapters(project: ProjectManifest): List<ToolAdapter> {
+        val declared = project.deploy.tools ?: return tools
+        val configured = tools.mapTo(mutableSetOf()) { it.toolType }
+        val unavailable = declared.filterNot { it in configured }
+        if (unavailable.isNotEmpty()) {
+            LOG.warn("{}: deploy.tools names {}, which this run does not configure. Skipping.", project.id, unavailable)
+        }
+        val selected = tools.filter { it.toolType in declared }
+        if (selected.isEmpty()) {
+            LOG.warn("{}: deploy.tools selects none of the configured tools, so the project is not exported.", project.id)
+        }
+        return selected
     }
 
     /**

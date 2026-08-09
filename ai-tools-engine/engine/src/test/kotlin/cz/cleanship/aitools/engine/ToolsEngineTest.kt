@@ -1,14 +1,20 @@
 package cz.cleanship.aitools.engine
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
 
@@ -17,18 +23,31 @@ class ToolsEngineTest {
     @TempDir
     lateinit var tempDir: Path
 
+    private val logAppender = ListAppender<ILoggingEvent>()
+
     private lateinit var workspace: File
     private lateinit var destination: File
     private lateinit var engine: ToolsEngine
+    private lateinit var engineLogger: Logger
 
     @BeforeEach
     fun setUp() {
         workspace = tempDir.resolve("workspace").toFile()
         destination = tempDir.resolve("destination").toFile()
         engine = ToolsEngine(workspace, tools = listOf(ClaudeAdapter()))
+        engineLogger = LoggerFactory.getLogger(ToolsEngine::class.java) as Logger
+        logAppender.start()
+        engineLogger.addAppender(logAppender)
         // - a resolvable ruleset and the project that deploys into the destination are always present
         writeRuleset("base")
         writeProject()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        engineLogger.detachAppender(logAppender)
+        logAppender.stop()
+        logAppender.list.clear()
     }
 
     @Nested
@@ -106,6 +125,76 @@ class ToolsEngineTest {
             assertThat(absoluteDestination.resolve("CLAUDE.md")).exists()
             // - an absolute destination is never re-based under the working directory
             assertThat(workspace.walkTopDown().filter { it.name == "CLAUDE.md" }.toList()).isEmpty()
+        }
+    }
+
+    @Nested
+    inner class ToolSelection {
+
+        @Test
+        fun `should export a project only through the tools it declares`() {
+            // given
+            // - the run configures two tools
+            val multiAdapterEngine = ToolsEngine(workspace, tools = listOf(ClaudeAdapter(), CursorAdapter()))
+            // - the project narrows itself down to one of them
+            writeProject(tools = listOf("claude"))
+            writeAgent("good-agent", "base")
+
+            // when
+            multiAdapterEngine.process(locations())
+
+            // then
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(agentFile("good-agent")).exists()
+            assertThat(cursorProjectFile()).doesNotExist()
+            assertThat(cursorAgentFile("good-agent")).doesNotExist()
+        }
+
+        @Test
+        fun `should export a project through every configured tool when it declares none`() {
+            // given
+            // - the project omits deploy.tools entirely, leaving the run-wide tool list in charge
+            val multiAdapterEngine = ToolsEngine(workspace, tools = listOf(ClaudeAdapter(), CursorAdapter()))
+            writeAgent("good-agent", "base")
+
+            // when
+            multiAdapterEngine.process(locations())
+
+            // then
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(agentFile("good-agent")).exists()
+            assertThat(cursorProjectFile()).exists()
+            assertThat(cursorAgentFile("good-agent")).exists()
+        }
+
+        @Test
+        fun `should export through the configured tools and warn when a declared tool is not configured`() {
+            // given
+            // - the run configures Claude alone, so the Cursor the project declares cannot be honoured
+            writeProject(tools = listOf("claude", "cursor"))
+
+            // when
+            engine.process(locations())
+
+            // then
+            // - the run does not fail over a tool it was simply not asked to build
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(cursorProjectFile()).doesNotExist()
+            assertThat(warnings()).anyMatch { it.contains("test-project") && it.contains("CURSOR") }
+        }
+
+        @Test
+        fun `should export a project through no tool when it declares an empty tool list`() {
+            // given
+            // - an explicit empty list restricts to nothing, unlike an omitted one
+            writeProject(tools = emptyList())
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(destination).doesNotExist()
+            assertThat(warnings()).anyMatch { it.contains("test-project") && it.contains("not exported") }
         }
     }
 
@@ -419,6 +508,12 @@ class ToolsEngineTest {
 
     private fun promptFile(id: String) = destination.resolve(".claude/commands/$id.md")
 
+    private fun cursorProjectFile() = destination.resolve(".cursor/rules/project.mdc")
+
+    private fun cursorAgentFile(id: String) = destination.resolve(".cursor/rules/agent-$id.mdc")
+
+    private fun warnings() = logAppender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
+
     private fun writeRuleset(id: String, fileName: String = "$id.yml") = writeYaml(
         "rulesets/$fileName",
         "id: $id\ndescription: A ruleset\nrules:\n  - A rule from $id.\n",
@@ -457,12 +552,23 @@ class ToolsEngineTest {
         directoryName: String = "test-project",
         id: String = "test-project",
         deployDirectory: String = destination.absolutePath,
+        tools: List<String>? = null,
     ) = writeYaml(
         "projects/$directoryName/project.yml",
         "id: $id\ndescription: A project\n" +
             "context:\n  documentation:\n    readme: README.md\n" +
-            "deploy:\n  directory: \"$deployDirectory\"\n",
+            "deploy:\n  directory: \"$deployDirectory\"\n" + toolsDeclaration(tools),
     )
+
+    /**
+     * Renders the optional `deploy.tools` list: absent for `null`, an explicit empty list for an empty one, since
+     * the two mean opposite things to the engine.
+     */
+    private fun toolsDeclaration(tools: List<String>?) = when {
+        tools == null -> ""
+        tools.isEmpty() -> "  tools: []\n"
+        else -> tools.joinToString(separator = "", prefix = "  tools:\n") { "    - $it\n" }
+    }
 
     private fun writeFeature(projectDirectoryName: String, fileName: String, id: String) = writeYaml(
         "projects/$projectDirectoryName/features/$fileName",

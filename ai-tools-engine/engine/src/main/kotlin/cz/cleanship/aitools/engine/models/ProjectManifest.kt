@@ -39,11 +39,17 @@ data class ProjectDocumentationItem(
  * `.` means that directory itself and the value does not shift with the working directory of the JVM process.
  * An absolute value is used exactly as written, which is what a project outside the manifest repository wants.
  * @param replace whether a deploy may delete the directories it generates before writing them again
+ * @param tools which of the tools configured for the run deploy this project. Omitting it - not emptying it - means
+ * every configured tool, so a project that says nothing keeps following the run-wide `tools` of `config.yml`, while
+ * an empty list deliberately restricts the project to no tool at all. A tool the run does not configure is narrowed
+ * away rather than rejected: the same manifest is deployed by runs configuring different tools, so naming one that
+ * this run does not build is a difference in scope rather than an authoring error.
  */
 @Serializable
 data class ProjectDeploy(
     val directory: String,
     val replace: Boolean = false,
+    val tools: List<ToolType>? = null,
     val prompts: ProjectPrompts = ProjectPrompts(),
     val agents: ProjectAgents = ProjectAgents(),
     val features: ProjectFeatures = ProjectFeatures(),

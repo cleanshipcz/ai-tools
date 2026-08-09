@@ -177,6 +177,7 @@ tools:
 Every entry under `locations` is a list, so you can point at additional directories outside this repository.
 Relative location paths resolve against the working directory; absolute paths are used as given — the same rule a project's `deploy.directory` follows.
 The `tools` list accepts exactly the six keys above, and controls which adapters run.
+An individual project can narrow itself down to a subset of them with `deploy.tools` in its `project.yml` — see [QUICKREF.md](QUICKREF.md).
 
 ## Not Yet Implemented
 

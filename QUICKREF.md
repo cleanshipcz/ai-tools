@@ -184,6 +184,7 @@ context:
 deploy:
   directory: "/absolute/path/to/target"
   replace: false
+  tools: [claude, cursor]      # optional; omit to deploy through every tool config.yml configures
   agents:
     filter:
       - type: tags
@@ -227,6 +228,18 @@ It also causes `No rulesets match pattern ... excluded by project filter`: a rul
 
 Relative `deploy.directory` values resolve against `--working-dir`, which `deploy.sh` sets to this repository's root, so `.` is that root — the same base the `locations` paths of `config.yml` use.
 Prefer an absolute path for anything else.
+
+### Restricting a project to some tools
+
+`deploy.tools` narrows a project to a subset of the tools `config.yml` configures, using the same six keys: `windsurf`, `antigravity`, `github_copilot`, `cursor`, `claude`, `codex`.
+It only ever narrows — it cannot add a tool the run does not configure.
+
+- **Omitted** — the project deploys through every configured tool. This is the default.
+- **Listed** — the project deploys through the listed tools only, and the other configured tools skip it.
+- **`tools: []`** — the project deploys through no tool at all. Emptiness restricts to nothing; only omission means "all".
+
+Naming a tool that `config.yml` does not configure is not an error: the project deploys through the tools both lists agree on, and the engine logs a warning naming the project and the unavailable tool.
+This keeps one project manifest usable across runs that configure different tools.
 
 ## Creating a Feature
 
