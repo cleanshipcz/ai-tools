@@ -169,6 +169,9 @@ variables:
 - Test against red team scenarios
 - Follow principle of least privilege
 
+The placeholder above is for manifest and generated content, which the engine emits literally — it never resolves a secret into an artifact.
+Declared paths are the exception: a `${NAME}` in a `locations.*` entry or in a project's `deploy.directory` is expanded from the config `env_vars` or the environment, and fails the run when nothing declares it.
+
 ## Common Patterns
 
 ### Conditional Content

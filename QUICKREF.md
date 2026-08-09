@@ -182,7 +182,7 @@ context:
       - path: docs/architecture.md
         description: "System design"
 deploy:
-  directory: "/absolute/path/to/target"
+  directory: "/absolute/path/to/target"   # may reference config env_vars, e.g. "${PROJECTS_FOLDER}/my-app"
   replace: false
   # tools: [claude, cursor]    # optional; omitted here so this example deploys through every configured tool
   agents:
@@ -228,6 +228,8 @@ It also causes `No rulesets match pattern ... excluded by project filter`: a rul
 
 Relative `deploy.directory` values resolve against `--working-dir`, which `deploy.sh` sets to this repository's root, so `.` is that root — the same base the `locations` paths of `config.yml` use.
 Prefer an absolute path for anything else.
+
+Any `${NAME}` reference in `deploy.directory` — or in a `locations` entry — is expanded first, from the `env_vars` of `config.local.yml`, then `config.yml`, then the environment. Because expansion precedes the rule above, a variable can supply the absolute base. A variable declared nowhere fails the run before anything is deployed. See [README.md](README.md#path-variables).
 
 ### Restricting a project to some tools
 
@@ -322,7 +324,7 @@ Use `fragments` for shared content; there is no include mechanism.
 ├── 10_schemas/      # JSON schemas - STALE, not used for validation
 ├── 90_docs/         # Reference documentation
 ├── ai-tools-engine/ # The Kotlin engine
-├── config.yml       # Engine configuration (locations + tools)
+├── config.yml       # Engine configuration (locations + tools + env_vars)
 └── config.local.yml # Machine-local overrides (gitignored)
 ```
 
@@ -361,8 +363,8 @@ Do not treat them as authoritative — the data classes in `ai-tools-engine/engi
 ## Security
 
 Never commit API keys, passwords, tokens, or PII.
-The engine performs no variable interpolation, so a `${VAR}` written into a manifest is emitted literally rather than resolved from the environment — it will not keep a secret out of the generated files.
-Keep machine-local paths and settings in `config.local.yml`, which is gitignored.
+`${VAR}` is interpolated in declared paths only — `locations.*` in the config files, and `deploy.directory` in `project.yml`. Everywhere else, including all generated content, a `${VAR}` is emitted literally rather than resolved, so it will not keep a secret out of the generated files.
+Keep machine-local paths and settings in `config.local.yml`, which is gitignored — declare a machine-specific base path as an `env_vars` variable there and reference it from the versioned manifests.
 
 ## Getting Help
 
@@ -381,6 +383,8 @@ Keep machine-local paths and settings in `config.local.yml`, which is gitignored
 **`Invalid version format`**: `metadata.version` is not `MAJOR.MINOR.PATCH` with an optional `-SUFFIX`. The message names the manifest file that carries it.
 
 **`No rulesets match pattern 'x'`**: the pattern matched nothing. The message lists similar available ids, and flags rulesets excluded by the project's filter.
+
+**`Unresolved variable 'X'`** / **`Cannot resolve the deploy directory of N project(s)`**: a `${X}` reference in a `locations` entry or a `deploy.directory` names a variable no `env_vars` map and no environment variable declares. The message names the variable and where it was read from. Nothing is deployed until every project's directory resolves.
 
 **`Export failed for N manifest(s)`**: N manifests could not be exported; the list below the headline names each one, together with every tool it failed for. The run still exports everything else before reporting, and exits non-zero.
 

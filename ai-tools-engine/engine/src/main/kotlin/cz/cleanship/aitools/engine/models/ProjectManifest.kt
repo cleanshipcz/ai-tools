@@ -34,9 +34,12 @@ data class ProjectDocumentationItem(
 )
 
 /**
- * @param directory where the generated artifacts of this project land. A relative value resolves against the
- * `--working-dir` of the run - the directory holding `config.yml`, the same base its `locations.*` paths use - so
- * `.` means that directory itself and the value does not shift with the working directory of the JVM process.
+ * @param directory where the generated artifacts of this project land. Any `${NAME}` reference it carries is expanded
+ * first, from the `env_vars` of the config files of the run or from its environment - see
+ * [cz.cleanship.aitools.engine.env.VariableResolver] - which is how a base that differs between machines stays out of
+ * a manifest that is shared. A relative value resolves against the `--working-dir` of the run - the directory holding
+ * `config.yml`, the same base its `locations.*` paths use - so `.` means that directory itself and the value does not
+ * shift with the working directory of the JVM process.
  * An absolute value is used exactly as written, which is what a project outside the manifest repository wants.
  * @param replace whether a deploy may delete the directories it generates before writing them again
  * @param tools which of the tools configured for the run deploy this project. Omitting it - not emptying it - means

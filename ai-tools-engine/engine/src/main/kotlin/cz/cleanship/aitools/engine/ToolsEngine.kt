@@ -1,5 +1,7 @@
 package cz.cleanship.aitools.engine
 
+import cz.cleanship.aitools.engine.env.VariableResolver
+import cz.cleanship.aitools.engine.env.VariableSubstitutionException
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
 import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
@@ -39,11 +41,16 @@ import java.io.File
  * `deploy.directory` resolves against it - see [resolveDeclaredPath] - so it is the same base the `locations.*`
  * paths of that same `config.yml` already use. It is required rather than defaulted because the adapters delete
  * under whatever it resolves to, which is not a decision to make by omission.
+ * @param variables the variables of the run, which `deploy.directory` is substituted with before it is resolved -
+ * see [VariableResolver]. They are the ones the config files of the run declared, so a project manifest reads the
+ * same variables the `locations.*` of that run did. The default declares none and falls back to the environment of
+ * the process, which is what an engine built without a config sees.
  */
 class ToolsEngine(
     private val workingDirectory: File,
     private val loaderService: LoaderService = LoaderService(),
     private val filterService: FilterService = FilterService(),
+    private val variables: VariableResolver = VariableResolver(),
     private val tools: List<ToolAdapter> = listOf(
         WindsurfAdapter(),
         AntigravityAdapter(),
@@ -72,6 +79,8 @@ class ToolsEngine(
      *
      * @throws ExportFailedException if at least one manifest could not be exported or at least one project was
      * left out because its ids collide
+     * @throws DeployDirectoryResolvingException if a `deploy.directory` references a variable that nothing declares,
+     * which stops the run before a single project is exported - see [resolveDeployDirectories]
      * @throws cz.cleanship.aitools.engine.services.DuplicateManifestIdException if manifests shared by every
      * project declare the same id, which no project can be exported around
      */
@@ -104,6 +113,8 @@ class ToolsEngine(
                 LOG.warn("This run configures no tools, so no project is exported. Declare the tools to build under 'tools:' in config.yml, or in config.local.yml, which replaces that list.")
             }
 
+            val destinations = resolveDeployDirectories(allData.projects.values)
+
             val failures = mutableListOf<ExportFailure>()
             for (projectManifest in allData.projects.values) {
                 // Selecting before the project is assembled keeps a project that exports through no tool out of the
@@ -112,7 +123,7 @@ class ToolsEngine(
                 if (adapters.isEmpty()) continue
                 LOG.info("Processing project {}", projectManifest.id)
                 val project = assembleProject(projectManifest, allData)
-                val destination = workingDirectory.resolveDeclaredPath(projectManifest.deploy.directory)
+                val destination = destinations.getValue(projectManifest.id)
                 for (adapter in adapters) {
                     failures += exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments)
                 }
@@ -123,6 +134,42 @@ class ToolsEngine(
                 throw ExportFailedException(failures, allData.duplicates)
             }
         }
+    }
+
+    /**
+     * Resolves the directory every manifest of [projects] deploys to: the variables of the run are expanded first -
+     * see [VariableResolver] - and what they produced is resolved by [resolveDeclaredPath] afterwards, so a variable
+     * is free to supply the absolute base a relative value would otherwise be denied.
+     *
+     * Every project is resolved before any project is exported, and one failure stops the whole run. A deploy may
+     * delete the directories it generates before writing them again, so a run that cannot finish must not have
+     * already replaced the projects that happened to be read first - which is why this cannot sit in the export loop,
+     * where the order the manifests were found in would decide how much of the run had happened. It also reaches the
+     * projects that export through no adapter at all, which that loop skips before it would look at their directory.
+     *
+     * The run stops rather than collecting the failure like the authoring errors of [exportOrCollectFailure], because
+     * a variable nothing declares is a fault in the configuration of the run rather than in one manifest. Every such
+     * failure is still gathered first, so an author fixing their variables is told about all of them at once.
+     *
+     * @return the directory each project deploys to, by project id
+     * @throws DeployDirectoryResolvingException if at least one declared directory could not be resolved
+     */
+    private fun resolveDeployDirectories(projects: Collection<ProjectManifest>): Map<String, File> {
+        val destinations = mutableMapOf<String, File>()
+        val failures = mutableListOf<VariableSubstitutionException>()
+        for (manifest in projects) {
+            try {
+                val declared = variables.substitute(manifest.deploy.directory, origin = "deploy.directory of project '${manifest.id}'")
+                destinations[manifest.id] = workingDirectory.resolveDeclaredPath(declared)
+            } catch (ex: VariableSubstitutionException) {
+                LOG.error("{}: deploy.directory could not be resolved. {}", manifest.id, ex.message)
+                failures += ex
+            }
+        }
+        if (failures.isNotEmpty()) {
+            throw DeployDirectoryResolvingException(failures)
+        }
+        return destinations
     }
 
     /**
@@ -281,6 +328,20 @@ class ToolsEngine(
         private val LOG = LoggerFactory.getLogger(ToolsEngine::class.java)
     }
 }
+
+/**
+ * Thrown before a single project of the run is exported, when the `deploy.directory` of at least one of them could
+ * not be resolved - see [ToolsEngine.resolveDeployDirectories]. Carries every failure the run found, so that an
+ * author is told about all of their broken references at once instead of one per run.
+ */
+class DeployDirectoryResolvingException(
+    val failures: List<VariableSubstitutionException>,
+) : RuntimeException(
+        buildString {
+            append("Cannot resolve the deploy directory of ${failures.size} project(s):")
+            failures.forEach { failure -> append("\n  - ${failure.message}") }
+        },
+    )
 
 /**
  * A single manifest that could not be exported, together with the resolution failure that stopped it.

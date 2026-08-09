@@ -6,7 +6,9 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
+import cz.cleanship.aitools.engine.DeployDirectoryResolvingException
 import cz.cleanship.aitools.engine.ExportFailedException
+import cz.cleanship.aitools.engine.env.VariableSubstitutionException
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
 import java.io.FileNotFoundException
@@ -37,6 +39,10 @@ class AiToolsCli(
         } catch (ex: DuplicateManifestIdException) {
             throw CliktError(ex.message, ex)
         } catch (ex: ManifestLoadingException) {
+            throw CliktError(ex.message, ex)
+        } catch (ex: VariableSubstitutionException) {
+            throw CliktError(ex.message, ex)
+        } catch (ex: DeployDirectoryResolvingException) {
             throw CliktError(ex.message, ex)
         }
     }
