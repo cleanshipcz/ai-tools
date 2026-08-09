@@ -30,6 +30,10 @@
 - prompts webpage supported
 - should it be somehow interconnected? Maybe CRUD server? Or just a webpage?
 
+## Relative location
+
+- add support for env variables to define absolute base, then projects can reference that variable -> requires only a local .env file
+
 ## MCPs
 
 - add support for MCPs
