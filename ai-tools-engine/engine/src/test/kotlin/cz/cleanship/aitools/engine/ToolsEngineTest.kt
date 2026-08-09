@@ -4,6 +4,9 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import cz.cleanship.aitools.engine.env.EnvironmentSource
+import cz.cleanship.aitools.engine.env.UnresolvedVariableException
+import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
@@ -24,6 +27,9 @@ class ToolsEngineTest {
     lateinit var tempDir: Path
 
     private val logAppender = ListAppender<ILoggingEvent>()
+
+    // An environment carrying nothing, so that no variable of the JVM running the tests can reach a deploy directory.
+    private val emptyEnvironment = EnvironmentSource { null }
 
     private lateinit var workspace: File
     private lateinit var destination: File
@@ -125,6 +131,49 @@ class ToolsEngineTest {
             assertThat(absoluteDestination.resolve("CLAUDE.md")).exists()
             // - an absolute destination is never re-based under the working directory
             assertThat(workspace.walkTopDown().filter { it.name == "CLAUDE.md" }.toList()).isEmpty()
+        }
+
+        @Test
+        fun `should expand a variable in the deploy directory before resolving it`() {
+            // given
+            // - the variable carries an absolute base, so the expanded value is absolute rather than relative
+            val variableDestination = tempDir.resolve("variable-destination").toFile()
+            val variableEngine = ToolsEngine(
+                workspace,
+                variables = VariableResolver(mapOf("PROJECTS_FOLDER" to variableDestination.absolutePath), emptyEnvironment),
+                tools = listOf(ClaudeAdapter()),
+            )
+            writeProject(deployDirectory = "\${PROJECTS_FOLDER}/custom-ai-tools")
+
+            // when
+            variableEngine.process(locations())
+
+            // then
+            assertThat(variableDestination.resolve("custom-ai-tools/CLAUDE.md")).exists()
+        }
+
+        @Test
+        fun `should fail naming the variable when the deploy directory references an undeclared one`() {
+            // given
+            val variableEngine = ToolsEngine(
+                workspace,
+                variables = VariableResolver(emptyMap(), emptyEnvironment),
+                tools = listOf(ClaudeAdapter()),
+            )
+            writeProject(deployDirectory = "\${MISSING_FOLDER}/custom-ai-tools")
+
+            // when
+            val error = runCatching { variableEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(UnresolvedVariableException::class.java)
+                .hasMessageContaining("MISSING_FOLDER")
+                // - the project naming the reference is named too, so the author knows which manifest to fix
+                .hasMessageContaining("test-project")
+            // - and nothing was deployed to a directory literally called '${MISSING_FOLDER}'
+            val created = tempDir.toFile().walkTopDown().toList()
+            assertThat(created).noneMatch { it.name.contains("MISSING_FOLDER") }
         }
     }
 

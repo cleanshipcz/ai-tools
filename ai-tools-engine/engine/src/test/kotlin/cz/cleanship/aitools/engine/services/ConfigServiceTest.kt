@@ -1,8 +1,12 @@
 package cz.cleanship.aitools.engine.services
 
+import cz.cleanship.aitools.engine.env.EnvironmentSource
+import cz.cleanship.aitools.engine.env.UnresolvedVariableException
 import cz.cleanship.aitools.engine.models.ToolType
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -102,4 +106,200 @@ class ConfigServiceTest {
         // then
         exception.isInstanceOf(FileNotFoundException::class.java)
     }
+
+    @Nested
+    inner class EnvironmentVariables {
+
+        private lateinit var processEnvironment: MutableMap<String, String>
+        private lateinit var service: ConfigService
+
+        @BeforeEach
+        fun setUp() {
+            // A faked environment keeps the tests from depending on - or mutating - the environment of the JVM they run in.
+            processEnvironment = mutableMapOf()
+            service = ConfigService(EnvironmentSource { name -> processEnvironment[name] })
+        }
+
+        @Test
+        fun `should expand a declared variable in every location referencing it`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            File(tempDir, "config.yml").writeText(
+                """
+                env_vars:
+                  ROOT: "${tempDir.absolutePath}"
+                  TEAM: "platform"
+                locations:
+                  agents:
+                    - "${variableReference("ROOT")}/agents"
+                  projects:
+                    - "${variableReference("ROOT")}/projects/${variableReference("TEAM")}"
+                  prompts:
+                    - "prompts_without_reference"
+                """.trimIndent(),
+            )
+
+            // when
+            val (locations) = service.loadConfig(tempDir)
+
+            // then
+            assertThat(locations.agents).containsExactly(File(tempDir, "agents"))
+            // - a value may carry several references
+            assertThat(locations.projects).containsExactly(File(tempDir, "projects/platform"))
+            // - and one that carries none is resolved exactly as before
+            assertThat(locations.prompts).containsExactly(File(tempDir, "prompts_without_reference"))
+        }
+
+        @Test
+        fun `should override a single variable from the local config while keeping the others`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            File(tempDir, "config.yml").writeText(
+                """
+                env_vars:
+                  ROOT: "${tempDir.absolutePath}/default"
+                  TEAM: "platform"
+                locations:
+                  agents:
+                    - "${variableReference("ROOT")}/agents"
+                  projects:
+                    - "${variableReference("ROOT")}/${variableReference("TEAM")}"
+                """.trimIndent(),
+            )
+            // - the local config redeclares one of the two variables
+            File(tempDir, "config.local.yml").writeText(
+                """
+                env_vars:
+                  ROOT: "${tempDir.absolutePath}/local"
+                """.trimIndent(),
+            )
+
+            // when
+            val (locations) = service.loadConfig(tempDir)
+
+            // then
+            assertThat(locations.agents).containsExactly(File(tempDir, "local/agents"))
+            // - the variable the local config says nothing about survives the merge
+            assertThat(locations.projects).containsExactly(File(tempDir, "local/platform"))
+        }
+
+        @Test
+        fun `should read a variable from the process environment when no config declares it`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            processEnvironment["PROJECTS_FOLDER"] = "${tempDir.absolutePath}/from-environment"
+            File(tempDir, "config.yml").writeText(
+                """
+                locations:
+                  agents:
+                    - "${variableReference("PROJECTS_FOLDER")}/agents"
+                """.trimIndent(),
+            )
+
+            // when
+            val (locations) = service.loadConfig(tempDir)
+
+            // then
+            assertThat(locations.agents).containsExactly(File(tempDir, "from-environment/agents"))
+        }
+
+        @Test
+        fun `should prefer the declared variable when the process environment carries the same name`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            processEnvironment["PROJECTS_FOLDER"] = "${tempDir.absolutePath}/from-environment"
+            File(tempDir, "config.yml").writeText(
+                """
+                env_vars:
+                  PROJECTS_FOLDER: "${tempDir.absolutePath}/from-config"
+                locations:
+                  agents:
+                    - "${variableReference("PROJECTS_FOLDER")}/agents"
+                """.trimIndent(),
+            )
+
+            // when
+            val (locations) = service.loadConfig(tempDir)
+
+            // then
+            assertThat(locations.agents).containsExactly(File(tempDir, "from-config/agents"))
+        }
+
+        @Test
+        fun `should fail naming the variable when a location references one nothing declares`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            File(tempDir, "config.yml").writeText(
+                """
+                locations:
+                  agents:
+                    - "${variableReference("MISSING_ROOT")}/agents"
+                """.trimIndent(),
+            )
+
+            // when
+            val error = runCatching { service.loadConfig(tempDir) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(UnresolvedVariableException::class.java)
+                .hasMessageContaining("MISSING_ROOT")
+                // - the field the reference was read from is named, so the author knows where to look
+                .hasMessageContaining("locations.agents")
+        }
+
+        @Test
+        fun `should expose the merged variables so a path declared outside the config can use them`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            // - 'deploy.directory' of a project manifest is substituted with the variables of the run, not of the manifest
+            File(tempDir, "config.yml").writeText(
+                """
+                env_vars:
+                  PROJECTS_FOLDER: "${tempDir.absolutePath}"
+                """.trimIndent(),
+            )
+
+            // when
+            val config = service.loadConfig(tempDir)
+
+            // then
+            assertThat(config.variables.substitute("${variableReference("PROJECTS_FOLDER")}/custom-ai-tools"))
+                .isEqualTo("${tempDir.absolutePath}/custom-ai-tools")
+            assertThat(config.variables.substitute("plain/path")).isEqualTo("plain/path")
+        }
+
+        @Test
+        fun `should load a config declaring no variables`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            // - every config written before this feature existed declares none, and must keep loading
+            File(tempDir, "config.yml").writeText(
+                """
+                locations:
+                  agents:
+                    - "agents_default"
+                """.trimIndent(),
+            )
+
+            // when
+            val config = service.loadConfig(tempDir)
+
+            // then
+            assertThat(config.locations.agents).containsExactly(File(tempDir, "agents_default"))
+        }
+    }
 }
+
+/**
+ * Renders a `${NAME}` reference into a YAML fixture. Written through a function because a Kotlin raw string cannot
+ * escape the dollar of the reference itself.
+ */
+private fun variableReference(name: String) = "\${$name}"

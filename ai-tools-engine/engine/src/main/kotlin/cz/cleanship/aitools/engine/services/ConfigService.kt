@@ -3,6 +3,8 @@ package cz.cleanship.aitools.engine.services
 import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
+import cz.cleanship.aitools.engine.env.EnvironmentSource
+import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
 import cz.cleanship.aitools.engine.models.ConfigManifest
 import cz.cleanship.aitools.engine.models.EngineConfig
@@ -13,7 +15,12 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileNotFoundException
 
-class ConfigService {
+/**
+ * @param environment where a `${NAME}` reference that the `env_vars` of the config files do not declare is looked up
+ */
+class ConfigService(
+    private val environment: EnvironmentSource = EnvironmentSource.PROCESS,
+) {
     private val yaml = Yaml(
         configuration = YamlConfiguration(
             polymorphismStyle = PolymorphismStyle.Property,
@@ -21,6 +28,18 @@ class ConfigService {
         ),
     )
 
+    /**
+     * Reads `config.yml` and the `config.local.yml` beside it into the configuration of one run.
+     *
+     * Every `locations.*` entry is substituted with the variables of the run before it is resolved into a directory,
+     * so a variable may expand to the absolute base a relative path would otherwise be denied - see [VariableResolver].
+     * The resolver itself travels on in [EngineConfig.variables], because `deploy.directory` of a project manifest is
+     * substituted with the same variables, and that manifest is only read once these locations are known.
+     *
+     * @throws FileNotFoundException if the working directory holds no `config.yml`
+     * @throws cz.cleanship.aitools.engine.env.VariableSubstitutionException if a location references a variable that
+     * neither the config files nor the environment declare
+     */
     fun loadConfig(workingDirectory: File = File(".")): EngineConfig {
         // TODO make config file location configurable
         // config.yml and config.local.yml are defaults that can be overriden based on the strategy
@@ -33,17 +52,19 @@ class ConfigService {
         val mergedConfig = merge(defaultConfig, localConfig)
         val locations = mergedConfig.locations ?: LocationsConfig()
         val tools = mergedConfig.tools ?: emptyList()
+        val variables = VariableResolver(mergedConfig.envVars.orEmpty(), environment)
 
         return EngineConfig(
             locations = Locations(
-                agents = resolvePaths(workingDirectory, locations.agents),
-                projects = resolvePaths(workingDirectory, locations.projects),
-                prompts = resolvePaths(workingDirectory, locations.prompts),
-                rulesets = resolvePaths(workingDirectory, locations.rulesets),
-                fragments = resolvePaths(workingDirectory, locations.fragments),
-                skills = resolvePaths(workingDirectory, locations.skills),
+                agents = resolvePaths(workingDirectory, locations.agents, variables, "agents"),
+                projects = resolvePaths(workingDirectory, locations.projects, variables, "projects"),
+                prompts = resolvePaths(workingDirectory, locations.prompts, variables, "prompts"),
+                rulesets = resolvePaths(workingDirectory, locations.rulesets, variables, "rulesets"),
+                fragments = resolvePaths(workingDirectory, locations.fragments, variables, "fragments"),
+                skills = resolvePaths(workingDirectory, locations.skills, variables, "skills"),
             ),
             tools = tools,
+            variables = variables,
         )
     }
 
@@ -61,6 +82,9 @@ class ConfigService {
         return ConfigManifest(
             locations = mergeLocations(default.locations, local.locations),
             tools = local.tools ?: default.tools,
+            // Variables merge per key rather than as a whole: a local config usually redeclares the one base that
+            // differs on its machine, and replacing the whole map would silently drop the ones it agrees with.
+            envVars = default.envVars.orEmpty() + local.envVars.orEmpty(),
         )
     }
 
@@ -78,8 +102,16 @@ class ConfigService {
         )
     }
 
-    private fun resolvePaths(workingDirectory: File, paths: List<String>?): List<File> =
-        paths?.map(workingDirectory::resolveDeclaredPath) ?: emptyList()
+    /**
+     * @param field the key of `locations` these [paths] were declared under, named in a substitution failure so the
+     * author is told which list to fix
+     */
+    private fun resolvePaths(
+        workingDirectory: File,
+        paths: List<String>?,
+        variables: VariableResolver,
+        field: String,
+    ): List<File> = paths?.map { path -> workingDirectory.resolveDeclaredPath(variables.substitute(path, origin = "locations.$field of config.yml or config.local.yml")) } ?: emptyList()
 
     companion object {
         private val LOG = LoggerFactory.getLogger(ConfigService::class.java)

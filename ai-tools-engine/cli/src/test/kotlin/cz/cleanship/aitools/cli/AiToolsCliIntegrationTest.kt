@@ -76,6 +76,70 @@ class AiToolsCliIntegrationTest {
     }
 
     @Test
+    fun `should deploy to the expanded directory when the deploy directory references a declared variable`() {
+        // given
+        // - the config declares the variable, the way a user keeps a machine-specific base out of the manifests
+        File(tempDir, "config.yml").writeText(
+            """
+            env_vars:
+              PROJECTS_FOLDER: "${tempDir.absolutePath}/deployments"
+            locations:
+              projects:
+                - "projects"
+            tools:
+              - claude
+            """.trimIndent(),
+        )
+        val projectFile = File(tempDir, "projects/test-project/project.yml")
+        projectFile.parentFile.mkdirs()
+        projectFile.writeText(
+            """
+            id: test-project
+            description: A project
+            metadata:
+              version: 1.0.0
+            context:
+              documentation:
+                readme: README.md
+            deploy:
+              directory: "${variableReference("PROJECTS_FOLDER")}/custom-ai-tools"
+            """.trimIndent(),
+        )
+        val cli = AiToolsCli()
+
+        // when
+        cli.parse(arrayOf("--working-dir", tempDir.absolutePath))
+
+        // then
+        assertThat(File(tempDir, "deployments/custom-ai-tools/CLAUDE.md")).exists()
+        // - the reference was expanded rather than taken for a directory name
+        assertThat(File(tempDir, "deployments").list()).containsExactly("custom-ai-tools")
+    }
+
+    @Test
+    fun `should fail with the variable name when a declared path references an undeclared variable`() {
+        // given
+        // - a name no config file and no environment of a test machine declares
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              projects:
+                - "${variableReference("AI_TOOLS_UNDECLARED_TEST_FOLDER")}/projects"
+            """.trimIndent(),
+        )
+        val cli = AiToolsCli()
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessageContaining("AI_TOOLS_UNDECLARED_TEST_FOLDER")
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
     fun `should fail with the resolver message when an export fails`() {
         // given
         // - a CliktError makes the command report on stderr and exit with a non-zero status code
@@ -183,3 +247,9 @@ class AiToolsCliIntegrationTest {
         assertThat((error as CliktError).statusCode).isNotZero()
     }
 }
+
+/**
+ * Renders a `${NAME}` reference into a YAML fixture. Written through a function because a Kotlin raw string cannot
+ * escape the dollar of the reference itself.
+ */
+private fun variableReference(name: String) = "\${$name}"

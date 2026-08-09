@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.cli
 
+import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.models.EngineConfig
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ToolType
@@ -51,9 +52,12 @@ class DefaultToolsApplicationRunnerTest {
                 fragments = listOf(File("fragments")),
                 skills = listOf(File("skills")),
             )
+            // - the variables the config declares must reach the engine, which substitutes 'deploy.directory' with them
+            val variables = VariableResolver(mapOf("PROJECTS_FOLDER" to "/home/user/Projects"))
             val config = EngineConfig(
                 locations = locations,
                 tools = listOf(ToolType.CLAUDE, ToolType.CODEX),
+                variables = variables,
             )
             val claudeAdapter = mockk<ToolAdapter>()
             val codexAdapter = mockk<ToolAdapter>()
@@ -61,7 +65,7 @@ class DefaultToolsApplicationRunnerTest {
             every { configService.loadConfig(workingDirectory) } returns config
             every { toolAdapterFactory.create(ToolType.CLAUDE) } returns claudeAdapter
             every { toolAdapterFactory.create(ToolType.CODEX) } returns codexAdapter
-            every { engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory) } returns engineProcessor
+            every { engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables) } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
@@ -71,7 +75,7 @@ class DefaultToolsApplicationRunnerTest {
             verify(exactly = 1) { configService.loadConfig(workingDirectory) }
             verify(exactly = 1) { toolAdapterFactory.create(ToolType.CLAUDE) }
             verify(exactly = 1) { toolAdapterFactory.create(ToolType.CODEX) }
-            verify(exactly = 1) { engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory) }
+            verify(exactly = 1) { engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables) }
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
     }
@@ -91,14 +95,16 @@ class DefaultToolsApplicationRunnerTest {
                 fragments = emptyList(),
                 skills = emptyList(),
             )
+            val variables = VariableResolver()
             val config = EngineConfig(
                 locations = locations,
                 tools = emptyList(),
+                variables = variables,
             )
             val emptyAdapters = emptyList<ToolAdapter>()
 
             every { configService.loadConfig(workingDirectory) } returns config
-            every { engineFactory.create(emptyAdapters, workingDirectory) } returns engineProcessor
+            every { engineFactory.create(emptyAdapters, workingDirectory, variables) } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
@@ -106,7 +112,7 @@ class DefaultToolsApplicationRunnerTest {
 
             // then
             verify(exactly = 1) { configService.loadConfig(workingDirectory) }
-            verify(exactly = 1) { engineFactory.create(emptyAdapters, workingDirectory) }
+            verify(exactly = 1) { engineFactory.create(emptyAdapters, workingDirectory, variables) }
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
     }

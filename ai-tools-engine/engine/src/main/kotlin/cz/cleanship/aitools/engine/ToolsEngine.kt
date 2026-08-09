@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine
 
+import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
 import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
@@ -39,11 +40,16 @@ import java.io.File
  * `deploy.directory` resolves against it - see [resolveDeclaredPath] - so it is the same base the `locations.*`
  * paths of that same `config.yml` already use. It is required rather than defaulted because the adapters delete
  * under whatever it resolves to, which is not a decision to make by omission.
+ * @param variables the variables of the run, which `deploy.directory` is substituted with before it is resolved -
+ * see [VariableResolver]. They are the ones the config files of the run declared, so a project manifest reads the
+ * same variables the `locations.*` of that run did. The default declares none and falls back to the environment of
+ * the process, which is what an engine built without a config sees.
  */
 class ToolsEngine(
     private val workingDirectory: File,
     private val loaderService: LoaderService = LoaderService(),
     private val filterService: FilterService = FilterService(),
+    private val variables: VariableResolver = VariableResolver(),
     private val tools: List<ToolAdapter> = listOf(
         WindsurfAdapter(),
         AntigravityAdapter(),
@@ -72,6 +78,8 @@ class ToolsEngine(
      *
      * @throws ExportFailedException if at least one manifest could not be exported or at least one project was
      * left out because its ids collide
+     * @throws cz.cleanship.aitools.engine.env.VariableSubstitutionException if a `deploy.directory` references a
+     * variable that nothing declares, which stops the run rather than being collected - see [deployDirectoryOf]
      * @throws cz.cleanship.aitools.engine.services.DuplicateManifestIdException if manifests shared by every
      * project declare the same id, which no project can be exported around
      */
@@ -112,7 +120,7 @@ class ToolsEngine(
                 if (adapters.isEmpty()) continue
                 LOG.info("Processing project {}", projectManifest.id)
                 val project = assembleProject(projectManifest, allData)
-                val destination = workingDirectory.resolveDeclaredPath(projectManifest.deploy.directory)
+                val destination = workingDirectory.resolveDeclaredPath(deployDirectoryOf(projectManifest))
                 for (adapter in adapters) {
                     failures += exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments)
                 }
@@ -124,6 +132,24 @@ class ToolsEngine(
             }
         }
     }
+
+    /**
+     * Returns the `deploy.directory` of [projectManifest] with the variables of the run expanded, still as declared
+     * - relative or absolute - so that [resolveDeclaredPath] decides the base afterwards and a variable is free to
+     * supply an absolute one.
+     *
+     * A variable nothing declares aborts the run here rather than being collected like the authoring errors of
+     * [exportOrCollectFailure]: it is a fault in the configuration of the run, not in one manifest, so every project
+     * behind this one would fail on the very same missing name. Aborting before an adapter has seen the destination
+     * also means nothing was written, and nothing was deleted, under a path that would have held the reference itself.
+     *
+     * @throws cz.cleanship.aitools.engine.env.VariableSubstitutionException if the declared directory references a
+     * variable that neither the config files nor the environment of the run declare
+     */
+    private fun deployDirectoryOf(projectManifest: ProjectManifest): String = variables.substitute(
+        projectManifest.deploy.directory,
+        origin = "deploy.directory of project '${projectManifest.id}'",
+    )
 
     /**
      * Builds the project that is exported: every manifest of [allData] that survives the filter [projectManifest]
