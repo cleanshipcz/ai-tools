@@ -45,24 +45,17 @@ class ConfigService(
         // config.yml and config.local.yml are defaults that can be overriden based on the strategy
         // default strategy, key=merge -> config, then config.local, then provided (just like config vs config.local)
         // key=override -> provided config is the only relevant (this is when e.g. I want to deploy only a specific subset of projects/tools)
-        val defaultConfig = loadConfigFile(File(workingDirectory, "config.yml"))
-            ?: throw FileNotFoundException("Missing default config file: ${File(workingDirectory, "config.yml").absolutePath}")
-        val localConfig = loadConfigFile(File(workingDirectory, "config.local.yml")) ?: ConfigManifest()
+        val defaultConfig = loadConfigFile(File(workingDirectory, DEFAULT_CONFIG_FILE))
+            ?: throw FileNotFoundException("Missing default config file: ${File(workingDirectory, DEFAULT_CONFIG_FILE).absolutePath}")
+        val localConfig = loadConfigFile(File(workingDirectory, LOCAL_CONFIG_FILE)) ?: ConfigManifest()
 
-        val mergedConfig = merge(defaultConfig, localConfig)
-        val locations = mergedConfig.locations ?: LocationsConfig()
-        val tools = mergedConfig.tools ?: emptyList()
-        val variables = VariableResolver(mergedConfig.envVars.orEmpty(), environment)
+        val tools = localConfig.tools ?: defaultConfig.tools ?: emptyList()
+        // Variables merge per key rather than as a whole: a local config usually redeclares the one base that differs
+        // on its machine, and replacing the whole map would silently drop the ones it agrees with.
+        val variables = VariableResolver(defaultConfig.envVars.orEmpty() + localConfig.envVars.orEmpty(), environment)
 
         return EngineConfig(
-            locations = Locations(
-                agents = resolvePaths(workingDirectory, locations.agents, variables, "agents"),
-                projects = resolvePaths(workingDirectory, locations.projects, variables, "projects"),
-                prompts = resolvePaths(workingDirectory, locations.prompts, variables, "prompts"),
-                rulesets = resolvePaths(workingDirectory, locations.rulesets, variables, "rulesets"),
-                fragments = resolvePaths(workingDirectory, locations.fragments, variables, "fragments"),
-                skills = resolvePaths(workingDirectory, locations.skills, variables, "skills"),
-            ),
+            locations = resolveLocations(workingDirectory, defaultConfig.locations, localConfig.locations, variables),
             tools = tools,
             variables = variables,
         )
@@ -76,44 +69,40 @@ class ConfigService(
         null
     }
 
-    private fun merge(default: ConfigManifest, local: ConfigManifest?): ConfigManifest {
-        if (local == null) return default
-
-        return ConfigManifest(
-            locations = mergeLocations(default.locations, local.locations),
-            tools = local.tools ?: default.tools,
-            // Variables merge per key rather than as a whole: a local config usually redeclares the one base that
-            // differs on its machine, and replacing the whole map would silently drop the ones it agrees with.
-            envVars = default.envVars.orEmpty() + local.envVars.orEmpty(),
-        )
-    }
-
-    private fun mergeLocations(default: LocationsConfig?, local: LocationsConfig?): LocationsConfig? {
-        if (default == null) return local
-        if (local == null) return default
-
-        return LocationsConfig(
-            agents = local.agents ?: default.agents,
-            projects = local.projects ?: default.projects,
-            prompts = local.prompts ?: default.prompts,
-            rulesets = local.rulesets ?: default.rulesets,
-            fragments = local.fragments ?: default.fragments,
-            skills = local.skills ?: default.skills,
-        )
-    }
-
     /**
-     * @param field the key of `locations` these [paths] were declared under, named in a substitution failure so the
-     * author is told which list to fix
+     * Resolves every `locations.*` list into the directories the run reads manifests from, substituting the variables
+     * of the run into each entry first.
+     *
+     * A list is taken whole from the one file that declares it - `config.local.yml` when it declares one, `config.yml`
+     * otherwise - rather than being merged entry by entry. That is what lets a substitution failure name the single
+     * file the offending value was written in, instead of both candidates.
      */
-    private fun resolvePaths(
+    private fun resolveLocations(
         workingDirectory: File,
-        paths: List<String>?,
+        default: LocationsConfig?,
+        local: LocationsConfig?,
         variables: VariableResolver,
-        field: String,
-    ): List<File> = paths?.map { path -> workingDirectory.resolveDeclaredPath(variables.substitute(path, origin = "locations.$field of config.yml or config.local.yml")) } ?: emptyList()
+    ): Locations {
+        fun resolve(field: String, select: (LocationsConfig) -> List<String>?): List<File> {
+            val declaredLocally = local?.let(select)
+            val declared = declaredLocally ?: default?.let(select) ?: return emptyList()
+            val declaredIn = if (declaredLocally != null) LOCAL_CONFIG_FILE else DEFAULT_CONFIG_FILE
+            return declared.map { path -> workingDirectory.resolveDeclaredPath(variables.substitute(path, origin = "locations.$field of $declaredIn")) }
+        }
+
+        return Locations(
+            agents = resolve("agents") { it.agents },
+            projects = resolve("projects") { it.projects },
+            prompts = resolve("prompts") { it.prompts },
+            rulesets = resolve("rulesets") { it.rulesets },
+            fragments = resolve("fragments") { it.fragments },
+            skills = resolve("skills") { it.skills },
+        )
+    }
 
     companion object {
+        private const val DEFAULT_CONFIG_FILE = "config.yml"
+        private const val LOCAL_CONFIG_FILE = "config.local.yml"
         private val LOG = LoggerFactory.getLogger(ConfigService::class.java)
     }
 }

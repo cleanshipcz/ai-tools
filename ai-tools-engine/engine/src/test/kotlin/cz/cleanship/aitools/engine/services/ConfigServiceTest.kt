@@ -186,6 +186,62 @@ class ConfigServiceTest {
         }
 
         @Test
+        fun `should expand a variable that only the local config declares`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            // - the shared config references a variable it leaves to each machine to declare
+            File(tempDir, "config.yml").writeText(
+                """
+                env_vars:
+                  TEAM: "platform"
+                locations:
+                  agents:
+                    - "${variableReference("ROOT")}/agents/${variableReference("TEAM")}"
+                """.trimIndent(),
+            )
+            File(tempDir, "config.local.yml").writeText(
+                """
+                env_vars:
+                  ROOT: "${tempDir.absolutePath}/local-only"
+                """.trimIndent(),
+            )
+
+            // when
+            val (locations) = service.loadConfig(tempDir)
+
+            // then
+            assertThat(locations.agents).containsExactly(File(tempDir, "local-only/agents/platform"))
+        }
+
+        @Test
+        fun `should expand a local variable when the default config declares none at all`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            // - a config written before this feature existed, beside a local config that adds the variables
+            File(tempDir, "config.yml").writeText(
+                """
+                locations:
+                  agents:
+                    - "${variableReference("ROOT")}/agents"
+                """.trimIndent(),
+            )
+            File(tempDir, "config.local.yml").writeText(
+                """
+                env_vars:
+                  ROOT: "${tempDir.absolutePath}/from-local"
+                """.trimIndent(),
+            )
+
+            // when
+            val (locations) = service.loadConfig(tempDir)
+
+            // then
+            assertThat(locations.agents).containsExactly(File(tempDir, "from-local/agents"))
+        }
+
+        @Test
         fun `should read a variable from the process environment when no config declares it`(
             @TempDir tempDir: File,
         ) {
@@ -249,8 +305,39 @@ class ConfigServiceTest {
             assertThat(error)
                 .isInstanceOf(UnresolvedVariableException::class.java)
                 .hasMessageContaining("MISSING_ROOT")
-                // - the field the reference was read from is named, so the author knows where to look
-                .hasMessageContaining("locations.agents")
+                // - the field is named together with the one file that declared it, not both candidates
+                .hasMessageContaining("locations.agents of config.yml")
+        }
+
+        @Test
+        fun `should name the local config in the failure when it declared the failing location`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            // - a location list is taken whole from one file, and here the local config replaced the default one
+            File(tempDir, "config.yml").writeText(
+                """
+                locations:
+                  agents:
+                    - "agents_default"
+                """.trimIndent(),
+            )
+            File(tempDir, "config.local.yml").writeText(
+                """
+                locations:
+                  agents:
+                    - "${variableReference("MISSING_ROOT")}/agents"
+                """.trimIndent(),
+            )
+
+            // when
+            val error = runCatching { service.loadConfig(tempDir) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(UnresolvedVariableException::class.java)
+                .hasMessageContaining("MISSING_ROOT")
+                .hasMessageContaining("locations.agents of config.local.yml")
         }
 
         @Test

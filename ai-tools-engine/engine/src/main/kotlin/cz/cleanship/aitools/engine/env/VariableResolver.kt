@@ -39,29 +39,40 @@ fun interface EnvironmentSource {
  * artifacts, so a literal `${NAME}` reaching that far would write to - and clear out - a directory named after the
  * mistake rather than after the intent.
  *
- * Expansion is single-pass. Nested expansion is out of scope, so a variable whose own value carries a reference fails
- * with [NestedVariableReferenceException] rather than being expanded further; failing is what keeps the alternative,
- * a path quietly holding a literal `${...}`, from ever being deployed to. One pass also cannot loop, not even when a
+ * Expansion is single-pass, and nested expansion is out of scope. A reference that survives that one pass therefore
+ * fails with [UnexpandedReferenceException] rather than being expanded further, which is what keeps the alternative -
+ * a path quietly holding a literal `${...}` - from ever being deployed to. One pass also cannot loop, not even when a
  * variable refers to itself.
  */
-class VariableResolver(
+data class VariableResolver(
     private val variables: Map<String, String> = emptyMap(),
     private val environment: EnvironmentSource = EnvironmentSource.PROCESS,
 ) {
 
     /**
+     * The declared variables as they stood when this resolver was built. Copied, so that a map the caller still holds
+     * cannot change what a path resolves to later in the run, while equality keeps comparing what was declared.
+     */
+    private val declared = variables.toMap()
+
+    /**
      * Returns [value] with every reference it carries expanded.
      *
      * @param origin where [value] was declared, named in a failure so that the author is told which field to fix -
-     * for example `locations.agents of config.yml or config.local.yml`, or `deploy.directory of project 'ai-tools'`
+     * for example `locations.agents of config.yml`, or `deploy.directory of project 'ai-tools'`
      * @throws UnresolvedVariableException if a referenced variable is declared neither by the config nor by the environment
-     * @throws NestedVariableReferenceException if a referenced variable expands to a value carrying a reference of its own
+     * @throws UnexpandedReferenceException if a reference survives the one pass this resolver makes
      */
-    fun substitute(value: String, origin: String? = null): String = REFERENCE.replace(value) { reference ->
-        val name = reference.groupValues[1]
-        val expansion = variables[name] ?: environment.read(name) ?: throw UnresolvedVariableException(name, value, origin)
-        if (REFERENCE.containsMatchIn(expansion)) throw NestedVariableReferenceException(name, expansion, value, origin)
-        expansion
+    fun substitute(value: String, origin: String? = null): String {
+        val substituted = REFERENCE.replace(value) { reference ->
+            val name = reference.groupValues[1]
+            declared[name] ?: environment.read(name) ?: throw UnresolvedVariableException(name, value, origin)
+        }
+        // The result is checked as a whole rather than each expansion on its own, because an expansion can also
+        // assemble a reference together with the text around it: a variable holding a bare dollar turns the `{NAME}`
+        // written after it into a reference that no expansion ever looked at.
+        val leftover = REFERENCE.find(substituted) ?: return substituted
+        throw UnexpandedReferenceException(leftover.groupValues[1], substituted, value, origin)
     }
 
     companion object {
@@ -88,17 +99,20 @@ class UnresolvedVariableException(
     )
 
 /**
- * Thrown when a referenced variable expands to a value carrying a reference of its own, which this single-pass
- * substitution deliberately does not expand - see [VariableResolver].
+ * Thrown when a `${NAME}` reference survives the single pass [VariableResolver] makes, which happens when a variable
+ * carries a reference in its own value and when an expansion assembles one together with the text around it. Either
+ * way the reference is left unexpanded, and a path is never deployed to carrying one.
+ *
+ * @param variable the name of the reference that survived, which is not necessarily the one [value] asked for
  */
-class NestedVariableReferenceException(
+class UnexpandedReferenceException(
     val variable: String,
-    val expansion: String,
+    val substituted: String,
     val value: String,
     val origin: String? = null,
 ) : VariableSubstitutionException(
-        "Variable '$variable' expands to \"$expansion\", which carries a reference of its own, and nested expansion is not supported. " +
-            "Declare '$variable' with an already expanded value. Referenced in \"$value\"${origin.readFrom()}.",
+        "Unexpanded reference '\${$variable}' left after substituting \"$value\"${origin.readFrom()}, which produced \"$substituted\". " +
+            "Nested expansion is not supported: declare every variable with a value that is already expanded.",
     )
 
 private fun String?.readFrom() = this?.let { ", read from $it" } ?: ""

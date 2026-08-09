@@ -110,6 +110,36 @@ class VariableResolverTest {
     }
 
     @Nested
+    inner class Construction {
+
+        @Test
+        fun `should keep resolving what it was built with when the map it was given changes afterwards`() {
+            // given
+            val declared = mutableMapOf("ROOT" to "/first")
+            val resolver = VariableResolver(declared, environment)
+
+            // when
+            declared["ROOT"] = "/second"
+
+            // then
+            assertThat(resolver.substitute("\${ROOT}/agents")).isEqualTo("/first/agents")
+        }
+
+        @Test
+        fun `should equal a resolver declaring the same variables and reading the same environment`() {
+            // given
+            // - the configuration of a run carries a resolver, so two configurations declaring the same must compare equal
+            val resolver = VariableResolver(mapOf("ROOT" to "/root"), environment)
+            val same = VariableResolver(mapOf("ROOT" to "/root"), environment)
+            val different = VariableResolver(mapOf("ROOT" to "/elsewhere"), environment)
+
+            // then
+            assertThat(resolver).isEqualTo(same).hasSameHashCodeAs(same)
+            assertThat(resolver).isNotEqualTo(different)
+        }
+    }
+
+    @Nested
     inner class Precedence {
 
         @Test
@@ -184,7 +214,7 @@ class VariableResolverTest {
         }
 
         @Test
-        fun `should fail naming the variable when its own value carries a reference`() {
+        fun `should fail naming the reference left over when a value carries one of its own`() {
             // given
             // - nested expansion is out of scope, and expanding one level would leave a literal reference in a path
             val resolver = VariableResolver(
@@ -197,9 +227,10 @@ class VariableResolverTest {
 
             // then
             assertThat(error)
-                .isInstanceOf(NestedVariableReferenceException::class.java)
+                .isInstanceOf(UnexpandedReferenceException::class.java)
+                // - the value the author wrote is quoted back, so the variable they need to fix is in the message
                 .hasMessageContaining("OUTER")
-            assertThat((error as NestedVariableReferenceException).variable).isEqualTo("OUTER")
+            assertThat((error as UnexpandedReferenceException).variable).isEqualTo("INNER")
         }
 
         @Test
@@ -211,7 +242,25 @@ class VariableResolverTest {
             val error = runCatching { resolver.substitute("\${SELF}") }.exceptionOrNull()
 
             // then
-            assertThat(error).isInstanceOf(NestedVariableReferenceException::class.java)
+            assertThat(error).isInstanceOf(UnexpandedReferenceException::class.java)
+        }
+
+        @Test
+        fun `should fail when an expansion assembles a reference with the text around it`() {
+            // given
+            // - a value expanding to a bare dollar turns the '{HOME}' written after it into a reference no pass will
+            //   expand, which is the one way a single pass could still hand a literal '${...}' to a deploy
+            environmentVariables["HOME"] = "/home/user"
+            val resolver = VariableResolver(mapOf("DOLLAR" to "$"), environment)
+
+            // when
+            val error = runCatching { resolver.substitute("\${DOLLAR}{HOME}/projects") }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(UnexpandedReferenceException::class.java)
+                .hasMessageContaining("HOME")
+            assertThat((error as UnexpandedReferenceException).variable).isEqualTo("HOME")
         }
     }
 }

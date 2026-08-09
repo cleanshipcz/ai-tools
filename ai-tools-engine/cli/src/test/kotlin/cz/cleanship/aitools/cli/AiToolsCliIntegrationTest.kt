@@ -117,6 +117,47 @@ class AiToolsCliIntegrationTest {
     }
 
     @Test
+    fun `should fail with the variable name when a deploy directory references an undeclared variable`() {
+        // given
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              projects:
+                - "projects"
+            tools:
+              - claude
+            """.trimIndent(),
+        )
+        val projectFile = File(tempDir, "projects/test-project/project.yml")
+        projectFile.parentFile.mkdirs()
+        projectFile.writeText(
+            """
+            id: test-project
+            description: A project
+            metadata:
+              version: 1.0.0
+            context:
+              documentation:
+                readme: README.md
+            deploy:
+              directory: "${variableReference("AI_TOOLS_UNDECLARED_TEST_FOLDER")}/custom-ai-tools"
+            """.trimIndent(),
+        )
+        val cli = AiToolsCli()
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        // - the run reports on stderr and exits non-zero rather than failing with a stack trace
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessageContaining("AI_TOOLS_UNDECLARED_TEST_FOLDER")
+            .hasMessageContaining("test-project")
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
     fun `should fail with the variable name when a declared path references an undeclared variable`() {
         // given
         // - a name no config file and no environment of a test machine declares
