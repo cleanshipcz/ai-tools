@@ -38,13 +38,22 @@ data class Version(
     companion object {
         fun parse(version: String): Version {
             val pattern = Regex("""^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$""")
-            val match = pattern.matchEntire(version) ?: throw IllegalArgumentException("Invalid version format: $version. Expected MAJOR.MINOR.PATCH(-SUFFIX)")
+            val match = pattern.matchEntire(version) ?: throw InvalidVersionException(version)
 
             val (major, minor, patch, suffix) = match.destructured
             return Version(major.toInt(), minor.toInt(), patch.toInt(), suffix.ifBlank { null })
         }
     }
 }
+
+/**
+ * Thrown when a version string does not follow `MAJOR.MINOR.PATCH(-SUFFIX)`. It remains an
+ * [IllegalArgumentException] so existing callers keep the contract they were written against, while being named
+ * lets the manifest loader recognise it and report the file that carries the malformed version.
+ */
+class InvalidVersionException(
+    val version: String,
+) : IllegalArgumentException("Invalid version format: $version. Expected MAJOR.MINOR.PATCH(-SUFFIX)")
 
 fun String.toVersion(): Version = Version.parse(this)
 

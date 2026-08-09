@@ -6,7 +6,6 @@ plugins {
 
 dependencies {
     implementation(project(":engine"))
-    implementation(project(":utils"))
     implementation(project(":telemetry"))
 
     implementation(libs.ktorServerCore)

@@ -14,6 +14,7 @@ rules:
   - "Document class invariants and contract conditions."
   - "Use inline comments for complex logic within implementations."
   - "Document configuration options and environment variables."
+  - "Keep documentation accurate and up-to-date by verifying against actual implementation."
 metadata:
   version: 1.0.0
   author: "AI Tools Team"

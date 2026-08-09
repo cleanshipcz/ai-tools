@@ -47,7 +47,7 @@ prompt: |
   - For every optional specialist, record a one-line justification whether engaged or skipped
     (example: "engaged reviewer-security: change parses external input").
   - Describe outcomes and constraints only; never prescribe classes, methods, or file structure.
-  - Save the plan to .delivery/<run-slug>/plan.md and commit it.
+  - Save the plan to .tmp/<run-slug>/plan.md and commit it.
   - Interactive session: present the plan summary and wait for approval before Phase 4.
 
   Phase 4: Implement
@@ -62,7 +62,7 @@ prompt: |
   - Spawn optional reviewers per the staffing decisions
     (reviewer-security, reviewer-api, reviewer-architecture, reviewer-documentation).
   - Route findings to a developer agent to fix, then re-review.
-  - Every finding MUST end as resolved, or waived with a written rationale in .delivery/<run-slug>/.
+  - Every finding MUST end as resolved, or waived with a written rationale in .tmp/<run-slug>/.
 
   Phase 6: Verify
   - Run the target project's own verification commands as defined by its rules or CLAUDE.md
@@ -74,19 +74,19 @@ prompt: |
     public surface or user-facing behavior changed, per the staffing decisions.
 
   Phase 8: Deliver
-  - Write the delivery report to .delivery/<run-slug>/report.md: what was delivered, staffing
+  - Write the delivery report to .tmp/<run-slug>/report.md: what was delivered, staffing
     decisions taken, gate outcomes, waived findings with rationales.
   - Commit all work on the feature branch and stop.
 
   FAILURE HANDLING
   If any gate cannot be satisfied within the 3-iteration budget, stop delivering.
-  Commit the current state and write a handoff report to .delivery/<run-slug>/report.md instead:
+  Commit the current state and write a handoff report to .tmp/<run-slug>/report.md instead:
   what was attempted, what passed, what is failing and why, and the recommended next action.
 
   DELIVERABLES
   1. A feature branch with the implemented, reviewed, and verified change.
-  2. .delivery/<run-slug>/plan.md — plan with staffing decisions and justifications.
-  3. .delivery/<run-slug>/report.md — delivery report, or handoff report on failure.
+  2. .tmp/<run-slug>/plan.md — plan with staffing decisions and justifications.
+  3. .tmp/<run-slug>/report.md — delivery report, or handoff report on failure.
 constraints:
   - "NEVER implement, fix, or edit production code yourself — route every code change through a developer agent."
   - "NEVER skip the review or verification gates, regardless of change size."

@@ -30,7 +30,11 @@ context:
   rules:
     - Verify correct output for ai-tools-engine project with running `./gradlew clean build`, focus on running ktlint and detekt
 deploy:
-  directory: "/home/blaha/Documents/Projects/ai-tools/"
+  # This project deploys onto the ai-tools repository itself.
+  # Relative paths are resolved against `--working-dir`, which `deploy.sh` sets to
+  # the repository root, so `.` is that root regardless of how the engine is launched.
+  # Use an absolute path for any project outside this repository.
+  directory: "."
   agents:
     filter:
       - type: tags
@@ -51,7 +55,7 @@ deploy:
           - docs-document-api
           - docs-write-readme
           - docs-create-tutorial
-          - ocs-summarize-pr
+          - docs-summarize-pr
           - planning-design-architecture
           - planning-create-implementation-plan
           - planning-tech-decision-record

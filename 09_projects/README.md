@@ -4,6 +4,15 @@
 
 This guide explains how to use the Projects feature to create customized AI tool configurations for your specific projects.
 
+> **Status: partially outdated.** This guide still largely describes the retired TypeScript CLI.
+> The `npm run project:*` commands, the separate `deploy.yml`, `deploy.local.yml`, and the
+> `projects/global/template/` scaffold **no longer exist**. The current engine has a single
+> command, `./deploy.sh`, and all deployment settings live in the `deploy:` block of `project.yml`.
+>
+> The "Project Sources Configuration" section below is accurate and has been updated.
+> For everything else, treat [../README.md](../README.md) and [../QUICKREF.md](../QUICKREF.md)
+> as authoritative until this guide gets a full pass.
+
 ---
 
 ## Table of Contents
@@ -105,96 +114,52 @@ You'll see:
 
 ### Project Sources Configuration
 
-**Configurable Project Locations** (`15_config/config.yml` + `config.local.yml`)
+**Configurable Project Locations** (`config.yml` + `config.local.yml`, in the repository root)
 
-The system searches for projects in directories defined in configuration files. This allows you to:
-
-- **Share team sources**: Define common paths in `config.yml` (versioned)
-- **Add personal sources**: Define your own paths in `config.local.yml` (gitignored)
-- **Support multiple repositories**: Include projects from other repos
-- **Maintain flexibility**: Use relative or absolute paths
+The engine searches for projects in the directories listed under `locations.projects`.
+A project is any directory containing a `project.yml`; the search is recursive.
 
 **Configuration Files:**
 
-1. **`15_config/config.yml`** (versioned, shared)
-   - Contains project sources for the entire team
-   - Committed to git
-   - Should include shared project locations
+1. **`config.yml`** (versioned, shared) - the project locations used by everyone
+2. **`config.local.yml`** (gitignored, personal) - your machine-local overrides
 
-2. **`15_config/config.local.yml`** (gitignored, personal)
-   - Contains your personal project sources
-   - NOT committed to git
-   - Create from `config.local.yml.example` template
+Both live in the repository root. There is no `15_config/` directory, and the engine does not read one.
 
 **Default Configuration (`config.yml`):**
 
 ```yaml
-project_sources:
-  - ./09_projects/global # Versioned, shared projects
-  - ./09_projects/local # Local, gitignored projects
+locations:
+  projects:
+    - "09_projects"
 ```
 
 **Adding Personal Sources (`config.local.yml`):**
 
-Create `15_config/config.local.yml` to add your personal project locations:
-
 ```yaml
-project_sources:
-  - /home/myuser/personal-projects
-  - /absolute/path/to/client-projects
-  - ../other-repo/projects
+locations:
+  projects:
+    - "09_projects"
+    - "../ai-tools-projects/projects"
 ```
 
 **Configuration Merging:**
 
-When both files exist, they are merged using these rules:
+Each key is **replaced wholesale**, not merged element-wise.
+If `config.local.yml` defines `locations.projects`, that list fully replaces the one in `config.yml` - so you must repeat any default entry you still want, as the example above repeats `09_projects`.
 
-- **Scalars** (strings, numbers): `config.local.yml` takes priority
-- **Lists** (arrays): Both lists are merged, duplicates removed
-  - Result: `config.yml` sources + `config.local.yml` sources
-- **Maps** (objects): Recursively merged, `config.local.yml` takes priority for conflicts
-
-**Example Merge:**
-
-If `config.yml` has:
-
-```yaml
-project_sources:
-  - ./09_projects/global
-  - ./09_projects/local
-```
-
-And `config.local.yml` has:
-
-```yaml
-project_sources:
-  - /home/user/my-projects
-  - ../external-projects
-```
-
-**Result:**
-
-```yaml
-project_sources:
-  - ./09_projects/global
-  - ./09_projects/local
-  - /home/user/my-projects
-  - ../external-projects
-```
+The same applies to the other `locations` entries and to the `tools` list.
 
 **Path Types:**
 
-- **Relative**: Resolved relative to repository root (e.g., `./09_projects/global`)
-- **Absolute**: Full file system paths (e.g., `/home/user/projects`)
+- **Relative**: resolved against the directory passed to `--working-dir`, i.e. the repository root (e.g. `09_projects`)
+- **Absolute**: used as given (e.g. `/home/user/projects`)
 
-**Commands Using Configuration:**
+**When Configuration Is Used:**
 
-The system searches these directories when:
+Every project found under these locations is processed on each `./deploy.sh` run, and written to its own `deploy.directory`.
+There is no command to list, generate, or deploy a single project.
 
-- Listing projects (`npm run project:list`)
-- Loading projects for generation (`npm run project:generate`)
-- Deploying projects (`npm run project:deploy`)
-- Validating manifests (`npm run validate`)
 
 ### Global vs Local Projects
 

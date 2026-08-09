@@ -3,6 +3,7 @@ package cz.cleanship.aitools.engine.services
 import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
+import cz.cleanship.aitools.engine.io.resolveDeclaredPath
 import cz.cleanship.aitools.engine.models.ConfigManifest
 import cz.cleanship.aitools.engine.models.EngineConfig
 import cz.cleanship.aitools.engine.models.Locations
@@ -77,14 +78,8 @@ class ConfigService {
         )
     }
 
-    private fun resolvePaths(workingDirectory: File, paths: List<String>?): List<File> = paths?.map { path ->
-        val file = File(path)
-        if (file.isAbsolute) {
-            file
-        } else {
-            File(workingDirectory, path).absoluteFile
-        }
-    } ?: emptyList()
+    private fun resolvePaths(workingDirectory: File, paths: List<String>?): List<File> =
+        paths?.map(workingDirectory::resolveDeclaredPath) ?: emptyList()
 
     companion object {
         private val LOG = LoggerFactory.getLogger(ConfigService::class.java)

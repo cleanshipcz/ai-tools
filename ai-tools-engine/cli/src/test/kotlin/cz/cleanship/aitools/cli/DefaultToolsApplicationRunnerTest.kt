@@ -61,7 +61,7 @@ class DefaultToolsApplicationRunnerTest {
             every { configService.loadConfig(workingDirectory) } returns config
             every { toolAdapterFactory.create(ToolType.CLAUDE) } returns claudeAdapter
             every { toolAdapterFactory.create(ToolType.CODEX) } returns codexAdapter
-            every { engineFactory.create(listOf(claudeAdapter, codexAdapter)) } returns engineProcessor
+            every { engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory) } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
@@ -71,7 +71,7 @@ class DefaultToolsApplicationRunnerTest {
             verify(exactly = 1) { configService.loadConfig(workingDirectory) }
             verify(exactly = 1) { toolAdapterFactory.create(ToolType.CLAUDE) }
             verify(exactly = 1) { toolAdapterFactory.create(ToolType.CODEX) }
-            verify(exactly = 1) { engineFactory.create(listOf(claudeAdapter, codexAdapter)) }
+            verify(exactly = 1) { engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory) }
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
     }
@@ -98,7 +98,7 @@ class DefaultToolsApplicationRunnerTest {
             val emptyAdapters = emptyList<ToolAdapter>()
 
             every { configService.loadConfig(workingDirectory) } returns config
-            every { engineFactory.create(emptyAdapters) } returns engineProcessor
+            every { engineFactory.create(emptyAdapters, workingDirectory) } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
@@ -106,7 +106,7 @@ class DefaultToolsApplicationRunnerTest {
 
             // then
             verify(exactly = 1) { configService.loadConfig(workingDirectory) }
-            verify(exactly = 1) { engineFactory.create(emptyAdapters) }
+            verify(exactly = 1) { engineFactory.create(emptyAdapters, workingDirectory) }
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
     }
