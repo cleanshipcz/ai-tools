@@ -79,7 +79,7 @@
       "properties": {
         "directory": {
           "type": "string",
-          "description": "Target directory for deployment"
+          "description": "Target directory for deployment. A '${NAME}' reference is expanded from the variables declared under 'env_vars' in config.local.yml, then config.yml, then the environment of the process, before the value is resolved as a relative or absolute path - so a variable may supply the absolute base. A referenced variable that is declared nowhere fails the run."
         },
         "replace": {
           "type": "boolean",

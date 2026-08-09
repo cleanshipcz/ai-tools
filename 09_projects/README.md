@@ -149,11 +149,45 @@ Each key is **replaced wholesale**, not merged element-wise.
 If `config.local.yml` defines `locations.projects`, that list fully replaces the one in `config.yml` - so you must repeat any default entry you still want, as the example above repeats `09_projects`.
 
 The same applies to the other `locations` entries and to the `tools` list.
+The one key that does merge element-wise is `env_vars`, described below.
 
 **Path Types:**
 
 - **Relative**: resolved against the directory passed to `--working-dir`, i.e. the repository root (e.g. `09_projects`)
 - **Absolute**: used as given (e.g. `/home/user/projects`)
+
+**Path Variables:**
+
+Every entry under `locations`, and every project's `deploy.directory`, may reference a variable as `${NAME}`.
+Variables are declared under the top-level `env_vars` key of either config file:
+
+```yaml
+# config.local.yml
+env_vars:
+  PROJECTS_FOLDER: /home/alice/projects
+```
+
+```yaml
+# project.yml of a project that lives under that folder
+deploy:
+  directory: "${PROJECTS_FOLDER}/custom-ai-tools"
+```
+
+A name is resolved from the `env_vars` of `config.local.yml` first, then from those of `config.yml`, then from the environment of the process.
+Unlike the `locations` lists, the two `env_vars` maps merge per variable: a local declaration overrides that one variable, and variables declared in only one of the files survive.
+
+This is what makes a `project.yml` shareable. The absolute base each machine deploys under lives in the gitignored `config.local.yml`, while the versioned manifest names only the variable - so a colleague whose projects sit under a different root runs the same manifest without editing it.
+
+Substitution happens *before* the relative-vs-absolute decision above, so a variable may supply the absolute base of a value whose remainder is written as a relative fragment.
+
+A reference to a variable that is declared nowhere aborts the run with an error naming the variable, and for a location also the config file the offending value came from.
+Every project's `deploy.directory` is resolved before any project is deployed, so a typo cannot leave you with some projects deployed and others not, and nothing is ever written to a directory literally named `${...}`.
+
+Values must already be fully expanded: a variable whose own value contains `${...}`, or an expansion that assembles a new reference together with the surrounding text, is an error rather than a second substitution pass.
+Groups that are not valid references - `${1ST}`, `${A-B}`, `$NO_BRACES` - pass through as literal text.
+A name consists of letters, digits, and underscores, and may not start with a digit.
+
+Configs without `env_vars`, and paths without references, behave exactly as they did before.
 
 **When Configuration Is Used:**
 

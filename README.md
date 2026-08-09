@@ -80,6 +80,7 @@ A project is a directory under a configured `projects` location containing `proj
 
 Relative `deploy.directory` values resolve against `--working-dir`, the same base the `locations` paths of `config.yml` use — so `.` means the root of this repository and the value does not change with the launcher.
 Use an absolute path for any project outside this repository.
+`deploy.directory` may also reference a variable declared under `env_vars` in the config files, as `${NAME}`; the reference is expanded before the value is judged relative or absolute, so the variable can supply the absolute base — see [Path variables](#path-variables).
 
 Filters select which manifests reach a project. Each of `agents`, `prompts`, `rulesets`, `fragments`, `skills`, and `features` accepts a list of filters of type `tags`, `whitelist`, or `blacklist`:
 
@@ -155,6 +156,7 @@ The engine reads `config.yml` from the directory given by `--working-dir` — th
 
 Merging happens per individual key: each of the six entries under `locations`, and the `tools` list, is replaced wholesale when present in `config.local.yml`.
 Lists are never appended to, so a local `projects:` list must repeat any default entry you still want.
+The `env_vars` map is the exception — it merges per variable, so a local declaration overrides that one variable and leaves the rest of the shared map in place.
 
 ```yaml
 locations:
@@ -178,6 +180,35 @@ Every entry under `locations` is a list, so you can point at additional director
 Relative location paths resolve against the working directory; absolute paths are used as given — the same rule a project's `deploy.directory` follows.
 The `tools` list accepts exactly the six keys above, and controls which adapters run.
 An individual project can narrow itself down to a subset of them with `deploy.tools` in its `project.yml` — see [QUICKREF.md](QUICKREF.md).
+
+### Path variables
+
+The optional top-level `env_vars` key declares variables that every `locations` entry and every project's `deploy.directory` may reference as `${NAME}`:
+
+```yaml
+env_vars:
+  PROJECTS_FOLDER: /home/alice/projects
+```
+
+```yaml
+# 09_projects/<scope>/<project>/project.yml
+deploy:
+  directory: "${PROJECTS_FOLDER}/custom-ai-tools"
+```
+
+A name is looked up in the `env_vars` of `config.local.yml` first, then in those of `config.yml`, and finally in the environment of the process.
+The typical use is the one above: the machine-specific absolute base lives in the gitignored `config.local.yml`, and the shared `project.yml` files only name the variable, so the same manifest works on a machine whose checkout sits somewhere else.
+
+References are expanded before a path is judged relative or absolute, which is what lets a variable carry an absolute base for a value whose remainder is written as a fragment.
+
+A reference to a variable declared nowhere fails the run, naming the variable — and, for a location, the file that declared the offending value.
+Every project's `deploy.directory` is resolved up front, before any project is deployed, so a broken reference cannot leave a run half-deployed, and nothing is ever written to a directory literally named `${...}`.
+
+Variable values must already be fully expanded: a value that itself contains `${...}`, or an expansion that assembles a new reference together with the text around it, is an error rather than a second substitution pass.
+A `${...}` group that is not a valid reference — `${1ST}`, `${A-B}`, or a braceless `$NO_BRACES` — is left exactly as written, so a path is free to contain one.
+A name is made of letters, digits, and underscores, and may not start with a digit.
+
+Configs without `env_vars`, and paths without references, behave exactly as they did before.
 
 ## Not Yet Implemented
 
