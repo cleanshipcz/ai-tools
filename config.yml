@@ -19,3 +19,7 @@ tools:
   - claude
   - codex
   - cursor
+
+env_vars:
+  HOME_FOLDER: ~
+  PROJECTS_FOLDER: ~/Documents/Projects
