@@ -30,6 +30,10 @@
 - prompts webpage supported
 - should it be somehow interconnected? Maybe CRUD server? Or just a webpage?
 
+## Relative location
+
+- add support for env variables to define absolute base, then projects can reference that variable -> requires only a local .env file
+
 ## MCPs
 
 - add support for MCPs
@@ -47,3 +51,56 @@
 ## Separate DAO and service layers
 
 - this will allow hierarchical definitions and better validation
+
+## Deployment
+
+- deploy local/global skills
+- deploy local/global mcps
+- custom destinations
+
+## Known issues
+
+Raised by the analysis and code review in `.delivery/project-improvements/`. Not fixed there, with reasons.
+
+### Manifest validation is not enforced anywhere
+
+- The old npm CI ran `npm run validate`. There is no Gradle equivalent, so nothing validates manifests today.
+- The JSON schemas in `10_schemas/` cannot serve as-is: three have drifted from the Kotlin models, and
+  `skill.schema.json` describes a completely different shape (`command`, `timeout_sec`, `retry`) from
+  `SkillManifest` (`sections`, `files`).
+- Fix: realign the schemas with the data classes, then wire validation into the Gradle build so it is enforced
+  by the same gate as ktlint and detekt and cannot drift again.
+
+### SonarCloud and CodeQL workflows never run
+
+- Both live in `ai-tools-engine/.github/workflows/`, but `ai-tools-engine` is a plain subdirectory rather than a
+  submodule, and GitHub Actions only reads workflows from the repository root. They have never executed.
+- Moving them as-is is not enough: they need `defaults.run.working-directory: ai-tools-engine`, and Sonar's
+  `projectBaseDir` currently points away from `sonar-project.properties`.
+- Also requires confirming the `cleanshipcz_ai-tools` project and `SONAR_TOKEN` exist, or relocating them just
+  turns a dormant workflow into a failing check on every pull request.
+- Alternative: delete them and stop implying the project has Sonar and CodeQL coverage.
+
+### `prepare()` swallows cleanup failures
+
+- All six adapters discard the `Boolean` returned by `deleteRecursively()`, which does not throw on failure.
+- With `deploy.replace: true`, a permission error during cleanup is silently ignored: stale files from a previous
+  run survive and mix with new output while the run reports success.
+- Pre-existing, and the one genuinely swallowed failure left in the export path.
+
+### Smaller items
+
+- Export writes use `Files.move` without `ATOMIC_MOVE`, and without `fsync` before the rename, so a power loss
+  (not a process crash) can still leave a truncated file. A JVM kill between temp-file creation and the move
+  strands a `*.tmp` in the output directory.
+- `copySkillFiles` uses `copyTo`, which is not atomic, so skill companion files can still be left half-copied.
+- CI actions are pinned to mutable major tags; Gradle caching is configured twice; unfiltered `push` +
+  `pull_request` double-runs pull request branches.
+- `./gradlew clean build` pulls in `:server`, whose frontend shells out to `npm ci` with no `setup-node` - an
+  undeclared network dependency. `setup.sh` sidesteps it by building `:cli:build` instead.
+- `90_docs/` still references the deleted `15_config/`, and `README.md` and `QUICKREF.md` link
+  `90_docs/TOOLS.md` as authoritative while it still documents `.output/`, `.backups/` and `deploy.yml`.
+- `90_docs/AGENTS.md` is tracked while matching the `AGENTS.md` ignore pattern.
+- `07_mcp/github/` is a 4.4 MB vendored copy of `github/github-mcp-server`, 438 of the repository's tracked
+  files. Git history shows it was forked deliberately, so it was left alone - but keep, submodule, or drop is
+  an open decision.
