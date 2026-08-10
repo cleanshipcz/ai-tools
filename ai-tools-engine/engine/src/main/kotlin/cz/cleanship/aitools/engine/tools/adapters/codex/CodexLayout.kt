@@ -27,7 +27,8 @@ internal class CodexLayout(
 
     fun featureFile(featureId: String): File = toolDir.resolve("features").resolve("feature-$featureId.md")
 
-    private val skillsDir: File get() = toolDir.resolve("skills")
+    /** The directory holding every skill-shaped artifact of this scope, which a deploy writes into but never removes. */
+    val skillsDir: File get() = toolDir.resolve("skills")
 
     companion object {
         fun ofProject(projectDir: File) = CodexLayout(

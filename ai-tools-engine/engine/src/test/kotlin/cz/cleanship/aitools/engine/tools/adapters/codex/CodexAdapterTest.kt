@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
 import cz.cleanship.aitools.engine.data.textOnlySkill
 import cz.cleanship.aitools.engine.data.userDeployment
+import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.ProjectContext
 import cz.cleanship.aitools.engine.models.ProjectDeploy
@@ -297,6 +298,28 @@ class CodexAdapterTest {
 
             // then
             assertThat(neighbourSkill).hasContent("A skill installed by hand.\n")
+        }
+
+        @Test
+        fun `should delete nothing when the id of a skill climbs out of the skills directory`() {
+            // given
+            // - nothing validates a manifest id today, so a replacing deploy must not follow one out of its own
+            //   directory: the delete is the single irreversible thing this engine does
+            val neighbour = userHome.resolve("unrelated/notes.md")
+            neighbour.parentFile.mkdirs()
+            neighbour.writeText("Not written by any deploy.\n")
+            // - one segment more than Claude needs, because the 'skill-' prefix of this layout swallows the first one
+            val escapingSkill = textOnlySkill.copy(id = "../../../unrelated")
+            val exporter = exporterFor(userDeployment.copy(replace = true))
+
+            // when
+            val error = runCatching { exporter.export(SkillContext(escapingSkill)) }.exceptionOrNull()
+
+            // then
+            assertThat(neighbour).exists()
+            assertThat(error)
+                .isInstanceOf(ArtifactPathException::class.java)
+                .hasMessageContaining("unrelated")
         }
 
         @Test

@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine.tools.adapters.codex
 
+import cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.UserDeploymentManifest
@@ -137,23 +138,23 @@ class CodexAdapter(
         }
 
         override fun export(promptContext: PromptContext) {
-            replaceIfRequested(layout.promptDir(promptContext.prompt.id))
+            replaceIfRequested(layout.promptDir(promptContext.prompt.id), "prompt '${promptContext.prompt.id}'")
             exportPrompt(layout, promptContext)
         }
 
         override fun export(agentContext: AgentContext) {
-            replaceIfRequested(layout.agentDir(agentContext.agent.id))
+            replaceIfRequested(layout.agentDir(agentContext.agent.id), "agent '${agentContext.agent.id}'")
             exportAgent(layout, agentContext)
         }
 
         override fun export(skillContext: SkillContext) {
-            replaceIfRequested(layout.skillDir(skillContext.skill.id))
+            replaceIfRequested(layout.skillDir(skillContext.skill.id), "skill '${skillContext.skill.id}'")
             exportSkill(layout, skillContext)
         }
 
-        private fun replaceIfRequested(artifactDir: File) {
+        private fun replaceIfRequested(artifactDir: File, describedBy: String) {
             if (deployment.replace) {
-                artifactDir.deleteRecursively()
+                artifactDir.deleteArtifactDirectoryWithin(owned = layout.skillsDir, describedBy = describedBy)
             }
         }
     }

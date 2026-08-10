@@ -16,7 +16,10 @@ internal class ClaudeLayout(
     val toolDir: File,
     val instructionsFile: File,
 ) {
-    fun skillDir(skillId: String): File = toolDir.resolve("skills").resolve(skillId)
+    /** The directory holding every skill of this scope, which a deploy writes into but never removes. */
+    val skillsDir: File get() = toolDir.resolve("skills")
+
+    fun skillDir(skillId: String): File = skillsDir.resolve(skillId)
 
     fun agentFile(agentId: String): File = toolDir.resolve("agents").resolve("$agentId.md")
 
