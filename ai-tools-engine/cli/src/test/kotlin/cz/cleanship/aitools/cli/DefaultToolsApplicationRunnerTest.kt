@@ -46,7 +46,7 @@ class DefaultToolsApplicationRunnerTest {
             val workingDirectory = File("workspace")
             val locations = Locations(
                 agents = listOf(File("agents")),
-                projects = listOf(File("projects")),
+                deployments = listOf(File("deployments")),
                 prompts = listOf(File("prompts")),
                 rulesets = listOf(File("rulesets")),
                 fragments = listOf(File("fragments")),
@@ -89,7 +89,7 @@ class DefaultToolsApplicationRunnerTest {
             val workingDirectory = File("workspace")
             val locations = Locations(
                 agents = emptyList(),
-                projects = emptyList(),
+                deployments = emptyList(),
                 prompts = emptyList(),
                 rulesets = emptyList(),
                 fragments = emptyList(),

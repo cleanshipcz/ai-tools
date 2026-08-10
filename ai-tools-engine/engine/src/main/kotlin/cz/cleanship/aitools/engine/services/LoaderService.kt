@@ -15,6 +15,7 @@ import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
 import cz.cleanship.aitools.engine.models.SkillManifest
+import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.models.VersionedManifest
 import kotlinx.serialization.decodeFromString
 import java.io.File
@@ -40,6 +41,8 @@ class LoaderService {
 
     fun loadProject(file: File): ProjectManifest = yaml.load(file)
 
+    fun loadUserDeployment(file: File): UserDeploymentManifest = yaml.load(file)
+
     inline fun <reified T> Yaml.load(file: File): T {
         try {
             val content = file.readText()
@@ -60,11 +63,17 @@ class LoaderService {
      * rather than something to resolve silently. A winner is never picked behind the author's back: every manifest
      * sharing a contested id is dropped and the collision is reported, naming the id and both files.
      *
+     * The `deployments` locations hold both kinds of deployment manifest, told apart by their filename: a
+     * `project.yml` is a [ProjectManifest] and a `user.yml` a [UserDeploymentManifest]. Ids are indexed per kind, so
+     * a project and a user deployment are free to share a name - they are separate manifests of separate scopes,
+     * and nothing ever has to choose between them.
+     *
      * How far a collision reaches follows the kind of manifest, mirroring the collect-all-then-fail policy of
      * [cz.cleanship.aitools.engine.ToolsEngine]:
-     * - `projects` and per-project `features` belong to a single project, so a collision there costs only the
-     *   project(s) that carry it. Those projects are left out of [AllManifests.projects] and reported through
-     *   [AllManifests.duplicates], which lets every unaffected project still be exported before the run fails.
+     * - `projects`, `userDeployments` and per-project `features` belong to a single deployment, so a collision
+     *   there costs only the deployment(s) that carry it. Those are left out of [AllManifests.projects] and
+     *   [AllManifests.userDeployments] and reported through [AllManifests.duplicates], which lets every unaffected
+     *   deployment still be exported before the run fails.
      * - `agents`, `prompts`, `rulesets`, `fragments` and `skills` are shared by every project, and a project that
      *   declares no filter for a kind deploys all of it, so dropping a colliding pair would silently ship every
      *   project without content it never excluded. These therefore still fail the whole run - but only once every
@@ -80,17 +89,20 @@ class LoaderService {
         val fragments = loadAllFromDirectories(locations.fragments, ::loadFragment)
         val (skills, skillSourceDirs) = loadSkills(locations.skills)
 
-        val projectFiles = locations.projects.flatMap { directory ->
-            findYamlFiles(directory).filter { it.name == "project.yml" }
-        }
-        val loadedProjects = projectFiles.loadEach(::loadProject)
+        val deploymentFiles = locations.deployments.flatMap { directory -> findYamlFiles(directory) }
+        val loadedProjects = deploymentFiles.filter { it.name == PROJECT_MANIFEST_FILE }.loadEach(::loadProject)
         val projects = loadedProjects.indexByUniqueId()
+        val userDeployments = deploymentFiles
+            .filter { it.name == USER_DEPLOYMENT_MANIFEST_FILE }
+            .loadEach(::loadUserDeployment)
+            .indexByUniqueId()
         val features = loadedProjects.associate { (projectFile, project) ->
             val featureFiles = findYamlFiles(projectFile.parentFile.resolve("features"))
             project to featureFiles.loadEach(::loadFeature).indexByUniqueId()
         }
 
-        val scopedDuplicates = projects.duplicates + features.values.flatMap { it.duplicates }
+        val scopedDuplicates = projects.duplicates + userDeployments.duplicates +
+            features.values.flatMap { it.duplicates }
         val sharedDuplicates = agents.duplicates + prompts.duplicates + rulesets.duplicates +
             fragments.duplicates + skills.duplicates
         if (sharedDuplicates.isNotEmpty()) {
@@ -112,6 +124,7 @@ class LoaderService {
             skills = skills.byId,
             skillSourceDirs = skillSourceDirs,
             projects = projects.byId.filterKeys { it !in projectsWithCollidingFeatures },
+            userDeployments = userDeployments.byId,
             features = features.mapValues { (_, featuresOfProject) -> featuresOfProject.byId },
             duplicates = scopedDuplicates,
         )
@@ -161,6 +174,14 @@ class LoaderService {
         .walkTopDown()
         .filter { it.isFile && (it.extension == "yml" || it.extension == "yaml") }
         .toList()
+
+    companion object {
+        /** The filename that makes a directory under `locations.deployments` a project - see [ProjectManifest]. */
+        private const val PROJECT_MANIFEST_FILE = "project.yml"
+
+        /** The filename that makes it a user deployment instead - see [UserDeploymentManifest]. */
+        private const val USER_DEPLOYMENT_MANIFEST_FILE = "user.yml"
+    }
 }
 
 /**

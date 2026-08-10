@@ -9,7 +9,7 @@ locations:
     - "02_fragments"
   skills:
     - "04_skills"
-  projects:
+  deployments:
     - "09_projects"
 
 tools:

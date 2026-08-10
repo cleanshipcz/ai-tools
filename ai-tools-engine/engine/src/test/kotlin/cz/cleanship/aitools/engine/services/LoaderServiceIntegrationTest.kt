@@ -3,10 +3,12 @@ package cz.cleanship.aitools.engine.services
 import cz.cleanship.aitools.engine.models.InnerFeatureContext
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ManifestMetadata
+import cz.cleanship.aitools.engine.models.ProjectFilter
 import cz.cleanship.aitools.engine.models.PromptOutput
 import cz.cleanship.aitools.engine.models.PromptVariable
 import cz.cleanship.aitools.engine.models.SkillFile
 import cz.cleanship.aitools.engine.models.SkillSection
+import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.Version
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -291,7 +293,7 @@ class LoaderServiceIntegrationTest {
             rulesets = emptyList(),
             fragments = emptyList(),
             skills = listOf(skillsDir),
-            projects = emptyList(),
+            deployments = emptyList(),
         )
 
         // when
@@ -407,7 +409,7 @@ class LoaderServiceIntegrationTest {
 
         private fun rulesetLocations() = Locations(
             agents = emptyList(),
-            projects = emptyList(),
+            deployments = emptyList(),
             prompts = emptyList(),
             rulesets = listOf(tempDir.resolve("malformed-versions").toFile()),
             fragments = emptyList(),
@@ -491,7 +493,7 @@ class LoaderServiceIntegrationTest {
             writeProject(projectsDirectory.resolve("beta"), "duplicated-project")
             val locations = Locations(
                 agents = emptyList(),
-                projects = listOf(projectsDirectory),
+                deployments = listOf(projectsDirectory),
                 prompts = emptyList(),
                 rulesets = listOf(rulesetsDirectory),
                 fragments = listOf(fragmentsDirectory),
@@ -517,7 +519,7 @@ class LoaderServiceIntegrationTest {
             writeProject(directory.resolve("gamma"), "healthy-project")
 
             // when
-            val allManifests = loaderService.loadAll(locationsFor("projects", directory))
+            val allManifests = loaderService.loadAll(locationsFor("deployments", directory))
 
             // then
             // - neither colliding project can be exported, but the project that shares nothing with them still is
@@ -544,7 +546,7 @@ class LoaderServiceIntegrationTest {
             writeProject(directory.resolve("beta"), "beta-project")
 
             // when
-            val allManifests = loaderService.loadAll(locationsFor("projects", directory))
+            val allManifests = loaderService.loadAll(locationsFor("deployments", directory))
 
             // then
             assertThat(allManifests.projects).containsOnlyKeys("beta-project")
@@ -566,7 +568,7 @@ class LoaderServiceIntegrationTest {
             writeFeature(directory.resolve("beta"), "shared.yml", "shared-feature")
 
             // when
-            val allManifests = loaderService.loadAll(locationsFor("projects", directory))
+            val allManifests = loaderService.loadAll(locationsFor("deployments", directory))
 
             // then
             assertThat(allManifests.projects).containsOnlyKeys("alpha-project", "beta-project")
@@ -649,12 +651,203 @@ class LoaderServiceIntegrationTest {
             val directories = listOf(directory)
             return Locations(
                 agents = directories.takeIf { kind == "agents" } ?: emptyList(),
-                projects = directories.takeIf { kind == "projects" } ?: emptyList(),
+                deployments = directories.takeIf { kind == "deployments" } ?: emptyList(),
                 prompts = directories.takeIf { kind == "prompts" } ?: emptyList(),
                 rulesets = directories.takeIf { kind == "rulesets" } ?: emptyList(),
                 fragments = directories.takeIf { kind == "fragments" } ?: emptyList(),
                 skills = directories.takeIf { kind == "skills" } ?: emptyList(),
             )
         }
+    }
+
+    @Nested
+    inner class UserDeployments {
+
+        @Test
+        fun `should load a user deployment from a user yml beside the projects`() {
+            // given
+            // - both kinds live under the same configured location, the filename deciding which schema is read
+            val directory = tempDir.resolve("deployments").toFile()
+            writeProject(directory.resolve("ai-tools"), "ai-tools")
+            writeUserDeployment(directory.resolve("globals"), "globals")
+
+            // when
+            val allManifests = loaderService.loadAll(deploymentLocations(directory))
+
+            // then
+            assertThat(allManifests.userDeployments).containsOnlyKeys("globals")
+            assertThat(allManifests.projects).containsOnlyKeys("ai-tools")
+            assertThat(allManifests.userDeployments.getValue("globals").description).isEqualTo("A user deployment")
+        }
+
+        @Test
+        fun `should load the user deployments of every configured location`() {
+            // given
+            // - a machine-private location beside the one the repository ships, as config.local.yml adds
+            val sharedDirectory = tempDir.resolve("deployments").toFile()
+            val privateDirectory = tempDir.resolve("private-deployments").toFile()
+            writeUserDeployment(sharedDirectory.resolve("globals"), "globals")
+            writeUserDeployment(privateDirectory.resolve("machine"), "machine")
+
+            // when
+            val allManifests = loaderService.loadAll(
+                deploymentLocations(sharedDirectory).copy(deployments = listOf(sharedDirectory, privateDirectory)),
+            )
+
+            // then
+            assertThat(allManifests.userDeployments).containsOnlyKeys("globals", "machine")
+        }
+
+        @Test
+        fun `should read the filters of a user deployment`() {
+            // given
+            val directory = tempDir.resolve("deployments").toFile()
+            writeYaml(
+                directory.resolve("globals"),
+                "user.yml",
+                """
+                id: globals
+                description: A user deployment
+                tools:
+                  - claude
+                rulesets:
+                  filter:
+                    - type: tags
+                      tags:
+                        - global
+
+                """.trimIndent(),
+            )
+
+            // when
+            val allManifests = loaderService.loadAll(deploymentLocations(directory))
+
+            // then
+            val deployment = allManifests.userDeployments.getValue("globals")
+            assertThat(deployment.tools).containsExactly(ToolType.CLAUDE)
+            assertThat(deployment.rulesets.filter).containsExactly(ProjectFilter.ByTags(listOf("global")))
+        }
+
+        @Test
+        fun `should fail naming the file when a user deployment declares an unknown field`() {
+            // given
+            // - the same strict decoding every other kind is loaded with, so a typo is reported instead of ignored
+            val directory = tempDir.resolve("deployments").toFile()
+            val file = writeYaml(
+                directory.resolve("globals"),
+                "user.yml",
+                "id: globals\ndescription: A user deployment\ndirectory: /home/user\n",
+            )
+
+            // when
+            val error = runCatching { loaderService.loadAll(deploymentLocations(directory)) }.exceptionOrNull()
+
+            // then
+            // - the message names the file and the failure behind it names the key, exactly as for every other kind
+            assertThat(error)
+                .hasMessageContaining(file.absolutePath)
+                .hasStackTraceContaining("Unknown property 'directory'")
+        }
+
+        @Test
+        fun `should fail naming the file when a user deployment declares a malformed version`() {
+            // given
+            val directory = tempDir.resolve("deployments").toFile()
+            val file = directory.resolve("globals").also { it.mkdirs() }.resolve("user.yml")
+            file.writeText("id: globals\ndescription: A user deployment\nmetadata:\n  version: 1.0\n")
+
+            // when
+            val error = runCatching { loaderService.loadAll(deploymentLocations(directory)) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(file.absolutePath)
+        }
+
+        @Test
+        fun `should drop both user deployments and keep the others when two of them share an id`() {
+            // given
+            val directory = tempDir.resolve("deployments").toFile()
+            val firstFile = writeUserDeployment(directory.resolve("alpha"), "duplicated-deployment")
+            val secondFile = writeUserDeployment(directory.resolve("beta"), "duplicated-deployment")
+            writeUserDeployment(directory.resolve("gamma"), "healthy-deployment")
+
+            // when
+            val allManifests = loaderService.loadAll(deploymentLocations(directory))
+
+            // then
+            assertThat(allManifests.userDeployments).containsOnlyKeys("healthy-deployment")
+            val duplicate = allManifests.duplicates.single()
+            assertThat(duplicate.id).isEqualTo("duplicated-deployment")
+            assertThat(listOf(duplicate.firstFile, duplicate.secondFile)).containsExactlyInAnyOrder(firstFile, secondFile)
+        }
+
+        @Test
+        fun `should load both when a user deployment and a project share an id`() {
+            // given
+            // - the two kinds are indexed apart, so the same name may describe a project and a user deployment
+            val directory = tempDir.resolve("deployments").toFile()
+            writeProject(directory.resolve("ai-tools"), "shared-id")
+            writeUserDeployment(directory.resolve("globals"), "shared-id")
+
+            // when
+            val allManifests = loaderService.loadAll(deploymentLocations(directory))
+
+            // then
+            assertThat(allManifests.projects).containsOnlyKeys("shared-id")
+            assertThat(allManifests.userDeployments).containsOnlyKeys("shared-id")
+            assertThat(allManifests.duplicates).isEmpty()
+        }
+
+        @Test
+        fun `should load a user deployment once when the same directory is configured twice`() {
+            // given
+            val directory = tempDir.resolve("deployments").toFile()
+            writeUserDeployment(directory.resolve("globals"), "globals")
+
+            // when
+            val allManifests = loaderService.loadAll(
+                deploymentLocations(directory).copy(deployments = listOf(directory, directory)),
+            )
+
+            // then
+            assertThat(allManifests.userDeployments).containsOnlyKeys("globals")
+            assertThat(allManifests.duplicates).isEmpty()
+        }
+
+        private fun writeUserDeployment(directory: File, id: String): File =
+            writeYaml(directory, "user.yml", "id: $id\ndescription: A user deployment\n")
+
+        private fun writeProject(directory: File, id: String): File = writeYaml(
+            directory,
+            "project.yml",
+            """
+            id: $id
+            description: A project
+            context:
+              documentation:
+                readme: README.md
+            deploy:
+              directory: "${directory.absolutePath}"
+
+            """.trimIndent(),
+        )
+
+        private fun writeYaml(directory: File, fileName: String, content: String): File {
+            directory.mkdirs()
+            val file = directory.resolve(fileName)
+            file.writeText(content + "metadata:\n  version: 1.0.0\n")
+            return file
+        }
+
+        private fun deploymentLocations(directory: File) = Locations(
+            agents = emptyList(),
+            deployments = listOf(directory),
+            prompts = emptyList(),
+            rulesets = emptyList(),
+            fragments = emptyList(),
+            skills = emptyList(),
+        )
     }
 }

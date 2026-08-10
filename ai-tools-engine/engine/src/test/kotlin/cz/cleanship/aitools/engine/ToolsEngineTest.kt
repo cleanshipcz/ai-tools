@@ -212,9 +212,9 @@ class ToolsEngineTest {
             //   within one directory are found in whatever order the filesystem lists them, while the roots
             //   themselves are read in the order they are configured - so this one is provably read first
             writeProject(deployDirectory = destination.absolutePath)
-            writeProject("broken-project", "broken-project", "\${MISSING_FOLDER}/custom-ai-tools", root = "late-projects")
+            writeProject("broken-project", "broken-project", "\${MISSING_FOLDER}/custom-ai-tools", root = "late-deployments")
             val twoProjectRoots = locations().copy(
-                projects = listOf(workspace.resolve("projects"), workspace.resolve("late-projects")),
+                deployments = listOf(workspace.resolve("deployments"), workspace.resolve("late-deployments")),
             )
 
             // when
@@ -690,7 +690,7 @@ class ToolsEngineTest {
 
     private fun locations() = Locations(
         agents = listOf(workspace.resolve("agents")),
-        projects = listOf(workspace.resolve("projects")),
+        deployments = listOf(workspace.resolve("deployments")),
         prompts = listOf(workspace.resolve("prompts")),
         rulesets = listOf(workspace.resolve("rulesets")),
         fragments = emptyList(),
@@ -742,7 +742,7 @@ class ToolsEngineTest {
     }
 
     /**
-     * @param root the configured `locations.projects` directory to write this project under, which decides when the
+     * @param root the configured `locations.deployments` directory to write this project under, which decides when the
      * loader reads it relative to the projects of another root
      */
     private fun writeProject(
@@ -750,7 +750,7 @@ class ToolsEngineTest {
         id: String = "test-project",
         deployDirectory: String = destination.absolutePath,
         tools: List<String>? = null,
-        root: String = "projects",
+        root: String = "deployments",
     ) = writeYaml(
         "$root/$directoryName/project.yml",
         "id: $id\ndescription: A project\n" +
@@ -769,7 +769,7 @@ class ToolsEngineTest {
     }
 
     private fun writeFeature(projectDirectoryName: String, fileName: String, id: String) = writeYaml(
-        "projects/$projectDirectoryName/features/$fileName",
+        "deployments/$projectDirectoryName/features/$fileName",
         "id: $id\ndescription: A feature\nprompt: A feature prompt\n",
     )
 

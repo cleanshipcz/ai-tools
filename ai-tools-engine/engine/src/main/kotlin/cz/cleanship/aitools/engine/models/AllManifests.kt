@@ -8,10 +8,12 @@ data class AllManifests(
     val skills: Map<String, SkillManifest>,
     val skillSourceDirs: Map<String, java.io.File> = emptyMap(),
     val projects: Map<String, ProjectManifest>,
+    val userDeployments: Map<String, UserDeploymentManifest> = emptyMap(),
     val features: Map<ProjectManifest, Map<String, FeatureManifest>>,
     /**
-     * Id collisions that cost only the project(s) they belong to. The affected projects are deliberately absent
-     * from [projects] - they cannot be exported - while every other project is still there to be exported.
+     * Id collisions that cost only the deployment(s) they belong to. The affected projects and user deployments are
+     * deliberately absent from [projects] and [userDeployments] - they cannot be exported - while every other one is
+     * still there to be exported.
      */
     val duplicates: List<DuplicateManifestId> = emptyList(),
 )

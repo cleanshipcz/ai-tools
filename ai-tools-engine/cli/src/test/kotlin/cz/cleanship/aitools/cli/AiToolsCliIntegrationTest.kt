@@ -42,14 +42,14 @@ class AiToolsCliIntegrationTest {
         File(tempDir, "config.yml").writeText(
             """
             locations:
-              projects:
-                - "projects"
+              deployments:
+                - "deployments"
             tools:
               - claude
             """.trimIndent(),
         )
         // - a project deploying to a relative directory, which must land on the same base the locations use
-        val projectFile = File(tempDir, "projects/test-project/project.yml")
+        val projectFile = File(tempDir, "deployments/test-project/project.yml")
         projectFile.parentFile.mkdirs()
         projectFile.writeText(
             """
@@ -82,15 +82,15 @@ class AiToolsCliIntegrationTest {
         File(tempDir, "config.yml").writeText(
             """
             env_vars:
-              PROJECTS_FOLDER: "${tempDir.absolutePath}/deployments"
+              PROJECTS_FOLDER: "${tempDir.absolutePath}/exported"
             locations:
-              projects:
-                - "projects"
+              deployments:
+                - "deployments"
             tools:
               - claude
             """.trimIndent(),
         )
-        val projectFile = File(tempDir, "projects/test-project/project.yml")
+        val projectFile = File(tempDir, "deployments/test-project/project.yml")
         projectFile.parentFile.mkdirs()
         projectFile.writeText(
             """
@@ -111,9 +111,9 @@ class AiToolsCliIntegrationTest {
         cli.parse(arrayOf("--working-dir", tempDir.absolutePath))
 
         // then
-        assertThat(File(tempDir, "deployments/custom-ai-tools/CLAUDE.md")).exists()
+        assertThat(File(tempDir, "exported/custom-ai-tools/CLAUDE.md")).exists()
         // - the reference was expanded rather than taken for a directory name
-        assertThat(File(tempDir, "deployments").list()).containsExactly("custom-ai-tools")
+        assertThat(File(tempDir, "exported").list()).containsExactly("custom-ai-tools")
     }
 
     @Test
@@ -122,13 +122,13 @@ class AiToolsCliIntegrationTest {
         File(tempDir, "config.yml").writeText(
             """
             locations:
-              projects:
-                - "projects"
+              deployments:
+                - "deployments"
             tools:
               - claude
             """.trimIndent(),
         )
-        val projectFile = File(tempDir, "projects/test-project/project.yml")
+        val projectFile = File(tempDir, "deployments/test-project/project.yml")
         projectFile.parentFile.mkdirs()
         projectFile.writeText(
             """
@@ -164,8 +164,8 @@ class AiToolsCliIntegrationTest {
         File(tempDir, "config.yml").writeText(
             """
             locations:
-              projects:
-                - "${variableReference("AI_TOOLS_UNDECLARED_TEST_FOLDER")}/projects"
+              deployments:
+                - "${variableReference("AI_TOOLS_UNDECLARED_TEST_FOLDER")}/deployments"
             """.trimIndent(),
         )
         val cli = AiToolsCli()

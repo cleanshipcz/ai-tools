@@ -16,9 +16,14 @@ data class EngineConfig(
     val variables: VariableResolver = VariableResolver(),
 )
 
+/**
+ * @param deployments the directories holding the deployment manifests of the run, of both kinds: a `project.yml`
+ * deploys into a project directory - see [ProjectManifest] - and a `user.yml` into the user scope of each tool -
+ * see [UserDeploymentManifest]. One list feeds both, because a directory that holds one kind usually holds the other.
+ */
 data class Locations(
     val agents: List<File>,
-    val projects: List<File>,
+    val deployments: List<File>,
     val prompts: List<File>,
     val rulesets: List<File>,
     val fragments: List<File>,

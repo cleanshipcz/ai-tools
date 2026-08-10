@@ -92,7 +92,7 @@ class ConfigService(
 
         return Locations(
             agents = resolve("agents") { it.agents },
-            projects = resolve("projects") { it.projects },
+            deployments = resolve("deployments") { it.deployments },
             prompts = resolve("prompts") { it.prompts },
             rulesets = resolve("rulesets") { it.rulesets },
             fragments = resolve("fragments") { it.fragments },
