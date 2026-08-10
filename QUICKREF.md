@@ -320,7 +320,7 @@ Use `fragments` for shared content; there is no include mechanism.
 ├── 03_prompts/      # Prompts
 ├── 04_skills/       # Skills (<id>.yml, or <dir>/skill.yml)
 ├── 05_agents/       # Agents
-├── 09_projects/     # Projects: <scope>/<project>/project.yml (+ features/)
+├── 09_deployments/  # Deployments: <deployment>/project.yml or user.yml (+ features/)
 ├── 10_schemas/      # JSON schemas - STALE, not used for validation
 ├── 90_docs/         # Reference documentation
 ├── ai-tools-engine/ # The Kotlin engine

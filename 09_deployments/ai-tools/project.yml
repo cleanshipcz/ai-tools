@@ -17,7 +17,7 @@ context:
         prompts: 03_prompts/README.md
         agents: AGENTS.md
         skills: 04_skills/README.md
-        projects: 09_projects/README.md
+        deployments: 09_deployments/README.md
         recipes: 08_recipes/README.md
         tools: 90_docs/TOOLS.md
         user_tools: 90_docs/USER_TOOLS.md

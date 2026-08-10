@@ -25,7 +25,7 @@ See [Not Yet Implemented](#not-yet-implemented) before looking for them.
 - `03_prompts/` – prompt manifests
 - `04_skills/` – skill manifests, as `<id>.yml` or as a directory containing `skill.yml`
 - `05_agents/` – agent manifests
-- `09_projects/` – project manifests (`global/` and `local/`), each a directory containing `project.yml` and an optional `features/`
+- `09_deployments/` – deployment manifests, each a directory containing a `project.yml` (deploys into a project directory) or a `user.yml` (deploys into the user scope of a tool), plus an optional `features/`
 - `ai-tools-engine/` – the Kotlin build engine (Gradle multi-module: `:engine`, `:cli`, `:server`, `:telemetry`)
 - `10_schemas/` – JSON schemas; **stale**, they have drifted from the engine's Kotlin models and are not used for validation
 - `90_docs/` – reference documentation
@@ -53,7 +53,7 @@ Left over from the retired TypeScript CLI and no longer written or read by anyth
 ./setup.sh
 ```
 
-2) Edit manifests, then edit `09_projects/<scope>/<project>/project.yml` to set `deploy.directory` and the filters
+2) Edit manifests, then edit `09_deployments/<deployment>/project.yml` to set `deploy.directory` and the filters
 
 3) Generate and deploy
 
@@ -70,8 +70,8 @@ cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir <repository root>
 The CLI has exactly one option, `--working-dir`, which points at the directory containing `config.yml`.
 There are no subcommands and no other flags.
 
-Every project manifest found under the configured `projects` locations is processed on every run, and each is written to its own `deploy.directory`.
-There is no way to deploy a single project from the command line; narrow the `projects` list in `config.local.yml` instead.
+Every project manifest found under the configured `deployments` locations is processed on every run, and each is written to its own `deploy.directory`.
+There is no way to deploy a single project from the command line; narrow the `deployments` list in `config.local.yml` instead.
 
 ## Projects, Features, and Deployment
 
@@ -165,7 +165,7 @@ locations:
   rulesets:  ["01_rulesets"]
   fragments: ["02_fragments"]
   skills:    ["04_skills"]
-  projects:  ["09_projects"]
+  deployments: ["09_deployments"]
 
 tools:
   - windsurf
@@ -191,7 +191,7 @@ env_vars:
 ```
 
 ```yaml
-# 09_projects/<scope>/<project>/project.yml
+# 09_deployments/<deployment>/project.yml
 deploy:
   directory: "${PROJECTS_FOLDER}/custom-ai-tools"
 ```

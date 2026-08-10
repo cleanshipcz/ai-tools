@@ -1,0 +1,11 @@
+id: global-questions
+description: How an assistant should treat a question rather than a request, in every tool and every project
+rules:
+  - "When I ask a question, answer it — don't act on it. Read-only investigation is fine, but change nothing until I confirm. When unsure whether I want an answer or an action, answer."
+metadata:
+  version: 1.0.0
+  author: cleanshipcz
+  created: "2026-08-10"
+  tags:
+    - global
+    - behaviour

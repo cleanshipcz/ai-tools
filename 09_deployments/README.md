@@ -1,13 +1,18 @@
-# Projects: Project-Specific AI Tool Configurations
+# Deployments: Project and User AI Tool Configurations
 
-> **Generate and deploy project-specific AI tool configurations**
+> **Generate and deploy AI tool configurations, into a project directory or into your own user scope**
 
-This guide explains how to use the Projects feature to create customized AI tool configurations for your specific projects.
+This directory holds the deployment manifests of the repository. A directory containing a `project.yml` deploys into
+a project directory; a directory containing a `user.yml` deploys into the user scope of each tool it names.
 
 > **Status: partially outdated.** This guide still largely describes the retired TypeScript CLI.
 > The `npm run project:*` commands, the separate `deploy.yml`, `deploy.local.yml`, and the
 > `projects/global/template/` scaffold **no longer exist**. The current engine has a single
 > command, `./deploy.sh`, and all deployment settings live in the `deploy:` block of `project.yml`.
+> The `global/` and `local/` split described further down is gone as well: every manifest directory
+> now sits directly under `09_deployments/`, and a machine-private one lives outside this repository,
+> added to `locations.deployments` by `config.local.yml`.
+> The `user.yml` kind is not documented here yet.
 >
 > The "Project Sources Configuration" section below is accurate and has been updated.
 > For everything else, treat [../README.md](../README.md) and [../QUICKREF.md](../QUICKREF.md)
@@ -116,8 +121,8 @@ You'll see:
 
 **Configurable Project Locations** (`config.yml` + `config.local.yml`, in the repository root)
 
-The engine searches for projects in the directories listed under `locations.projects`.
-A project is any directory containing a `project.yml`; the search is recursive.
+The engine searches for deployments in the directories listed under `locations.deployments`.
+A project is any directory containing a `project.yml`, a user deployment any directory containing a `user.yml`; the search is recursive.
 
 **Configuration Files:**
 
@@ -130,30 +135,30 @@ Both live in the repository root. There is no `15_config/` directory, and the en
 
 ```yaml
 locations:
-  projects:
-    - "09_projects"
+  deployments:
+    - "09_deployments"
 ```
 
 **Adding Personal Sources (`config.local.yml`):**
 
 ```yaml
 locations:
-  projects:
-    - "09_projects"
+  deployments:
+    - "09_deployments"
     - "../ai-tools-projects/projects"
 ```
 
 **Configuration Merging:**
 
 Each key is **replaced wholesale**, not merged element-wise.
-If `config.local.yml` defines `locations.projects`, that list fully replaces the one in `config.yml` - so you must repeat any default entry you still want, as the example above repeats `09_projects`.
+If `config.local.yml` defines `locations.deployments`, that list fully replaces the one in `config.yml` - so you must repeat any default entry you still want, as the example above repeats `09_deployments`.
 
 The same applies to the other `locations` entries and to the `tools` list.
 The one key that does merge element-wise is `env_vars`, described below.
 
 **Path Types:**
 
-- **Relative**: resolved against the directory passed to `--working-dir`, i.e. the repository root (e.g. `09_projects`)
+- **Relative**: resolved against the directory passed to `--working-dir`, i.e. the repository root (e.g. `09_deployments`)
 - **Absolute**: used as given (e.g. `/home/user/projects`)
 
 **Path Variables:**
@@ -1369,7 +1374,6 @@ jobs:
 - [PLAN.md](../PLAN.md) - Implementation plan
 - [README.md](../README.md) - Main repository README
 - [schemas/project.schema.json](../schemas/project.schema.json) - Schema reference
-- [projects/global/example-ecommerce/](../09_projects/global/example-ecommerce/) - Complete example
 
 ---
 

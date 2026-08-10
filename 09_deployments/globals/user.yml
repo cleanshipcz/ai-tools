@@ -1,0 +1,36 @@
+id: globals
+description: My global AI tool setup
+tools:
+  - claude
+  - codex
+# The rules that used to live in a hand-written ~/.claude/CLAUDE.md. The engine owns that file from here on: it is
+# rewritten on every deploy, so these manifests are where the rules are edited.
+rulesets:
+  filter:
+    - type: tags
+      tags:
+        - global
+# A block that is left out selects everything of its kind, exactly as it does in a project manifest. These four are
+# therefore declared empty on purpose: the user scope carries the rules alone until an artifact is deliberately added.
+agents:
+  filter:
+    - type: whitelist
+      ids: []
+prompts:
+  filter:
+    - type: whitelist
+      ids: []
+skills:
+  filter:
+    - type: whitelist
+      ids: []
+fragments:
+  filter:
+    - type: whitelist
+      ids: []
+metadata:
+  version: 1.0.0
+  author: cleanshipcz
+  created: "2026-08-10"
+  tags:
+    - global

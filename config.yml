@@ -10,7 +10,7 @@ locations:
   skills:
     - "04_skills"
   deployments:
-    - "09_projects"
+    - "09_deployments"
 
 tools:
   - windsurf
