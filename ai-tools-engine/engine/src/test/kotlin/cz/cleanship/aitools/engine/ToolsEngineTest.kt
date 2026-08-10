@@ -698,6 +698,50 @@ class ToolsEngineTest {
         }
     }
 
+    /**
+     * A run that deploys nothing has to say so. The engine already refuses to be silent about a run that configures
+     * no tools, and a run that configures no deployment locations - or finds no manifest under them - is the same
+     * misconfiguration seen from the other side, most often a `config.local.yml` left on the retired key.
+     */
+    @Nested
+    inner class NothingToDeploy {
+
+        @Test
+        fun `should warn when no deployment location is configured`() {
+            // given
+            val noDeployments = locations().copy(deployments = emptyList())
+
+            // when
+            engine.process(noDeployments)
+
+            // then
+            assertThat(warnings()).anyMatch { it.contains("locations.deployments") }
+        }
+
+        @Test
+        fun `should warn when the configured locations hold no deployment manifest`() {
+            // given
+            // - the directory is configured and exists, it simply holds nothing the engine recognises
+            val emptyDirectory = workspace.resolve("empty-deployments").also { it.mkdirs() }
+            val emptyDeployments = locations().copy(deployments = listOf(emptyDirectory))
+
+            // when
+            engine.process(emptyDeployments)
+
+            // then
+            assertThat(warnings()).anyMatch { it.contains("no deployment manifest") }
+        }
+
+        @Test
+        fun `should not warn when the run has something to deploy`() {
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(warnings()).noneMatch { it.contains("no deployment manifest") }
+        }
+    }
+
     @Nested
     inner class UserDeployments {
 
@@ -822,8 +866,9 @@ class ToolsEngineTest {
             windsurfEngine.process(locations())
 
             // then
+            // - nothing at all is written for a tool the engine has no user-scope layout for
             assertThat(userHome).doesNotExist()
-            assertThat(warnings()).anyMatch { it.contains("globals") && it.contains("WINDSURF") }
+            assertThat(warnings()).anyMatch { it.contains("globals") && it.contains("no user-scope layout") }
         }
 
         @Test
@@ -847,17 +892,111 @@ class ToolsEngineTest {
         @Test
         fun `should deploy the unaffected user deployment when another one is broken`() {
             // given
+            // - the two deploy through different tools, so each owns its own instructions file and the assertion
+            //   below does not depend on which of them the loader happened to walk last
+            val multiAdapterEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ClaudeAdapter(), CodexAdapter()))
             writeAgent("broken-agent", "missing-ruleset")
-            writeUserDeployment(id = "with-agents")
-            writeUserDeployment(id = "without-agents", directoryName = "second", agentFilter = emptyList())
+            writePrompt("good-prompt", "base")
+            writeUserDeployment(id = "with-agents", tools = listOf("claude"))
+            writeUserDeployment(
+                id = "with-prompts",
+                directoryName = "second",
+                tools = listOf("codex"),
+                agentFilter = emptyList(),
+            )
+
+            // when
+            val error = runCatching { multiAdapterEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            // - an artifact only the second deployment produces, so reaching it is what is actually proven
+            assertThat(userHome.resolve(".codex/skills/prompt-good-prompt/SKILL.md")).exists()
+            assertThat(error).isInstanceOf(ExportFailedException::class.java)
+        }
+
+        @Test
+        fun `should deploy neither instructions file when two deployments contend for one`() {
+            // given
+            // - one tool has one instructions file, so two deployments claiming it is an ambiguity with no winner
+            writePrompt("good-prompt", "base")
+            writeUserDeployment(id = "personal", agentFilter = emptyList())
+            writeUserDeployment(id = "work", directoryName = "work", agentFilter = emptyList())
 
             // when
             val error = runCatching { engine.process(locations()) }.exceptionOrNull()
 
             // then
-            // - both write the same instructions file, and the run reaching the second one is what is proven here
-            assertThat(userHome.resolve(".claude/CLAUDE.md").readText()).contains("# without-agents")
-            assertThat(error).isInstanceOf(ExportFailedException::class.java)
+            // - neither manifest is picked as the winner, so the file the two contend for is not written at all
+            assertThat(userHome.resolve(".claude/CLAUDE.md")).doesNotExist()
+            // - the artifacts they do not contend for are still deployed
+            assertThat(userHome.resolve(".claude/commands/good-prompt.md")).exists()
+            // - and the run fails, naming both manifests and the path
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("personal")
+                .hasMessageContaining("work")
+            assertThat(errors()).anyMatch {
+                it.contains("personal") && it.contains("work") && it.contains("CLAUDE.md")
+            }
+        }
+
+        @Test
+        fun `should leave an existing instructions file untouched when two deployments contend for it`() {
+            // given
+            val instructions = userHome.resolve(".claude/CLAUDE.md")
+            instructions.parentFile.mkdirs()
+            instructions.writeText("From an earlier deploy.\n")
+            writeUserDeployment(id = "personal", agentFilter = emptyList())
+            writeUserDeployment(id = "work", directoryName = "work", agentFilter = emptyList())
+
+            // when
+            runCatching { engine.process(locations()) }
+
+            // then
+            assertThat(instructions).hasContent("From an earlier deploy.\n")
+        }
+
+        @Test
+        fun `should warn naming the absolute path when an instructions file is overwritten`() {
+            // given
+            val instructions = userHome.resolve(".claude/CLAUDE.md")
+            instructions.parentFile.mkdirs()
+            instructions.writeText("From an earlier deploy.\n")
+            writeUserDeployment()
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(warnings()).anyMatch { it.contains(instructions.absolutePath) }
+        }
+
+        @Test
+        fun `should name a tool without a user scope in the spelling a manifest writes it`() {
+            // given
+            val windsurfEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(WindsurfAdapter()))
+            writeUserDeployment(tools = listOf("windsurf"))
+
+            // when
+            windsurfEngine.process(locations())
+
+            // then
+            // - an author greps their own YAML for 'windsurf', never for the Kotlin constant
+            assertThat(warnings()).anyMatch { it.contains("globals") && it.contains("windsurf") }
+            assertThat(warnings()).noneMatch { it.contains("WINDSURF") }
+        }
+
+        @Test
+        fun `should log the absolute home before deploying into it`() {
+            // given
+            writeUserDeployment()
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(infos()).anyMatch { it.contains(userHome.absolutePath) }
         }
 
         @Test
@@ -876,7 +1015,13 @@ class ToolsEngineTest {
             // then
             // - the manifest never loads, so no adapter of any scope is ever handed the id
             assertThat(error).isInstanceOf(ManifestLoadingException::class.java)
-            assertThat(tempDir.toFile().walkTopDown().filter { it.name == "SKILL.md" }.toList()).isEmpty()
+            assertThat(
+                tempDir
+                    .toFile()
+                    .walkTopDown()
+                    .filter { it.name == "SKILL.md" }
+                    .toList(),
+            ).isEmpty()
             assertThat(userHome).doesNotExist()
         }
 
@@ -917,6 +1062,10 @@ class ToolsEngineTest {
     private fun cursorAgentFile(id: String) = destination.resolve(".cursor/rules/agent-$id.mdc")
 
     private fun warnings() = logAppender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
+
+    private fun errors() = logAppender.list.filter { it.level == Level.ERROR }.map { it.formattedMessage }
+
+    private fun infos() = logAppender.list.filter { it.level == Level.INFO }.map { it.formattedMessage }
 
     private fun writeRuleset(id: String, fileName: String = "$id.yml") = writeYaml(
         "rulesets/$fileName",

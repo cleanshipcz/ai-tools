@@ -36,10 +36,10 @@ internal class CodexLayout(
             instructionsFile = projectDir.resolve(INSTRUCTIONS_FILE),
         )
 
-        fun ofUser(userHome: File) = CodexLayout(
-            toolDir = userHome.resolve(CODEX_DIR),
-            instructionsFile = userHome.resolve(CODEX_DIR).resolve(INSTRUCTIONS_FILE),
-        )
+        fun ofUser(userHome: File): CodexLayout {
+            val toolDir = userHome.resolve(CODEX_DIR)
+            return CodexLayout(toolDir, instructionsFile = toolDir.resolve(INSTRUCTIONS_FILE))
+        }
 
         private const val CODEX_DIR = ".codex"
         private const val INSTRUCTIONS_FILE = "AGENTS.md"

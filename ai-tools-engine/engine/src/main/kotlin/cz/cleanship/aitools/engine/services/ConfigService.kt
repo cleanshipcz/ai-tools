@@ -49,6 +49,8 @@ class ConfigService(
             ?: throw FileNotFoundException("Missing default config file: ${File(workingDirectory, DEFAULT_CONFIG_FILE).absolutePath}")
         val localConfig = loadConfigFile(File(workingDirectory, LOCAL_CONFIG_FILE)) ?: ConfigManifest()
 
+        rejectRetiredKeys(defaultConfig, localConfig)
+
         val tools = localConfig.tools ?: defaultConfig.tools ?: emptyList()
         // Variables merge per key rather than as a whole: a local config usually redeclares the one base that differs
         // on its machine, and replacing the whole map would silently drop the ones it agrees with.
@@ -58,6 +60,30 @@ class ConfigService(
             locations = resolveLocations(workingDirectory, defaultConfig.locations, localConfig.locations, variables),
             tools = tools,
             variables = variables,
+        )
+    }
+
+    /**
+     * Fails when a config file still declares `locations.projects`, which was renamed to `locations.deployments`
+     * once the directories began holding two kinds of deployment manifest.
+     *
+     * Unknown keys are otherwise tolerated here - [YamlConfiguration.strictMode] is off, so that a config written
+     * for a newer engine still loads on an older one. That tolerance is exactly what would make this rename lossy:
+     * the retired list would be dropped without a word, `deployments` would resolve to nothing, and the run would
+     * deploy nothing while exiting successfully. Naming the rename costs one release of an explicit failure and
+     * saves a silent one.
+     *
+     * @throws RetiredConfigKeyException naming the retired key, its replacement and the file that declared it
+     */
+    private fun rejectRetiredKeys(defaultConfig: ConfigManifest, localConfig: ConfigManifest) {
+        val declaredIn = when {
+            localConfig.locations?.projects != null -> LOCAL_CONFIG_FILE
+            defaultConfig.locations?.projects != null -> DEFAULT_CONFIG_FILE
+            else -> return
+        }
+        throw RetiredConfigKeyException(
+            "'locations.projects' of $declaredIn was renamed to 'locations.deployments', because those directories " +
+                "now hold both project.yml and user.yml manifests. Rename the key to keep deploying them.",
         )
     }
 
@@ -106,3 +132,9 @@ class ConfigService(
         private val LOG = LoggerFactory.getLogger(ConfigService::class.java)
     }
 }
+
+/**
+ * Thrown when a config file declares a key this engine has retired, naming what to write instead - see
+ * [ConfigService.rejectRetiredKeys].
+ */
+class RetiredConfigKeyException(message: String) : RuntimeException(message)

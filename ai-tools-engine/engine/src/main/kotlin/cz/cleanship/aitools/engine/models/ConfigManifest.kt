@@ -17,10 +17,17 @@ data class ConfigManifest(
     val envVars: Map<String, String>? = null,
 )
 
+/**
+ * @param projects the retired name of [deployments]. It is still decoded, and only so that a config left on it is
+ * rejected by [cz.cleanship.aitools.engine.services.ConfigService] instead of being dropped as an unknown key -
+ * `config.local.yml` is gitignored, so no rename in the repository can reach the one on another machine, and a
+ * silently dropped list means a run that deploys nothing and reports success.
+ */
 @Serializable
 data class LocationsConfig(
     val agents: List<String>? = null,
     val deployments: List<String>? = null,
+    val projects: List<String>? = null,
     val prompts: List<String>? = null,
     val rulesets: List<String>? = null,
     val fragments: List<String>? = null,

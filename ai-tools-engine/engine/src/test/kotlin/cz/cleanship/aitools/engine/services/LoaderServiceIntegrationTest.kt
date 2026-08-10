@@ -686,7 +686,11 @@ class LoaderServiceIntegrationTest {
         @Test
         fun `should fail naming the file when an id is empty`() {
             // given
-            val file = tempDir.resolve("rulesets").toFile().also { it.mkdirs() }.resolve("empty.yml")
+            val file = tempDir
+                .resolve("rulesets")
+                .toFile()
+                .also { it.mkdirs() }
+                .resolve("empty.yml")
             file.writeText("id: \"\"\ndescription: A ruleset\nrules:\n  - A rule.\nmetadata:\n  version: 1.0.0\n")
 
             // when

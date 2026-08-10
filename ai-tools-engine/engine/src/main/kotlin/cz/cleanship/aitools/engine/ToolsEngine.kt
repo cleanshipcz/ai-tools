@@ -26,6 +26,7 @@ import cz.cleanship.aitools.engine.tools.RulesetResolvingException
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserInstructionsContext
+import cz.cleanship.aitools.engine.tools.UserScopeExporter
 import cz.cleanship.aitools.engine.tools.adapters.antigravity.AntigravityAdapter
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
@@ -90,6 +91,10 @@ class ToolsEngine(
      * left out because its ids collide
      * @throws DeployDirectoryResolvingException if a `deploy.directory` references a variable that nothing declares,
      * which stops the run before a single project is exported - see [resolveDeployDirectories]
+     * @throws cz.cleanship.aitools.engine.io.ArtifactPathException if a replacing deploy would remove a path outside
+     * the directory it owns. It aborts the run where an authoring error would only fail its own manifest, because a
+     * deploy about to delete something nobody asked it to must not continue - see
+     * [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin]
      * @throws cz.cleanship.aitools.engine.services.DuplicateManifestIdException if manifests shared by every
      * project declare the same id, which no project can be exported around
      */
@@ -122,6 +127,7 @@ class ToolsEngine(
             if (tools.isEmpty()) {
                 LOG.warn("This run configures no tools, so no project is exported. Declare the tools to build under 'tools:' in config.yml, or in config.local.yml, which replaces that list.")
             }
+            warnWhenNothingToDeploy(locations, allData)
 
             val destinations = resolveDeployDirectories(allData.projects.values)
 
@@ -146,6 +152,22 @@ class ToolsEngine(
             if (failures.isNotEmpty() || allData.duplicates.isNotEmpty()) {
                 throw ExportFailedException(failures, allData.duplicates)
             }
+        }
+    }
+
+    /**
+     * Names a run that has nothing to deploy, for the same reason a run configuring no tools is named: a deploy that
+     * writes nothing and reports success reads exactly like one that worked.
+     *
+     * The likeliest cause is a `config.local.yml` left on the retired `locations.projects` key - which
+     * [cz.cleanship.aitools.engine.services.ConfigService] rejects outright when it can see it - or a location
+     * pointing at a directory that has since moved.
+     */
+    private fun warnWhenNothingToDeploy(locations: Locations, allData: AllManifests) {
+        if (locations.deployments.isEmpty()) {
+            LOG.warn("This run configures no deployment locations, so nothing is deployed. Declare the directories holding your project.yml and user.yml files under 'locations.deployments' in config.yml, or in config.local.yml, which replaces that list.")
+        } else if (allData.projects.isEmpty() && allData.userDeployments.isEmpty()) {
+            LOG.warn("Found no deployment manifest under {}, so nothing is deployed. A project is a directory holding a project.yml, a user deployment one holding a user.yml.", locations.deployments.map { it.absolutePath })
         }
     }
 
@@ -227,15 +249,39 @@ class ToolsEngine(
      * @return the failures collected while exporting, which the caller reports together with those of the projects
      */
     private fun exportUserDeployments(allData: AllManifests): List<ExportFailure> {
+        if (allData.userDeployments.isEmpty()) return emptyList()
+
+        // Selecting for every manifest first keeps `selectAdapters` - which warns - to one call per manifest, and is
+        // what lets the contention below be decided before anything has been written.
+        val selections = allData.userDeployments.values
+            .map { manifest ->
+                manifest to selectAdapters(manifest.id, manifest.tools, toolsField = "tools", subject = "user deployment")
+            }.filter { (_, adapters) -> adapters.isNotEmpty() }
+        if (selections.isEmpty()) return emptyList()
+
+        LOG.info("Deploying the user scope under '{}'", userHome.absolutePath)
+        if (!userHome.exists()) {
+            LOG.info("The home '{}' does not exist yet and is created by this deploy.", userHome.absolutePath)
+        }
+
+        val targets = selections.flatMap { (manifest, adapters) ->
+            adapters.mapNotNull { adapter -> userScopeTarget(manifest, adapter) }
+        }
+        val contendedInstructions = reportContendedInstructionsFiles(targets)
+
         val failures = mutableListOf<ExportFailure>()
-        for (manifest in allData.userDeployments.values) {
-            val adapters =
-                selectAdapters(manifest.id, manifest.tools, toolsField = "tools", subject = "user deployment")
-            if (adapters.isEmpty()) continue
+        for ((manifest, adapters) in selections) {
             LOG.info("Processing user deployment {}", manifest.id)
             val deployment = assembleUserDeployment(manifest, allData)
             for (adapter in adapters) {
-                failures += exportUserAdapter(deployment, adapter, allData.rulesets, allData.fragments)
+                val target = targets.firstOrNull { it.manifest.id == manifest.id && it.adapter === adapter } ?: continue
+                failures += exportUserAdapter(
+                    deployment,
+                    target,
+                    ownsInstructionsFile = target.instructionsFile !in contendedInstructions,
+                    allRulesets = allData.rulesets,
+                    allFragments = allData.fragments,
+                )
             }
             LOG.info("Processing user deployment {} completed", manifest.id)
         }
@@ -243,37 +289,101 @@ class ToolsEngine(
     }
 
     /**
-     * Exports every manifest of [deployment] into the user scope of [adapter], isolating each of them the way
+     * Returns how [adapter] would deploy [manifest], or `null` when this tool has no user-scope layout - which is
+     * reported here rather than passed over, so a manifest naming it is never dropped without a word.
+     */
+    private fun userScopeTarget(manifest: UserDeploymentManifest, adapter: ToolAdapter): UserScopeTarget? {
+        val exporter = adapter.userScope(userHome, manifest)
+        if (exporter == null) {
+            LOG.warn(
+                "{}: {} has no user-scope layout in this engine, so the manifest is not deployed for it.",
+                manifest.id,
+                adapter.toolType.serialName,
+            )
+            return null
+        }
+        return UserScopeTarget(manifest, adapter, exporter)
+    }
+
+    /**
+     * Returns the instructions files that more than one manifest claims, having reported each of them.
+     *
+     * A tool reads one instructions file per home, so two manifests deploying to the same tool both own
+     * `<home>/.claude/CLAUDE.md` and the one processed last would silently decide what every session on the machine
+     * reads. No winner is picked, mirroring what [LoaderService] does with a contested id: both are reported, the
+     * file neither may own is left alone, and the artifacts they do not contend for are still deployed.
+     */
+    private fun reportContendedInstructionsFiles(targets: List<UserScopeTarget>): Set<File> = targets
+        .groupBy { it.instructionsFile }
+        .filterValues { claimants -> claimants.distinctBy { it.manifest.id }.size > 1 }
+        .onEach { (instructionsFile, claimants) ->
+            val claimingIds = claimants.map { it.manifest.id }.distinct()
+            LOG.error(
+                "Not writing '{}': the user deployment(s) {} all deploy it. Give each tool a single deployment, or narrow their 'tools' lists.",
+                instructionsFile.absolutePath,
+                claimingIds,
+            )
+        }.keys
+
+    /**
+     * Returns the export of the instructions file of one deployment, named the way every other export of the run is.
+     *
+     * The path is logged before it is written rather than left to be derived from the home: this is the one file the
+     * engine takes over from the user, and a replacement of something already there is worth a warning of its own.
+     * A manifest that does not own the file - because another one claims it too - keeps its place in the list and
+     * fails there, so the contention is reported against the manifest that caused it.
+     */
+    private fun instructionsExport(
+        deployment: UserDeployment,
+        exporter: UserScopeExporter,
+        ownsInstructionsFile: Boolean,
+    ): Pair<String, () -> Unit> {
+        val manifest = deployment.manifest
+        val name = "instructions of '${manifest.id}'"
+        if (!ownsInstructionsFile) {
+            return name to {
+                throw ContendedInstructionsFileException(
+                    "'${exporter.instructionsFile.absolutePath}' is deployed by more than one user deployment, so " +
+                        "none of them may write it. Give each tool a single deployment, or narrow their 'tools' lists.",
+                )
+            }
+        }
+        if (exporter.instructionsFile.exists()) {
+            LOG.warn("{}: Replacing the instructions file '{}'.", manifest.id, exporter.instructionsFile.absolutePath)
+        } else {
+            LOG.info("{}: Writing the instructions file '{}'.", manifest.id, exporter.instructionsFile.absolutePath)
+        }
+        return name to { exporter.export(UserInstructionsContext(manifest, deployment.rulesets)) }
+    }
+
+    /**
+     * Exports every manifest of [deployment] into the user scope of [target], isolating each of them the way
      * [exportAdapter] isolates the manifests of a project.
      *
-     * @return the failures collected while exporting, empty when everything was exported or when this tool has no
-     * user scope at all
+     * @param ownsInstructionsFile whether this manifest may write the instructions file of the tool, which is false
+     * when another manifest claims the same file - see [reportContendedInstructionsFiles]. The contention is
+     * reported as a failure of this manifest, so the run cannot end successfully having written neither.
+     * @return the failures collected while exporting, empty when everything was exported
      */
     private fun exportUserAdapter(
         deployment: UserDeployment,
-        adapter: ToolAdapter,
+        target: UserScopeTarget,
+        ownsInstructionsFile: Boolean,
         allRulesets: Map<String, RulesetManifest>,
         allFragments: Map<String, FragmentManifest>,
     ): List<ExportFailure> {
         val manifest = deployment.manifest
-        val exporter = adapter.userScope(userHome, manifest)
-        if (exporter == null) {
-            LOG.warn("{}: {} has no user-scope layout in this engine, so the manifest is not deployed for it.", manifest.id, adapter.toolType)
-            return emptyList()
-        }
-        LOG.info("{}: Deploying into the user scope of {} under '{}'", manifest.id, adapter.toolType, userHome)
+        val exporter = target.exporter
+        val toolType = target.adapter.toolType
+        LOG.info("{}: Deploying into the user scope of {} under '{}'", manifest.id, toolType.serialName, userHome.absolutePath)
         if (manifest.replace) {
             // Quoted for the same reason the project loop quotes its destination: a home can end in a character
             // that reads as part of the sentence around it.
-            LOG.warn("{}: Replacing the artifacts of this deployment under '{}'.", manifest.id, userHome)
+            LOG.warn("{}: Replacing the artifacts of this deployment under '{}'.", manifest.id, userHome.absolutePath)
         }
 
         val exports = buildList<Pair<String, () -> Unit>> {
-            add(
-                "instructions of '${manifest.id}'" to {
-                    exporter.export(UserInstructionsContext(manifest, deployment.rulesets))
-                },
-            )
+            add(instructionsExport(deployment, exporter, ownsInstructionsFile))
             deployment.agents.values.forEach { agent ->
                 add(
                     "agent '${agent.id}'" to {
@@ -307,7 +417,7 @@ class ToolsEngine(
         }
 
         return exports.mapNotNull { (name, export) ->
-            exportOrCollectFailure(manifest.id, adapter.toolType, name, export)
+            exportOrCollectFailure(manifest.id, toolType, name, export)
         }
     }
 
@@ -464,6 +574,22 @@ class ToolsEngine(
     } catch (ex: SkillFileResolvingException) {
         LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
         ExportFailure(deploymentId, toolType, manifest, ex)
+    } catch (ex: ContendedInstructionsFileException) {
+        // Reported once for the file, above; collected here so the run of every claimant fails rather than
+        // succeeding having quietly written nothing.
+        ExportFailure(deploymentId, toolType, manifest, ex)
+    }
+
+    /**
+     * One tool deploying one user deployment: the exporter it will write through, kept beside the manifest and the
+     * adapter it came from so that the destinations of a whole run can be compared before any of them is written.
+     */
+    private data class UserScopeTarget(
+        val manifest: UserDeploymentManifest,
+        val adapter: ToolAdapter,
+        val exporter: UserScopeExporter,
+    ) {
+        val instructionsFile: File get() = exporter.instructionsFile.absoluteFile
     }
 
     companion object {
@@ -484,6 +610,13 @@ class DeployDirectoryResolvingException(
             failures.forEach { failure -> append("\n  - ${failure.message}") }
         },
     )
+
+/**
+ * Thrown for each user deployment that claims an instructions file another one claims too. A tool reads one such
+ * file per home, so there is nothing to merge and no winner to pick - see
+ * [ToolsEngine.reportContendedInstructionsFiles].
+ */
+class ContendedInstructionsFileException(message: String) : RuntimeException(message)
 
 /**
  * A single manifest that could not be exported, together with the resolution failure that stopped it.

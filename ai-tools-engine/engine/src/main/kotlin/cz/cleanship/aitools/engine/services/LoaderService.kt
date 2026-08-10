@@ -68,6 +68,12 @@ class LoaderService {
      * a project and a user deployment are free to share a name - they are separate manifests of separate scopes,
      * and nothing ever has to choose between them.
      *
+     * The filename decides the kind at any depth, deliberately: a configured location is walked whole, `project.yml`
+     * has always been found wherever it sits, and a machine-private location is free to group its manifests in
+     * subdirectories. The one shape this admits is a `user.yml` inside a project's `features/`, which is then read as
+     * both a feature and a user deployment - and strict decoding turns that into a loud failure naming the file
+     * rather than something silently mis-deployed, so it needs no rule of its own.
+     *
      * How far a collision reaches follows the kind of manifest, mirroring the collect-all-then-fail policy of
      * [cz.cleanship.aitools.engine.ToolsEngine]:
      * - `projects`, `userDeployments` and per-project `features` belong to a single deployment, so a collision

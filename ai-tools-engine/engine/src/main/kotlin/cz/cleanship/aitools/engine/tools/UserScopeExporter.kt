@@ -1,5 +1,7 @@
 package cz.cleanship.aitools.engine.tools
 
+import java.io.File
+
 /**
  * Writes the artifacts of one [cz.cleanship.aitools.engine.models.UserDeploymentManifest] into the per-user
  * configuration of one tool - `~/.claude`, `~/.codex` - the way [ToolAdapter] writes them into a project directory.
@@ -11,6 +13,14 @@ package cz.cleanship.aitools.engine.tools
  * [cz.cleanship.aitools.engine.models.UserDeploymentManifest.replace] for how far a replacing deploy reaches.
  */
 interface UserScopeExporter {
+
+    /**
+     * The single instructions file of this tool in this home - `<home>/.claude/CLAUDE.md`, `<home>/.codex/AGENTS.md`.
+     * The engine reads it before exporting: there is exactly one per tool per home, so two manifests deploying to the
+     * same tool would otherwise overwrite each other here without a word - see
+     * [cz.cleanship.aitools.engine.ToolsEngine].
+     */
+    val instructionsFile: File
 
     fun export(instructionsContext: UserInstructionsContext)
 

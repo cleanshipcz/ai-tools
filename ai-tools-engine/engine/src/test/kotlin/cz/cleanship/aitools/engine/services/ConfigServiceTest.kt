@@ -92,6 +92,61 @@ class ConfigServiceTest {
     }
 
     @Test
+    fun `should fail naming the rename when a config still declares the retired projects key`(
+        @TempDir tempDir: File,
+    ) {
+        // given
+        // - config.local.yml is gitignored, so no rename in this repository can reach the one on another machine;
+        //   dropping the key silently would leave that machine deploying nothing and reporting success
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              projects:
+                - "09_projects"
+            """.trimIndent(),
+        )
+
+        // when
+        val error = runCatching { ConfigService().loadConfig(tempDir) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(RetiredConfigKeyException::class.java)
+            .hasMessageContaining("locations.projects")
+            .hasMessageContaining("locations.deployments")
+            .hasMessageContaining("config.yml")
+    }
+
+    @Test
+    fun `should name the local config when it is the one declaring the retired projects key`(
+        @TempDir tempDir: File,
+    ) {
+        // given
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              deployments:
+                - "09_deployments"
+            """.trimIndent(),
+        )
+        File(tempDir, "config.local.yml").writeText(
+            """
+            locations:
+              projects:
+                - "09_projects"
+            """.trimIndent(),
+        )
+
+        // when
+        val error = runCatching { ConfigService().loadConfig(tempDir) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(RetiredConfigKeyException::class.java)
+            .hasMessageContaining("config.local.yml")
+    }
+
+    @Test
     fun `should throw exception when missing config file`(
         @TempDir tempDir: File,
     ) {

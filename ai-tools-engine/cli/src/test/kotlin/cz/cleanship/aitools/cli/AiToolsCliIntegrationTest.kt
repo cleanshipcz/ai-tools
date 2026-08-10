@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.parse
 import cz.cleanship.aitools.engine.ExportFailedException
 import cz.cleanship.aitools.engine.ExportFailure
+import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
@@ -229,6 +230,55 @@ class AiToolsCliIntegrationTest {
         assertThat(File(userHome, ".claude/CLAUDE.md").readText())
             .contains("# globals")
             .contains("A rule from base.")
+    }
+
+    @Test
+    fun `should fail when the user home is empty`() {
+        // given
+        // - an empty value resolves to the directory the shell happened to be in, which is never what was meant
+        val cli = AiToolsCli(runner = { _, _ -> })
+
+        // when
+        val error = runCatching {
+            cli.parse(arrayOf("--working-dir", tempDir.absolutePath, "--user-home", ""))
+        }.exceptionOrNull()
+
+        // then
+        assertThat(error).isInstanceOf(CliktError::class.java)
+    }
+
+    @Test
+    fun `should resolve a relative user home against the working directory`() {
+        // given
+        // - the same base every other declared path of the run uses, rather than the working directory of the JVM
+        var recordedUserHome: File? = null
+        val cli = AiToolsCli(runner = { _, userHome -> recordedUserHome = userHome })
+
+        // when
+        cli.parse(arrayOf("--working-dir", tempDir.absolutePath, "--user-home", "scratch-home"))
+
+        // then
+        assertThat(recordedUserHome).isEqualTo(File(tempDir, "scratch-home"))
+    }
+
+    @Test
+    fun `should fail with the guard message when a manifest id would escape its directory`() {
+        // given
+        val cli = AiToolsCli(
+            runner = { _, _ ->
+                throw ArtifactPathException("Refusing to replace '/home/user/evil': it is not inside '/home/user/.claude/skills'.")
+            },
+        )
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        // - the remediation sentence reaches the operator instead of being buried in a stack trace
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessageContaining("Refusing to replace")
+        assertThat((error as CliktError).statusCode).isNotZero()
     }
 
     @Test

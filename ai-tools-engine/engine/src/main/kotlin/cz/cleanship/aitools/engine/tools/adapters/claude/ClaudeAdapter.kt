@@ -112,6 +112,8 @@ class ClaudeAdapter(
         private val deployment: UserDeploymentManifest,
     ) : UserScopeExporter {
 
+        override val instructionsFile: File get() = layout.instructionsFile
+
         override fun export(instructionsContext: UserInstructionsContext) = exportService.export(
             instructionsContext.deployment,
             layout.instructionsFile,

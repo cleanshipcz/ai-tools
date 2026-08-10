@@ -33,10 +33,10 @@ internal class ClaudeLayout(
             instructionsFile = projectDir.resolve(INSTRUCTIONS_FILE),
         )
 
-        fun ofUser(userHome: File) = ClaudeLayout(
-            toolDir = userHome.resolve(CLAUDE_DIR),
-            instructionsFile = userHome.resolve(CLAUDE_DIR).resolve(INSTRUCTIONS_FILE),
-        )
+        fun ofUser(userHome: File): ClaudeLayout {
+            val toolDir = userHome.resolve(CLAUDE_DIR)
+            return ClaudeLayout(toolDir, instructionsFile = toolDir.resolve(INSTRUCTIONS_FILE))
+        }
 
         private const val CLAUDE_DIR = ".claude"
         private const val INSTRUCTIONS_FILE = "CLAUDE.md"
