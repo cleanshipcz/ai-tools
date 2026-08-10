@@ -10,7 +10,9 @@ import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
+import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
+import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -33,6 +35,12 @@ class ToolsEngineTest {
 
     private lateinit var workspace: File
     private lateinit var destination: File
+
+    /**
+     * The home base every engine of this class deploys the user scope under. It is a directory of the test's own
+     * temporary tree, so no test can reach the real home of whoever runs the suite.
+     */
+    private lateinit var userHome: File
     private lateinit var engine: ToolsEngine
     private lateinit var engineLogger: Logger
 
@@ -40,7 +48,8 @@ class ToolsEngineTest {
     fun setUp() {
         workspace = tempDir.resolve("workspace").toFile()
         destination = tempDir.resolve("destination").toFile()
-        engine = ToolsEngine(workspace, tools = listOf(ClaudeAdapter()))
+        userHome = tempDir.resolve("home").toFile()
+        engine = ToolsEngine(workspace, userHome = userHome, tools = listOf(ClaudeAdapter()))
         engineLogger = LoggerFactory.getLogger(ToolsEngine::class.java) as Logger
         logAppender.start()
         engineLogger.addAppender(logAppender)
@@ -688,6 +697,185 @@ class ToolsEngineTest {
         }
     }
 
+    @Nested
+    inner class UserDeployments {
+
+        @Test
+        fun `should deploy every artifact of a user deployment into the home of the run`() {
+            // given
+            writeAgent("global-agent", "base")
+            writePrompt("global-prompt", "base")
+            writeDirectorySkill("global-skill", "helper.md", companionFileExists = true)
+            writeUserDeployment()
+
+            // when
+            engine.process(locations())
+
+            // then
+            val claudeDir = userHome.resolve(".claude")
+            assertThat(claudeDir.resolve("CLAUDE.md").readText())
+                .contains("# globals")
+                .contains("A rule from base.")
+            assertThat(claudeDir.resolve("agents/global-agent.md")).exists()
+            assertThat(claudeDir.resolve("commands/global-prompt.md")).exists()
+            assertThat(claudeDir.resolve("skills/global-skill/SKILL.md")).exists()
+            assertThat(claudeDir.resolve("skills/global-skill/helper.md")).exists()
+        }
+
+        @Test
+        fun `should deploy only the manifests the filters of the deployment select`() {
+            // given
+            writeAgent("selected-agent", "base")
+            writeAgent("rejected-agent", "base")
+            writeUserDeployment(agentFilter = listOf("selected-agent"))
+
+            // when
+            engine.process(locations())
+
+            // then
+            val agentsDir = userHome.resolve(".claude/agents")
+            assertThat(agentsDir.resolve("selected-agent.md")).exists()
+            assertThat(agentsDir.resolve("rejected-agent.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should deploy the projects and the user deployments of the same run`() {
+            // given
+            // - the project written in setUp deploys as usual while the user deployment reaches the home
+            writeUserDeployment()
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(userHome.resolve(".claude/CLAUDE.md")).exists()
+        }
+
+        @Test
+        fun `should deploy a user deployment only through the tools it declares`() {
+            // given
+            val multiAdapterEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(ClaudeAdapter(), CodexAdapter()))
+            writeUserDeployment(tools = listOf("claude"))
+
+            // when
+            multiAdapterEngine.process(locations())
+
+            // then
+            assertThat(userHome.resolve(".claude/CLAUDE.md")).exists()
+            assertThat(userHome.resolve(".codex/AGENTS.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should deploy a user deployment through every configured tool when it declares none`() {
+            // given
+            val multiAdapterEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(ClaudeAdapter(), CodexAdapter()))
+            writeUserDeployment(tools = null)
+
+            // when
+            multiAdapterEngine.process(locations())
+
+            // then
+            assertThat(userHome.resolve(".claude/CLAUDE.md")).exists()
+            assertThat(userHome.resolve(".codex/AGENTS.md")).exists()
+        }
+
+        @Test
+        fun `should warn in the spelling of the manifest when a declared tool is not configured`() {
+            // given
+            // - the run configures Claude alone, so the Codex the manifest declares cannot be honoured
+            writeUserDeployment(tools = listOf("claude", "codex"))
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(userHome.resolve(".claude/CLAUDE.md")).exists()
+            assertThat(warnings()).anyMatch { it.contains("globals") && it.contains("codex") }
+            assertThat(warnings()).noneMatch { it.contains("CODEX") }
+        }
+
+        @Test
+        fun `should deploy a user deployment through no tool when it declares an empty tool list`() {
+            // given
+            writeUserDeployment(tools = emptyList())
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(userHome).doesNotExist()
+            assertThat(warnings()).anyMatch { it.contains("globals") && it.contains("not exported") }
+        }
+
+        @Test
+        fun `should warn and deploy nothing for a configured tool that has no user scope`() {
+            // given
+            // - Windsurf builds projects in this run but has no per-user layout, which must not pass in silence
+            val windsurfEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(WindsurfAdapter()))
+            writeUserDeployment(tools = listOf("windsurf"))
+
+            // when
+            windsurfEngine.process(locations())
+
+            // then
+            assertThat(userHome).doesNotExist()
+            assertThat(warnings()).anyMatch { it.contains("globals") && it.contains("WINDSURF") }
+        }
+
+        @Test
+        fun `should deploy the remaining artifacts when one artifact of a user deployment fails`() {
+            // given
+            writeAgent("broken-agent", "missing-ruleset")
+            writePrompt("good-prompt", "base")
+            writeUserDeployment()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(userHome.resolve(".claude/commands/good-prompt.md")).exists()
+            assertThat(userHome.resolve(".claude/agents/broken-agent.md")).doesNotExist()
+            // - the failure is reported against the deployment that carries it, beside the one of the project
+            assertThat((error as ExportFailedException).failures.map { it.deploymentId to it.manifest })
+                .contains("globals" to "agent 'broken-agent'")
+        }
+
+        @Test
+        fun `should deploy the unaffected user deployment when another one is broken`() {
+            // given
+            writeAgent("broken-agent", "missing-ruleset")
+            writeUserDeployment(id = "with-agents")
+            writeUserDeployment(id = "without-agents", directoryName = "second", agentFilter = emptyList())
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            // - both write the same instructions file, and the run reaching the second one is what is proven here
+            assertThat(userHome.resolve(".claude/CLAUDE.md").readText()).contains("# without-agents")
+            assertThat(error).isInstanceOf(ExportFailedException::class.java)
+        }
+
+        @Test
+        fun `should deploy no user deployment at all when two of them share an id`() {
+            // given
+            writeUserDeployment(id = "duplicated", directoryName = "first")
+            writeUserDeployment(id = "duplicated", directoryName = "second")
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(userHome).doesNotExist()
+            // - the project of the same run is untouched by the collision, and the run still fails
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("duplicated")
+        }
+    }
+
     private fun locations() = Locations(
         agents = listOf(workspace.resolve("agents")),
         deployments = listOf(workspace.resolve("deployments")),
@@ -766,6 +954,39 @@ class ToolsEngineTest {
         tools == null -> ""
         tools.isEmpty() -> "  tools: []\n"
         else -> tools.joinToString(separator = "", prefix = "  tools:\n") { "    - $it\n" }
+    }
+
+    /**
+     * Writes a `user.yml` beside the projects, which is how the loader tells the two kinds apart.
+     *
+     * @param agentFilter the agent ids the deployment whitelists, or `null` for every agent there is
+     */
+    private fun writeUserDeployment(
+        id: String = "globals",
+        directoryName: String = id,
+        tools: List<String>? = listOf("claude"),
+        agentFilter: List<String>? = null,
+    ) = writeYaml(
+        "deployments/$directoryName/user.yml",
+        "id: $id\ndescription: A user deployment\n" + userToolsDeclaration(tools) + agentFilterDeclaration(agentFilter),
+    )
+
+    /**
+     * Renders the optional `tools` list of a user deployment, which sits at the top level rather than under `deploy`.
+     */
+    private fun userToolsDeclaration(tools: List<String>?) = when {
+        tools == null -> ""
+        tools.isEmpty() -> "tools: []\n"
+        else -> tools.joinToString(separator = "", prefix = "tools:\n") { "  - $it\n" }
+    }
+
+    private fun agentFilterDeclaration(ids: List<String>?) = when {
+        ids == null -> ""
+        ids.isEmpty() -> "agents:\n  filter:\n    - type: whitelist\n      ids: []\n"
+        else -> ids.joinToString(
+            separator = "",
+            prefix = "agents:\n  filter:\n    - type: whitelist\n      ids:\n",
+        ) { "        - $it\n" }
     }
 
     private fun writeFeature(projectDirectoryName: String, fileName: String, id: String) = writeYaml(

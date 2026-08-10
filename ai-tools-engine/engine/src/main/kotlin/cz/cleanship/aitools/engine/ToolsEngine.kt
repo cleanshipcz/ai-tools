@@ -11,6 +11,8 @@ import cz.cleanship.aitools.engine.models.Project
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.models.UserDeployment
+import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
@@ -23,6 +25,7 @@ import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.RulesetResolvingException
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
+import cz.cleanship.aitools.engine.tools.UserInstructionsContext
 import cz.cleanship.aitools.engine.tools.adapters.antigravity.AntigravityAdapter
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
@@ -45,12 +48,17 @@ import java.io.File
  * see [VariableResolver]. They are the ones the config files of the run declared, so a project manifest reads the
  * same variables the `locations.*` of that run did. The default declares none and falls back to the environment of
  * the process, which is what an engine built without a config sees.
+ * @param userHome the home directory a [UserDeploymentManifest] is deployed under, from which each adapter derives
+ * the per-user location of its own tool - `<home>/.claude`, `<home>/.codex`. It defaults to the home of the user
+ * running the engine, which is the only home a deploy is ever meant to reach; a test overrides it so that it writes
+ * into a directory of its own instead.
  */
 class ToolsEngine(
     private val workingDirectory: File,
     private val loaderService: LoaderService = LoaderService(),
     private val filterService: FilterService = FilterService(),
     private val variables: VariableResolver = VariableResolver(),
+    private val userHome: File = File(System.getProperty("user.home")),
     private val tools: List<ToolAdapter> = listOf(
         WindsurfAdapter(),
         AntigravityAdapter(),
@@ -65,7 +73,8 @@ class ToolsEngine(
 
     /**
      * Loads every manifest in [locations] and exports each project through every configured adapter, or through the
-     * subset a project narrows itself down to with `deploy.tools` - see [selectAdapters].
+     * subset a project narrows itself down to with `deploy.tools` - see [selectAdapters]. The user deployments of the
+     * run follow the projects, each into the per-user location of the tools it names - see [exportUserDeployments].
      *
      * Failure policy: COLLECT-ALL-THEN-FAIL. An unresolvable ruleset or fragment reference fails only the single
      * manifest that carries it; every remaining manifest, adapter and project is still exported, and all failures
@@ -97,15 +106,16 @@ class ToolsEngine(
             LOG.info("Processing locations {}", locations)
             val allData = loaderService.loadAll(locations)
             LOG.info(
-                "Loaded {} agents, {} prompts, {} rulesets, {} fragments, {} skills, {} projects",
+                "Loaded {} agents, {} prompts, {} rulesets, {} fragments, {} skills, {} projects, {} user deployments",
                 allData.agents.size,
                 allData.prompts.size,
                 allData.rulesets.size,
                 allData.fragments.size,
                 allData.skills.size,
                 allData.projects.size,
+                allData.userDeployments.size,
             )
-            allData.duplicates.forEach { LOG.error("Not exporting the project(s) affected by an ambiguous id. {}", it.message) }
+            allData.duplicates.forEach { LOG.error("Not exporting the deployment(s) affected by an ambiguous id. {}", it.message) }
 
             // A run with no adapters exports nothing at all, and every project below is skipped before it reaches a
             // log line, so the misconfiguration is named here rather than leaving the run silent and successful.
@@ -119,7 +129,7 @@ class ToolsEngine(
             for (projectManifest in allData.projects.values) {
                 // Selecting before the project is assembled keeps a project that exports through no tool out of the
                 // log entirely, rather than bracketing it in the lines that report a deploy which never happened.
-                val adapters = selectAdapters(projectManifest)
+                val adapters = selectAdapters(projectManifest.id, projectManifest.deploy.tools, toolsField = "deploy.tools", subject = "project")
                 if (adapters.isEmpty()) continue
                 LOG.info("Processing project {}", projectManifest.id)
                 val project = assembleProject(projectManifest, allData)
@@ -129,6 +139,8 @@ class ToolsEngine(
                 }
                 LOG.info("Processing project {} completed", projectManifest.id)
             }
+
+            failures += exportUserDeployments(allData)
 
             if (failures.isNotEmpty() || allData.duplicates.isNotEmpty()) {
                 throw ExportFailedException(failures, allData.duplicates)
@@ -204,27 +216,155 @@ class ToolsEngine(
     }
 
     /**
-     * Returns the configured adapters that export [projectManifest], narrowed to its `deploy.tools` when it declares one.
+     * Exports every user deployment of [allData] into [userHome], through the adapters its `tools` list selects.
+     *
+     * It mirrors the project loop above, minus the parts a user scope does not have: there is no directory to resolve
+     * - each adapter knows the per-user location of its own tool - and no features to deploy. A tool the engine has
+     * no user-scope layout for is reported rather than passed over, so a manifest naming it is never dropped without
+     * a word - see [ToolAdapter.userScope].
+     *
+     * @return the failures collected while exporting, which the caller reports together with those of the projects
+     */
+    private fun exportUserDeployments(allData: AllManifests): List<ExportFailure> {
+        val failures = mutableListOf<ExportFailure>()
+        for (manifest in allData.userDeployments.values) {
+            val adapters = selectAdapters(manifest.id, manifest.tools, toolsField = "tools", subject = "user deployment")
+            if (adapters.isEmpty()) continue
+            LOG.info("Processing user deployment {}", manifest.id)
+            val deployment = assembleUserDeployment(manifest, allData)
+            for (adapter in adapters) {
+                failures += exportUserAdapter(deployment, adapter, allData.rulesets, allData.fragments)
+            }
+            LOG.info("Processing user deployment {} completed", manifest.id)
+        }
+        return failures
+    }
+
+    /**
+     * Exports every manifest of [deployment] into the user scope of [adapter], isolating each of them the way
+     * [exportAdapter] isolates the manifests of a project.
+     *
+     * @return the failures collected while exporting, empty when everything was exported or when this tool has no
+     * user scope at all
+     */
+    private fun exportUserAdapter(
+        deployment: UserDeployment,
+        adapter: ToolAdapter,
+        allRulesets: Map<String, RulesetManifest>,
+        allFragments: Map<String, FragmentManifest>,
+    ): List<ExportFailure> {
+        val manifest = deployment.manifest
+        val exporter = adapter.userScope(userHome, manifest)
+        if (exporter == null) {
+            LOG.warn("{}: {} has no user-scope layout in this engine, so the manifest is not deployed for it.", manifest.id, adapter.toolType)
+            return emptyList()
+        }
+        LOG.info("{}: Deploying into the user scope of {} under '{}'", manifest.id, adapter.toolType, userHome)
+        if (manifest.replace) {
+            // Quoted for the same reason the project loop quotes its destination: a home can end in a character
+            // that reads as part of the sentence around it.
+            LOG.warn("{}: Replacing the artifacts of this deployment under '{}'.", manifest.id, userHome)
+        }
+
+        val exports = buildList<Pair<String, () -> Unit>> {
+            add(
+                "instructions of '${manifest.id}'" to {
+                    exporter.export(UserInstructionsContext(manifest, deployment.rulesets))
+                },
+            )
+            deployment.agents.values.forEach { agent ->
+                add(
+                    "agent '${agent.id}'" to {
+                        exporter.export(AgentContext(agent, deployment.rulesets, allRulesets, deployment.fragments, allFragments))
+                    },
+                )
+            }
+            deployment.prompts.values.forEach { prompt ->
+                add(
+                    "prompt '${prompt.id}'" to {
+                        exporter.export(PromptContext(prompt, deployment.rulesets, allRulesets, deployment.fragments, allFragments))
+                    },
+                )
+            }
+            deployment.skills.values.forEach { skill ->
+                add(
+                    "skill '${skill.id}'" to {
+                        exporter.export(
+                            SkillContext(
+                                skill,
+                                deployment.rulesets,
+                                allRulesets,
+                                deployment.fragments,
+                                allFragments,
+                                sourceDir = deployment.skillSourceDirs[skill.id],
+                            ),
+                        )
+                    },
+                )
+            }
+        }
+
+        return exports.mapNotNull { (name, export) ->
+            exportOrCollectFailure(manifest.id, adapter.toolType, name, export)
+        }
+    }
+
+    /**
+     * Builds the user deployment that is exported: every manifest of [allData] that survives the filter [manifest]
+     * declares for its kind, indexed by id - the user-scope counterpart of [assembleProject].
+     */
+    private fun assembleUserDeployment(manifest: UserDeploymentManifest, allData: AllManifests): UserDeployment {
+        val filteredSkills = filterService
+            .filter(allData.skills.values, manifest.skills.filter)
+            .associateBy { it.id }
+        return UserDeployment(
+            manifest,
+            agents = filterService
+                .filter(allData.agents.values, manifest.agents.filter)
+                .associateBy { it.id },
+            prompts = filterService
+                .filter(allData.prompts.values, manifest.prompts.filter)
+                .associateBy { it.id },
+            rulesets = filterService
+                .filter(allData.rulesets.values, manifest.rulesets.filter)
+                .associateBy { it.id },
+            fragments = filterService
+                .filter(allData.fragments.values, manifest.fragments.filter)
+                .associateBy { it.id },
+            skills = filteredSkills,
+            skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
+        )
+    }
+
+    /**
+     * Returns the configured adapters that deploy the manifest [manifestId], narrowed to [declaredTools] when it
+     * declares any. Both kinds of deployment manifest narrow themselves the same way, under the key [toolsField] -
+     * `deploy.tools` for a project, `tools` for a user deployment - which the warnings quote back to their author.
      *
      * A declared tool the run does not configure is warned about rather than failed on: the tools configured for the
-     * run decide which adapters exist at all, and a project manifest travels between runs that configure different
-     * sets of them, so the two lists disagreeing is a difference in scope rather than a broken manifest. Narrowing to
-     * nothing is warned about for the same reason it is allowed - a project that exports through no tool is a
-     * deliberate but silent outcome, and a silent one is worth saying out loud.
+     * run decide which adapters exist at all, and a manifest travels between runs that configure different sets of
+     * them, so the two lists disagreeing is a difference in scope rather than a broken manifest. Narrowing to nothing
+     * is warned about for the same reason it is allowed - a [subject] that exports through no tool is a deliberate
+     * but silent outcome, and a silent one is worth saying out loud.
      *
      * The warning quotes the unavailable tools in the spelling a manifest writes them, not as Kotlin constants, so
      * that an author can search their own YAML for the word the engine just told them about.
      */
-    private fun selectAdapters(projectManifest: ProjectManifest): List<ToolAdapter> {
-        val declared = projectManifest.deploy.tools?.toSet() ?: return tools
+    private fun selectAdapters(
+        manifestId: String,
+        declaredTools: List<ToolType>?,
+        toolsField: String,
+        subject: String,
+    ): List<ToolAdapter> {
+        val declared = declaredTools?.toSet() ?: return tools
         val configured = tools.mapTo(mutableSetOf()) { it.toolType }
         val unavailable = declared.filterNot { it in configured }
         if (unavailable.isNotEmpty()) {
-            LOG.warn("{}: deploy.tools names {}, which this run does not configure. Leaving the tool(s) out of this deploy.", projectManifest.id, unavailable.map { it.serialName })
+            LOG.warn("{}: {} names {}, which this run does not configure. Leaving the tool(s) out of this deploy.", manifestId, toolsField, unavailable.map { it.serialName })
         }
         val selected = tools.filter { it.toolType in declared }
         if (selected.isEmpty()) {
-            LOG.warn("{}: deploy.tools selects none of the configured tools, so the project is not exported.", projectManifest.id)
+            LOG.warn("{}: {} selects none of the configured tools, so the {} is not exported.", manifestId, toolsField, subject)
         }
         return selected
     }
@@ -306,7 +446,7 @@ class ToolsEngine(
      * @return the failure that stopped this manifest, or `null` when it was exported successfully
      */
     private fun exportOrCollectFailure(
-        projectId: String,
+        deploymentId: String,
         toolType: ToolType,
         manifest: String,
         export: () -> Unit,
@@ -314,14 +454,14 @@ class ToolsEngine(
         export()
         null
     } catch (ex: RulesetResolvingException) {
-        LOG.error("{}: {} could not be exported for {}", projectId, manifest, toolType, ex)
-        ExportFailure(projectId, toolType, manifest, ex)
+        LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
+        ExportFailure(deploymentId, toolType, manifest, ex)
     } catch (ex: FragmentResolvingException) {
-        LOG.error("{}: {} could not be exported for {}", projectId, manifest, toolType, ex)
-        ExportFailure(projectId, toolType, manifest, ex)
+        LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
+        ExportFailure(deploymentId, toolType, manifest, ex)
     } catch (ex: SkillFileResolvingException) {
-        LOG.error("{}: {} could not be exported for {}", projectId, manifest, toolType, ex)
-        ExportFailure(projectId, toolType, manifest, ex)
+        LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
+        ExportFailure(deploymentId, toolType, manifest, ex)
     }
 
     companion object {
@@ -345,9 +485,12 @@ class DeployDirectoryResolvingException(
 
 /**
  * A single manifest that could not be exported, together with the resolution failure that stopped it.
+ *
+ * @param deploymentId the deployment the manifest was exported for - a project or a user deployment, both of which
+ * export through the same isolation
  */
 data class ExportFailure(
-    val projectId: String,
+    val deploymentId: String,
     val toolType: ToolType,
     val manifest: String,
     val cause: RuntimeException,
@@ -367,15 +510,15 @@ class ExportFailedException(
                 // A broken manifest fails once per adapter, so counting the failures would report a single broken
                 // agent as six problems with the six tools of config.yml. The count is therefore over the distinct
                 // manifests, while the body still lists every adapter that could not export them.
-                val brokenManifests = failures.distinctBy { it.projectId to it.manifest }.size
+                val brokenManifests = failures.distinctBy { it.deploymentId to it.manifest }.size
                 append("Export failed for $brokenManifests manifest(s):")
                 failures.forEach { failure ->
-                    append("\n  - [${failure.projectId} | ${failure.toolType} | ${failure.manifest}] ${failure.cause.message}")
+                    append("\n  - [${failure.deploymentId} | ${failure.toolType} | ${failure.manifest}] ${failure.cause.message}")
                 }
             }
             if (duplicates.isNotEmpty()) {
                 if (isNotEmpty()) append("\n")
-                append("Skipped the project(s) affected by ${duplicates.size} duplicate manifest id(s):")
+                append("Skipped the deployment(s) affected by ${duplicates.size} duplicate manifest id(s):")
                 duplicates.forEach { duplicate -> append("\n  - ${duplicate.message}") }
             }
         },

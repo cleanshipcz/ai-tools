@@ -181,11 +181,76 @@ class AiToolsCliIntegrationTest {
     }
 
     @Test
+    fun `should deploy a user deployment into the home the option names`() {
+        // given
+        // - the home base is always the one the run was given; the real home of this machine is never involved
+        val userHome = File(tempDir, "home")
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              deployments:
+                - "deployments"
+              rulesets:
+                - "rulesets"
+            tools:
+              - claude
+            """.trimIndent(),
+        )
+        val rulesetFile = File(tempDir, "rulesets/base.yml")
+        rulesetFile.parentFile.mkdirs()
+        rulesetFile.writeText(
+            """
+            id: base
+            description: A ruleset
+            rules:
+              - A rule from base.
+            metadata:
+              version: 1.0.0
+            """.trimIndent(),
+        )
+        val deploymentFile = File(tempDir, "deployments/globals/user.yml")
+        deploymentFile.parentFile.mkdirs()
+        deploymentFile.writeText(
+            """
+            id: globals
+            description: A user deployment
+            tools:
+              - claude
+            metadata:
+              version: 1.0.0
+            """.trimIndent(),
+        )
+        val cli = AiToolsCli()
+
+        // when
+        cli.parse(arrayOf("--working-dir", tempDir.absolutePath, "--user-home", userHome.absolutePath))
+
+        // then
+        assertThat(File(userHome, ".claude/CLAUDE.md").readText())
+            .contains("# globals")
+            .contains("A rule from base.")
+    }
+
+    @Test
+    fun `should run under the home of this user when the option is not given`() {
+        // given
+        // - a runner that records what it was given, so the default is proven without a single file being written
+        var recordedUserHome: File? = null
+        val cli = AiToolsCli(runner = { _, userHome -> recordedUserHome = userHome })
+
+        // when
+        cli.parse(arrayOf("--working-dir", tempDir.absolutePath))
+
+        // then
+        assertThat(recordedUserHome).isEqualTo(File(System.getProperty("user.home")))
+    }
+
+    @Test
     fun `should fail with the resolver message when an export fails`() {
         // given
         // - a CliktError makes the command report on stderr and exit with a non-zero status code
         val failure = ExportFailure(
-            projectId = "test-project",
+            deploymentId = "test-project",
             toolType = ToolType.CLAUDE,
             manifest = "agent 'broken-agent'",
             cause = RulesetResolvingException(
@@ -194,7 +259,7 @@ class AiToolsCliIntegrationTest {
                 availableIds = listOf("base"),
             ),
         )
-        val cli = AiToolsCli(runner = { throw ExportFailedException(listOf(failure)) })
+        val cli = AiToolsCli(runner = { _, _ -> throw ExportFailedException(listOf(failure)) })
 
         // when
         val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
@@ -211,7 +276,7 @@ class AiToolsCliIntegrationTest {
     fun `should fail with the file path when a manifest declares a malformed version`() {
         // given
         val cli = AiToolsCli(
-            runner = {
+            runner = { _, _ ->
                 throw ManifestLoadingException(
                     file = File("/manifests/broken.yml"),
                     cause = IllegalArgumentException("Invalid version format: 1.0"),
@@ -237,7 +302,7 @@ class AiToolsCliIntegrationTest {
         val firstFile = File("/projects/alpha/project.yml")
         val secondFile = File("/projects/beta/project.yml")
         val cli = AiToolsCli(
-            runner = {
+            runner = { _, _ ->
                 throw ExportFailedException(
                     failures = emptyList(),
                     duplicates = listOf(
@@ -263,7 +328,7 @@ class AiToolsCliIntegrationTest {
     fun `should fail with both file paths when a duplicate manifest id is loaded`() {
         // given
         val cli = AiToolsCli(
-            runner = {
+            runner = { _, _ ->
                 throw DuplicateManifestIdException(
                     listOf(
                         DuplicateManifestId(

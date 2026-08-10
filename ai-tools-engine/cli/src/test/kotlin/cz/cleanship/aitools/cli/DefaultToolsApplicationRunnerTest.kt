@@ -44,6 +44,8 @@ class DefaultToolsApplicationRunnerTest {
         fun `should create tool adapters and process locations when config is loaded`() {
             // given
             val workingDirectory = File("workspace")
+            // - a home of the run that is never read here, only handed on: no test of this suite touches a real home
+            val userHome = File("home")
             val locations = Locations(
                 agents = listOf(File("agents")),
                 deployments = listOf(File("deployments")),
@@ -65,17 +67,22 @@ class DefaultToolsApplicationRunnerTest {
             every { configService.loadConfig(workingDirectory) } returns config
             every { toolAdapterFactory.create(ToolType.CLAUDE) } returns claudeAdapter
             every { toolAdapterFactory.create(ToolType.CODEX) } returns codexAdapter
-            every { engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables) } returns engineProcessor
+            every {
+                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome)
+            } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
-            runner.run(workingDirectory)
+            runner.run(workingDirectory, userHome)
 
             // then
             verify(exactly = 1) { configService.loadConfig(workingDirectory) }
             verify(exactly = 1) { toolAdapterFactory.create(ToolType.CLAUDE) }
             verify(exactly = 1) { toolAdapterFactory.create(ToolType.CODEX) }
-            verify(exactly = 1) { engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables) }
+            // - the home of the run reaches the engine, which is what the adapters derive their user scope from
+            verify(exactly = 1) {
+                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome)
+            }
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
     }
@@ -102,17 +109,18 @@ class DefaultToolsApplicationRunnerTest {
                 variables = variables,
             )
             val emptyAdapters = emptyList<ToolAdapter>()
+            val userHome = File("home")
 
             every { configService.loadConfig(workingDirectory) } returns config
-            every { engineFactory.create(emptyAdapters, workingDirectory, variables) } returns engineProcessor
+            every { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome) } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
-            runner.run(workingDirectory)
+            runner.run(workingDirectory, userHome)
 
             // then
             verify(exactly = 1) { configService.loadConfig(workingDirectory) }
-            verify(exactly = 1) { engineFactory.create(emptyAdapters, workingDirectory, variables) }
+            verify(exactly = 1) { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome) }
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
     }
@@ -128,7 +136,7 @@ class DefaultToolsApplicationRunnerTest {
             every { configService.loadConfig(workingDirectory) } throws FileNotFoundException("Missing config")
 
             // when
-            val error = runCatching { runner.run(workingDirectory) }.exceptionOrNull()
+            val error = runCatching { runner.run(workingDirectory, File("home")) }.exceptionOrNull()
 
             // then
             assertThat(error)
