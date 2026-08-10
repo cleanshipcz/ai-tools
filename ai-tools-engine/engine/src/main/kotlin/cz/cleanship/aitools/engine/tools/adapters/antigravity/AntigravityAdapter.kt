@@ -94,6 +94,7 @@ class AntigravityAdapter(
             skillContext.skill.files,
             skillContext.sourceDir,
             rulesDir(projectDir).resolve("skill-$skillId"),
+            skillId,
         )
     }
 

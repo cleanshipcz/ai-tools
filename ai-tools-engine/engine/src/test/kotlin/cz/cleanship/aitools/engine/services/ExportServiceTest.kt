@@ -1,11 +1,18 @@
 package cz.cleanship.aitools.engine.services
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import cz.cleanship.aitools.engine.data.ruleset
 import cz.cleanship.aitools.engine.models.SkillFile
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
 
@@ -21,6 +28,94 @@ class ExportServiceTest {
     fun setUp() {
         exportService = ExportService()
         targetFile = tempDir.resolve("nested").resolve("ruleset.md").toFile()
+    }
+
+    /**
+     * A companion file may legitimately come from outside the skill's own directory - an absolute `source` is a
+     * documented shape - but in the user scope it lands in `~/.claude/skills/<id>/`, a directory whose purpose is to
+     * be read into an agent's context. Such a copy is therefore named in the transcript rather than made quietly.
+     */
+    @Nested
+    inner class SourcesFromOutsideTheSkill {
+
+        private val logAppender = ListAppender<ILoggingEvent>()
+        private lateinit var exportLogger: Logger
+        private lateinit var sourceDir: File
+        private lateinit var skillDir: File
+
+        @BeforeEach
+        fun setUp() {
+            exportLogger = LoggerFactory.getLogger(ExportService::class.java) as Logger
+            logAppender.start()
+            exportLogger.addAppender(logAppender)
+            sourceDir = tempDir.resolve("skills/a-skill").toFile()
+            sourceDir.mkdirs()
+            sourceDir.resolve("helper.md").writeText("Next to the manifest.\n")
+            skillDir = tempDir.resolve("home/.claude/skills/a-skill").toFile()
+            tempDir.resolve("elsewhere").toFile().mkdirs()
+            tempDir.resolve("elsewhere/secret.md").toFile().writeText("From elsewhere.\n")
+        }
+
+        @AfterEach
+        fun tearDown() {
+            exportLogger.detachAppender(logAppender)
+            logAppender.stop()
+            logAppender.list.clear()
+        }
+
+        @Test
+        fun `should warn naming the skill and both paths when a source is absolute`() {
+            // given
+            val outside = tempDir.resolve("elsewhere/secret.md").toFile()
+
+            // when
+            exportService.copySkillFiles(
+                listOf(SkillFile(source = outside.absolutePath, target = "secret.md")),
+                sourceDir,
+                skillDir,
+                skillId = "a-skill",
+            )
+
+            // then
+            assertThat(skillDir.resolve("secret.md")).hasContent("From elsewhere.\n")
+            assertThat(warnings()).anyMatch {
+                it.contains("a-skill") && it.contains(outside.absolutePath)
+            }
+        }
+
+        @Test
+        fun `should warn naming the skill and both paths when a source climbs out of its directory`() {
+            // when
+            exportService.copySkillFiles(
+                listOf(SkillFile(source = "../../elsewhere/secret.md", target = "secret.md")),
+                sourceDir,
+                skillDir,
+                skillId = "a-skill",
+            )
+
+            // then
+            assertThat(skillDir.resolve("secret.md")).hasContent("From elsewhere.\n")
+            assertThat(warnings()).anyMatch {
+                it.contains("a-skill") && it.contains("../../elsewhere/secret.md")
+            }
+        }
+
+        @Test
+        fun `should not warn when a source sits inside the directory of its own skill`() {
+            // when
+            exportService.copySkillFiles(
+                listOf(SkillFile(source = "helper.md", target = "helper.md")),
+                sourceDir,
+                skillDir,
+                skillId = "a-skill",
+            )
+
+            // then
+            assertThat(skillDir.resolve("helper.md")).hasContent("Next to the manifest.\n")
+            assertThat(warnings()).isEmpty()
+        }
+
+        private fun warnings() = logAppender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
     }
 
     @Test

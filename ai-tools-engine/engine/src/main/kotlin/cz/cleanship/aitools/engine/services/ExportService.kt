@@ -50,14 +50,37 @@ class ExportService {
         skillFiles: List<SkillFile>,
         sourceDir: File?,
         targetDir: File,
+        skillId: String = "",
     ) {
         for (skillFile in skillFiles) {
             val sourceFile = resolveSource(skillFile.source, sourceDir)
+            warnWhenSourceComesFromOutside(skillFile.source, sourceFile, sourceDir, skillId)
             val targetFile = resolveTarget(skillFile.target, targetDir)
             targetFile.parentFile.mkdirs()
             copySkillFile(sourceFile, targetFile)
             LOG.info("Copied skill file {} to {}", sourceFile.absolutePath, targetFile.absolutePath)
         }
+    }
+
+    /**
+     * Names a companion file that comes from somewhere other than the directory of the skill declaring it.
+     *
+     * An absolute `source`, and a relative one climbing out with `..`, are both supported and stay supported: sharing
+     * one reference file between skills is what they are for. They are worth saying out loud all the same, because
+     * the directory such a file is copied into is `<skills>/<id>/` - in the user scope, a directory inside the home
+     * whose whole purpose is to be read into an agent's context. A run should not have to be reconstructed from the
+     * manifests to see that it pulled a file in from elsewhere.
+     */
+    private fun warnWhenSourceComesFromOutside(declared: String, sourceFile: File, sourceDir: File?, skillId: String) {
+        val owned = sourceDir?.toPath()?.toAbsolutePath()?.normalize() ?: return
+        val resolved = sourceFile.toPath().toAbsolutePath().normalize()
+        if (resolved.startsWith(owned)) return
+        LOG.warn(
+            "Skill '{}' copies '{}' from outside its own directory: {}",
+            skillId,
+            declared,
+            resolved,
+        )
     }
 
     /**

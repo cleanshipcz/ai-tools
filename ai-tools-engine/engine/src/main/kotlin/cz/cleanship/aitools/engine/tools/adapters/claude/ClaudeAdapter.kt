@@ -97,7 +97,7 @@ class ClaudeAdapter(
             )
             printers.skillPrinter.print(skillContext, it)
         }
-        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir)
+        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir, skillContext.skill.id)
     }
 
     /**

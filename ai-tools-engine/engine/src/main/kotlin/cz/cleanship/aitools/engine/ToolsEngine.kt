@@ -164,10 +164,15 @@ class ToolsEngine(
      * pointing at a directory that has since moved.
      */
     private fun warnWhenNothingToDeploy(locations: Locations, allData: AllManifests) {
-        if (locations.deployments.isEmpty()) {
-            LOG.warn("This run configures no deployment locations, so nothing is deployed. Declare the directories holding your project.yml and user.yml files under 'locations.deployments' in config.yml, or in config.local.yml, which replaces that list.")
-        } else if (allData.projects.isEmpty() && allData.userDeployments.isEmpty()) {
-            LOG.warn("Found no deployment manifest under {}, so nothing is deployed. A project is a directory holding a project.yml, a user deployment one holding a user.yml.", locations.deployments.map { it.absolutePath })
+        val foundNothing = allData.projects.isEmpty() && allData.userDeployments.isEmpty()
+        when {
+            locations.deployments.isEmpty() ->
+                LOG.warn("This run configures no deployment locations, so nothing is deployed. Declare the directories holding your project.yml and user.yml files under 'locations.deployments' in config.yml, or in config.local.yml, which replaces that list.")
+            // Manifests dropped for an ambiguous id are already absent from allData, and each collision was reported
+            // above. Explaining where manifests go to someone whose manifests were found and rejected would be
+            // misdirection, so that run is left with the error that actually describes it.
+            foundNothing && allData.duplicates.isEmpty() ->
+                LOG.warn("Found no deployment manifest under {}, so nothing is deployed. A project is a directory holding a project.yml, a user deployment one holding a user.yml.", locations.deployments.map { it.absolutePath })
         }
     }
 
@@ -259,25 +264,25 @@ class ToolsEngine(
             }.filter { (_, adapters) -> adapters.isNotEmpty() }
         if (selections.isEmpty()) return emptyList()
 
-        LOG.info("Deploying the user scope under '{}'", userHome.absolutePath)
-        if (!userHome.exists()) {
-            LOG.info("The home '{}' does not exist yet and is created by this deploy.", userHome.absolutePath)
-        }
-
         val targets = selections.flatMap { (manifest, adapters) ->
             adapters.mapNotNull { adapter -> userScopeTarget(manifest, adapter) }
         }
         val contendedInstructions = reportContendedInstructionsFiles(targets)
 
+        // A manifest every selected tool lacks a user scope for has no targets at all, and is left out here rather
+        // than bracketed by a pair of log lines reporting a deploy that never happened - the skip was reported per
+        // tool above. Assembling is pure filtering, so it can happen before the home is announced.
         val targetsByDeployment = targets.groupBy { it.manifest.id }
+        val planned = selections.mapNotNull { (manifest, _) ->
+            targetsByDeployment[manifest.id]?.let { PlannedUserDeployment(assembleUserDeployment(manifest, allData), it) }
+        }
+        announceHome(planned, contendedInstructions)
+
         val failures = mutableListOf<ExportFailure>()
-        for ((manifest, _) in selections) {
-            // A manifest every selected tool lacks a user scope for has no targets at all, and is skipped without a
-            // pair of log lines bracketing a deploy that never happened - the skip was reported per tool above.
-            val deploymentTargets = targetsByDeployment[manifest.id] ?: continue
-            LOG.info("Processing user deployment {}", manifest.id)
-            val deployment = assembleUserDeployment(manifest, allData)
-            for (target in deploymentTargets) {
+        for (plannedDeployment in planned) {
+            val deployment = plannedDeployment.deployment
+            LOG.info("Processing user deployment {}", deployment.manifest.id)
+            for (target in plannedDeployment.targets) {
                 failures += exportUserAdapter(
                     deployment,
                     target,
@@ -286,9 +291,28 @@ class ToolsEngine(
                     allFragments = allData.fragments,
                 )
             }
-            LOG.info("Processing user deployment {} completed", manifest.id)
+            LOG.info("Processing user deployment {} completed", deployment.manifest.id)
         }
         return failures
+    }
+
+    /**
+     * Names the home a user deploy is about to write into, and says when that home does not exist yet.
+     *
+     * It is deliberately the last thing decided before the exports run: a run can select tools that turn out to have
+     * no user scope, or manifests that turn out to contend for the only file they carry, and announcing the home
+     * before either is known would report a deploy - and the creation of a directory - that never happens.
+     */
+    private fun announceHome(planned: List<PlannedUserDeployment>, contendedInstructions: Set<File>) {
+        val writesSomething = planned.any { plannedDeployment ->
+            plannedDeployment.targets.any { it.instructionsFile !in contendedInstructions } ||
+                plannedDeployment.deployment.hasArtifacts()
+        }
+        if (!writesSomething) return
+        LOG.info("Deploying the user scope under '{}'", userHome.absolutePath)
+        if (!userHome.exists()) {
+            LOG.info("The home '{}' does not exist yet and is created by this deploy.", userHome.absolutePath)
+        }
     }
 
     /**
@@ -582,6 +606,15 @@ class ToolsEngine(
         // succeeding having quietly written nothing.
         ExportFailure(deploymentId, toolType, manifest, ex)
     }
+
+    /**
+     * A user deployment with its artifacts selected and its destinations known, before anything has been written.
+     * Having both is what lets the run say whether it is about to write at all - see [announceHome].
+     */
+    private data class PlannedUserDeployment(
+        val deployment: UserDeployment,
+        val targets: List<UserScopeTarget>,
+    )
 
     /**
      * One tool deploying one user deployment: the exporter it will write through, kept beside the manifest and the

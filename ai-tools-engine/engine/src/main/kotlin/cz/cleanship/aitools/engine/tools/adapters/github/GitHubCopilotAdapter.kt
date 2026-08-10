@@ -102,6 +102,7 @@ class GitHubCopilotAdapter(
             skill.files,
             skillContext.sourceDir,
             promptsDir(projectDir).resolve("skill-${skill.id}"),
+            skill.id,
         )
     }
 

@@ -13,4 +13,10 @@ data class UserDeployment(
     val fragments: Map<String, FragmentManifest>,
     val skills: Map<String, SkillManifest>,
     val skillSourceDirs: Map<String, java.io.File> = emptyMap(),
-)
+) {
+    /**
+     * Whether this deployment writes anything besides the instructions file. Rulesets and fragments are not counted:
+     * they are rendered into the artifacts below rather than deployed as files of their own.
+     */
+    fun hasArtifacts(): Boolean = agents.isNotEmpty() || prompts.isNotEmpty() || skills.isNotEmpty()
+}

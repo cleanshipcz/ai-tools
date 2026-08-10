@@ -16,13 +16,22 @@ set -euo pipefail
 
 CUR_DIR="$(pwd)"
 
-# Gradle splits --args itself, honouring double quotes, so every forwarded
-# argument is quoted here and any quote inside it escaped. Without this the
-# documented `--user-home /tmp/try` would be dropped and the run would write
-# into the real home instead - the one accident the option exists to prevent.
+# Gradle splits --args itself: it groups on double quotes and has no escape
+# mechanism at all, so a backslash reaches the CLI as a literal character.
+# Quoting each argument therefore carries a path containing spaces correctly,
+# while a path containing a double quote cannot be expressed - escaping it
+# would silently deliver a different, still-plausible path. Such an argument
+# is refused here rather than corrupted; run the CLI directly for that case.
 FORWARDED_ARGS=""
 for arg in "$@"; do
-    FORWARDED_ARGS="$FORWARDED_ARGS \"${arg//\"/\\\"}\""
+    case "$arg" in
+        *'"'*)
+            echo "deploy.sh: cannot pass '$arg' to Gradle: --args has no way to escape a double quote." >&2
+            echo "Run the engine directly instead: (cd ai-tools-engine && ./gradlew :cli:run --args=...)" >&2
+            exit 2
+            ;;
+    esac
+    FORWARDED_ARGS="$FORWARDED_ARGS \"$arg\""
 done
 
 # The subshell keeps the caller's working directory intact even when the run

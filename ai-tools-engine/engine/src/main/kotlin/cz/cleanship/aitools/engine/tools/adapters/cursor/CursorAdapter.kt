@@ -102,6 +102,7 @@ class CursorAdapter(
             skillContext.skill.files,
             skillContext.sourceDir,
             cursorDir(projectDir).resolve("commands").resolve("skill-$skillId"),
+            skillId,
         )
     }
 

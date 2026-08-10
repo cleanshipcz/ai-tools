@@ -740,6 +740,24 @@ class ToolsEngineTest {
             // then
             assertThat(warnings()).noneMatch { it.contains("no deployment manifest") }
         }
+
+        @Test
+        fun `should not explain manifest layout when the manifests were found and dropped for an ambiguous id`() {
+            // given
+            // - the only manifests of this run collide, so they were found and rejected rather than never written;
+            //   the error naming the collision already says what happened
+            val collidingRoot = workspace.resolve("colliding")
+            writeProject("alpha", "duplicated-project", root = "colliding")
+            writeProject("beta", "duplicated-project", root = "colliding")
+            val collidingOnly = locations().copy(deployments = listOf(collidingRoot))
+
+            // when
+            runCatching { engine.process(collidingOnly) }
+
+            // then
+            assertThat(warnings()).noneMatch { it.contains("no deployment manifest") }
+            assertThat(errors()).anyMatch { it.contains("duplicated-project") }
+        }
     }
 
     @Nested
@@ -988,6 +1006,37 @@ class ToolsEngineTest {
         }
 
         @Test
+        fun `should announce no home when no configured tool has a user scope`() {
+            // given
+            // - the manifest selects a tool the engine has no user-scope layout for, so nothing is written at all
+            val windsurfEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(WindsurfAdapter()))
+            writeUserDeployment(tools = listOf("windsurf"))
+
+            // when
+            windsurfEngine.process(locations())
+
+            // then
+            assertThat(userHome).doesNotExist()
+            assertThat(infos()).noneMatch { it.contains("Deploying the user scope") }
+            assertThat(infos()).noneMatch { it.contains("created by this deploy") }
+        }
+
+        @Test
+        fun `should announce no home when every deployment only contends for the instructions file`() {
+            // given
+            // - two deployments claiming one instructions file and carrying nothing else write nothing between them
+            writeUserDeployment(id = "personal", agentFilter = emptyList(), promptFilter = emptyList())
+            writeUserDeployment(id = "work", directoryName = "work", agentFilter = emptyList(), promptFilter = emptyList())
+
+            // when
+            runCatching { engine.process(locations()) }
+
+            // then
+            assertThat(userHome).doesNotExist()
+            assertThat(infos()).noneMatch { it.contains("Deploying the user scope") }
+        }
+
+        @Test
         fun `should log the absolute home before deploying into it`() {
             // given
             writeUserDeployment()
@@ -1138,9 +1187,11 @@ class ToolsEngineTest {
         directoryName: String = id,
         tools: List<String>? = listOf("claude"),
         agentFilter: List<String>? = null,
+        promptFilter: List<String>? = null,
     ) = writeYaml(
         "deployments/$directoryName/user.yml",
-        "id: $id\ndescription: A user deployment\n" + userToolsDeclaration(tools) + agentFilterDeclaration(agentFilter),
+        "id: $id\ndescription: A user deployment\n" + userToolsDeclaration(tools) +
+            whitelistDeclaration("agents", agentFilter) + whitelistDeclaration("prompts", promptFilter),
     )
 
     /**
@@ -1152,12 +1203,16 @@ class ToolsEngineTest {
         else -> tools.joinToString(separator = "", prefix = "tools:\n") { "  - $it\n" }
     }
 
-    private fun agentFilterDeclaration(ids: List<String>?) = when {
+    /**
+     * Renders a whitelist filter for one kind: absent for `null`, which selects everything of that kind, and an
+     * empty list of ids - which selects nothing - for an empty one.
+     */
+    private fun whitelistDeclaration(kind: String, ids: List<String>?) = when {
         ids == null -> ""
-        ids.isEmpty() -> "agents:\n  filter:\n    - type: whitelist\n      ids: []\n"
+        ids.isEmpty() -> "$kind:\n  filter:\n    - type: whitelist\n      ids: []\n"
         else -> ids.joinToString(
             separator = "",
-            prefix = "agents:\n  filter:\n    - type: whitelist\n      ids:\n",
+            prefix = "$kind:\n  filter:\n    - type: whitelist\n      ids:\n",
         ) { "        - $it\n" }
     }
 
