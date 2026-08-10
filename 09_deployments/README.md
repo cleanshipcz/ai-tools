@@ -316,7 +316,7 @@ Give each tool a single deployment, or narrow their `tools` lists.
 ### What a deploy touches, and what it leaves alone
 
 A user deploy owns the paths of the artifacts it writes and nothing else.
-The directories holding them — `~/.claude/skills/`, `~/.claude/agents/`, `~/.codex/skills/` — are shared with everything you installed by hand, so they are created when missing and never deleted wholesale.
+The directories holding them — `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/commands/`, `~/.codex/skills/` — are shared with everything you installed by hand, so they are created when missing and never deleted wholesale.
 
 With `replace: true`, the directory of each artifact this manifest deploys is deleted and rewritten (for Claude the skill directories, for Codex the skill, agent, and prompt directories), and single-file artifacts are overwritten in place.
 A skill you wrote yourself, sitting beside the generated ones, survives every deploy.
@@ -443,7 +443,9 @@ How much a collision costs depends on the kind:
 
 **`... has no user-scope layout in this engine`** — a `user.yml` names a tool whose per-user layout is not implemented yet. It still deploys for the tools that have one.
 
-**`Refusing to replace '...': it is not inside '...'`** — a manifest id would steer a replacing deploy out of the directory it owns. An id must name a single file or directory: no path separators, no `.` or `..`.
+**`Invalid manifest id '...'`** — an id must name a single file or directory: no path separators, no `.` or `..`, not empty. It becomes the name of what the adapters write, so the check runs at load time for every manifest kind, and the run fails naming the file before anything is written.
+
+**`Refusing to replace '...': it is not inside '...'`** — a user deploy with `replace: true` found one of its artifact paths in the home resolving outside the directory it owns, which in practice means a directory that has been replaced by a symlink pointing elsewhere. The run aborts and that check deletes nothing. Inspect the named path in the home rather than the manifest.
 
 **A manifest does not show up in the output** — check the filters of the deployment. A manifest with no matching tag and no whitelist entry is skipped silently, and a `blacklist` placed before the filter it was meant to trim removes nothing.
 

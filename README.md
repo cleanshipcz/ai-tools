@@ -2,7 +2,8 @@
 > Manifest-driven generator for AI coding assistant configs
 
 This repository is the source of truth for prompts, rulesets, fragments, agents, skills, and deployment manifests.
-A Kotlin engine (`ai-tools-engine/`) reads the YAML in this repo and writes tool-specific configuration files for Windsurf, Antigravity, Cursor, Claude Code, GitHub Copilot, and Codex — into each project's deploy directory, and into your own user scope (`~/.claude/`, `~/.codex/`).
+A Kotlin engine (`ai-tools-engine/`) reads the YAML in this repo and writes tool-specific configuration files for Windsurf, Antigravity, Cursor, Claude Code, GitHub Copilot, and Codex into each project's deploy directory.
+Claude Code and Codex can also be configured for your user account instead of for a project, in `~/.claude/` and `~/.codex/`.
 
 ## What You Get
 - One YAML definition per agent, prompt, ruleset, fragment, and skill, exported to six tools at once
@@ -62,13 +63,18 @@ Left over from the retired TypeScript CLI and no longer written or read by anyth
 ./deploy.sh
 ```
 
+If a `user.yml` is in play — and this repository ships one, `09_deployments/globals/user.yml` — that run also rewrites `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` from the manifest, keeping no backup of what those files held.
+Try `./deploy.sh --user-home /tmp/try` first and read what it produced there; see [User-Scope Deployments](#user-scope-deployments).
+
 `deploy.sh` is a thin wrapper around the CLI:
 
 ```bash
-cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir <repository root>"
+cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir \"<repository root>\""
 ```
 
-The CLI has two options and no subcommands:
+The inner quotes survive Gradle's own splitting of `--args`, so a repository path containing spaces stays a single argument.
+
+The CLI has two options besides `--help`, and no subcommands:
 
 - `--working-dir` — the directory containing `config.yml` (and the optional `config.local.yml`). Defaults to `.`, and `deploy.sh` sets it to the directory it was started from.
 - `--user-home` — the home directory a `user.yml` deploys under. Defaults to the home of whoever runs the command; see [User-Scope Deployments](#user-scope-deployments).
@@ -188,6 +194,7 @@ Paths are relative to `--user-home`, which defaults to the home of whoever runs 
 | skills | `~/.claude/skills/<id>/SKILL.md` | `~/.codex/skills/skill-<id>/SKILL.md` |
 
 Codex has one shape for everything it can be asked to do, so its agents and prompts are skill-shaped there too, told apart by the prefix of their directory — the same layout it uses inside a project.
+A skill's companion `files` are copied next to the generated `SKILL.md`, exactly as in project scope.
 
 `windsurf`, `antigravity`, `github_copilot`, and `cursor` have no user-scope layout in this engine yet.
 A `user.yml` naming one of them is never silently dropped: the run logs that the manifest is not deployed for that tool, and deploys it for the tools that do have a layout.
@@ -209,7 +216,7 @@ Give each tool a single deployment, or narrow their `tools` lists.
 ### What a deploy touches, and what it leaves alone
 
 A user deploy owns the paths of the artifacts it writes and nothing else.
-The directories holding them — `~/.claude/skills/`, `~/.claude/agents/`, `~/.codex/skills/` — are shared with everything you installed by hand, so they are created when missing and never deleted wholesale.
+The directories holding them — `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/commands/`, `~/.codex/skills/` — are shared with everything you installed by hand, so they are created when missing and never deleted wholesale.
 
 With `replace: true`, the directory of each artifact this manifest deploys is deleted and rewritten (for Claude, that is the skill directories; for Codex, the skill, agent, and prompt directories), and single-file artifacts are overwritten in place.
 A skill you wrote yourself, sitting beside the generated ones, survives every deploy.

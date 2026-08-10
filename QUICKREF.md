@@ -9,14 +9,16 @@ Manifests are parsed in strict mode: **an unknown key fails the run**, so do not
 # First-run setup: checks prerequisites, builds the engine
 ./setup.sh
 
-# Generate and deploy configs for every deployment manifest
-./deploy.sh
-
-# Deploy the user.yml manifests into a scratch home instead of your own
+# Try a run first: user.yml manifests land in a scratch home instead of your own
 ./deploy.sh --user-home /tmp/try
 
+# Generate and deploy configs for every deployment manifest
+# WARNING: with a user.yml in play, this rewrites ~/.claude/CLAUDE.md and
+# ~/.codex/AGENTS.md from the manifest, keeping no backup of what they held
+./deploy.sh
+
 # What deploy.sh runs under the hood
-cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir <repository root>"
+cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir \"<repository root>\""
 
 # Engine development
 cd ai-tools-engine
@@ -25,7 +27,9 @@ cd ai-tools-engine
 ./gradlew ktlintFormat   # auto-fix Kotlin formatting
 ```
 
-The CLI has two options and no subcommands:
+The inner quotes in that snippet survive Gradle's own splitting of `--args`, which is what keeps a repository path containing spaces a single argument.
+
+The CLI has two options besides `--help`, and no subcommands:
 
 - `--working-dir` — the directory holding `config.yml`. Defaults to `.`; `deploy.sh` sets it to the directory it was started from.
 - `--user-home` — the home a `user.yml` deploys under. Defaults to the home of the current user. A relative value resolves against `--working-dir`, an empty value is rejected, and a home that does not exist yet is created.
@@ -301,6 +305,8 @@ Destinations, relative to `--user-home`:
 | prompts | `~/.claude/commands/<id>.md` | `~/.codex/skills/prompt-<id>/SKILL.md` |
 | skills | `~/.claude/skills/<id>/SKILL.md` | `~/.codex/skills/skill-<id>/SKILL.md` |
 
+A skill's companion `files` are copied next to the generated `SKILL.md`, exactly as in project scope.
+
 `windsurf`, `antigravity`, `github_copilot`, and `cursor` have no user-scope layout yet; a manifest naming one is deployed for the other tools, and the run logs the tool it skipped.
 
 **The engine owns the instructions file.**
@@ -458,13 +464,15 @@ Keep machine-local paths and settings in `config.local.yml`, which is gitignored
 
 **`'locations.projects' ... was renamed to 'locations.deployments'`**: a config file still declares the retired key. Rename it — those directories now hold both `project.yml` and `user.yml` manifests. The run fails rather than dropping the list silently, which would deploy nothing while exiting successfully.
 
-**`Found no deployment manifest under [...]`**: the `deployments` locations exist but hold no `project.yml` and no `user.yml`. Nothing was deployed; check the paths the message lists.
+**`Found no deployment manifest under [...]`**: no `project.yml` and no `user.yml` was found under the `deployments` locations. Nothing was deployed. A directory that does not exist reads the same as an empty one here, so a mistyped path in `config.local.yml` produces this too; check the absolute paths the message lists.
 
 **`... is deployed by more than one user deployment`**: two `user.yml` manifests select the same tool and therefore claim its single instructions file. Neither writes it. Give each tool one deployment, or narrow their `tools` lists.
 
 **`... has no user-scope layout in this engine`**: a `user.yml` names a tool whose per-user layout is not implemented (everything except `claude` and `codex`). The manifest still deploys for the other tools it names.
 
-**`Refusing to replace '...': it is not inside '...'`**: a manifest id would steer a replacing deploy out of the directory it owns. Give the manifest an id that names a single file or directory — no path separators, no `.` or `..`.
+**`Invalid manifest id '...'`**: an id must name a single file or directory — no path separators, no `.` or `..`, not empty — because it becomes the name of what the adapters write. The check runs at load time, for every manifest kind, so the run fails before anything is written and the message names the file to fix.
+
+**`Refusing to replace '...': it is not inside '...'`**: a user deploy with `replace: true` found that one of its artifact paths in the home resolves outside the directory it owns — in practice a directory that has been replaced by a symlink pointing elsewhere. The run aborts; nothing was deleted by that check. Inspect the named path in the home, not the manifest.
 
 **Manifest changes do not show up**: check the project's filters in `project.yml`, or the filters in `user.yml` for the user scope. A manifest with no matching tag and no whitelist entry is silently skipped.
 
