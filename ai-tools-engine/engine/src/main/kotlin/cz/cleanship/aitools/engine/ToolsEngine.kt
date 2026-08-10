@@ -269,12 +269,15 @@ class ToolsEngine(
         }
         val contendedInstructions = reportContendedInstructionsFiles(targets)
 
+        val targetsByDeployment = targets.groupBy { it.manifest.id }
         val failures = mutableListOf<ExportFailure>()
-        for ((manifest, adapters) in selections) {
+        for ((manifest, _) in selections) {
+            // A manifest every selected tool lacks a user scope for has no targets at all, and is skipped without a
+            // pair of log lines bracketing a deploy that never happened - the skip was reported per tool above.
+            val deploymentTargets = targetsByDeployment[manifest.id] ?: continue
             LOG.info("Processing user deployment {}", manifest.id)
             val deployment = assembleUserDeployment(manifest, allData)
-            for (adapter in adapters) {
-                val target = targets.firstOrNull { it.manifest.id == manifest.id && it.adapter === adapter } ?: continue
+            for (target in deploymentTargets) {
                 failures += exportUserAdapter(
                     deployment,
                     target,

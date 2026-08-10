@@ -19,9 +19,9 @@ import java.nio.file.attribute.BasicFileAttributes
  * - The walk below it never follows a symbolic link. A link is removed as a link, so a corpus linked into a skill
  *   bundle loses the link and keeps its contents - the target belongs to the user, not to this deploy.
  *
- * That a path is inside [owned] at all is what manifest id validation guarantees - see
- * [cz.cleanship.aitools.engine.models.requireSingleSegmentId], which rejects an id carrying path segments before any
- * artifact is written. This check is the second line rather than the only one.
+ * That a path is inside [owned] at all is what id validation guarantees: [cz.cleanship.aitools.engine.services.LoaderService]
+ * rejects a manifest whose id is not a single path segment, before any artifact of any scope is written, which is
+ * what protects the writes as well. This check is the second line behind it rather than the only one.
  *
  * @throws ArtifactPathException if this path is not inside [owned]. Nothing was deleted by this call; whatever the
  * run had already exported before it stays where it is.
