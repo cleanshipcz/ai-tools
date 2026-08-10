@@ -5,18 +5,8 @@
 This directory holds the deployment manifests of the repository. A directory containing a `project.yml` deploys into
 a project directory; a directory containing a `user.yml` deploys into the user scope of each tool it names.
 
-> **Status: partially outdated.** This guide still largely describes the retired TypeScript CLI.
-> The `npm run project:*` commands, the separate `deploy.yml`, `deploy.local.yml`, and the
-> `projects/global/template/` scaffold **no longer exist**. The current engine has a single
-> command, `./deploy.sh`, and all deployment settings live in the `deploy:` block of `project.yml`.
-> The `global/` and `local/` split described further down is gone as well: every manifest directory
-> now sits directly under `09_deployments/`, and a machine-private one lives outside this repository,
-> added to `locations.deployments` by `config.local.yml`.
-> The `user.yml` kind is not documented here yet.
->
-> The "Project Sources Configuration" section below is accurate and has been updated.
-> For everything else, treat [../README.md](../README.md) and [../QUICKREF.md](../QUICKREF.md)
-> as authoritative until this guide gets a full pass.
+Everything below describes the current Kotlin engine, which is driven by a single command, `./deploy.sh`.
+For the field-by-field manifest reference see [../QUICKREF.md](../QUICKREF.md), and for the generated artifacts of each tool see [../README.md](../README.md#tool-output).
 
 ---
 
@@ -24,109 +14,114 @@ a project directory; a directory containing a `user.yml` deploys into the user s
 
 - [Overview](#overview)
 - [Quick Start](#quick-start)
-- [Concepts](#concepts)
-- [Creating Projects](#creating-projects)
-- [Generating Configurations](#generating-configurations)
-- [Deploying to Projects](#deploying-to-projects)
-- [Project Manifest Reference](#project-manifest-reference)
-- [Commands](#commands)
+- [Directory Layout](#directory-layout)
+- [Configuration](#configuration)
+- [Project Manifests](#project-manifests)
+- [User Deployments](#user-deployments)
 - [Features System](#features-system)
-- [External Projects](#external-projects)
+- [Duplicate Ids](#duplicate-ids)
 - [Best Practices](#best-practices)
 - [Troubleshooting](#troubleshooting)
-- [Examples](#examples)
+- [See Also](#see-also)
 
 ---
 
 ## Overview
 
-The Projects feature allows you to:
+A deployment answers one question: *which of the manifests in this repository land where, for which tools?*
 
-1. **Define project-specific context** - Tech stack, conventions, commands, documentation
-2. **Generate tool-specific configs** - Customized for GitHub Copilot, Windsurf, Cursor, Claude Code
-3. **Deploy automatically** - Push configurations to your project repositories
-4. **Version control** - Track changes to your project configurations
+There are two kinds of deployment, and **the filename names the kind while the directory names the instance**:
 
-### Why Use Projects?
+| File | Kind | Deploys into |
+| --- | --- | --- |
+| `project.yml` | project deployment | the `deploy.directory` it declares |
+| `user.yml` | user deployment | the per-user configuration of each tool it names (`~/.claude/`, `~/.codex/`) |
 
-- **Context-aware AI**: AI tools understand your project's specific requirements
-- **Consistent conventions**: Enforce project-specific naming, patterns, testing standards
-- **Easy updates**: Update once, deploy everywhere
-- **Team alignment**: Share project configurations across the team
+There is no `type:` discriminator inside the YAML, and no separate list of locations per kind: the engine walks every directory under `locations.deployments` and picks the schema by filename.
+
+Both kinds select their content the same way — filters over `agents`, `prompts`, `rulesets`, `fragments`, and `skills` — and both may narrow themselves to a subset of the tools configured for the run.
+Only a project has a `context` block, a `deploy.directory`, and `features/`.
+
+Every deployment manifest found is processed on every `./deploy.sh` run.
+There is no command to deploy a single one; narrow the `locations.deployments` list in `config.local.yml` instead.
 
 ---
 
 ## Quick Start
 
-### 1. Create a New Project
+### 1. Create a deployment
+
+Create a directory named after the deployment, and put one manifest in it:
 
 ```bash
-# Create a local project (private, not versioned)
-npm run project:create my-project -- --description "My awesome project"
+# a project deployment
+mkdir -p 09_deployments/my-project
+$EDITOR 09_deployments/my-project/project.yml
 
-# Create a global project (versioned, shared with team)
-npm run project:create my-api -- --global -d "Company REST API"
+# a user deployment
+mkdir -p 09_deployments/my-globals
+$EDITOR 09_deployments/my-globals/user.yml
 ```
 
-This will:
+Copy the shape from [`ai-tools/project.yml`](ai-tools/project.yml) or [`globals/user.yml`](globals/user.yml), or from the templates in [../QUICKREF.md](../QUICKREF.md).
 
-- Create the project directory
-- Copy template files (`project.yml`, `deploy.yml`)
-- Set up initial configuration
+Manifests are parsed strictly: an unknown key, a missing required field, or a malformed `metadata.version` fails the run naming the offending file.
 
-### 2. Configure Your Project
+### 2. Try it out
 
-Edit the generated files:
+A user deployment writes into your own home, so try it somewhere harmless first:
 
 ```bash
-# Edit project details
-code projects/local/my-project/project.yml
-
-# Edit deployment settings
-code projects/local/my-project/deploy.yml
-
-# For local overrides (gitignored)
-code projects/local/my-project/deploy.local.yml
+./deploy.sh --user-home /tmp/try
 ```
 
-### 3. Deploy to Your Project
+Every argument given to `deploy.sh` is forwarded to the engine.
+A project deployment has no equivalent switch — point its `deploy.directory` at a scratch directory while experimenting.
+
+### 3. Deploy
 
 ```bash
-# Deploy automatically generates and copies files (no confirmation by default)
-npm run project:deploy my-project
-
-# Dry run to preview
-npm run project:deploy my-project -- --dry-run
-
-# Interactive mode with step-by-step confirmation
-npm run project:deploy my-project -- --interactive
+./deploy.sh
 ```
 
-### 4. List Projects
-
-```bash
-npm run project:list
-```
-
-You'll see:
-
-- **Global projects** - Shared, versioned projects in `projects/global/`
-- **Local projects** - Your private projects in `projects/local/`
+Run it from the repository root: the current directory is passed to the engine as `--working-dir`, and that is where `config.yml` is read from.
+The exit status is the engine's own, so a manifest that fails to export fails the script too.
 
 ---
 
-## Concepts
+## Directory Layout
 
-### Project Sources Configuration
+Manifest directories sit **directly** under `09_deployments/`:
 
-**Configurable Project Locations** (`config.yml` + `config.local.yml`, in the repository root)
+```
+09_deployments/
+├── README.md
+├── ai-tools/
+│   ├── project.yml            # deploys onto this repository itself
+│   └── features/
+│       ├── export-global-file.yml
+│       └── ruleset-filtering.yml
+└── globals/
+    └── user.yml               # deploys into ~/.claude and ~/.codex
+```
+
+There is no `global/` and `local/` split.
+A manifest that should not be versioned here lives in a directory outside this repository, added to `locations.deployments` by the gitignored `config.local.yml` — see [Configuration](#configuration).
+
+The search is recursive, so a machine-private location is free to group its manifests in subdirectories.
+
+---
+
+## Configuration
+
+**Configurable deployment locations** (`config.yml` + `config.local.yml`, in the repository root)
 
 The engine searches for deployments in the directories listed under `locations.deployments`.
 A project is any directory containing a `project.yml`, a user deployment any directory containing a `user.yml`; the search is recursive.
 
 **Configuration Files:**
 
-1. **`config.yml`** (versioned, shared) - the project locations used by everyone
+1. **`config.yml`** (versioned, shared) - the deployment locations used by everyone
 2. **`config.local.yml`** (gitignored, personal) - your machine-local overrides
 
 Both live in the repository root. There is no `15_config/` directory, and the engine does not read one.
@@ -147,6 +142,9 @@ locations:
     - "09_deployments"
     - "../ai-tools-projects/projects"
 ```
+
+This key was named `locations.projects` before the second kind of manifest existed.
+A config file still declaring the old name fails the run with a message naming the replacement, rather than having its list dropped as an unknown key — which would deploy nothing while exiting successfully.
 
 **Configuration Merging:**
 
@@ -192,1189 +190,270 @@ Values must already be fully expanded: a variable whose own value contains `${..
 Groups that are not valid references - `${1ST}`, `${A-B}`, `$NO_BRACES` - pass through as literal text.
 A name consists of letters, digits, and underscores, and may not start with a digit.
 
+A user deployment declares no path at all, so nothing in a `user.yml` is substituted.
+Its destination comes from `--user-home`, which is not a variable reference and is never expanded — a literal `~` in it stays a literal `~`.
+
 Configs without `env_vars`, and paths without references, behave exactly as they did before.
 
 **When Configuration Is Used:**
 
-Every project found under these locations is processed on each `./deploy.sh` run, and written to its own `deploy.directory`.
-There is no command to list, generate, or deploy a single project.
-
-
-### Global vs Local Projects
-
-**Global Projects** (`projects/global/`)
-
-- Versioned in git
-- Shared across the team
-- Examples and templates
-- Use for: Reference implementations, team standards
-
-**Local Projects** (`projects/local/`)
-
-- Gitignored (private)
-- User-specific
-- Use for: Personal projects, client work, experiments
-
-### Project Manifest
-
-A YAML file (`project.yml`) containing:
-
-- **Metadata**: ID, name, description, version
-- **Context**: Overview, purpose
-- **Tech Stack**: Languages, frameworks, tools
-- **Documentation**: Links to docs
-- **Commands**: Dev, build, test, deploy commands
-- **Conventions**: Naming, patterns, testing rules
-- **AI Tools Config**: Preferred agents, rulesets, custom rules
-
-### Generated Outputs
-
-For each tool, the generator creates:
-
-**GitHub Copilot**
-
-- `.github/copilot-instructions.md` - Project-specific instructions
-
-**Windsurf**
-
-- `.windsurf/rules/project-rules.json` - Project rules
-
-**Cursor**
-
-- `.cursor/project-rules.json` - Project configuration
-
-**Claude Code**
-
-- `.claude/project-context.json` - Project context
-
-### Deployment
-
-### Deployment Process
-
-The deployment automatically:
-
-1. **Generates** outputs from project manifest (no separate step needed)
-2. **Backs up** existing files (if `backup: true`)
-3. **Copies** to target directory
-4. **Commits** changes (if `auto_commit: true`)
+Every deployment found under these locations is processed on each `./deploy.sh` run: a project into its own `deploy.directory`, a user deployment into the user scope of the tools it names.
+There is no command to list, generate, or deploy a single one.
 
 ---
 
-## Creating Projects
+## Project Manifests
 
-### Using the Create Command (Recommended)
-
-```bash
-# Create a local project (private, gitignored)
-npm run project:create my-project
-
-# With description
-npm run project:create my-project -- -d "Brief project description"
-
-# Create a global project (versioned, shared)
-npm run project:create my-api -- --global -d "Company REST API"
-```
-
-This automatically:
-
-- Creates the project directory structure
-- Generates `project.yml` from template with your project name
-- Generates `deploy.yml` with deployment configuration
-- Sets up proper metadata (creation date, etc.)
-
-### Manual Creation
-
-If you prefer to create projects manually:
-
-```bash
-# 1. Copy template
-mkdir -p projects/local/my-project
-cp projects/global/template/project.yml projects/local/my-project/
-cp projects/global/template/deploy.yml projects/local/my-project/
-
-# 2. Edit files
-code projects/local/my-project/project.yml
-code projects/local/my-project/deploy.yml
-
-# 3. Validate
-npm run validate
-```
-
----
-
-## Generating Configurations
-
-**Note**: Generation now happens automatically during deployment. You rarely need to run this manually.
-
-### Manual Generation (Optional)
-
-```bash
-# Generate for all tools
-npm run project:generate my-project
-
-# Generate for specific tools
-npm run project:generate my-project github-copilot windsurf
-```
-
-Output is generated in `.output/<project-id>/` (gitignored):
-
-- `.output/my-project/github-copilot/`
-- `.output/my-project/windsurf/`
-- `.output/my-project/cursor/`
-- `.output/my-project/claude-code/`
-
-### What Gets Generated?
-
-#### GitHub Copilot
-
-Generates `.github/copilot-instructions.md` containing:
-
-- Project name and description
-- Context (overview, purpose)
-- Tech stack details
-- Key commands (dev, build, test, etc.)
-- Conventions (naming, patterns, testing)
-- Project-specific rules
-- Documentation references
-
-**Note:** GitHub Copilot doesn't support CLI-based recipes, so no recipe scripts are deployed.
-
-#### Windsurf
-
-Generates `.windsurf/rules/project-rules.json` with project-specific rules.
-
-**Note:** Windsurf doesn't currently support CLI-based recipes, so no recipe scripts are deployed.
-
-#### Cursor
-
-Generates `.cursor/project-rules.json` with project rules and context, plus:
-
-- **Recipe Scripts:** Deployed to `.cs.recipes/` subdirectory
-- Tool-specific executable bash scripts for each recipe
-- Recipes that specify cursor support in their manifests
-
-#### Claude Code
-
-Generates `.claude/project-context.json` with project context, plus:
-
-- **Recipe Scripts:** Deployed to `.cs.recipes/` subdirectory
-- Executable bash scripts for automated multi-agent workflows
-- All recipes that support claude-code tool
-
-#### Copilot CLI
-
-Generates `AGENTS.md` with agent definitions and project context, plus:
-
-- **Recipe Scripts:** Deployed to `.cs.recipes/` subdirectory
-- Scripts designed for GitHub Copilot CLI tool
-- All recipes that support copilot-cli tool
-
----
-
-## Deploying to Projects
-
-### Setup Deployment Configuration
-
-Each project has its own `deploy.yml` file created during project creation.
-
-1. Edit `projects/local/my-project/deploy.yml`:
-
-   ```yaml
-   # Target project directory (absolute or relative path)
-   target: '../my-actual-project'
-
-   # Tools to deploy
-   tools:
-     - github-copilot
-     - windsurf
-
-   # Deployment mode
-   mode: local
-
-   # Settings
-   backup: true
-   auto_commit: false
-   ```
-
-2. (Optional) Create local overrides in `deploy.local.yml` (gitignored):
-
-   ```yaml
-   # Override target with your local path
-   target: /home/user/projects/my-project
-   ```
-
-3. Deploy:
-
-   ```bash
-   npm run project:deploy my-project
-   ```
-
-Deployment automatically generates outputs and copies them to your target project.
-
-### Deployment Modes
-
-**Local Mode** (`mode: local`)
-
-- Copies files to target directory
-- Can auto-commit if `auto_commit: true`
-- Requires absolute path to project
-
-**Manual Mode** (`mode: manual`)
-
-- Generates files
-- Shows instructions
-- You copy manually
-
-### Deployment Options
-
-**Backup** (`backup: true`)
-
-- Backs up existing files before deploying
-- Stored in `.backups/<project>/<timestamp>/`
-- Recommended: `true`
-
-**Auto-commit** (`auto_commit: true`)
-
-- Automatically commits changes
-- Creates/uses branch specified in `git_branch`
-- Requires `mode: local`
-- Useful for automated workflows
-
-### Deploy Commands
-
-```bash
-# Deploy specific project
-npm run project:deploy my-project
-
-# Deploy all configured projects
-npm run project:deploy-all
-
-# Dry run (preview what would happen)
-npm run project:deploy my-project -- --dry-run
-
-# Force deploy (skip confirmation)
-npm run project:deploy my-project -- --force
-
-# Dry run + check all projects
-npm run project:deploy-all -- --dry-run
-```
-
-### Rollback (Experimental)
-
-```bash
-# Rollback to previous version
-npm run project:rollback my-project
-
-# Rollback to specific timestamp
-npm run project:rollback my-project 2024-11-15T10-30-00
-```
-
----
-
-## Project Manifest Reference
-
-### Required Fields
+A project deployment is a directory holding a `project.yml`, optionally with a `features/` directory beside it.
 
 ```yaml
-id: my-project # Unique ID (kebab-case)
-version: 1.0.0 # Semantic version
-name: 'My Project' # Human-readable name
-description: 'Brief description (10-500 chars)'
-```
-
-### Context (Optional but Recommended)
-
-```yaml
+id: my-project
+description: What this project is
 context:
   overview: |
-    Detailed project overview.
-    Multiple lines supported.
-  purpose: 'Primary goal of the project'
-```
-
-### Tech Stack (Configure in deploy.yml)
-
-Defined in `deploy.yml` so deployment filters can be applied per environment.
-
-```yaml
-# deploy.yml
-tech_stack:
-  languages:
-    - typescript
-    - python
-  frontend:
-    - react
-    - next.js
-  backend:
-    - node.js
-    - express
-  database:
-    - postgresql
-  infrastructure:
-    - docker
-    - kubernetes
-  tools:
-    - jest
-    - eslint
-```
-
-### Documentation (Optional)
-
-```yaml
-documentation:
-  readme: 'README.md'
-  contributing: 'CONTRIBUTING.md'
-  architecture: 'docs/ARCHITECTURE.md'
-  code_style: 'docs/CODE_STYLE.md'
-  api_docs: 'docs/API.md'
-  custom:
-    deployment: 'docs/DEPLOYMENT.md'
-```
-
-### Commands (Optional)
-
-```yaml
-commands:
-  dev:
-    all: 'npm run dev'
-    frontend: 'cd frontend && npm run dev'
-  build:
-    all: 'npm run build'
-  test:
-    unit: 'npm test'
-    e2e: 'npm run test:e2e'
-```
-
-### Conventions (Optional but Recommended)
-
-```yaml
-conventions:
-  naming:
-    - 'Use PascalCase for React components'
-    - 'Use camelCase for functions'
-  patterns:
-    - 'Prefer functional components'
-    - 'Use TypeScript strict mode'
-  testing:
-    - 'Test coverage minimum 80%'
-  structure:
-    - 'Follow feature-based structure'
-  custom:
-    - 'Any other conventions'
-```
-
-### AI Tools Configuration (configure in deploy.yml)
-
-```yaml
-# deploy.yml
-ai_tools:
-  preferred_agents:
-    - code-reviewer
-    - feature-builder
-  preferred_rulesets:
-    - base
-    - coding-typescript
-    - security
-  custom_rules:
-    - 'Always use our logger utility'
-    - 'API responses must follow standard format'
-```
-
-#### Filtering: Regex include/exclude patterns (deploy.yml)
-
-Define filters in `deploy.yml` under top-level `agents`, `prompts`, `rulesets`, and `recipes`. Legacy whitelist/blacklist arrays are rejected by the schema.
-
-```yaml
-# deploy.yml
-agents:
-  include:
-    - '^code-reviewer$'
-    - '^feature-builder$'
-  exclude:
-    - 'experimental'
-prompts:
-  include:
-    - '^refactor/'
-  exclude:
-    - 'experimental'
-rulesets:
-  include:
-    - '^(base|coding-typescript)$'
-recipes:
-  include:
-    - '^feature-'
-  exclude:
-    - 'deprecated'
-```
-
-##### Referencing Prompts
-
-Prompts are organized in subdirectories (e.g., `03_prompts/refactor/`, `03_prompts/docs/`, `03_prompts/planning/`, `03_prompts/qa/`). You can reference them in two ways:
-
-1. **By path (recommended):**
-
-   ```yaml
-   prompts:
-     include:
-       - '^refactor/(extract-method|simplify-conditionals)$'
-       - '^docs/(document-api|write-readme)$'
-   ```
-
-2. **By ID (only if unique across directories):**
-
-   ```yaml
-   prompts:
-     include:
-       - '^write-tests$'
-   ```
-
-Use anchored patterns to avoid accidental matches. Schemas reject `whitelist_*` and `blacklist_*` keys; use `include`/`exclude` instead.
-
-### Metadata (Optional)
-
-```yaml
+    Free-form description injected into every generated context file.
+  documentation:
+    readme: README.md
+deploy:
+  directory: "${PROJECTS_FOLDER}/my-app"   # or an absolute path, or "." for this repository
+  replace: false
+  # tools: [claude, codex]                 # optional; omitted = every configured tool
+  agents:
+    filter:
+      - type: tags
+        tags: [development]
+  prompts:
+    filter:
+      - type: whitelist
+        ids: [docs-write-readme]
+  rulesets: {}
+  fragments: {}
+  skills: {}
+  features: {}
 metadata:
-  repository: 'https://github.com/user/project'
-  maintainers:
-    - 'email@example.com'
-  created: '2024-01-15'
-  updated: '2024-11-15'
-  tags:
-    - web
-    - api
+  version: 1.0.0
 ```
+
+Key points, all documented in full in [../QUICKREF.md](../QUICKREF.md#creating-a-project):
+
+- `deploy.directory` decides where the generated files land. A relative value resolves against `--working-dir`, so `.` means this repository's root.
+- `deploy.replace: true` wipes the output directories each tool owns inside `deploy.directory` before writing them again. There is no backup and no auto-commit; files are overwritten in place, each written atomically through a temporary file.
+- `deploy.tools` narrows the project to a subset of the tools configured for the run. Omitting it means all of them, `[]` means none, and naming a tool the run does not configure is a warning rather than an error.
+- Filters fold over a selection that **starts empty**: `tags` and `whitelist` add, `blacklist` subtracts, so `blacklist` must come last and an omitted or empty `filter` lets everything through.
+- A ruleset or fragment an agent references must itself survive the project's `rulesets` / `fragments` filter, otherwise that agent fails to export.
+
+[`ai-tools/project.yml`](ai-tools/project.yml) is a worked example: it deploys onto this repository itself with `directory: "."`.
 
 ---
 
-## Commands
+## User Deployments
 
-### Project Creation
+A user deployment is a directory holding a `user.yml`.
+It installs a filtered selection of rulesets, agents, prompts, and skills into the per-user configuration of each tool it names, instead of into a project directory.
 
-```bash
-# Create a new local project (managed in this repo)
-npm run project:create <name>
-
-# Create with description
-npm run project:create <name> -- -d "Description"
-
-# Create a global project
-npm run project:create <name> -- --global -d "Description"
+```yaml
+# 09_deployments/globals/user.yml
+id: globals
+description: My global AI tool setup
+tools:                        # optional; omitted = every tool configured for the run
+  - claude
+  - codex
+replace: false                # optional, default false
+rulesets:
+  filter:
+    - type: tags
+      tags: [global]
+agents:
+  filter:
+    - type: whitelist
+      ids: []                 # an empty whitelist selects nothing
+prompts: {}                   # an omitted or empty filter selects everything
+skills: {}
+fragments: {}
+metadata:
+  version: 1.0.0
 ```
 
-### External Project Initialization
+It carries none of the fields a user scope has no answer for:
+
+- no `context` — a user scope has no repository, README, or per-topic documentation to describe
+- no `directory` — the destination is each tool's canonical per-user location, under `--user-home`
+- no `features` — a feature belongs to the project whose directory it lives under
+
+Everything else behaves as it does in a project manifest: the same three filter types with the same order sensitivity, and the same `tools` semantics.
+
+### Where it lands
+
+Paths are relative to `--user-home`, which defaults to the home of whoever runs the deploy.
+
+| Artifact | `claude` | `codex` |
+| --- | --- | --- |
+| rulesets → instructions file | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` |
+| agents | `~/.claude/agents/<id>.md` | `~/.codex/skills/agent-<id>/SKILL.md` |
+| prompts | `~/.claude/commands/<id>.md` | `~/.codex/skills/prompt-<id>/SKILL.md` |
+| skills | `~/.claude/skills/<id>/SKILL.md` | `~/.codex/skills/skill-<id>/SKILL.md` |
+
+Codex has one shape for everything it can be asked to do, so its agents and prompts are skill-shaped there too, told apart by the prefix of their directory — the same layout it writes inside a project.
+A skill's companion `files` are copied next to the generated `SKILL.md`, exactly as in project scope.
+
+`windsurf`, `antigravity`, `github_copilot`, and `cursor` have no user-scope layout in this engine yet.
+A manifest naming one of them is not silently dropped: the run logs that the manifest is not deployed for that tool, and deploys it for the tools that do have a layout.
+
+### The engine owns the instructions file
+
+`~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` are generated from the manifest — a heading naming the deployment, its `description`, and a `## Rules` list holding the rules of every ruleset the manifest selected.
+The engine **owns and overwrites these files on every deploy**, and logs the path each time, as a warning when it is replacing a file that already exists.
+
+Anything written into them by hand is lost on the next deploy.
+That includes what Claude Code's `#`-remember shortcut appends and what CLAUDE.md-editing tooling adds.
+The workflow is: edit the ruleset YAML, redeploy.
+Auto-memory is unaffected — it lives under `~/.claude/projects/.../memory/`.
+
+Two user deployments that select the same tool both claim that tool's single instructions file.
+No winner is picked: the file is left alone, the collision is reported naming both manifests, and the run fails — while the artifacts they do not contend for are still deployed.
+Give each tool a single deployment, or narrow their `tools` lists.
+
+### What a deploy touches, and what it leaves alone
+
+A user deploy owns the paths of the artifacts it writes and nothing else.
+The directories holding them — `~/.claude/skills/`, `~/.claude/agents/`, `~/.codex/skills/` — are shared with everything you installed by hand, so they are created when missing and never deleted wholesale.
+
+With `replace: true`, the directory of each artifact this manifest deploys is deleted and rewritten (for Claude the skill directories, for Codex the skill, agent, and prompt directories), and single-file artifacts are overwritten in place.
+A skill you wrote yourself, sitting beside the generated ones, survives every deploy.
+
+Known limitations:
+
+- Removing an artifact from a `user.yml` leaves its previously deployed copy behind in the home until you delete it by hand. The engine keeps no ledger of what it wrote, so it cannot tell a stale artifact from one you installed yourself.
+- `replace: true` reaches per-artifact paths only. Parent directories and hand-made neighbours are never touched.
+
+### Choosing the home
 
 ```bash
-# Initialize AI tools in an external project
-npm run project:init <path>
-
-# With custom alias
-npm run project:init <path> -- --alias <name>
-
-# With description
-npm run project:init <path> -- -d "Description"
-
-# Register in global registry (shared with team)
-npm run project:init <path> -- --register-global
-
-# Initialize without auto-registering
-npm run project:init <path> -- --no-register
-
-# Complete example
-npm run project:init /home/user/my-app -- --alias my-app -d "My application" --register-local
+./deploy.sh --user-home /tmp/try
 ```
 
-### Project Management
+A relative `--user-home` resolves against `--working-dir`, the same base every other declared path of the run uses, rather than against the shell's current directory.
+An empty value is rejected instead of resolved.
+A home that does not exist yet is allowed — a first deploy onto a fresh machine creates it, and the run says so.
+
+`deploy.sh` forwards every argument to the engine, with one exception: Gradle's `--args` cannot escape a double quote, so an argument containing one is refused rather than delivered as a different, still-plausible path.
+Run the CLI directly for that case:
 
 ```bash
-# List all projects
-npm run project:list
-
-# Validate project manifests
-npm run validate
-```
-
-### Generation (Optional - happens automatically during deployment)
-
-```bash
-# Generate for all tools
-npm run project:generate <project-id>
-
-# Generate for specific tools
-npm run project:generate <project-id> <tool1> <tool2>
-
-# Example
-npm run project:generate my-project github-copilot windsurf
-```
-
-### Deployment
-
-```bash
-# Deploy a project (auto-generates outputs)
-npm run project:deploy <project-id>
-
-# Dry run (preview changes)
-npm run project:deploy <project-id> -- --dry-run
-
-# Interactive mode with step-by-step confirmation
-npm run project:deploy <project-id> -- --interactive
-
-# Dry run + interactive mode
-npm run project:deploy <project-id> -- --dry-run --interactive
-```
-
-### Rollback
-
-```bash
-# Rollback to previous version
-npm run project:rollback <project-id>
-
-# Rollback to specific backup
-npm run project:rollback <project-id> <timestamp>
+cd ai-tools-engine && ./gradlew :cli:run --args=...
 ```
 
 ---
 
 ## Features System
 
-The Features system allows you to define feature-specific context and code snippets within your projects.
+Features are project-scoped: they describe a slice of one project, and they exist only beside a `project.yml`.
+A `user.yml` has no features.
 
-### What Are Features?
+### Creating a feature
 
-Features are sub-components of your project that have their own:
+Put the manifest in a `features/` directory next to `project.yml`:
 
-- Context and documentation
-- Architecture notes
-- Code snippets and examples
-- Conventions specific to that feature
-
-### Creating Features
-
-1. Create a features directory in your project:
-
-   ```bash
-   mkdir -p projects/local/my-project/features/user-authentication
-   ```
-
-2. Create a `feature.yml` manifest:
-
-   ```yaml
-   # projects/local/my-project/features/user-authentication/feature.yml
-   id: user-authentication
-   version: 1.0.0
-   name: 'User Authentication'
-   description: 'JWT-based user authentication and session management'
-
-   context:
-     overview: |
-       Handles user login, registration, and session management using JWT tokens.
-     architecture: |
-       Uses middleware-based approach with token validation on protected routes.
-     dependencies:
-       - jsonwebtoken
-       - passport
-       - bcrypt
-
-   files:
-     entry_points:
-       - src/auth/index.ts
-     key_files:
-       - src/auth/strategies/jwt.ts
-       - src/middleware/auth.ts
-     patterns:
-       - src/auth/**/*.ts
-
-   snippets:
-     - id: protect-route
-       title: 'Protect a Route'
-       description: 'Apply authentication middleware to protect an endpoint'
-       language: typescript
-       content: |
-         router.get('/protected',
-           authenticate('jwt'),
-           (req, res) => {
-             res.json({ user: req.user });
-           }
-         );
-
-   conventions:
-     - 'Always hash passwords before storing'
-     - 'Use HTTP-only cookies for token storage'
-     - 'Implement refresh token rotation'
-
-   metadata:
-     status: active
-     owner: security-team
-   ```
-
-### Feature Generation
-
-Features are automatically generated when you deploy your project:
-
-```bash
-# Features are generated during deploy
-npm run project:deploy my-project
-
-# Or generate manually
-npm run project:generate-features my-project
 ```
-
-### What Gets Generated for Features?
-
-**GitHub Copilot**: `feature-<id>.md` files with full feature documentation
-
-**Windsurf**: `feature-<id>.json` files with structured feature data
-
-**Claude Code**: `feature-<id>.md` files with examples and context
-
-**Cursor**: `features.json` with all features combined
-
-### Feature Schema
-
-See [`schemas/feature.schema.json`](../schemas/feature.schema.json) for the complete schema reference.
-
-### Feature-Recipe Binding
-
-Features can be bound to recipes to create automated workflows with pre-populated context.
-
-#### Example: Feature with Recipe Binding
+09_deployments/my-project/
+├── project.yml
+└── features/
+    └── user-authentication.yml
+```
 
 ```yaml
-# projects/local/my-project/features/user-authentication/feature.yml
 id: user-authentication
-version: 1.0.0
-name: 'User Authentication'
-description: 'Implement JWT-based user authentication'
-
-recipe:
-  id: feature-delivery # Which recipe to use
-  context:
-    # Feature-specific context passed to the recipe
-    feature_description: |
-      Implement a complete authentication system with:
-      - User registration (POST /api/auth/register)
-      - User login (POST /api/auth/login)
-      - JWT token generation and validation
-      - Protected routes middleware
-      - Password hashing with bcrypt
-
-    acceptance_criteria: |
-      - Users can register with email/password
-      - Passwords are hashed before storage
-      - Login returns JWT token (24h expiry)
-      - Protected routes verify JWT tokens
-      - Comprehensive input validation
-      - Unit and integration tests included
-      - API documentation updated
-
-  tools:
-    - claude-code
-    - copilot-cli
-# ... rest of feature manifest
+description: JWT-based user authentication and session management
+context:
+  overview: |
+    Handles user login, registration, and session management using JWT tokens.
+  architecture: |
+    Middleware-based, with token validation on protected routes.
+  dependencies:
+    - jsonwebtoken
+  files:
+    - src/auth/index.ts
+prompt: |
+  Implement the authentication flow described above.
+acceptance_criteria:
+  - "All existing tests pass"
+constraints:
+  - "Use JUnit 5 + AssertJ for tests"
+metadata:
+  version: 1.0.0
+  tags:
+    - auth
 ```
 
-#### Generate and Run Feature Workflow
+`id`, `description`, `prompt`, and `metadata` are required; `context`, `acceptance_criteria`, and `constraints` are optional.
 
-```bash
-# Generate feature-bound recipe scripts
-npm run project:generate-features my-project
+### Deploying features
 
-# Scripts are created with context pre-populated:
-# .output/my-project/features/claude-code/user-authentication.sh
-# .output/my-project/features/copilot-cli/user-authentication.sh
+Features are exported during the normal `./deploy.sh` run, as one workflow or instruction file per tool — see the [tool output table](../README.md#tool-output) for the exact paths.
 
-# Run the feature workflow
-cd .output/my-project/features/claude-code
-./user-authentication.sh
+They are filtered like every other kind, through `deploy.features.filter` in `project.yml`.
+Two features of the same project sharing an id keep that project from being exported at all, because a project that does not filter its features deploys all of them.
 
-# The script already contains:
-# - FEATURE_DESCRIPTION from recipe.context.feature_description
-# - ACCEPTANCE_CRITERIA from recipe.context.acceptance_criteria
-# - All workflow steps from the recipe
-```
-
-#### Benefits of Feature-Recipe Binding
-
-1. **Single Source of Truth**: Requirements live in feature.yml, not scattered across scripts
-2. **Reusable Workflows**: Same recipe can be used for multiple features with different context
-3. **Version Controlled**: Feature specifications are versioned with your project
-4. **Automated Execution**: No manual copy-paste of requirements into recipe commands
-5. **Self-Documenting**: Feature manifest serves as both spec and automation input
-
-#### Available Recipe Context Variables
-
-The `recipe.context` field accepts any variables needed by the recipe:
-
-- `feature_description` - For feature-delivery recipe
-- `acceptance_criteria` - For feature-delivery recipe
-- `bug_description` - For bug-fix-workflow recipe
-- `reproduction_steps` - For bug-fix-workflow recipe
-- Custom variables - Any variables defined in the recipe's `variables` section
-
-See [recipes/README.md](../08_recipes/README.md) for more information on recipe binding.
+[`ai-tools/features/`](ai-tools/features/) holds two worked examples.
 
 ---
 
-## External Projects
+## Duplicate Ids
 
-External Projects allow you to link projects from other repositories without duplicating configuration.
+Manifest ids are the primary key of the whole engine, so two files declaring the same id are never resolved by picking a winner.
+One run reports every collision it found, names the id and both files, and exits non-zero.
 
-### What Are External Projects?
+Ids are indexed **per kind**, so a `project.yml` and a `user.yml` may declare the same id — they are separate manifests of separate scopes.
 
-External projects are projects that live in other repositories but use this ai-tools configuration system. They're tracked via project registries.
+How much a collision costs depends on the kind:
 
-### Why Use External Projects?
-
-- **Centralized management**: Manage all project configs from one place
-- **No duplication**: Projects maintain their own `.cleanship-ai-tools` folder
-- **Team consistency**: Share global project configs, keep local ones private
-- **Flexible deployment**: Deploy updates to multiple projects at once
-
-### Setting Up an External Project
-
-#### Method 1: Using project:init (Recommended)
-
-The easiest way to set up an external project:
-
-```bash
-# Initialize AI tools in an existing project
-npm run project:init /path/to/your-project
-
-# With custom alias and description
-npm run project:init /path/to/your-project --alias my-app -d "My application"
-
-# Register in global registry (shared with team)
-npm run project:init /path/to/your-project --register-global
-
-# Initialize without auto-registering
-npm run project:init /path/to/your-project --no-register
-```
-
-This will:
-
-1. Create `.cleanship-ai-tools/` folder in your project
-2. Copy and customize `project.yml` from template
-3. Create `deploy.yml` configured to deploy to project root
-4. Create example feature template
-5. Auto-register in external projects registry (by default in local)
-
-#### Method 2: Manual Setup
-
-If you prefer manual setup:
-
-1. **In the external project repository**, create a `.cleanship-ai-tools` folder:
-
-   ```bash
-   cd /path/to/your-project
-   mkdir .cleanship-ai-tools
-   ```
-
-2. **Create project manifest** in the external project:
-
-   ```bash
-   # Copy template from ai-tools repo
-   cp /path/to/ai-tools/projects/global/template/project.yml \
-      .cleanship-ai-tools/project.yml
-
-   # Edit it
-   code .cleanship-ai-tools/project.yml
-   ```
-
-3. **Create deployment config** in the external project:
-
-   ```yaml
-   # .cleanship-ai-tools/deploy.yml
-   target: '..' # Deploy to project root (parent of .cleanship-ai-tools)
-   tools:
-     - github-copilot
-     - windsurf
-   mode: local
-   backup: true
-   ```
-
-4. **Register in ai-tools repository**:
-
-   ```bash
-   cd /path/to/ai-tools
-
-   # Add to local registry (gitignored)
-   npm run project:external add /path/to/your-project/.cleanship-ai-tools --alias my-app
-
-   # Or add to global registry (versioned, shared)
-   npm run project:external add /path/to/your-project/.cleanship-ai-tools --alias my-app --global
-   ```
-
-### Managing External Projects
-
-```bash
-# List all external projects
-npm run project:external list
-
-# Add external project (local registry)
-npm run project:external add /path/to/project/.cleanship-ai-tools --alias my-app
-
-# Add external project (global registry, shared with team)
-npm run project:external add /path/to/project/.cleanship-ai-tools --alias my-app --global
-
-# Remove external project
-npm run project:external remove my-app
-
-# Remove from global registry
-npm run project:external remove my-app --global
-```
-
-### Project Registries
-
-**Global Registry** (`projects/projects.global.yml`)
-
-- Versioned in git
-- Shared with entire team
-- Use for: Company projects, shared services
-
-**Local Registry** (`projects/projects.local.yml`)
-
-- Gitignored
-- Private to you
-- Use for: Personal projects, client work, experiments
-
-Example registry structure:
-
-```yaml
-# projects/projects.global.yml
-projects:
-  - path: /opt/company/services/api-gateway/.cleanship-ai-tools
-    alias: api-gateway
-  - path: /opt/company/services/auth-service/.cleanship-ai-tools
-    alias: auth-service
-```
-
-```yaml
-# projects/projects.local.yml (gitignored)
-projects:
-  - path: /home/user/personal/my-app/.cleanship-ai-tools
-    alias: my-personal-app
-```
-
-### Using External Projects
-
-Once registered, external projects work just like local projects:
-
-```bash
-# List (includes external)
-npm run project:list
-
-# Generate
-npm run project:generate my-app
-
-# Deploy
-npm run project:deploy my-app
-
-# Deploy all (includes external)
-npm run project:deploy-all
-```
-
-### External Project Structure
-
-```
-your-project/
-├── src/
-├── package.json
-├── README.md
-└── .cleanship-ai-tools/      # AI tools configuration
-    ├── project.yml           # Project manifest
-    ├── deploy.yml            # Deployment config
-    └── features/             # Optional: Feature-specific context
-        └── user-auth/
-            └── feature.yml
-```
-
-After deployment:
-
-```
-your-project/
-├── src/
-├── .github/                  # Generated by deployment
-│   └── copilot-instructions.md
-├── .windsurf/                # Generated by deployment
-│   └── rules/
-└── .cleanship-ai-tools/      # Your configuration
-    ├── project.yml
-    └── deploy.yml
-```
-
-### Best Practices for External Projects
-
-1. **Keep `.cleanship-ai-tools` in the project**: Let each project maintain its own configuration
-2. **Use global registry for team projects**: Share paths to company projects
-3. **Use local registry for personal work**: Keep client/personal projects private
-4. **Document in project README**: Mention that the project uses ai-tools
-5. **Version the manifests**: Track changes to project configs in the project's git history
+- Two projects, two user deployments, or two features of the same project sharing an id cost only the deployment(s) that carry them. Those are left unexported, everything else is deployed as usual, and the run still fails at the end.
+- Two agents, prompts, rulesets, fragments, or skills sharing an id stop the whole run before anything is written. They are shared by every deployment, and one that does not filter that kind deploys all of it.
 
 ---
 
 ## Best Practices
 
-### 1. Start with the Template
-
-Always start from `projects/local/.template/project.yml` - it has helpful comments.
-
-### 2. Use Semantic Versioning
-
-Update `version` when making significant changes:
-
-- `1.0.0` → `1.1.0` - Added new conventions
-- `1.1.0` → `2.0.0` - Breaking change (removed/changed rules)
-
-### 3. Be Specific in Descriptions
-
-Bad: "Use proper naming"
-Good: "Use PascalCase for React components (e.g., ProductCard, UserProfile)"
-
-### 4. Document Custom Rules
-
-If your project has unique patterns, document them in `deploy.yml` under `ai_tools.custom_rules`.
-
-### 5. Keep It Updated
-
-Update `metadata.updated` when making changes.
-Update configurations when project conventions change.
-
-### 6. Test Before Deploying
-
-Always run with `--dry-run` first:
-
-```bash
-npm run project:deploy my-project -- --dry-run
-```
-
-### 7. Use Global Projects for Standards
-
-Put team-wide standards in `projects/global/` so everyone uses them.
-
-### 8. Enable Backups
-
-Always deploy with `backup: true` in your deployment config.
+1. **Name the directory after the deployment.** The filename says what kind it is; the directory is the only place the instance is named.
+2. **Keep machine-specific paths out of the versioned manifests.** Declare the base as an `env_vars` variable in `config.local.yml` and reference it as `${NAME}` from `deploy.directory`.
+3. **Try a user deployment against a scratch home first** with `--user-home`, and read the generated instructions file before deploying into your own.
+4. **Never hand-edit `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md`** once a `user.yml` deploys them. Edit the rulesets and redeploy.
+5. **Prefer tag filters over whitelists**, so a new manifest is picked up without editing every deployment.
+6. **Put `blacklist` last**, or it trims a selection that is still empty and does nothing.
+7. **Bump `metadata.version`** when a manifest's behaviour changes, and keep `metadata.updated` current.
+8. **Remember that nothing is cleaned up for you** when you drop an artifact from a manifest: the previously deployed copy stays until it is deleted by hand.
 
 ---
 
 ## Troubleshooting
 
-### Project Not Found
+**`Missing default config file`** — the engine found no `config.yml` in `--working-dir`. Run `./deploy.sh` from the repository root.
 
-**Error**: `Project "my-project" not found`
+**`'locations.projects' ... was renamed to 'locations.deployments'`** — a config file still declares the retired key. Rename it; the run fails rather than silently deploying nothing.
 
-**Solution**: Check that `projects/local/my-project/project.yml` or `projects/global/my-project/project.yml` exists.
+**`Found no deployment manifest under [...]`** — the configured directories hold no `project.yml` and no `user.yml`. The message lists the absolute paths that were searched.
 
-### Validation Errors
+**`Cannot resolve the deploy directory of N project(s)`** — a `${NAME}` in a `deploy.directory` names a variable no `env_vars` map and no environment variable declares. Nothing is deployed until every project's directory resolves.
 
-**Error**: `Schema validation failed`
+**`Export failed for N manifest(s)`** — the list below the headline names each manifest and every tool it failed for. Everything else was still exported, and the run exits non-zero.
 
-**Solution**:
+**`No rulesets match pattern 'x'`** — the pattern matched nothing. The message says whether a match exists but was excluded by the deployment's `rulesets` filter.
 
-1. Run `npm run validate` to see specific errors
-2. Check required fields: `id`, `version`, `name`, `description`
-3. Verify `id` is kebab-case
-4. Verify `version` is semver (e.g., `1.0.0`)
+**`... is deployed by more than one user deployment`** — two `user.yml` manifests claim the same tool's instructions file. Neither writes it. Give each tool one deployment, or narrow their `tools` lists.
 
-### Generation Failed
+**`... has no user-scope layout in this engine`** — a `user.yml` names a tool whose per-user layout is not implemented yet. It still deploys for the tools that have one.
 
-**Error**: `Failed to generate project outputs`
+**`Refusing to replace '...': it is not inside '...'`** — a manifest id would steer a replacing deploy out of the directory it owns. An id must name a single file or directory: no path separators, no `.` or `..`.
 
-**Solution**:
+**A manifest does not show up in the output** — check the filters of the deployment. A manifest with no matching tag and no whitelist entry is skipped silently, and a `blacklist` placed before the filter it was meant to trim removes nothing.
 
-1. Check project manifest is valid YAML
-2. Run `npm run validate`
-3. Check file permissions
-
-### Deployment Failed
-
-**Error**: `Target directory does not exist`
-
-**Solution**: Verify the `target` path in `config/deploy.yml` exists and is absolute.
-
-**Error**: `Git commit failed`
-
-**Solution**: Target directory might not be a git repository, or you have uncommitted changes.
-
-### Files Not Copied
-
-**Issue**: Deployment succeeds but files aren't where expected
-
-**Solution**:
-
-1. Run with `--dry-run` to see what would be copied
-2. Check tool-specific target paths:
-   - GitHub Copilot → `.github/`
-   - Windsurf → `.windsurf/`
-   - Cursor → `.cursor/`
-   - Claude Code → `.claude/`
-
----
-
-## Examples
-
-### Example 1: Simple TypeScript Project
-
-`project.yml`
-
-```yaml
-id: simple-ts-app
-version: 1.0.0
-name: 'Simple TypeScript App'
-description: 'A simple TypeScript application with basic conventions'
-
-conventions:
-  naming:
-    - 'Use camelCase for variables and functions'
-    - 'Use PascalCase for classes'
-  patterns:
-    - 'Use TypeScript strict mode'
-```
-
-`deploy.yml`
-
-```yaml
-target: './.output/'
-tools:
-  - github-copilot
-  - windsurf
-mode: local
-
-tech_stack:
-  languages:
-    - typescript
-
-ai_tools:
-  preferred_rulesets:
-    - base
-    - coding-typescript
-```
-
-### Example 2: Full-Stack Project
-
-`project.yml`
-
-```yaml
-id: fullstack-app
-version: 1.0.0
-name: 'Full-Stack Web App'
-description: 'React frontend with Node.js backend'
-
-context:
-  overview: 'E-commerce web application with React and Node.js'
-  purpose: 'Provide online shopping experience'
-
-commands:
-  dev:
-    frontend: 'cd frontend && npm run dev'
-    backend: 'cd backend && npm run dev'
-  test:
-    all: 'npm test'
-
-conventions:
-  naming:
-    - 'Use PascalCase for React components'
-  patterns:
-    - 'Use hooks for state management'
-  testing:
-    - 'Minimum 80% test coverage'
-```
-
-`deploy.yml`
-
-```yaml
-target: './.output/'
-tools:
-  - github-copilot
-  - windsurf
-mode: local
-
-tech_stack:
-  languages:
-    - typescript
-  frontend:
-    - react
-    - redux
-  backend:
-    - node.js
-    - express
-  database:
-    - postgresql
-
-ai_tools:
-  preferred_agents:
-    - code-reviewer
-    - feature-builder
-  preferred_rulesets:
-    - base
-    - coding-typescript
-    - security
-  custom_rules:
-    - 'Always use our custom logger (src/utils/logger.ts)'
-    - 'API responses must follow { success, data, error } format'
-```
-
-### Example 3: Deployment Configuration
-
-```yaml
-# projects/local/my-api/deploy.yml
-target: /home/user/projects/my-api
-tools:
-  - github-copilot
-  - windsurf
-mode: local
-auto_commit: true
-git_branch: 'chore/update-ai-config'
-backup: true
-```
-
-With local override in `deploy.local.yml` (gitignored):
-
-```yaml
-# projects/local/my-api/deploy.local.yml
-target: /actual/local/path/to/my-api
-```
-
----
-
-## Advanced Usage
-
-### Output Location
-
-Generated outputs are stored in `.output/<project-id>/` (gitignored at repo root).
-
-This location is automatically cleaned up and regenerated on each deployment.
-
-### CI/CD Integration
-
-Add to your CI pipeline:
-
-```yaml
-# .github/workflows/update-ai-config.yml
-name: Update AI Config
-on:
-  push:
-    paths:
-      - 'projects/global/**'
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-      - run: npm install
-      - run: npm run validate
-      - run: npm run project:deploy my-project
-```
+**A tool stopped receiving files, but its old files are still there** — narrowing `tools` only stops future writes. A de-selected tool never runs, so `replace: true` does not clean up after it either; remove what it left by hand.
 
 ---
 
 ## See Also
 
-- [PLAN.md](../PLAN.md) - Implementation plan
-- [README.md](../README.md) - Main repository README
-- [schemas/project.schema.json](../schemas/project.schema.json) - Schema reference
-
----
-
-**Questions?** Open an issue on GitHub or check the [main documentation](../README.md).
+- [../README.md](../README.md) - overview, workflow, tool output, and configuration
+- [../QUICKREF.md](../QUICKREF.md) - manifest templates and field reference
+- [../90_docs/TOOLS.md](../90_docs/TOOLS.md) - per-tool integration details
+- [../PLANNED_FEATURES.md](../PLANNED_FEATURES.md) - what is intended next
