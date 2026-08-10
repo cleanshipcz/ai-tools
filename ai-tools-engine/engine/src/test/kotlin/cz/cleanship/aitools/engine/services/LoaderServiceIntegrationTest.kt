@@ -660,6 +660,96 @@ class LoaderServiceIntegrationTest {
         }
     }
 
+    /**
+     * An id names a file or a directory in every scope the engine writes to, so it has to be a name rather than a
+     * path. Checking it here covers every kind, every adapter and both scopes at once, before anything is written.
+     */
+    @Nested
+    inner class ManifestIds {
+
+        @ParameterizedTest
+        @CsvSource("nested/id", "../climbing", "..", ".", "trailing/", "back\\slash")
+        fun `should fail naming the file when an id is not a single path segment`(id: String) {
+            // given
+            val file = writeRuleset(id)
+
+            // when
+            val error = runCatching { loaderService.loadAll(rulesetLocations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(file.absolutePath)
+                .hasMessageContaining(id)
+        }
+
+        @Test
+        fun `should fail naming the file when an id is empty`() {
+            // given
+            val file = tempDir.resolve("rulesets").toFile().also { it.mkdirs() }.resolve("empty.yml")
+            file.writeText("id: \"\"\ndescription: A ruleset\nrules:\n  - A rule.\nmetadata:\n  version: 1.0.0\n")
+
+            // when
+            val error = runCatching { loaderService.loadAll(rulesetLocations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(file.absolutePath)
+        }
+
+        @ParameterizedTest
+        @CsvSource("xbid.bobcat", "coding-kotlin", "agent_1", "UPPER")
+        fun `should load a manifest whose id is a single segment`(id: String) {
+            // given
+            // - dots, dashes, underscores and case are all ordinary in the ids this repository already uses
+            writeRuleset(id)
+
+            // when
+            val allManifests = loaderService.loadAll(rulesetLocations())
+
+            // then
+            assertThat(allManifests.rulesets).containsOnlyKeys(id)
+        }
+
+        @Test
+        fun `should fail naming the file when a user deployment id is not a single path segment`() {
+            // given
+            // - every kind is checked, not only the ones that name a directory of their own
+            val directory = tempDir.resolve("deployments").resolve("globals").toFile()
+            directory.mkdirs()
+            val file = directory.resolve("user.yml")
+            file.writeText("id: ../escaping\ndescription: A user deployment\nmetadata:\n  version: 1.0.0\n")
+            val locations = rulesetLocations().copy(deployments = listOf(tempDir.resolve("deployments").toFile()))
+
+            // when
+            val error = runCatching { loaderService.loadAll(locations) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(file.absolutePath)
+        }
+
+        private fun writeRuleset(id: String): File {
+            val directory = tempDir.resolve("rulesets").toFile()
+            directory.mkdirs()
+            val file = directory.resolve("ruleset.yml")
+            // - single quotes, so that YAML passes a backslash through as the character the id really contains
+            file.writeText("id: '$id'\ndescription: A ruleset\nrules:\n  - A rule.\nmetadata:\n  version: 1.0.0\n")
+            return file
+        }
+
+        private fun rulesetLocations() = Locations(
+            agents = emptyList(),
+            deployments = emptyList(),
+            prompts = emptyList(),
+            rulesets = listOf(tempDir.resolve("rulesets").toFile()),
+            fragments = emptyList(),
+            skills = emptyList(),
+        )
+    }
+
     @Nested
     inner class UserDeployments {
 

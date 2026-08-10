@@ -43,10 +43,10 @@ class LoaderService {
 
     fun loadUserDeployment(file: File): UserDeploymentManifest = yaml.load(file)
 
-    inline fun <reified T> Yaml.load(file: File): T {
+    private inline fun <reified T : VersionedManifest> Yaml.load(file: File): T {
         try {
             val content = file.readText()
-            return decodeFromString(content)
+            return decodeFromString<T>(content).also { it.requireSingleSegmentId(file) }
         } catch (ex: YamlException) {
             throw YamlException("Failed to load ${file.absolutePath}", ex.path, ex)
         } catch (ex: InvalidVersionException) {
@@ -185,6 +185,35 @@ class LoaderService {
 }
 
 /**
+ * Fails when the id of this manifest cannot name a file or a directory.
+ *
+ * An id is the name of what the adapters write: `<skills>/<id>/`, `<agents>/<id>.md`, `skill-<id>/`. An id carrying
+ * path segments therefore steers a write - and, under `replace`, a delete - out of the directory the deploy owns,
+ * into the repository around a project or into the home around a user scope. Requiring a single path segment here,
+ * once, covers every kind, every adapter and both scopes, and does it before anything has been written; the
+ * containment check in [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin] is the second line behind it.
+ *
+ * The rule is deliberately narrow, because ids in this repository already carry dots, dashes, underscores and case
+ * (`xbid.bobcat`, `coding-kotlin`): only a separator, an empty name and the two directory names that mean "here"
+ * and "up" are rejected.
+ *
+ * @throws ManifestLoadingException naming the file and the offending id, the way every other malformed manifest
+ * is reported
+ */
+private fun VersionedManifest.requireSingleSegmentId(file: File) {
+    val reason = when {
+        id.isEmpty() -> "it is empty"
+        id == "." || id == ".." -> "it names a directory rather than a manifest"
+        id.contains('/') || id.contains('\\') -> "it contains a path separator"
+        else -> return
+    }
+    throw ManifestLoadingException(
+        file,
+        InvalidManifestIdException("Invalid manifest id '$id': $reason. An id must name a single file or directory."),
+    )
+}
+
+/**
  * Loads every file with [loader], keeping each loaded manifest paired with the file it came from so that a later
  * id collision can name both sources. Files reachable through several overlapping [Locations] entries are loaded
  * once, so overlapping configuration never looks like a duplicate id.
@@ -240,6 +269,12 @@ class ManifestLoadingException(
     val file: File,
     cause: Throwable,
 ) : RuntimeException("Failed to load ${file.absolutePath}: ${cause.message}", cause)
+
+/**
+ * Thrown when a manifest declares an id that cannot name a file or a directory - see [requireSingleSegmentId]. It
+ * always travels wrapped in a [ManifestLoadingException], so the author is told which file to fix.
+ */
+class InvalidManifestIdException(message: String) : RuntimeException(message)
 
 /**
  * Thrown when manifest files of a kind shared by every project declare the same id. Carries every collision found

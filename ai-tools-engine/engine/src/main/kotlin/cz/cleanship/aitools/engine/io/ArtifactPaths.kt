@@ -1,19 +1,30 @@
 package cz.cleanship.aitools.engine.io
 
 import java.io.File
+import java.io.IOException
+import java.nio.file.FileVisitResult
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 
 /**
  * Deletes this artifact directory together with everything under it, after making sure it really is under [owned].
  *
  * A replacing deploy is the one moment the engine removes files it did not write in this run, and in the user scope
- * it does so inside a home the user shares with everything they installed themselves. The directory it deletes is
- * named after a manifest id, and nothing validates that id today, so an id carrying `..` segments would otherwise
- * walk the delete out of the directory the deploy owns.
+ * it does so inside a home the user shares with everything they installed themselves. Two things therefore bound it:
  *
- * The containment is decided on the canonical paths, so a symbolic link pointing out of [owned] is caught as well
- * rather than only the `..` segments that are visible in the path.
+ * - The directory has to be inside [owned]. The decision is made on the canonical paths, so a directory reached
+ *   through a symbolic link is judged by where it really is rather than by how it was named.
+ * - The walk below it never follows a symbolic link. A link is removed as a link, so a corpus linked into a skill
+ *   bundle loses the link and keeps its contents - the target belongs to the user, not to this deploy.
  *
- * @throws ArtifactPathException if this path is not inside [owned], leaving everything on disk untouched
+ * That a path is inside [owned] at all is what manifest id validation guarantees - see
+ * [cz.cleanship.aitools.engine.models.requireSingleSegmentId], which rejects an id carrying path segments before any
+ * artifact is written. This check is the second line rather than the only one.
+ *
+ * @throws ArtifactPathException if this path is not inside [owned]. Nothing was deleted by this call; whatever the
+ * run had already exported before it stays where it is.
  */
 fun File.deleteArtifactDirectoryWithin(owned: File, describedBy: String) {
     val ownedPath = owned.canonicalFile.toPath()
@@ -24,13 +35,36 @@ fun File.deleteArtifactDirectoryWithin(owned: File, describedBy: String) {
                 "Give the manifest an id that names a single directory.",
         )
     }
-    deleteRecursively()
+    deleteTreeWithoutFollowingLinks(toPath())
 }
 
 /**
- * Thrown when an artifact would be written to or removed from a path outside the directory its deploy owns, which
- * a manifest id carrying path segments is what produces. It aborts the run rather than being collected like an
- * unresolvable reference: an id that escapes its own scope is not a broken reference to fix in one manifest but a
- * deploy about to touch something nobody asked it to.
+ * Removes [root] and everything below it, treating a symbolic link as an entry to unlink rather than a directory to
+ * descend into. [Files.walkFileTree] does not follow links unless asked to, which is what separates this from
+ * `File.deleteRecursively`: that one asks [File.isDirectory], which resolves the link and walks the target.
+ */
+private fun deleteTreeWithoutFollowingLinks(root: Path) {
+    if (!Files.exists(root, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return
+    Files.walkFileTree(
+        root,
+        object : SimpleFileVisitor<Path>() {
+            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                Files.deleteIfExists(file)
+                return FileVisitResult.CONTINUE
+            }
+
+            override fun postVisitDirectory(dir: Path, exc: IOException?): FileVisitResult {
+                if (exc != null) throw exc
+                Files.deleteIfExists(dir)
+                return FileVisitResult.CONTINUE
+            }
+        },
+    )
+}
+
+/**
+ * Thrown when an artifact would be removed from a path outside the directory its deploy owns. It aborts the run
+ * rather than being collected like an unresolvable reference: a path that escapes its own scope is not a broken
+ * reference to fix in one manifest but a deploy about to touch something nobody asked it to.
  */
 class ArtifactPathException(message: String) : RuntimeException(message)

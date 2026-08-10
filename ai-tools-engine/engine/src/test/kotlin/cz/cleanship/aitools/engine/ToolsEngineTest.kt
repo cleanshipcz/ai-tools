@@ -9,6 +9,7 @@ import cz.cleanship.aitools.engine.env.UnresolvedVariableException
 import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
+import cz.cleanship.aitools.engine.services.ManifestLoadingException
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
@@ -857,6 +858,26 @@ class ToolsEngineTest {
             // - both write the same instructions file, and the run reaching the second one is what is proven here
             assertThat(userHome.resolve(".claude/CLAUDE.md").readText()).contains("# without-agents")
             assertThat(error).isInstanceOf(ExportFailedException::class.java)
+        }
+
+        @Test
+        fun `should write nothing outside the home when a skill id climbs out of its directory`() {
+            // given
+            // - replace is false here, which is the default: the write is what has to be contained, not only the delete
+            writeYaml(
+                "skills/escaping/skill.yml",
+                "id: ../../escaped\ndescription: A skill\nsections:\n  - text: Some skill content\n",
+            )
+            writeUserDeployment()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            // - the manifest never loads, so no adapter of any scope is ever handed the id
+            assertThat(error).isInstanceOf(ManifestLoadingException::class.java)
+            assertThat(tempDir.toFile().walkTopDown().filter { it.name == "SKILL.md" }.toList()).isEmpty()
+            assertThat(userHome).doesNotExist()
         }
 
         @Test

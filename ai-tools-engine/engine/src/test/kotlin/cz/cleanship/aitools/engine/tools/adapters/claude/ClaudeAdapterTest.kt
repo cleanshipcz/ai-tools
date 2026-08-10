@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 
 class ClaudeAdapterTest {
@@ -343,6 +344,28 @@ class ClaudeAdapterTest {
             assertThat(error)
                 .isInstanceOf(ArtifactPathException::class.java)
                 .hasMessageContaining("../../unrelated")
+        }
+
+        @Test
+        fun `should keep the target of a symlink inside a skill directory when replace is true`() {
+            // given
+            // - a corpus linked into a skill bundle lives outside the home, and a deploy has no business deleting it
+            val outsideFile = tempDir.resolve("outside/thesis.txt").toFile()
+            outsideFile.parentFile.mkdirs()
+            outsideFile.writeText("Years of work.\n")
+            val skillDir = claudeDir.resolve("skills/${textOnlySkill.id}")
+            skillDir.mkdirs()
+            Files.createSymbolicLink(skillDir.resolve("corpus").toPath(), outsideFile.parentFile.toPath())
+            val exporter = exporterFor(userDeployment.copy(replace = true))
+
+            // when
+            exporter.export(SkillContext(textOnlySkill))
+
+            // then
+            assertThat(outsideFile).hasContent("Years of work.\n")
+            // - the link itself was removed with the directory that held it, and the skill was written again
+            assertThat(skillDir.resolve("corpus")).doesNotExist()
+            assertThat(skillDir.resolve("SKILL.md")).exists()
         }
 
         @Test

@@ -43,7 +43,8 @@ class ExportService {
     /**
      * Copies every companion file declared by a skill next to its generated manifest.
      *
-     * @throws SkillFileResolvingException if a declared file cannot be resolved or does not exist
+     * @throws SkillFileResolvingException if a declared file cannot be resolved, does not exist, or would land
+     * outside [targetDir] - see [resolveTarget]
      */
     fun copySkillFiles(
         skillFiles: List<SkillFile>,
@@ -52,11 +53,34 @@ class ExportService {
     ) {
         for (skillFile in skillFiles) {
             val sourceFile = resolveSource(skillFile.source, sourceDir)
-            val targetFile = targetDir.resolve(skillFile.target)
+            val targetFile = resolveTarget(skillFile.target, targetDir)
             targetFile.parentFile.mkdirs()
             copySkillFile(sourceFile, targetFile)
             LOG.info("Copied skill file {} to {}", sourceFile.absolutePath, targetFile.absolutePath)
         }
+    }
+
+    /**
+     * Resolves the declared [target] of a companion file against [targetDir], refusing one that would leave it.
+     *
+     * `target` is free-form manifest text, and the directory it resolves against is the skill directory of whatever
+     * scope is being deployed - inside a project, or inside the user's home. A value climbing out of it with `..`
+     * would let a skill manifest write anywhere the process can, so it is rejected rather than resolved. Nesting
+     * further in is left alone, because `templates/example.txt` is how the existing manifests ship their files.
+     *
+     * The comparison is on the normalized paths rather than the canonical ones: the target does not exist yet, and
+     * its parents usually do not either, so there is nothing on disk to canonicalize against.
+     */
+    private fun resolveTarget(target: String, targetDir: File): File {
+        val resolved = targetDir.resolve(target).toPath().normalize()
+        val owned = targetDir.toPath().normalize()
+        if (resolved == owned || !resolved.startsWith(owned)) {
+            throw SkillFileResolvingException(
+                "Skill file target '$target' would be written outside the skill directory " +
+                    "'${targetDir.absolutePath}'. Declare a target inside the skill.",
+            )
+        }
+        return resolved.toFile()
     }
 
     private fun copySkillFile(sourceFile: File, targetFile: File) {

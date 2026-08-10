@@ -24,6 +24,54 @@ class ExportServiceTest {
     }
 
     @Test
+    fun `should refuse to copy a skill file whose target climbs out of the skill directory`() {
+        // given
+        // - 'target' is free-form manifest text, and the directory it resolves against now sits in the user's home
+        val sourceDir = tempDir.resolve("skill-source").toFile()
+        sourceDir.mkdirs()
+        sourceDir.resolve("payload.md").writeText("Payload.\n")
+        val skillDir = tempDir.resolve("home/.claude/skills/a-skill").toFile()
+        val victim = tempDir.resolve("home/.bashrc").toFile()
+        victim.parentFile.mkdirs()
+        victim.writeText("Untouched.\n")
+
+        // when
+        val error = runCatching {
+            exportService.copySkillFiles(
+                listOf(SkillFile(source = "payload.md", target = "../../../.bashrc")),
+                sourceDir,
+                skillDir,
+            )
+        }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(SkillFileResolvingException::class.java)
+            .hasMessageContaining("../../../.bashrc")
+        assertThat(victim).hasContent("Untouched.\n")
+    }
+
+    @Test
+    fun `should copy a skill file into a subdirectory of the skill directory`() {
+        // given
+        // - a target may still nest, which is what 'templates/example.txt' in the manifests relies on
+        val sourceDir = tempDir.resolve("skill-source").toFile()
+        sourceDir.mkdirs()
+        sourceDir.resolve("payload.md").writeText("Payload.\n")
+        val skillDir = tempDir.resolve("skills/a-skill").toFile()
+
+        // when
+        exportService.copySkillFiles(
+            listOf(SkillFile(source = "payload.md", target = "templates/example.md")),
+            sourceDir,
+            skillDir,
+        )
+
+        // then
+        assertThat(skillDir.resolve("templates/example.md")).hasContent("Payload.\n")
+    }
+
+    @Test
     fun `should write exported content when output consumer succeeds`() {
         // when
         exportService.export(ruleset, targetFile) { output ->
