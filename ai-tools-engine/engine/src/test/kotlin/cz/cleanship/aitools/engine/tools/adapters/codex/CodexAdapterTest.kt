@@ -193,7 +193,7 @@ class CodexAdapterTest {
         @Test
         fun `should write the instructions file from the rulesets of the deployment`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(UserInstructionsContext(userDeployment, rulesets))
@@ -210,7 +210,7 @@ class CodexAdapterTest {
             // given
             codexDir.mkdirs()
             codexDir.resolve("AGENTS.md").writeText("Hand-written content.\n")
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(UserInstructionsContext(userDeployment, rulesets))
@@ -222,7 +222,7 @@ class CodexAdapterTest {
         @Test
         fun `should write an agent as a skill of the user skills directory`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(AgentContext(agent, rulesets))
@@ -237,7 +237,7 @@ class CodexAdapterTest {
         @Test
         fun `should write a prompt as a skill of the user skills directory`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(PromptContext(prompt, rulesets))
@@ -252,7 +252,7 @@ class CodexAdapterTest {
         @Test
         fun `should write a skill into the user skills directory`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(SkillContext(textOnlySkill))
@@ -269,7 +269,7 @@ class CodexAdapterTest {
             val staleFile = codexDir.resolve("skills/skill-${textOnlySkill.id}/stale.md")
             staleFile.parentFile.mkdirs()
             staleFile.writeText("Stale content.\n")
-            val exporter = userScope(userDeployment.copy(replace = true))
+            val exporter = exporterFor(userDeployment.copy(replace = true))
 
             // when
             exporter.export(SkillContext(textOnlySkill))
@@ -287,7 +287,7 @@ class CodexAdapterTest {
             neighbourSkill.parentFile.mkdirs()
             neighbourSkill.writeText("A skill installed by hand.\n")
             val replacingDeployment = userDeployment.copy(replace = true)
-            val exporter = userScope(replacingDeployment)
+            val exporter = exporterFor(replacingDeployment)
 
             // when
             exporter.export(UserInstructionsContext(replacingDeployment, rulesets))
@@ -302,7 +302,7 @@ class CodexAdapterTest {
         @Test
         fun `should write nothing outside the home it was given`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(UserInstructionsContext(userDeployment, rulesets))
@@ -312,7 +312,7 @@ class CodexAdapterTest {
             assertThat(tempDir.toFile().listFiles()!!.map { it.name }).containsExactly("home")
         }
 
-        private fun userScope(deployment: UserDeploymentManifest) =
+        private fun exporterFor(deployment: UserDeploymentManifest) =
             requireNotNull(adapter.userScope(userHome, deployment)) { "Codex has a user scope" }
     }
 }

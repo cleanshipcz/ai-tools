@@ -191,10 +191,11 @@ needs Node/npm; build it with `cd ai-tools-engine && ./gradlew build`.
 Next step - generate and deploy tool configs:
   ./deploy.sh
 
-That runs the engine over every project manifest found under the `projects`
-locations in config.yml, and writes tool-specific files (.claude/, .github/,
-.windsurf/, .cursor/, .codex/, .agent/, CLAUDE.md, AGENTS.md) into each
-project's `deploy.directory`.
+That runs the engine over every deployment manifest found under the
+`deployments` locations in config.yml, and writes tool-specific files
+(.claude/, .github/, .windsurf/, .cursor/, .codex/, .agent/, CLAUDE.md,
+AGENTS.md) into each project's `deploy.directory` - and, for a `user.yml`,
+into the user scope of the tools it names.
 
 To change which manifests and tools are used, edit config.yml, or create
 config.local.yml next to it for machine-local overrides (gitignored).

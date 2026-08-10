@@ -1,11 +1,15 @@
 #!/bin/bash
-# Generates the tool-specific artifacts for every project manifest and writes
-# them into each project's deploy.directory.
+# Generates the tool-specific artifacts for every deployment manifest: a
+# project.yml is written into its own deploy.directory, a user.yml into the
+# user scope of each tool it names, under the home of whoever runs this.
 #
 # Run it from the repository root: the current directory is passed to the engine
 # as --working-dir, and that is where config.yml (and config.local.yml) are read
 # from. The exit status is the engine CLI's own, so a manifest that fails to
 # export fails this script too.
+#
+# Pass --user-home to the engine to deploy the user scope somewhere else, which
+# is how a run is tried out without touching your own configuration.
 
 set -euo pipefail
 

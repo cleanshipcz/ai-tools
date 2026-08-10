@@ -129,7 +129,8 @@ class ToolsEngine(
             for (projectManifest in allData.projects.values) {
                 // Selecting before the project is assembled keeps a project that exports through no tool out of the
                 // log entirely, rather than bracketing it in the lines that report a deploy which never happened.
-                val adapters = selectAdapters(projectManifest.id, projectManifest.deploy.tools, toolsField = "deploy.tools", subject = "project")
+                val adapters =
+                    selectAdapters(projectManifest.id, projectManifest.deploy.tools, toolsField = "deploy.tools", subject = "project")
                 if (adapters.isEmpty()) continue
                 LOG.info("Processing project {}", projectManifest.id)
                 val project = assembleProject(projectManifest, allData)
@@ -228,7 +229,8 @@ class ToolsEngine(
     private fun exportUserDeployments(allData: AllManifests): List<ExportFailure> {
         val failures = mutableListOf<ExportFailure>()
         for (manifest in allData.userDeployments.values) {
-            val adapters = selectAdapters(manifest.id, manifest.tools, toolsField = "tools", subject = "user deployment")
+            val adapters =
+                selectAdapters(manifest.id, manifest.tools, toolsField = "tools", subject = "user deployment")
             if (adapters.isEmpty()) continue
             LOG.info("Processing user deployment {}", manifest.id)
             val deployment = assembleUserDeployment(manifest, allData)

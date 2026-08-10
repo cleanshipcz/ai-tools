@@ -189,7 +189,7 @@ class ClaudeAdapterTest {
         @Test
         fun `should write the instructions file from the rulesets of the deployment`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(UserInstructionsContext(userDeployment, rulesets))
@@ -208,7 +208,7 @@ class ClaudeAdapterTest {
             // - the engine owns this file, so what a previous deploy or a hand edit left behind does not survive
             claudeDir.mkdirs()
             claudeDir.resolve("CLAUDE.md").writeText("Hand-written content.\n")
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(UserInstructionsContext(userDeployment, rulesets))
@@ -222,7 +222,7 @@ class ClaudeAdapterTest {
         @Test
         fun `should write an agent into the user agents directory`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(AgentContext(agent, rulesets))
@@ -237,7 +237,7 @@ class ClaudeAdapterTest {
         @Test
         fun `should write a prompt into the user commands directory`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(PromptContext(prompt, rulesets))
@@ -249,7 +249,7 @@ class ClaudeAdapterTest {
         @Test
         fun `should write a skill into the user skills directory`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(SkillContext(textOnlySkill))
@@ -267,7 +267,7 @@ class ClaudeAdapterTest {
             val staleFile = claudeDir.resolve("skills/${textOnlySkill.id}/stale.md")
             staleFile.parentFile.mkdirs()
             staleFile.writeText("Stale content.\n")
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(SkillContext(textOnlySkill))
@@ -282,7 +282,7 @@ class ClaudeAdapterTest {
             val staleFile = claudeDir.resolve("skills/${textOnlySkill.id}/stale.md")
             staleFile.parentFile.mkdirs()
             staleFile.writeText("Stale content.\n")
-            val exporter = userScope(userDeployment.copy(replace = true))
+            val exporter = exporterFor(userDeployment.copy(replace = true))
 
             // when
             exporter.export(SkillContext(textOnlySkill))
@@ -308,7 +308,7 @@ class ClaudeAdapterTest {
             val unrelatedDirectory = claudeDir.resolve("projects/some-project")
             unrelatedDirectory.mkdirs()
             val replacingDeployment = userDeployment.copy(replace = true)
-            val exporter = userScope(replacingDeployment)
+            val exporter = exporterFor(replacingDeployment)
 
             // when
             exporter.export(UserInstructionsContext(replacingDeployment, rulesets))
@@ -326,7 +326,7 @@ class ClaudeAdapterTest {
         @Test
         fun `should write nothing outside the home it was given`() {
             // given
-            val exporter = userScope(userDeployment)
+            val exporter = exporterFor(userDeployment)
 
             // when
             exporter.export(UserInstructionsContext(userDeployment, rulesets))
@@ -337,7 +337,7 @@ class ClaudeAdapterTest {
             assertThat(tempDir.toFile().listFiles()!!.map { it.name }).containsExactly("home")
         }
 
-        private fun userScope(deployment: UserDeploymentManifest) =
+        private fun exporterFor(deployment: UserDeploymentManifest) =
             requireNotNull(claudeAdapter.userScope(userHome, deployment)) { "Claude has a user scope" }
     }
 }

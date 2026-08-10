@@ -755,7 +755,8 @@ class ToolsEngineTest {
         @Test
         fun `should deploy a user deployment only through the tools it declares`() {
             // given
-            val multiAdapterEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(ClaudeAdapter(), CodexAdapter()))
+            val multiAdapterEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ClaudeAdapter(), CodexAdapter()))
             writeUserDeployment(tools = listOf("claude"))
 
             // when
@@ -769,7 +770,8 @@ class ToolsEngineTest {
         @Test
         fun `should deploy a user deployment through every configured tool when it declares none`() {
             // given
-            val multiAdapterEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(ClaudeAdapter(), CodexAdapter()))
+            val multiAdapterEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ClaudeAdapter(), CodexAdapter()))
             writeUserDeployment(tools = null)
 
             // when
