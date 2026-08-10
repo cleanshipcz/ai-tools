@@ -1,0 +1,54 @@
+id: docx-export
+description: >-
+  Convert a .docx document to Markdown with extracted images using the bundled converter script.
+  Use whenever a Word document needs a Markdown export or an existing export needs regenerating after the docx changed.
+sections:
+  - text: |
+      # DOCX → Markdown export
+
+      This skill ships its own converter — do not use pandoc, markitdown, or write a new script.
+
+      ## How to run
+
+      The converter is bundled with this skill at [scripts/docx_to_markdown.py](scripts/docx_to_markdown.py) (path relative to this skill's directory).
+
+      ```bash
+      python3 <skill-dir>/scripts/docx_to_markdown.py "<path/to/Document Name>.docx"
+      ```
+
+      - Output lands next to the source docx, with spaces in the name replaced by underscores: `Document_Name.md` plus a `Document_Name_images/` folder.
+      - Requires `python-docx` (`pip install python-docx`).
+      - `--image-format none` produces a text-only export without the images folder.
+      - An explicit output path can be passed as a second argument, but the default (next to the docx) is the convention.
+
+      ## Regenerating an existing export
+
+      Delete the old images folder first, otherwise stale numbered images survive:
+
+      ```bash
+      rm -rf "<dir>/Document_Name_images" && python3 <skill-dir>/scripts/docx_to_markdown.py "<dir>/<Document Name>.docx"
+      ```
+
+      ## Intentional behaviors — do not "fix" these
+
+      - Tracked-change deletions (`w:del`) are excluded from the output; insertions (`w:ins`) are included. The export shows the accepted-changes view, so the image count can be lower than the media count inside the docx zip.
+      - Header/footer images (logos, watermarks) are not extracted.
+      - Heading levels mirror the docx styles exactly — a flat hierarchy in the output means the source uses Heading 1 everywhere.
+      - Tables containing images or nested tables render as labeled sections instead of pipe tables; that is deliberate, for readability.
+      - OMML equations become best-effort LaTeX (`$...$` / `$$...$$`), hyperlinks become `[text](url)`, checkbox content controls keep their ☒/☐ state.
+
+      ## After converting
+
+      Leave the generated files uncommitted — the user always commits themselves, never do it for them.
+files:
+  - path: scripts/docx_to_markdown.py
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-08-10"
+  tags:
+    - docx
+    - markdown
+    - conversion
+    - extraction
+    - documentation
