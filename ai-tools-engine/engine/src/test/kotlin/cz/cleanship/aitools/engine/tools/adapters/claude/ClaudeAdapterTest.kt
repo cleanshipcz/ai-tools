@@ -7,11 +7,13 @@ import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
 import cz.cleanship.aitools.engine.data.textOnlySkill
+import cz.cleanship.aitools.engine.data.userDeployment
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.ProjectContext
 import cz.cleanship.aitools.engine.models.ProjectDeploy
 import cz.cleanship.aitools.engine.models.ProjectDocumentation
 import cz.cleanship.aitools.engine.models.ProjectManifest
+import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.models.Version
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
@@ -19,10 +21,12 @@ import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
+import cz.cleanship.aitools.engine.tools.UserInstructionsContext
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -164,5 +168,176 @@ class ClaudeAdapterTest {
         // then
         assertThat(claudeDir).exists()
         assertThat(File(claudeDir, "some-file.txt")).exists()
+    }
+
+    /**
+     * The user scope writes into the per-user configuration of Claude Code. Every test here points the home base at
+     * a temporary directory: the real home of whoever runs the suite is never read and never written.
+     */
+    @Nested
+    inner class UserScope {
+
+        private lateinit var userHome: File
+        private lateinit var claudeDir: File
+
+        @BeforeEach
+        fun setUp() {
+            userHome = tempDir.resolve("home").toFile()
+            claudeDir = userHome.resolve(".claude")
+        }
+
+        @Test
+        fun `should write the instructions file from the rulesets of the deployment`() {
+            // given
+            val exporter = userScope(userDeployment)
+
+            // when
+            exporter.export(UserInstructionsContext(userDeployment, rulesets))
+
+            // then
+            val content = claudeDir.resolve("CLAUDE.md").readText()
+            // - the header names the manifest the file was generated from, and there is no project to describe
+            assertThat(content).contains("# ${userDeployment.id}")
+            assertThat(content).contains(userDeployment.description)
+            assertThat(content).contains("Rule number one.")
+        }
+
+        @Test
+        fun `should overwrite the instructions file it already owns`() {
+            // given
+            // - the engine owns this file, so what a previous deploy or a hand edit left behind does not survive
+            claudeDir.mkdirs()
+            claudeDir.resolve("CLAUDE.md").writeText("Hand-written content.\n")
+            val exporter = userScope(userDeployment)
+
+            // when
+            exporter.export(UserInstructionsContext(userDeployment, rulesets))
+
+            // then
+            val content = claudeDir.resolve("CLAUDE.md").readText()
+            assertThat(content).doesNotContain("Hand-written content.")
+            assertThat(content).contains("# ${userDeployment.id}")
+        }
+
+        @Test
+        fun `should write an agent into the user agents directory`() {
+            // given
+            val exporter = userScope(userDeployment)
+
+            // when
+            exporter.export(AgentContext(agent, rulesets))
+
+            // then
+            val content = claudeDir.resolve("agents/${agent.id}.md").readText().trim()
+            assertThat(content).startsWith("---")
+            assertThat(content).contains("name: ${agent.id}")
+            assertThat(content).contains(expectedAgent.trim())
+        }
+
+        @Test
+        fun `should write a prompt into the user commands directory`() {
+            // given
+            val exporter = userScope(userDeployment)
+
+            // when
+            exporter.export(PromptContext(prompt, rulesets))
+
+            // then
+            assertThat(claudeDir.resolve("commands/${prompt.id}.md").readText().trim()).isEqualTo(expectedPrompt.trim())
+        }
+
+        @Test
+        fun `should write a skill into the user skills directory`() {
+            // given
+            val exporter = userScope(userDeployment)
+
+            // when
+            exporter.export(SkillContext(textOnlySkill))
+
+            // then
+            val skillFile = claudeDir.resolve("skills/${textOnlySkill.id}/SKILL.md")
+            assertThat(skillFile).exists()
+            assertThat(skillFile.readText()).contains("name: ${textOnlySkill.id}")
+        }
+
+        @Test
+        fun `should keep a file left in a skill directory when replace is false`() {
+            // given
+            // - the documented limitation: without replace, what an earlier deploy wrote is only overwritten, never removed
+            val staleFile = claudeDir.resolve("skills/${textOnlySkill.id}/stale.md")
+            staleFile.parentFile.mkdirs()
+            staleFile.writeText("Stale content.\n")
+            val exporter = userScope(userDeployment)
+
+            // when
+            exporter.export(SkillContext(textOnlySkill))
+
+            // then
+            assertThat(staleFile).exists()
+        }
+
+        @Test
+        fun `should rewrite the directory of a skill when replace is true`() {
+            // given
+            val staleFile = claudeDir.resolve("skills/${textOnlySkill.id}/stale.md")
+            staleFile.parentFile.mkdirs()
+            staleFile.writeText("Stale content.\n")
+            val exporter = userScope(userDeployment.copy(replace = true))
+
+            // when
+            exporter.export(SkillContext(textOnlySkill))
+
+            // then
+            assertThat(staleFile).doesNotExist()
+            assertThat(claudeDir.resolve("skills/${textOnlySkill.id}/SKILL.md")).exists()
+        }
+
+        @Test
+        fun `should keep everything it did not deploy when replace is true`() {
+            // given
+            // - the engine owns the paths of its own artifacts, never the directories of the tool that hold them
+            val neighbourSkill = claudeDir.resolve("skills/hand-made-skill/SKILL.md")
+            neighbourSkill.parentFile.mkdirs()
+            neighbourSkill.writeText("A skill installed by hand.\n")
+            val neighbourAgent = claudeDir.resolve("agents/hand-made-agent.md")
+            neighbourAgent.parentFile.mkdirs()
+            neighbourAgent.writeText("An agent installed by hand.\n")
+            val neighbourCommand = claudeDir.resolve("commands/hand-made-command.md")
+            neighbourCommand.parentFile.mkdirs()
+            neighbourCommand.writeText("A command installed by hand.\n")
+            val unrelatedDirectory = claudeDir.resolve("projects/some-project")
+            unrelatedDirectory.mkdirs()
+            val replacingDeployment = userDeployment.copy(replace = true)
+            val exporter = userScope(replacingDeployment)
+
+            // when
+            exporter.export(UserInstructionsContext(replacingDeployment, rulesets))
+            exporter.export(AgentContext(agent, rulesets))
+            exporter.export(PromptContext(prompt, rulesets))
+            exporter.export(SkillContext(textOnlySkill))
+
+            // then
+            assertThat(neighbourSkill).hasContent("A skill installed by hand.\n")
+            assertThat(neighbourAgent).hasContent("An agent installed by hand.\n")
+            assertThat(neighbourCommand).hasContent("A command installed by hand.\n")
+            assertThat(unrelatedDirectory).exists()
+        }
+
+        @Test
+        fun `should write nothing outside the home it was given`() {
+            // given
+            val exporter = userScope(userDeployment)
+
+            // when
+            exporter.export(UserInstructionsContext(userDeployment, rulesets))
+            exporter.export(SkillContext(textOnlySkill))
+
+            // then
+            // - the project-scope destination of the very same adapter stays empty, and so does everything else
+            assertThat(tempDir.toFile().listFiles()!!.map { it.name }).containsExactly("home")
+        }
+
+        private fun userScope(deployment: UserDeploymentManifest) =
+            requireNotNull(claudeAdapter.userScope(userHome, deployment)) { "Claude has a user scope" }
     }
 }

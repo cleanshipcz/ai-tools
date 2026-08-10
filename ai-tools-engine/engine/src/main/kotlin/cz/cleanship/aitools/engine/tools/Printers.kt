@@ -2,6 +2,7 @@ package cz.cleanship.aitools.engine.tools
 
 object Printers {
     val globalFilePrinter = GlobalFilePrinter()
+    val userInstructionsPrinter = UserInstructionsPrinter()
     val promptPrinter = PromptPrinter()
     val agentPrinter = AgentPrinter()
     val rulesetPrinter = RulesetPrinter()

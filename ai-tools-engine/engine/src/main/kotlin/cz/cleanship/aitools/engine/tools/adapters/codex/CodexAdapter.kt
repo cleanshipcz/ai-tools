@@ -2,6 +2,7 @@ package cz.cleanship.aitools.engine.tools.adapters.codex
 
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
@@ -10,6 +11,8 @@ import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
+import cz.cleanship.aitools.engine.tools.UserInstructionsContext
+import cz.cleanship.aitools.engine.tools.UserScopeExporter
 import java.io.File
 
 class CodexAdapter(
@@ -21,22 +24,50 @@ class CodexAdapter(
 
     override fun prepare(projectDir: File, project: ProjectManifest) {
         if (project.deploy.replace) {
-            codexDir(projectDir).deleteRecursively()
+            CodexLayout.ofProject(projectDir).toolDir.deleteRecursively()
         }
     }
 
     override fun export(projectDir: File, globalContext: GlobalContext) {
         exportService.export(
             globalContext.project,
-            projectDir.resolve("AGENTS.md"),
+            CodexLayout.ofProject(projectDir).instructionsFile,
         ) {
             printers.globalFilePrinter.print(globalContext, it)
         }
     }
 
-    override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
+    override fun export(projectDir: File, promptContext: PromptContext) =
+        exportPrompt(CodexLayout.ofProject(projectDir), promptContext)
+
+    override fun export(projectDir: File, agentContext: AgentContext) =
+        exportAgent(CodexLayout.ofProject(projectDir), agentContext)
+
+    override fun export(projectDir: File, featureContext: FeatureContext) = exportService.export(
+        featureContext.feature,
+        CodexLayout.ofProject(projectDir).featureFile(featureContext.feature.id),
+    ) {
+        it.appendText(
+            """
+            # ${featureContext.feature.id}
+
+            ${featureContext.feature.description}
+
+            """.trimIndent(),
+        )
+        it.appendLine()
+        printers.featurePrinter.print(featureContext, it)
+    }
+
+    override fun export(projectDir: File, skillContext: SkillContext) =
+        exportSkill(CodexLayout.ofProject(projectDir), skillContext)
+
+    override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter =
+        CodexUserScopeExporter(CodexLayout.ofUser(userHome), deployment)
+
+    private fun exportPrompt(layout: CodexLayout, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
-        skillsDir(projectDir).resolve("prompt-${promptContext.prompt.id}").resolve("SKILL.md"),
+        layout.promptDir(promptContext.prompt.id).resolve(SKILL_FILE),
     ) {
         it.appendText(
             """
@@ -44,15 +75,15 @@ class CodexAdapter(
             name: ${promptContext.prompt.id}
             description: ${promptContext.prompt.description.replace("\n", " ")}
             ---
-            
+
             """.trimIndent(),
         )
         printers.promptPrinter.print(promptContext, it)
     }
 
-    override fun export(projectDir: File, agentContext: AgentContext) = exportService.export(
+    private fun exportAgent(layout: CodexLayout, agentContext: AgentContext) = exportService.export(
         agentContext.agent,
-        skillsDir(projectDir).resolve("agent-${agentContext.agent.id}").resolve("SKILL.md"),
+        layout.agentDir(agentContext.agent.id).resolve(SKILL_FILE),
     ) {
         it.appendText(
             """
@@ -60,33 +91,17 @@ class CodexAdapter(
             name: ${agentContext.agent.id}
             description: ${agentContext.agent.description.replace("\n", " ")}
             ---
-            
+
             """.trimIndent(),
         )
         printers.agentPrinter.print(agentContext, it)
     }
 
-    override fun export(projectDir: File, featureContext: FeatureContext) = exportService.export(
-        featureContext.feature,
-        codexDir(projectDir).resolve("features").resolve("feature-${featureContext.feature.id}.md"),
-    ) {
-        it.appendText(
-            """
-            # ${featureContext.feature.id}
-            
-            ${featureContext.feature.description}
-            
-            """.trimIndent(),
-        )
-        it.appendLine()
-        printers.featurePrinter.print(featureContext, it)
-    }
-
-    override fun export(projectDir: File, skillContext: SkillContext) {
-        val skillDir = skillsDir(projectDir).resolve("skill-${skillContext.skill.id}")
+    private fun exportSkill(layout: CodexLayout, skillContext: SkillContext) {
+        val skillDir = layout.skillDir(skillContext.skill.id)
         exportService.export(
             skillContext.skill,
-            skillDir.resolve("SKILL.md"),
+            skillDir.resolve(SKILL_FILE),
         ) {
             it.appendText(
                 """
@@ -102,7 +117,48 @@ class CodexAdapter(
         exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir)
     }
 
-    private fun codexDir(projectDir: File) = projectDir.resolve(".codex")
+    /**
+     * Writes [deployment] into `<home>/.codex`, rendering exactly what a project deploy renders - see [CodexLayout].
+     *
+     * The instructions file is owned by the engine and overwritten on every deploy. Everything else the home holds is
+     * left alone: a replacing deploy rewrites the directory of each artifact it deploys, never the `skills` directory
+     * around them, so a skill the user wrote by hand survives.
+     */
+    private inner class CodexUserScopeExporter(
+        private val layout: CodexLayout,
+        private val deployment: UserDeploymentManifest,
+    ) : UserScopeExporter {
 
-    private fun skillsDir(projectDir: File) = codexDir(projectDir).resolve("skills")
+        override fun export(instructionsContext: UserInstructionsContext) = exportService.export(
+            instructionsContext.deployment,
+            layout.instructionsFile,
+        ) {
+            printers.userInstructionsPrinter.print(instructionsContext, it)
+        }
+
+        override fun export(promptContext: PromptContext) {
+            replaceIfRequested(layout.promptDir(promptContext.prompt.id))
+            exportPrompt(layout, promptContext)
+        }
+
+        override fun export(agentContext: AgentContext) {
+            replaceIfRequested(layout.agentDir(agentContext.agent.id))
+            exportAgent(layout, agentContext)
+        }
+
+        override fun export(skillContext: SkillContext) {
+            replaceIfRequested(layout.skillDir(skillContext.skill.id))
+            exportSkill(layout, skillContext)
+        }
+
+        private fun replaceIfRequested(artifactDir: File) {
+            if (deployment.replace) {
+                artifactDir.deleteRecursively()
+            }
+        }
+    }
+
+    companion object {
+        private const val SKILL_FILE = "SKILL.md"
+    }
 }
