@@ -7,9 +7,9 @@ tools:
 # rewritten on every deploy, so these manifests are where the rules are edited.
 rulesets:
   filter:
-    - type: tags
-      tags:
-        - global
+    - type: whitelist
+      ids:
+        - base
 # A block that is left out selects everything of its kind, exactly as it does in a project manifest. These four are
 # therefore declared empty on purpose: the user scope carries the rules alone until an artifact is deliberately added.
 agents:
@@ -27,7 +27,11 @@ skills:
 fragments:
   filter:
     - type: whitelist
-      ids: []
+      ids:
+        - confluence-doc
+        - confluence-search
+        - docx-export
+        - jira-ticket
 metadata:
   version: 1.0.0
   author: cleanshipcz
