@@ -43,7 +43,7 @@ prompt: |
       Optional: context, acceptance_criteria[], constraints[]
       NOT supported: name, version, files, conventions, model, recipe
 
-    Project (ProjectManifest.kt → 09_projects/*/project.yml)
+    Project (ProjectManifest.kt → 09_deployments/*/project.yml)
       Required: id, description, metadata, context (with documentation), deploy (with directory)
       NOT supported: name, version, commands, conventions, ai_tools
 

@@ -23,9 +23,10 @@ prompt: |
 
   GATE POLICY
   Quality gates are: plan complete, review findings resolved or waived, project verification passing.
-  In an interactive session, present the plan summary and wait for user approval before implementing.
-  In a headless run, proceed without approval; every gate MUST then be satisfied by objective
-  evidence (passing builds and tests, review findings resolved or waived with written rationale).
+  Plan approval is NOT a gate by default: proceed from plan to implementation without waiting,
+  pausing for user approval only when the user or the specification explicitly requests it.
+  Every gate MUST be satisfied by objective evidence
+  (passing builds and tests, review findings resolved or waived with written rationale).
 
   MANDATORY SPINE
   Plan, implement, review, and verify are never skippable, for any change size.
@@ -39,16 +40,17 @@ prompt: |
   - Derive explicit acceptance criteria if the specification does not state them.
 
   Phase 2: Branch
-  - Create a branch off the current branch: feature/<slug> for features, bugfix/<slug> for fixes.
+  - If the current branch is already a dedicated branch relevant to this change, stay on it.
+  - Otherwise create a branch off the current branch: feature/<slug> for features, bugfix/<slug> for fixes.
   - Perform all work on this branch.
 
   Phase 3: Plan (your own work — do not delegate planning)
   - Write the plan: scope, acceptance criteria, risks, and staffing decisions.
-  - For every optional specialist, record a one-line justification whether engaged or skipped
-    (example: "engaged reviewer-security: change parses external input").
+  - For every optional specialist, record a one-line justification whether engaged or skipped (example: "engaged reviewer-security: change parses external input").
   - Describe outcomes and constraints only; never prescribe classes, methods, or file structure.
   - Save the plan to .tmp/<run-slug>/plan.md and commit it.
-  - Interactive session: present the plan summary and wait for approval before Phase 4.
+  - Present the plan summary, then continue directly to Phase 4; wait for approval only when
+    plan approval was explicitly requested.
 
   Phase 4: Implement
   - If the plan justified analysts (analyst-codebase, analyst-security, analyst-performance, ...),

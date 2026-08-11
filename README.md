@@ -1,12 +1,14 @@
 # AI Tools Repository
 > Manifest-driven generator for AI coding assistant configs
 
-This repository is the source of truth for prompts, rulesets, fragments, agents, skills, and project manifests.
-A Kotlin engine (`ai-tools-engine/`) reads the YAML in this repo and writes tool-specific configuration files for Windsurf, Antigravity, Cursor, Claude Code, GitHub Copilot, and Codex directly into each project's deploy directory.
+This repository is the source of truth for prompts, rulesets, fragments, agents, skills, and deployment manifests.
+A Kotlin engine (`ai-tools-engine/`) reads the YAML in this repo and writes tool-specific configuration files for Windsurf, Antigravity, Cursor, Claude Code, GitHub Copilot, and Codex into each project's deploy directory.
+Claude Code and Codex can also be configured for your user account instead of for a project, in `~/.claude/` and `~/.codex/`.
 
 ## What You Get
 - One YAML definition per agent, prompt, ruleset, fragment, and skill, exported to six tools at once
 - Per-project filtering by tag, whitelist, or blacklist, declared in `project.yml`
+- The same filtering for the tools' per-user configuration, declared in `user.yml` — see [User-Scope Deployments](#user-scope-deployments)
 - Reusable rulesets and fragments referenced by regex, so one agent can pick up all `coding-language-*` rules at once
 - Feature manifests that emit per-tool feature workflows and instructions
 - Strict manifest parsing: an unknown key or an unresolvable ruleset reference fails the run instead of silently producing a wrong artifact
@@ -25,7 +27,7 @@ See [Not Yet Implemented](#not-yet-implemented) before looking for them.
 - `03_prompts/` – prompt manifests
 - `04_skills/` – skill manifests, as `<id>.yml` or as a directory containing `skill.yml`
 - `05_agents/` – agent manifests
-- `09_projects/` – project manifests (`global/` and `local/`), each a directory containing `project.yml` and an optional `features/`
+- `09_deployments/` – deployment manifests, each a directory containing a `project.yml` (deploys into a project directory) or a `user.yml` (deploys into the user scope of a tool), plus an optional `features/`
 - `ai-tools-engine/` – the Kotlin build engine (Gradle multi-module: `:engine`, `:cli`, `:server`, `:telemetry`)
 - `10_schemas/` – JSON schemas; **stale**, they have drifted from the engine's Kotlin models and are not used for validation
 - `90_docs/` – reference documentation
@@ -53,7 +55,7 @@ Left over from the retired TypeScript CLI and no longer written or read by anyth
 ./setup.sh
 ```
 
-2) Edit manifests, then edit `09_projects/<scope>/<project>/project.yml` to set `deploy.directory` and the filters
+2) Edit manifests, then edit `09_deployments/<deployment>/project.yml` to set `deploy.directory` and the filters, or `09_deployments/<deployment>/user.yml` to set the filters of a user-scope deployment
 
 3) Generate and deploy
 
@@ -61,21 +63,32 @@ Left over from the retired TypeScript CLI and no longer written or read by anyth
 ./deploy.sh
 ```
 
-`deploy.sh` is a two-line wrapper around the CLI:
+If a `user.yml` is in play — and this repository ships one, `09_deployments/globals/user.yml` — that run also rewrites `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` from the manifest, keeping no backup of what those files held.
+Try `./deploy.sh --user-home /tmp/try` first and read what it produced there; see [User-Scope Deployments](#user-scope-deployments).
+
+`deploy.sh` is a thin wrapper around the CLI:
 
 ```bash
-cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir <repository root>"
+cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir \"<repository root>\""
 ```
 
-The CLI has exactly one option, `--working-dir`, which points at the directory containing `config.yml`.
-There are no subcommands and no other flags.
+The inner quotes survive Gradle's own splitting of `--args`, so a repository path containing spaces stays a single argument.
 
-Every project manifest found under the configured `projects` locations is processed on every run, and each is written to its own `deploy.directory`.
-There is no way to deploy a single project from the command line; narrow the `projects` list in `config.local.yml` instead.
+The CLI has two options besides `--help`, and no subcommands:
+
+- `--working-dir` — the directory containing `config.yml` (and the optional `config.local.yml`). Defaults to `.`, and `deploy.sh` sets it to the directory it was started from.
+- `--user-home` — the home directory a `user.yml` deploys under. Defaults to the home of whoever runs the command; see [User-Scope Deployments](#user-scope-deployments).
+
+Every argument you give `deploy.sh` is forwarded to the CLI, so a trial run into a scratch directory is `./deploy.sh --user-home /tmp/try`.
+The one argument it cannot forward is one containing a double quote: Gradle's `--args` has no escape mechanism for it, so `deploy.sh` refuses such an argument instead of delivering a different, still-plausible path.
+Run the CLI directly for that case.
+
+Every deployment manifest found under the configured `deployments` locations is processed on every run: each `project.yml` is written to its own `deploy.directory`, and each `user.yml` into the user scope of the tools it names.
+There is no way to deploy a single manifest from the command line; narrow the `deployments` list in `config.local.yml` instead.
 
 ## Projects, Features, and Deployment
 
-A project is a directory under a configured `projects` location containing `project.yml`.
+A project is a directory under a configured `deployments` location containing `project.yml`.
 `deploy.directory` sets where its generated files land.
 
 Relative `deploy.directory` values resolve against `--working-dir`, the same base the `locations` paths of `config.yml` use — so `.` means the root of this repository and the value does not change with the launcher.
@@ -118,8 +131,112 @@ One run reports every collision it found, names the id and both files, and exits
 
 How much a collision costs depends on the kind of manifest:
 
-- Two projects sharing an id, or two features of the same project sharing an id, cost only the project(s) that carry them. Those projects are not exported, every other project is deployed as usual, and the run still fails at the end.
+- Two projects sharing an id, two user deployments sharing an id, or two features of the same project sharing an id, cost only the deployment(s) that carry them. Those are not exported, every other deployment is deployed as usual, and the run still fails at the end.
 - Two agents, prompts, rulesets, fragments, or skills sharing an id stop the whole run before anything is written. They are shared by every project, and a project that does not filter that kind deploys all of it, so dropping the colliding pair would silently ship every project without content it never excluded.
+
+Ids are indexed per kind, so a `project.yml` and a `user.yml` are free to declare the same id — they are separate manifests of separate scopes, and nothing ever has to choose between them.
+
+## User-Scope Deployments
+
+A user deployment installs a filtered selection of rulesets, agents, prompts, and skills into a tool's per-user configuration — `~/.claude/`, `~/.codex/` — instead of into a project directory.
+
+It follows the same file convention as a project: **the filename names the kind, the directory names the instance**.
+A directory under a configured `deployments` location holding a `project.yml` is a project; one holding a `user.yml` is a user deployment.
+There is no `type:` field inside the YAML, and one `locations.deployments` list feeds both kinds.
+
+```
+09_deployments/
+  ai-tools/
+    project.yml          # project-scope deployment
+    features/...
+  globals/
+    user.yml             # user-scope deployment
+```
+
+The manifest carries only what a user scope has an answer for: no `context` (there is no repository to describe), no `directory` (the destination is each tool's canonical per-user location), and no `features` (a feature belongs to the project whose directory it lives under).
+
+```yaml
+# 09_deployments/globals/user.yml
+id: globals
+description: My global AI tool setup
+tools: [claude, codex]        # optional; omitted means every tool configured for the run
+replace: false                # optional, default false
+rulesets:
+  filter:
+    - type: tags
+      tags: [global]
+agents:
+  filter:
+    - type: whitelist
+      ids: [reviewer-code]
+skills:
+  filter:
+    - type: whitelist
+      ids: []                 # an empty whitelist selects nothing
+# prompts and fragments are omitted here, which selects all of them
+metadata:
+  version: 1.0.0
+```
+
+Filters, and the `tools` list, behave exactly as they do in a `project.yml`: an omitted or empty `filter` lets everything of that kind through, an empty whitelist selects nothing, and `blacklist` must come last because filters fold over a selection that starts empty.
+An empty `tools: []` deploys through no tool at all, while omitting the key means every tool configured for the run.
+`09_deployments/globals/user.yml` deploys the rules alone, by declaring an empty whitelist for each of the other four kinds.
+
+### Where it lands
+
+Paths are relative to `--user-home`, which defaults to the home of whoever runs the deploy.
+
+| Artifact | `claude` | `codex` |
+| --- | --- | --- |
+| rulesets → instructions file | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` |
+| agents | `~/.claude/agents/<id>.md` | `~/.codex/skills/agent-<id>/SKILL.md` |
+| prompts | `~/.claude/commands/<id>.md` | `~/.codex/skills/prompt-<id>/SKILL.md` |
+| skills | `~/.claude/skills/<id>/SKILL.md` | `~/.codex/skills/skill-<id>/SKILL.md` |
+
+Codex has one shape for everything it can be asked to do, so its agents and prompts are skill-shaped there too, told apart by the prefix of their directory — the same layout it uses inside a project.
+A skill's companion `files` are copied next to the generated `SKILL.md`, exactly as in project scope.
+
+`windsurf`, `antigravity`, `github_copilot`, and `cursor` have no user-scope layout in this engine yet.
+A `user.yml` naming one of them is never silently dropped: the run logs that the manifest is not deployed for that tool, and deploys it for the tools that do have a layout.
+
+### The engine owns the instructions file
+
+`~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` are generated from the manifest — a heading naming the deployment, its `description`, and a `## Rules` list holding the rules of every ruleset the manifest selected.
+The engine **owns and overwrites these files on every deploy**, and the run warns you by path each time it replaces one.
+
+Anything you write into them by hand is lost on the next deploy.
+That includes what Claude Code's `#`-remember shortcut appends and what CLAUDE.md-editing tooling adds.
+The workflow is: edit the YAML, redeploy.
+Auto-memory is unaffected — it lives under `~/.claude/projects/.../memory/`.
+
+Two user deployments that select the same tool both claim that tool's single instructions file.
+No winner is picked: the file is left alone, the collision is reported naming both manifests, and the run fails — while the artifacts they do not contend for are still deployed.
+Give each tool a single deployment, or narrow their `tools` lists.
+
+### What a deploy touches, and what it leaves alone
+
+A user deploy owns the paths of the artifacts it writes and nothing else.
+The directories holding them — `~/.claude/skills/`, `~/.claude/agents/`, `~/.claude/commands/`, `~/.codex/skills/` — are shared with everything you installed by hand, so they are created when missing and never deleted wholesale.
+
+With `replace: true`, the directory of each artifact this manifest deploys is deleted and rewritten (for Claude, that is the skill directories; for Codex, the skill, agent, and prompt directories), and single-file artifacts are overwritten in place.
+A skill you wrote yourself, sitting beside the generated ones, survives every deploy.
+
+Known limitations:
+
+- Removing an artifact from a `user.yml` leaves its previously deployed copy behind in the home until you delete it by hand. The engine keeps no ledger of what it wrote, so it cannot tell a stale artifact from one you installed yourself.
+- `replace: true` reaches per-artifact paths only. Parent directories and hand-made neighbours are never touched.
+
+### Trying it out
+
+`--user-home` points a run at a directory of its own instead of your real home:
+
+```bash
+./deploy.sh --user-home /tmp/try
+```
+
+A relative value resolves against `--working-dir` — the same base every other declared path of the run uses — not against the shell's current directory.
+An empty value is rejected rather than resolved.
+A home that does not exist yet is fine: a first deploy onto a fresh machine creates it, and says so in the log.
 
 ## Rulesets and Fragments
 
@@ -138,7 +255,7 @@ A pattern that matches nothing is an error, and the message tells you whether th
 
 ## Tool Output
 
-Verified against the adapters in `ai-tools-engine/engine/.../tools/adapters/`. All paths are relative to the project's `deploy.directory`.
+Verified against the adapters in `ai-tools-engine/engine/.../tools/adapters/`. All paths are relative to the project's `deploy.directory`; for what a `user.yml` writes instead, see [Where it lands](#where-it-lands).
 
 | Tool (`config.yml` key) | Output |
 | --- | --- |
@@ -155,7 +272,7 @@ The engine reads `config.yml` from the directory given by `--working-dir` — th
 `config.local.yml` is gitignored and intended for machine-local overrides.
 
 Merging happens per individual key: each of the six entries under `locations`, and the `tools` list, is replaced wholesale when present in `config.local.yml`.
-Lists are never appended to, so a local `projects:` list must repeat any default entry you still want.
+Lists are never appended to, so a local `deployments:` list must repeat any default entry you still want.
 The `env_vars` map is the exception — it merges per variable, so a local declaration overrides that one variable and leaves the rest of the shared map in place.
 
 ```yaml
@@ -165,7 +282,7 @@ locations:
   rulesets:  ["01_rulesets"]
   fragments: ["02_fragments"]
   skills:    ["04_skills"]
-  projects:  ["09_projects"]
+  deployments: ["09_deployments"]
 
 tools:
   - windsurf
@@ -178,8 +295,10 @@ tools:
 
 Every entry under `locations` is a list, so you can point at additional directories outside this repository.
 Relative location paths resolve against the working directory; absolute paths are used as given — the same rule a project's `deploy.directory` follows.
+`locations.deployments` holds both kinds of deployment manifest, since a directory that holds one kind usually holds the other.
+It was named `locations.projects` before the second kind existed; a config file still declaring the old key fails the run with a message naming the replacement, rather than having its list silently ignored.
 The `tools` list accepts exactly the six keys above, and controls which adapters run.
-An individual project can narrow itself down to a subset of them with `deploy.tools` in its `project.yml` — see [QUICKREF.md](QUICKREF.md).
+An individual project can narrow itself down to a subset of them with `deploy.tools` in its `project.yml`, and a user deployment with its top-level `tools` — see [QUICKREF.md](QUICKREF.md).
 
 ### Path variables
 
@@ -191,7 +310,7 @@ env_vars:
 ```
 
 ```yaml
-# 09_projects/<scope>/<project>/project.yml
+# 09_deployments/<deployment>/project.yml
 deploy:
   directory: "${PROJECTS_FOLDER}/custom-ai-tools"
 ```
@@ -223,7 +342,9 @@ The CLI accepts no subcommands, so there is no command to run for any of them:
 - Documentation generation
 - Evaluation suite runner
 - `diff` and `clean` utilities
-- MCP server configuration output
+- MCP server configuration output, in either scope — a `user.yml` has no `mcps` block
+- User-scope deployment for `windsurf`, `antigravity`, `github_copilot`, and `cursor` — a `user.yml` deploys through `claude` and `codex` only, and names the tools it skipped
+- A ledger of what a deploy wrote, and with it the removal of artifacts a manifest no longer selects — see [User-Scope Deployments](#user-scope-deployments)
 - Deploy backups and auto-commit
 
 The committed `PROMPT_LIBRARY.md`, `PROMPT_LIBRARY.html`, and `docs/AGENTS.md` are artifacts of the retired TypeScript CLI.

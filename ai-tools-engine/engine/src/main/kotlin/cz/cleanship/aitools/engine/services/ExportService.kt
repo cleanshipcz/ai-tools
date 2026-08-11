@@ -43,20 +43,67 @@ class ExportService {
     /**
      * Copies every companion file declared by a skill next to its generated manifest.
      *
-     * @throws SkillFileResolvingException if a declared file cannot be resolved or does not exist
+     * @throws SkillFileResolvingException if a declared file cannot be resolved, does not exist, or would land
+     * outside [targetDir] - see [resolveTarget]
      */
     fun copySkillFiles(
         skillFiles: List<SkillFile>,
         sourceDir: File?,
         targetDir: File,
+        skillId: String = "",
     ) {
         for (skillFile in skillFiles) {
             val sourceFile = resolveSource(skillFile.source, sourceDir)
-            val targetFile = targetDir.resolve(skillFile.target)
+            warnWhenSourceComesFromOutside(skillFile.source, sourceFile, sourceDir, skillId)
+            val targetFile = resolveTarget(skillFile.target, targetDir)
             targetFile.parentFile.mkdirs()
             copySkillFile(sourceFile, targetFile)
             LOG.info("Copied skill file {} to {}", sourceFile.absolutePath, targetFile.absolutePath)
         }
+    }
+
+    /**
+     * Names a companion file that comes from somewhere other than the directory of the skill declaring it.
+     *
+     * An absolute `source`, and a relative one climbing out with `..`, are both supported and stay supported: sharing
+     * one reference file between skills is what they are for. They are worth saying out loud all the same, because
+     * the directory such a file is copied into is `<skills>/<id>/` - in the user scope, a directory inside the home
+     * whose whole purpose is to be read into an agent's context. A run should not have to be reconstructed from the
+     * manifests to see that it pulled a file in from elsewhere.
+     */
+    private fun warnWhenSourceComesFromOutside(declared: String, sourceFile: File, sourceDir: File?, skillId: String) {
+        val owned = sourceDir?.toPath()?.toAbsolutePath()?.normalize() ?: return
+        val resolved = sourceFile.toPath().toAbsolutePath().normalize()
+        if (resolved.startsWith(owned)) return
+        LOG.warn(
+            "Skill '{}' copies '{}' from outside its own directory: {}",
+            skillId,
+            declared,
+            resolved,
+        )
+    }
+
+    /**
+     * Resolves the declared [target] of a companion file against [targetDir], refusing one that would leave it.
+     *
+     * `target` is free-form manifest text, and the directory it resolves against is the skill directory of whatever
+     * scope is being deployed - inside a project, or inside the user's home. A value climbing out of it with `..`
+     * would let a skill manifest write anywhere the process can, so it is rejected rather than resolved. Nesting
+     * further in is left alone, because `templates/example.txt` is how the existing manifests ship their files.
+     *
+     * The comparison is on the normalized paths rather than the canonical ones: the target does not exist yet, and
+     * its parents usually do not either, so there is nothing on disk to canonicalize against.
+     */
+    private fun resolveTarget(target: String, targetDir: File): File {
+        val resolved = targetDir.resolve(target).toPath().normalize()
+        val owned = targetDir.toPath().normalize()
+        if (resolved == owned || !resolved.startsWith(owned)) {
+            throw SkillFileResolvingException(
+                "Skill file target '$target' would be written outside the skill directory " +
+                    "'${targetDir.absolutePath}'. Declare a target inside the skill.",
+            )
+        }
+        return resolved.toFile()
     }
 
     private fun copySkillFile(sourceFile: File, targetFile: File) {

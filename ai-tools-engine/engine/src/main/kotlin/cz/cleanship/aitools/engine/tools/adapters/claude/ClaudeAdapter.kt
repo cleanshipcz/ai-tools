@@ -1,7 +1,9 @@
 package cz.cleanship.aitools.engine.tools.adapters.claude
 
+import cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
@@ -10,6 +12,8 @@ import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
+import cz.cleanship.aitools.engine.tools.UserInstructionsContext
+import cz.cleanship.aitools.engine.tools.UserScopeExporter
 import java.io.File
 
 class ClaudeAdapter(
@@ -21,29 +25,48 @@ class ClaudeAdapter(
 
     override fun prepare(projectDir: File, project: ProjectManifest) {
         if (project.deploy.replace) {
-            claudeDir(projectDir).deleteRecursively()
+            ClaudeLayout.ofProject(projectDir).toolDir.deleteRecursively()
         }
     }
 
     override fun export(projectDir: File, globalContext: GlobalContext) {
         exportService.export(
             globalContext.project,
-            projectDir.resolve("CLAUDE.md"),
+            ClaudeLayout.ofProject(projectDir).instructionsFile,
         ) {
             printers.globalFilePrinter.print(globalContext, it)
         }
     }
 
-    override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
+    override fun export(projectDir: File, promptContext: PromptContext) =
+        exportPrompt(ClaudeLayout.ofProject(projectDir), promptContext)
+
+    override fun export(projectDir: File, agentContext: AgentContext) =
+        exportAgent(ClaudeLayout.ofProject(projectDir), agentContext)
+
+    override fun export(projectDir: File, featureContext: FeatureContext) = exportService.export(
+        featureContext.feature,
+        ClaudeLayout.ofProject(projectDir).featureFile(featureContext.feature.id),
+    ) {
+        printers.featurePrinter.print(featureContext, it)
+    }
+
+    override fun export(projectDir: File, skillContext: SkillContext) =
+        exportSkill(ClaudeLayout.ofProject(projectDir), skillContext)
+
+    override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter =
+        ClaudeUserScopeExporter(ClaudeLayout.ofUser(userHome), deployment)
+
+    private fun exportPrompt(layout: ClaudeLayout, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
-        claudeDir(projectDir).resolve("commands").resolve("${promptContext.prompt.id}.md"),
+        layout.promptFile(promptContext.prompt.id),
     ) {
         printers.promptPrinter.print(promptContext, it)
     }
 
-    override fun export(projectDir: File, agentContext: AgentContext) = exportService.export(
+    private fun exportAgent(layout: ClaudeLayout, agentContext: AgentContext) = exportService.export(
         agentContext.agent,
-        claudeDir(projectDir).resolve("agents").resolve("${agentContext.agent.id}.md"),
+        layout.agentFile(agentContext.agent.id),
     ) {
         it.appendText(
             """
@@ -51,21 +74,14 @@ class ClaudeAdapter(
             name: ${agentContext.agent.id}
             description: ${agentContext.agent.description.replace("\n", " ")}
             ---
-            
+
             """.trimIndent(),
         )
         printers.agentPrinter.print(agentContext, it)
     }
 
-    override fun export(projectDir: File, featureContext: FeatureContext) = exportService.export(
-        featureContext.feature,
-        claudeDir(projectDir).resolve("workflows").resolve("feature-${featureContext.feature.id}.md"),
-    ) {
-        printers.featurePrinter.print(featureContext, it)
-    }
-
-    override fun export(projectDir: File, skillContext: SkillContext) {
-        val skillDir = claudeDir(projectDir).resolve("skills").resolve(skillContext.skill.id)
+    private fun exportSkill(layout: ClaudeLayout, skillContext: SkillContext) {
+        val skillDir = layout.skillDir(skillContext.skill.id)
         exportService.export(
             skillContext.skill,
             skillDir.resolve("SKILL.md"),
@@ -81,8 +97,42 @@ class ClaudeAdapter(
             )
             printers.skillPrinter.print(skillContext, it)
         }
-        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir)
+        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir, skillContext.skill.id)
     }
 
-    private fun claudeDir(projectDir: File) = projectDir.resolve(".claude")
+    /**
+     * Writes [deployment] into `<home>/.claude`, rendering exactly what a project deploy renders - see [ClaudeLayout].
+     *
+     * The instructions file is owned by the engine and overwritten on every deploy. Everything else the home holds is
+     * left alone: a replacing deploy rewrites the directory of each skill it deploys, never the `skills` directory
+     * around them, so a skill the user wrote by hand survives.
+     */
+    private inner class ClaudeUserScopeExporter(
+        private val layout: ClaudeLayout,
+        private val deployment: UserDeploymentManifest,
+    ) : UserScopeExporter {
+
+        override val instructionsFile: File get() = layout.instructionsFile
+
+        override fun export(instructionsContext: UserInstructionsContext) = exportService.export(
+            instructionsContext.deployment,
+            layout.instructionsFile,
+        ) {
+            printers.userInstructionsPrinter.print(instructionsContext, it)
+        }
+
+        override fun export(promptContext: PromptContext) = exportPrompt(layout, promptContext)
+
+        override fun export(agentContext: AgentContext) = exportAgent(layout, agentContext)
+
+        override fun export(skillContext: SkillContext) {
+            if (deployment.replace) {
+                layout.skillDir(skillContext.skill.id).deleteArtifactDirectoryWithin(
+                    owned = layout.skillsDir,
+                    describedBy = "skill '${skillContext.skill.id}'",
+                )
+            }
+            exportSkill(layout, skillContext)
+        }
+    }
 }

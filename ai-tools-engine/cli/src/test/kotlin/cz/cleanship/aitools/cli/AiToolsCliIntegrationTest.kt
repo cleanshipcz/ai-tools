@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.parse
 import cz.cleanship.aitools.engine.ExportFailedException
 import cz.cleanship.aitools.engine.ExportFailure
+import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
@@ -42,14 +43,14 @@ class AiToolsCliIntegrationTest {
         File(tempDir, "config.yml").writeText(
             """
             locations:
-              projects:
-                - "projects"
+              deployments:
+                - "deployments"
             tools:
               - claude
             """.trimIndent(),
         )
         // - a project deploying to a relative directory, which must land on the same base the locations use
-        val projectFile = File(tempDir, "projects/test-project/project.yml")
+        val projectFile = File(tempDir, "deployments/test-project/project.yml")
         projectFile.parentFile.mkdirs()
         projectFile.writeText(
             """
@@ -82,15 +83,15 @@ class AiToolsCliIntegrationTest {
         File(tempDir, "config.yml").writeText(
             """
             env_vars:
-              PROJECTS_FOLDER: "${tempDir.absolutePath}/deployments"
+              PROJECTS_FOLDER: "${tempDir.absolutePath}/exported"
             locations:
-              projects:
-                - "projects"
+              deployments:
+                - "deployments"
             tools:
               - claude
             """.trimIndent(),
         )
-        val projectFile = File(tempDir, "projects/test-project/project.yml")
+        val projectFile = File(tempDir, "deployments/test-project/project.yml")
         projectFile.parentFile.mkdirs()
         projectFile.writeText(
             """
@@ -111,9 +112,9 @@ class AiToolsCliIntegrationTest {
         cli.parse(arrayOf("--working-dir", tempDir.absolutePath))
 
         // then
-        assertThat(File(tempDir, "deployments/custom-ai-tools/CLAUDE.md")).exists()
+        assertThat(File(tempDir, "exported/custom-ai-tools/CLAUDE.md")).exists()
         // - the reference was expanded rather than taken for a directory name
-        assertThat(File(tempDir, "deployments").list()).containsExactly("custom-ai-tools")
+        assertThat(File(tempDir, "exported").list()).containsExactly("custom-ai-tools")
     }
 
     @Test
@@ -122,13 +123,13 @@ class AiToolsCliIntegrationTest {
         File(tempDir, "config.yml").writeText(
             """
             locations:
-              projects:
-                - "projects"
+              deployments:
+                - "deployments"
             tools:
               - claude
             """.trimIndent(),
         )
-        val projectFile = File(tempDir, "projects/test-project/project.yml")
+        val projectFile = File(tempDir, "deployments/test-project/project.yml")
         projectFile.parentFile.mkdirs()
         projectFile.writeText(
             """
@@ -164,8 +165,8 @@ class AiToolsCliIntegrationTest {
         File(tempDir, "config.yml").writeText(
             """
             locations:
-              projects:
-                - "${variableReference("AI_TOOLS_UNDECLARED_TEST_FOLDER")}/projects"
+              deployments:
+                - "${variableReference("AI_TOOLS_UNDECLARED_TEST_FOLDER")}/deployments"
             """.trimIndent(),
         )
         val cli = AiToolsCli()
@@ -181,11 +182,125 @@ class AiToolsCliIntegrationTest {
     }
 
     @Test
+    fun `should deploy a user deployment into the home the option names`() {
+        // given
+        // - the home base is always the one the run was given; the real home of this machine is never involved
+        val userHome = File(tempDir, "home")
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              deployments:
+                - "deployments"
+              rulesets:
+                - "rulesets"
+            tools:
+              - claude
+            """.trimIndent(),
+        )
+        val rulesetFile = File(tempDir, "rulesets/base.yml")
+        rulesetFile.parentFile.mkdirs()
+        rulesetFile.writeText(
+            """
+            id: base
+            description: A ruleset
+            rules:
+              - A rule from base.
+            metadata:
+              version: 1.0.0
+            """.trimIndent(),
+        )
+        val deploymentFile = File(tempDir, "deployments/globals/user.yml")
+        deploymentFile.parentFile.mkdirs()
+        deploymentFile.writeText(
+            """
+            id: globals
+            description: A user deployment
+            tools:
+              - claude
+            metadata:
+              version: 1.0.0
+            """.trimIndent(),
+        )
+        val cli = AiToolsCli()
+
+        // when
+        cli.parse(arrayOf("--working-dir", tempDir.absolutePath, "--user-home", userHome.absolutePath))
+
+        // then
+        assertThat(File(userHome, ".claude/CLAUDE.md").readText())
+            .contains("# globals")
+            .contains("A rule from base.")
+    }
+
+    @Test
+    fun `should fail when the user home is empty`() {
+        // given
+        // - an empty value resolves to the directory the shell happened to be in, which is never what was meant
+        val cli = AiToolsCli(runner = { _, _ -> })
+
+        // when
+        val error = runCatching {
+            cli.parse(arrayOf("--working-dir", tempDir.absolutePath, "--user-home", ""))
+        }.exceptionOrNull()
+
+        // then
+        assertThat(error).isInstanceOf(CliktError::class.java)
+    }
+
+    @Test
+    fun `should resolve a relative user home against the working directory`() {
+        // given
+        // - the same base every other declared path of the run uses, rather than the working directory of the JVM
+        var recordedUserHome: File? = null
+        val cli = AiToolsCli(runner = { _, userHome -> recordedUserHome = userHome })
+
+        // when
+        cli.parse(arrayOf("--working-dir", tempDir.absolutePath, "--user-home", "scratch-home"))
+
+        // then
+        assertThat(recordedUserHome).isEqualTo(File(tempDir, "scratch-home"))
+    }
+
+    @Test
+    fun `should fail with the guard message when a manifest id would escape its directory`() {
+        // given
+        val cli = AiToolsCli(
+            runner = { _, _ ->
+                throw ArtifactPathException("Refusing to replace '/home/user/evil': it is not inside '/home/user/.claude/skills'.")
+            },
+        )
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        // - the remediation sentence reaches the operator instead of being buried in a stack trace
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessageContaining("Refusing to replace")
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
+    fun `should run under the home of this user when the option is not given`() {
+        // given
+        // - a runner that records what it was given, so the default is proven without a single file being written
+        var recordedUserHome: File? = null
+        val cli = AiToolsCli(runner = { _, userHome -> recordedUserHome = userHome })
+
+        // when
+        cli.parse(arrayOf("--working-dir", tempDir.absolutePath))
+
+        // then
+        assertThat(recordedUserHome).isEqualTo(File(System.getProperty("user.home")))
+    }
+
+    @Test
     fun `should fail with the resolver message when an export fails`() {
         // given
         // - a CliktError makes the command report on stderr and exit with a non-zero status code
         val failure = ExportFailure(
-            projectId = "test-project",
+            deploymentId = "test-project",
             toolType = ToolType.CLAUDE,
             manifest = "agent 'broken-agent'",
             cause = RulesetResolvingException(
@@ -194,7 +309,7 @@ class AiToolsCliIntegrationTest {
                 availableIds = listOf("base"),
             ),
         )
-        val cli = AiToolsCli(runner = { throw ExportFailedException(listOf(failure)) })
+        val cli = AiToolsCli(runner = { _, _ -> throw ExportFailedException(listOf(failure)) })
 
         // when
         val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
@@ -211,7 +326,7 @@ class AiToolsCliIntegrationTest {
     fun `should fail with the file path when a manifest declares a malformed version`() {
         // given
         val cli = AiToolsCli(
-            runner = {
+            runner = { _, _ ->
                 throw ManifestLoadingException(
                     file = File("/manifests/broken.yml"),
                     cause = IllegalArgumentException("Invalid version format: 1.0"),
@@ -237,7 +352,7 @@ class AiToolsCliIntegrationTest {
         val firstFile = File("/projects/alpha/project.yml")
         val secondFile = File("/projects/beta/project.yml")
         val cli = AiToolsCli(
-            runner = {
+            runner = { _, _ ->
                 throw ExportFailedException(
                     failures = emptyList(),
                     duplicates = listOf(
@@ -263,7 +378,7 @@ class AiToolsCliIntegrationTest {
     fun `should fail with both file paths when a duplicate manifest id is loaded`() {
         // given
         val cli = AiToolsCli(
-            runner = {
+            runner = { _, _ ->
                 throw DuplicateManifestIdException(
                     listOf(
                         DuplicateManifestId(
