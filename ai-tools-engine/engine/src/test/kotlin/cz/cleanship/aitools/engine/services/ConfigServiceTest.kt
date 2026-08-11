@@ -24,8 +24,8 @@ class ConfigServiceTest {
             locations:
               agents:
                 - "agents_default"
-              projects:
-                - "projects_default"
+              deployments:
+                - "deployments_default"
             tools:
                 - windsurf
             """.trimIndent(),
@@ -35,7 +35,7 @@ class ConfigServiceTest {
         val (locations, tools) = service.loadConfig(tempDir)
 
         assertThat(locations.agents).extracting("name").containsExactly("agents_default")
-        assertThat(locations.projects).extracting("name").containsExactly("projects_default")
+        assertThat(locations.deployments).extracting("name").containsExactly("deployments_default")
         assertThat(locations.prompts).isEmpty()
         assertThat(locations.rulesets).isEmpty()
         assertThat(tools).containsExactly(ToolType.WINDSURF)
@@ -51,8 +51,8 @@ class ConfigServiceTest {
             locations:
               agents:
                 - "agents_default"
-              projects:
-                - "projects_default"
+              deployments:
+                - "deployments_default"
             tools:
                 - windsurf
             """.trimIndent(),
@@ -62,8 +62,8 @@ class ConfigServiceTest {
         localConfigFile.writeText(
             """
             locations:
-              projects:
-                - "projects_local"
+              deployments:
+                - "deployments_local"
               rulesets:
                 - "rulesets_local"
             tools:
@@ -79,7 +79,7 @@ class ConfigServiceTest {
         assertThat(locations.agents).extracting("name").containsExactly("agents_default")
 
         // Projects should be overridden by local
-        assertThat(locations.projects).extracting("name").containsExactly("projects_local")
+        assertThat(locations.deployments).extracting("name").containsExactly("deployments_local")
 
         // Rulesets should take local value (default was null/empty)
         assertThat(locations.rulesets).extracting("name").containsExactly("rulesets_local")
@@ -89,6 +89,61 @@ class ConfigServiceTest {
 
         // Tools should be overridden by local
         assertThat(tools).containsExactly(ToolType.ANTIGRAVITY, ToolType.GITHUB_COPILOT)
+    }
+
+    @Test
+    fun `should fail naming the rename when a config still declares the retired projects key`(
+        @TempDir tempDir: File,
+    ) {
+        // given
+        // - config.local.yml is gitignored, so no rename in this repository can reach the one on another machine;
+        //   dropping the key silently would leave that machine deploying nothing and reporting success
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              projects:
+                - "09_projects"
+            """.trimIndent(),
+        )
+
+        // when
+        val error = runCatching { ConfigService().loadConfig(tempDir) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(RetiredConfigKeyException::class.java)
+            .hasMessageContaining("locations.projects")
+            .hasMessageContaining("locations.deployments")
+            .hasMessageContaining("config.yml")
+    }
+
+    @Test
+    fun `should name the local config when it is the one declaring the retired projects key`(
+        @TempDir tempDir: File,
+    ) {
+        // given
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              deployments:
+                - "09_deployments"
+            """.trimIndent(),
+        )
+        File(tempDir, "config.local.yml").writeText(
+            """
+            locations:
+              projects:
+                - "09_projects"
+            """.trimIndent(),
+        )
+
+        // when
+        val error = runCatching { ConfigService().loadConfig(tempDir) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(RetiredConfigKeyException::class.java)
+            .hasMessageContaining("config.local.yml")
     }
 
     @Test
@@ -133,7 +188,7 @@ class ConfigServiceTest {
                 locations:
                   agents:
                     - "${variableReference("ROOT")}/agents"
-                  projects:
+                  deployments:
                     - "${variableReference("ROOT")}/projects/${variableReference("TEAM")}"
                   prompts:
                     - "prompts_without_reference"
@@ -146,7 +201,7 @@ class ConfigServiceTest {
             // then
             assertThat(locations.agents).containsExactly(File(tempDir, "agents"))
             // - a value may carry several references
-            assertThat(locations.projects).containsExactly(File(tempDir, "projects/platform"))
+            assertThat(locations.deployments).containsExactly(File(tempDir, "projects/platform"))
             // - and one that carries none is resolved exactly as before
             assertThat(locations.prompts).containsExactly(File(tempDir, "prompts_without_reference"))
         }
@@ -164,7 +219,7 @@ class ConfigServiceTest {
                 locations:
                   agents:
                     - "${variableReference("ROOT")}/agents"
-                  projects:
+                  deployments:
                     - "${variableReference("ROOT")}/${variableReference("TEAM")}"
                 """.trimIndent(),
             )
@@ -182,7 +237,7 @@ class ConfigServiceTest {
             // then
             assertThat(locations.agents).containsExactly(File(tempDir, "local/agents"))
             // - the variable the local config says nothing about survives the merge
-            assertThat(locations.projects).containsExactly(File(tempDir, "local/platform"))
+            assertThat(locations.deployments).containsExactly(File(tempDir, "local/platform"))
         }
 
         @Test

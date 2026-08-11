@@ -10,7 +10,11 @@ import cz.cleanship.aitools.engine.tools.ToolFactory
 import java.io.File
 
 fun interface ToolsApplicationRunner {
-    fun run(workingDirectory: File)
+    /**
+     * @param userHome the home directory the user deployments of the run are written under - see
+     * [ToolsEngine]
+     */
+    fun run(workingDirectory: File, userHome: File)
 }
 
 class DefaultToolsApplicationRunner(
@@ -18,10 +22,10 @@ class DefaultToolsApplicationRunner(
     private val toolAdapterFactory: ToolAdapterFactory = DefaultToolAdapterFactory,
     private val engineFactory: ToolsEngineFactory = DefaultToolsEngineFactory(),
 ) : ToolsApplicationRunner {
-    override fun run(workingDirectory: File) {
+    override fun run(workingDirectory: File, userHome: File) {
         val config = configService.loadConfig(workingDirectory)
         val toolAdapters = config.tools.map(toolAdapterFactory::create)
-        engineFactory.create(toolAdapters, workingDirectory, config.variables).process(config.locations)
+        engineFactory.create(toolAdapters, workingDirectory, config.variables, userHome).process(config.locations)
     }
 }
 
@@ -44,8 +48,14 @@ fun interface ToolsEngineFactory {
      * @param variables the variables the config files of the run declared, which the engine substitutes a
      * `deploy.directory` with before resolving it - the same ones the `locations.*` of that config were substituted
      * with, so that one name means one directory across the whole run
+     * @param userHome the `--user-home` of the run, under which the adapters write the user scope of their tool
      */
-    fun create(tools: List<ToolAdapter>, workingDirectory: File, variables: VariableResolver): ToolsEngineProcessor
+    fun create(
+        tools: List<ToolAdapter>,
+        workingDirectory: File,
+        variables: VariableResolver,
+        userHome: File,
+    ): ToolsEngineProcessor
 }
 
 class DefaultToolsEngineFactory : ToolsEngineFactory {
@@ -53,8 +63,9 @@ class DefaultToolsEngineFactory : ToolsEngineFactory {
         tools: List<ToolAdapter>,
         workingDirectory: File,
         variables: VariableResolver,
+        userHome: File,
     ): ToolsEngineProcessor {
-        val engine = ToolsEngine(workingDirectory, variables = variables, tools = tools)
+        val engine = ToolsEngine(workingDirectory, variables = variables, userHome = userHome, tools = tools)
         return ToolsEngineProcessor { locations -> engine.process(locations) }
     }
 }

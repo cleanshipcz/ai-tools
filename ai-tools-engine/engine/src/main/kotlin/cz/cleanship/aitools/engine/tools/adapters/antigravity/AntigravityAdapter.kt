@@ -2,6 +2,7 @@ package cz.cleanship.aitools.engine.tools.adapters.antigravity
 
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
@@ -10,6 +11,7 @@ import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
+import cz.cleanship.aitools.engine.tools.UserScopeExporter
 import java.io.File
 
 class AntigravityAdapter(
@@ -24,6 +26,12 @@ class AntigravityAdapter(
             agentDir(projectDir).deleteRecursively()
         }
     }
+
+    /**
+     * Returns no exporter: the per-user layout of Antigravity is not implemented yet, so the engine reports a
+     * user deployment naming this tool as skipped for it instead of writing anything into the home.
+     */
+    override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter? = null
 
     override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
         globalContext.project,
@@ -86,6 +94,7 @@ class AntigravityAdapter(
             skillContext.skill.files,
             skillContext.sourceDir,
             rulesDir(projectDir).resolve("skill-$skillId"),
+            skillId,
         )
     }
 

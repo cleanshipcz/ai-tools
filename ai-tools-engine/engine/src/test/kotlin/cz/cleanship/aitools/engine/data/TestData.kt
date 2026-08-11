@@ -12,6 +12,7 @@ import cz.cleanship.aitools.engine.models.RulesetManifest
 import cz.cleanship.aitools.engine.models.SkillFile
 import cz.cleanship.aitools.engine.models.SkillManifest
 import cz.cleanship.aitools.engine.models.SkillSection
+import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.models.Version
 
 val ruleset = RulesetManifest(
@@ -48,6 +49,14 @@ val expectedRuleset =
 
 val rulesets = mapOf(
     ruleset.id to ruleset,
+)
+
+val userDeployment = UserDeploymentManifest(
+    id = "globals",
+    description = "My global AI tool setup",
+    metadata = ManifestMetadata(
+        version = Version("1.0.0"),
+    ),
 )
 
 val agent = AgentManifest(

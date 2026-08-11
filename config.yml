@@ -9,8 +9,8 @@ locations:
     - "02_fragments"
   skills:
     - "04_skills"
-  projects:
-    - "09_projects"
+  deployments:
+    - "09_deployments"
 
 tools:
   - windsurf

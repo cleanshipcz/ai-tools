@@ -9,11 +9,16 @@ Manifests are parsed in strict mode: **an unknown key fails the run**, so do not
 # First-run setup: checks prerequisites, builds the engine
 ./setup.sh
 
-# Generate and deploy configs for every project manifest
+# Try a run first: user.yml manifests land in a scratch home instead of your own
+./deploy.sh --user-home /tmp/try
+
+# Generate and deploy configs for every deployment manifest
+# WARNING: with a user.yml in play, this rewrites ~/.claude/CLAUDE.md and
+# ~/.codex/AGENTS.md from the manifest, keeping no backup of what they held
 ./deploy.sh
 
 # What deploy.sh runs under the hood
-cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir <repository root>"
+cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir \"<repository root>\""
 
 # Engine development
 cd ai-tools-engine
@@ -22,8 +27,15 @@ cd ai-tools-engine
 ./gradlew ktlintFormat   # auto-fix Kotlin formatting
 ```
 
-The CLI has exactly one option, `--working-dir`.
-There are no subcommands, no `--dry-run`, and no way to select a single project.
+The inner quotes in that snippet survive Gradle's own splitting of `--args`, which is what keeps a repository path containing spaces a single argument.
+
+The CLI has two options besides `--help`, and no subcommands:
+
+- `--working-dir` — the directory holding `config.yml`. Defaults to `.`; `deploy.sh` sets it to the directory it was started from.
+- `--user-home` — the home a `user.yml` deploys under. Defaults to the home of the current user. A relative value resolves against `--working-dir`, an empty value is rejected, and a home that does not exist yet is created.
+
+There is no `--dry-run` and no way to select a single manifest.
+`deploy.sh` forwards every argument to the CLI, except one containing a double quote — Gradle's `--args` cannot escape it, so the script refuses the argument rather than delivering a different path. Run `./gradlew :cli:run` directly for that case.
 
 ## File Naming Conventions
 
@@ -31,6 +43,8 @@ There are no subcommands, no `--dry-run`, and no way to select a single project.
 - **Versions**: semantic versioning, `MAJOR.MINOR.PATCH` with an optional `-SUFFIX`
 - **Files**: the filename does **not** have to match the `id`, and directory nesting is purely organisational — only `id` is ever referenced. For example `01_rulesets/coding/languages/coding-kotlin.yml` declares `id: coding-language-kotlin`.
 - **Skills**: either `04_skills/<id>.yml`, or a directory `04_skills/<name>/` containing `skill.yml` plus any files it ships
+- **Deployments**: a directory under a `deployments` location holding a `project.yml` (deploys into a project directory) or a `user.yml` (deploys into the user scope of a tool) — the filename names the kind, the directory names the instance
+- **IDs across kinds**: unique per kind, so a `project.yml` and a `user.yml` may share an id, while two `user.yml` files may not
 
 ## Shared Fields
 
@@ -251,6 +265,60 @@ Narrowing only stops future writes; it does not retract what the de-selected too
 Artifacts a tool generated before it was de-selected stay in the target directory and must be removed by hand, and `replace: true` does not clean them up either — a de-selected tool never runs, so it never gets the chance to delete its own directory.
 This is deliberate: narrowing is usually what someone does when another workflow takes ownership of that directory, and deleting it from under them would be the more dangerous default.
 
+## Creating a User Deployment
+
+A `user.yml` deploys into the per-user configuration of a tool (`~/.claude/`, `~/.codex/`) instead of into a project directory.
+It lives in its own directory under a configured `deployments` location, exactly like a `project.yml`: **the filename names the kind, the directory names the instance**, and there is no `type:` field.
+
+```yaml
+# 09_deployments/globals/user.yml
+id: globals
+description: My global AI tool setup
+tools:                        # optional; omitted = every tool configured for the run
+  - claude
+  - codex
+replace: false                # optional, default false
+rulesets:
+  filter:
+    - type: tags
+      tags: [global]
+agents:
+  filter:
+    - type: whitelist
+      ids: []                 # an empty whitelist selects nothing
+prompts: {}                   # an omitted or empty filter selects everything
+skills: {}
+fragments: {}
+metadata:
+  version: 1.0.0
+```
+
+A user deployment has **no** `context`, **no** `deploy` block, **no** `directory`, and **no** `features` — the destination is each tool's canonical per-user location, and a feature belongs to the project whose directory it lives under.
+Everything else works as it does in a project manifest: the same three filter types with the same order sensitivity, and the same `tools` semantics (omitted means all, `[]` means none, a tool the run does not configure is warned about and narrowed away).
+
+Destinations, relative to `--user-home`:
+
+| Artifact | `claude` | `codex` |
+| --- | --- | --- |
+| rulesets | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` |
+| agents | `~/.claude/agents/<id>.md` | `~/.codex/skills/agent-<id>/SKILL.md` |
+| prompts | `~/.claude/commands/<id>.md` | `~/.codex/skills/prompt-<id>/SKILL.md` |
+| skills | `~/.claude/skills/<id>/SKILL.md` | `~/.codex/skills/skill-<id>/SKILL.md` |
+
+A skill's companion `files` are copied next to the generated `SKILL.md`, exactly as in project scope.
+
+`windsurf`, `antigravity`, `github_copilot`, and `cursor` have no user-scope layout yet; a manifest naming one is deployed for the other tools, and the run logs the tool it skipped.
+
+**The engine owns the instructions file.**
+`~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` are generated from the manifest — a heading, its `description`, and a `## Rules` list of every selected ruleset's rules — and are overwritten on every deploy.
+Hand edits are lost, including what Claude Code's `#`-remember shortcut appends. Edit the YAML and redeploy instead. Auto-memory under `~/.claude/projects/.../memory/` is untouched.
+
+Limitations to know before you rely on it:
+
+- Removing an artifact from the manifest leaves its previously deployed copy in the home until you delete it by hand — there is no ledger of what was written.
+- `replace: true` deletes and rewrites the directory of each artifact this manifest deploys (Claude: skills; Codex: skills, agents, prompts) and overwrites single-file artifacts. Parent directories such as `~/.claude/skills/` and hand-made neighbours are never touched.
+- Two user deployments selecting the same tool contend for its one instructions file. Neither writes it, the run fails naming both, and their other artifacts are still deployed. Give each tool a single deployment, or narrow the `tools` lists.
+
 ## Creating a Feature
 
 Features live in `features/<name>.yml` beside a project's `project.yml`.
@@ -320,7 +388,7 @@ Use `fragments` for shared content; there is no include mechanism.
 ├── 03_prompts/      # Prompts
 ├── 04_skills/       # Skills (<id>.yml, or <dir>/skill.yml)
 ├── 05_agents/       # Agents
-├── 09_projects/     # Projects: <scope>/<project>/project.yml (+ features/)
+├── 09_deployments/  # Deployments: <deployment>/project.yml or user.yml (+ features/)
 ├── 10_schemas/      # JSON schemas - STALE, not used for validation
 ├── 90_docs/         # Reference documentation
 ├── ai-tools-engine/ # The Kotlin engine
@@ -351,6 +419,12 @@ Use `fragments` for shared content; there is no include mechanism.
 1. Create `04_skills/my-skill/skill.yml`
 2. Put the extra files in `04_skills/my-skill/`, and list them under `files`
 3. Run `./deploy.sh` — the files are copied next to the generated `SKILL.md`
+
+### Add a Rule to Every Project You Work On
+
+1. Add the rule to a ruleset that the `rulesets` filter of your `user.yml` selects — for this repository, a ruleset tagged `global`
+2. Try it out first with `./deploy.sh --user-home /tmp/try`, and read `/tmp/try/.claude/CLAUDE.md`
+3. Run `./deploy.sh` — `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` are rewritten from the manifest, so never edit them directly
 
 ## Validation
 
@@ -388,7 +462,19 @@ Keep machine-local paths and settings in `config.local.yml`, which is gitignored
 
 **`Export failed for N manifest(s)`**: N manifests could not be exported; the list below the headline names each one, together with every tool it failed for. The run still exports everything else before reporting, and exits non-zero.
 
-**Manifest changes do not show up**: check the project's filters in `project.yml`. A manifest with no matching tag and no whitelist entry is silently skipped.
+**`'locations.projects' ... was renamed to 'locations.deployments'`**: a config file still declares the retired key. Rename it — those directories now hold both `project.yml` and `user.yml` manifests. The run fails rather than dropping the list silently, which would deploy nothing while exiting successfully.
+
+**`Found no deployment manifest under [...]`**: no `project.yml` and no `user.yml` was found under the `deployments` locations. Nothing was deployed. A directory that does not exist reads the same as an empty one here, so a mistyped path in `config.local.yml` produces this too; check the absolute paths the message lists.
+
+**`... is deployed by more than one user deployment`**: two `user.yml` manifests select the same tool and therefore claim its single instructions file. Neither writes it. Give each tool one deployment, or narrow their `tools` lists.
+
+**`... has no user-scope layout in this engine`**: a `user.yml` names a tool whose per-user layout is not implemented (everything except `claude` and `codex`). The manifest still deploys for the other tools it names.
+
+**`Invalid manifest id '...'`**: an id must name a single file or directory — no path separators, no `.` or `..`, not empty — because it becomes the name of what the adapters write. The check runs at load time, for every manifest kind, so the run fails before anything is written and the message names the file to fix.
+
+**`Refusing to replace '...': it is not inside '...'`**: a user deploy with `replace: true` found that one of its artifact paths in the home resolves outside the directory it owns — in practice a directory that has been replaced by a symlink pointing elsewhere. The run aborts; nothing was deleted by that check. Inspect the named path in the home, not the manifest.
+
+**Manifest changes do not show up**: check the project's filters in `project.yml`, or the filters in `user.yml` for the user scope. A manifest with no matching tag and no whitelist entry is silently skipped.
 
 **`Build was configured to prefer settings repositories over project repositories`**: a global Gradle init script in `~/.gradle/` registers repositories, which this build rejects. `./setup.sh` detects this and works around it temporarily.
 
