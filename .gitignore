@@ -60,11 +60,49 @@ coverage/
 .output-test/
 .test-output/
 
+.gradle
+build/
+gradle.local.properties
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+### Kotlin ###
+.kotlin
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
 # Temporary files
 .tmp/
 tmp/
 temp/
 *.tmp
+.delivery/
 
 # Agentic files - they are managed by this project
 .claude
@@ -83,10 +121,3 @@ CLAUDE.md
 
 # Local configuration
 config.local.yml
-
-# A literal directory named "~" at the repository root, created by an unexpanded tilde in a
-# past deploy. It was previously ignored only by accident, because the `*~` IDE-swapfile
-# pattern happens to match it; this entry makes the exclusion deliberate. `~` has no special
-# meaning in gitignore so it needs no escaping, and the leading slash anchors it to the
-# repository root so no nested path is affected. The directory is intentionally left on disk.
-/~/
