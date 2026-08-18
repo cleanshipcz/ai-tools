@@ -8,6 +8,8 @@ rulesets:
   - authoring-yaml
   - authoring-ai
   - authoring-manifests
+fragments:
+  - authoring-engine-models
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"
   - "Keep rules specific and actionable — each rule should be independently verifiable"
@@ -23,8 +25,8 @@ content: |
 
   ## Step 1: Ask clarifying questions
 
-  - What domain does this ruleset cover? (language, framework, security, style, testing, etc.)
-  - What specific coding standards should be enforced?
+  - What domain does this ruleset cover? (language, framework, security, style, testing, docs, etc.)
+  - What specific standards should be enforced?
   - Are these rules from a standard? (PEP 8, ESLint, Kotlin style guide, etc.)
   - Any must-follow vs nice-to-have rules?
 
@@ -35,28 +37,17 @@ content: |
     - `testing-*` for testing standards
     - `review-*` for code review guidelines
     - `security-*` for security rules
+    - `docs-*` for documentation rules
+    - `analysis-*` for analysis rules
+    - `authoring-*` for manifest/content authoring rules
+  - List `01_rulesets/` for the current domain subdirectories before proposing a new one
   - Identify 2-4 rule categories
   - Recommend 5-20 total rules
 
-  ## Step 3: Create ruleset.yml matching the Kotlin engine contract
+  ## Step 3: Create the ruleset manifest
 
-  The manifest MUST have these fields (required by RulesetManifest.kt):
-
-  ```yaml
-  id: domain-topic
-  description: One-sentence purpose of this ruleset (10-500 chars)
-  rules:
-    - "Specific, actionable rule with clear guidance"
-    - "Each rule independently verifiable"
-    - "Use imperative voice: Do X, Use Y, Avoid Z"
-  metadata:
-    version: 1.0.0
-    author: "AI Tools Team"
-    created: "YYYY-MM-DD"
-    tags: [domain, category]
-  ```
-
-  **Fields NOT supported by engine:** `extends`, `overrides`, `tags` (use metadata.tags instead), `version` (use metadata.version)
+  Read RulesetManifest.kt and derive the exact field set from it (see the engine-models instructions).
+  Study one or two recently updated rulesets in `01_rulesets/` as style references before writing.
 
   ## Best practices
 
@@ -65,7 +56,7 @@ content: |
   - **Rules must be specific and actionable.** "Use parameterized queries for all DB calls" not "Write secure code."
   - **Compose via agents.** Agents reference multiple rulesets — that's how rules get combined.
   - **Prefix IDs by domain** to enable wildcard matching in agents (e.g., `coding-language-.*`).
-  - File location: `01_rulesets/<id>.yml` (use subdirectories for organization)
+  - File location: `01_rulesets/<domain>/<id>.yml` — place the file in the subdirectory matching its domain prefix.
 
   ## Example
 
@@ -86,17 +77,14 @@ content: |
   - Dataclass usage patterns
   ~15 rules total. Sound good?"
 
-  After confirmation, remind the user to validate:
-  ```bash
-  ./gradlew clean build
-  ```
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root).
 outputs:
   format: yaml
 metadata:
-  version: 3.0.0
+  version: 3.1.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-03-28"
+  updated: "2026-08-18"
   tags:
     - manifests
     - rulesets

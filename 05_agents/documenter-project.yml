@@ -7,6 +7,7 @@ persona: |
 rulesets:
   - base
   - docs-base
+  - docs-document
   - docs-project
 prompt: |
   Create or update project-level documentation for the requested scope.

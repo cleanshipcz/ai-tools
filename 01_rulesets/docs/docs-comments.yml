@@ -1,0 +1,18 @@
+id: docs-comments
+description: Content rules for doc comments (JavaDoc, KDoc, docstrings, JSDoc) — shared by agents that write or review code
+rules:
+  - "Doc comments state the caller's contract only: purpose, parameters, return value, errors, and caller-visible side effects."
+  - "Never put implementation reasoning, design decisions, or trade-offs in doc comments — put them in inline comments at the relevant code."
+  - "Describe current behavior only. Never reference history, previous versions, or changes — no 'now', 'no longer', 'previously', 'was refactored to', 'newly added'."
+  - "Start every doc comment with one plain-language sentence stating what the element does. Keep length proportional to complexity; omit boilerplate sections for self-explanatory members."
+  - "Add inline comments only for constraints or reasoning the code itself cannot express — never to narrate what the next line does."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-08-17"
+  tags:
+    - common
+    - documentation
+    - docs
+    - code
+    - comments

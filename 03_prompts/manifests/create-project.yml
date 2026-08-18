@@ -8,11 +8,12 @@ rulesets:
   - authoring-yaml
   - authoring-ai
   - authoring-manifests
+fragments:
+  - authoring-engine-models
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"
   - "Keep project manifests focused on essential context for AI agents"
   - "Do NOT try to document the entire codebase"
-  - "The Kotlin engine (ProjectManifest.kt) is the source of truth for project.yml structure"
   - "All deployment settings live in the deploy: block of project.yml; there is no separate deploy.yml"
 content: |
   The user wants to create a project manifest based on this description:
@@ -24,20 +25,24 @@ content: |
   ## Step 1: Ask clarifying questions
 
   - What does this project do? (2-3 sentences)
-  - Where is the project located? (absolute path for deploy.directory)
+  - Where is the project located? (path for deploy.directory)
   - Key documentation files? (README, architecture docs, etc.)
   - Any project-specific rules for AI agents?
-  - Which agents/prompts/rulesets should be available? (for filtering)
+  - Which agents/prompts/rulesets/fragments/skills should be available? (for filtering)
+  - Should the project deploy for all tools configured in config.yml, or a narrower set?
 
   ## Step 2: Suggest structure
 
   - Propose a kebab-case ID
   - Identify key documentation references
-  - Recommend filter strategy (tags, whitelist, or blacklist)
+  - Recommend a filter strategy per kind (tags, whitelist, or blacklist)
 
-  ## Step 3: Create project.yml matching ProjectManifest.kt
+  ## Step 3: Create the project manifest
 
-  The Kotlin engine requires this structure:
+  Read ProjectManifest.kt and derive the exact field set from it (see the engine-models instructions).
+  Study an existing project manifest (e.g., `09_deployments/ai-tools/project.yml`) as a style reference before writing.
+
+  Illustrative skeleton (the Kotlin model is authoritative):
 
   ```yaml
   id: project-name
@@ -52,9 +57,6 @@ content: |
       per_topic:
         main_docs:
           architecture: docs/ARCHITECTURE.md
-          api: docs/API.md
-        development:
-          style_guide: STYLE_GUIDE.md
       additional:
         - path: CONTRIBUTING.md
           description: Contribution guidelines
@@ -62,24 +64,21 @@ content: |
       - "Project-specific rules for AI agents"
 
   deploy:
-    directory: "/absolute/path/to/project"
+    directory: "${PROJECTS_FOLDER}/my-project"   # or a relative path resolved against the working dir
     replace: false
+    # tools: [claude, codex]                     # optional: narrow this project to a subset of the run's tools; omit for all
     agents:
       filter:
-        type: tags          # or: type: whitelist / type: blacklist
-        tags: [development, review]
+        - type: tags
+          tags: [development, review]
     prompts:
       filter:
-        type: whitelist
-        ids: [manifests-create-agent, refactor-improve-naming]
+        - type: whitelist
+          ids: [manifests-create-agent, refactor-improve-naming]
     rulesets:
       filter:
-        type: tags
-        tags: [common, development]
-    features:
-      filter:
-        type: whitelist
-        ids: [my-feature]
+        - type: tags
+          tags: [common, development]
 
   metadata:
     version: 1.0.0
@@ -88,20 +87,14 @@ content: |
     tags: [project-domain, tech-stack]
   ```
 
-  **Filter types** (sealed class in Kotlin):
-  - `type: tags` + `tags: [...]` — filter by metadata tags
-  - `type: whitelist` + `ids: [...]` — only include these IDs
-  - `type: blacklist` + `ids: [...]` — exclude these IDs
-
-  **Fields NOT supported by Kotlin engine:**
-  name, version (top-level), commands, conventions, ai_tools, context.purpose
+  **Filters:** each kind (agents, prompts, rulesets, fragments, skills, features) takes a `filter:` LIST; each entry is `type: tags` + `tags: [...]`, `type: whitelist` + `ids: [...]`, or `type: blacklist` + `ids: [...]`. An omitted filter selects everything of that kind.
 
   ## Deployment
 
-  Deployment is configured entirely in the `deploy:` block of `project.yml`: `directory`,
-  optional `replace`, and per-kind `filter` lists for agents, prompts, rulesets, fragments,
-  skills, and features. There is no separate `deploy.yml` — the engine never read one.
-  Which tools are generated is set globally by `tools:` in the root `config.yml`.
+  Deployment is configured entirely in the `deploy:` block of `project.yml`: `directory`, optional `replace`, optional `tools`, and per-kind `filter` lists. There is no separate `deploy.yml`.
+  The tools a run generates come from `tools:` in the root `config.yml`; a project may narrow them further with `deploy.tools` (omitting the key means all configured tools, an empty list means none).
+  `deploy.directory` supports `${NAME}` references resolved from `env_vars` in the config files; relative paths resolve against the run's working directory.
+  For user-scope deployments (artifacts landing under the user's home instead of a project), a deployment directory carries a `user.yml` instead — see UserDeploymentManifest.kt and `09_deployments/globals/user.yml`.
 
   ## Example conversation
 
@@ -123,17 +116,14 @@ content: |
   - Agent filter: whitelist developer-feature, developer-bugfix, reviewer-code
   Sound good?"
 
-  After confirmation, remind user to validate:
-  ```bash
-  ./gradlew clean build
-  ```
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root).
 outputs:
   format: yaml
 metadata:
-  version: 3.0.0
+  version: 3.1.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-03-28"
+  updated: "2026-08-18"
   tags:
     - manifests
     - projects

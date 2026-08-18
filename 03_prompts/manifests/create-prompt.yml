@@ -8,13 +8,14 @@ rulesets:
   - authoring-yaml
   - authoring-ai
   - authoring-manifests
+fragments:
+  - authoring-engine-models
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"
   - "Keep prompts atomic - one clear purpose only"
   - "Variable names must be snake_case"
   - "Use Mustache syntax for variables: {{variable}}"
   - "Keep the prompt content concise and actionable"
-  - "The Kotlin engine (PromptManifest.kt) is the source of truth for prompt.yml structure"
 content: |
   The user wants to create a prompt based on this description:
 
@@ -28,66 +29,33 @@ content: |
   - What inputs does it need? (these become variables)
   - Are the inputs required or optional?
   - What should the output look like? (markdown, code, json, yaml, text)
-  - What category? (refactor, qa, docs, planning, tickets, manifests)
+  - What category? (check `03_prompts/` for the current set: docs, manifests, planning, qa, refactor, tickets, ...)
   - Any specific constraints or rules it should follow?
 
   ## Step 2: Suggest structure
 
-  - Propose a kebab-case ID following category-action pattern
+  - Propose a kebab-case ID following the category-action pattern
   - Identify 2-3 key variables with snake_case names
-  - Recommend appropriate category for file placement
+  - Recommend the category directory for file placement
 
-  ## Step 3: Create prompt.yml matching PromptManifest.kt
+  ## Step 3: Create the prompt manifest
 
-  The Kotlin engine requires this structure:
+  Read PromptManifest.kt and derive the exact field set from it (see the engine-models instructions).
+  Study one or two recently updated prompts in `03_prompts/` as style references before writing.
 
-  ```yaml
-  id: category-action-name
-  description: What this prompt does (10-500 chars)
+  How to fill the fields:
 
-  variables:
-    - name: input_variable
-      required: true
-      description: "What this variable contains"
-    - name: optional_input
-      required: false
-      description: "Optional context"
-
-  rulesets:                         # Optional - compose existing rulesets
-    - relevant-ruleset
-
-  rules:                            # Optional - inline rules for this prompt
-    - "Specific constraint for this prompt"
-    - "Another rule to follow"
-
-  content: |
-    Clear, actionable prompt template with {{input_variable}} interpolation.
-
-    Use Mustache syntax: {{variable}} for required, {{#optional}}...{{/optional}} for conditionals.
-
-  outputs:                          # Optional
-    format: code                    # markdown|json|yaml|code|text
-    examples:
-      - "Example output string"
-
-  metadata:
-    version: 1.0.0
-    author: "AI Tools Team"
-    created: "YYYY-MM-DD"
-    updated: "YYYY-MM-DD"
-    tags: [category, domain]
-  ```
-
-  **Fields NOT supported by Kotlin engine:**
-  system, user, model, examples (top-level), includes, tags (top-level — use metadata.tags)
+  - **content** is the actual prompt template. Use Mustache syntax: {{variable}} for interpolation, {{#optional}}...{{/optional}} for conditionals.
+  - **variables** define the contract — what the caller must provide.
+  - **rulesets** compose shared rules. Use for domain standards (authoring-manifests, coding-security, etc.).
+  - **fragments** compose shared content blocks from `02_fragments/`. Use for reference material several prompts need.
+  - **rules** are inline, prompt-specific constraints. Use sparingly; prefer rulesets.
+  - **outputs** optionally declares the output format and examples.
 
   ## Best practices
 
   - **ONE clear purpose per prompt.** If it does two things, make two prompts.
-  - **content is required** — this is the actual prompt template.
-  - **variables** define the contract — what the caller must provide.
-  - **rulesets** compose shared rules. Use for domain standards (authoring-manifests, coding-security, etc.)
-  - **rules** are inline, prompt-specific constraints. Use sparingly; prefer rulesets.
+  - Never duplicate content that exists as a ruleset or fragment — reference it instead.
   - File location: `03_prompts/<category>/<id>.yml`
 
   ## Example conversation
@@ -108,17 +76,14 @@ content: |
   - Category: refactor/
   Sound good?"
 
-  After confirmation, remind user to validate:
-  ```bash
-  ./gradlew clean build
-  ```
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root).
 outputs:
   format: yaml
 metadata:
-  version: 3.0.0
+  version: 3.1.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-03-28"
+  updated: "2026-08-18"
   tags:
     - manifests
     - prompts

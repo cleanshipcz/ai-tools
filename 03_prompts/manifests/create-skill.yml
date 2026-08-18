@@ -1,18 +1,20 @@
 id: manifests-create-skill
-description: Clarify tool/command requirements and create a skill.yml manifest
+description: Clarify skill requirements and create a skill.yml manifest aligned with the Kotlin engine
 variables:
   - name: user_description
     required: true
-    description: "Brief description of the tool or command to integrate"
+    description: "Brief description of the tool or workflow the skill should cover"
 rulesets:
   - authoring-yaml
   - authoring-ai
   - authoring-manifests
+fragments:
+  - authoring-engine-models
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"
   - "Keep skill definitions simple and focused"
-  - "One command or tool per skill"
-  - "Focus on WHAT the tool does, not HOW to implement it"
+  - "One tool or workflow per skill"
+  - "Compose shared content via ruleset and fragment sections instead of duplicating it"
 content: |
   The user wants to create a skill based on this description:
 
@@ -20,98 +22,66 @@ content: |
 
   **Your job is to clarify and translate into a valid skill manifest.**
 
-  **Note:** Skills do not currently have a Kotlin engine model — they are processed by
-  the TypeScript CLI and transformed into SKILL.md files for Claude Code. The schema
-  at `10_schemas/skill.schema.json` is the validation authority.
+  Skills are reusable instruction packages. The engine assembles each one from its sections and deploys it as a SKILL.md the AI tool loads when the skill triggers.
 
   ## Step 1: Ask clarifying questions
 
-  - What command or tool does this integrate? (pytest, eslint, docker, gradle, etc.)
-  - What does it do in one sentence?
-  - What are the key parameters/flags?
-  - Any environment requirements? (Python installed, Docker running, etc.)
-  - Is this an MCP tool reference or a shell command?
+  - What tool or workflow does this skill cover? (gradle, pytest, Confluence, Jira, etc.)
+  - When should the AI use it? (this goes into the description, which doubles as the trigger)
+  - What are the exact commands or steps, including where output lands?
+  - Does it need supporting files? (templates, reference documents)
+  - Does shared content already exist as a ruleset or fragment it should reference?
 
   ## Step 2: Suggest structure
 
-  - Propose a kebab-case ID following verb-tool pattern: `run-pytest`, `lint-typescript`, `search-repo`
-  - Identify the command pattern
-  - Note required tools/dependencies
+  - Propose a kebab-case ID: verb-tool for command skills (run-pytest, search-repo), domain-tool for broader ones (confluence-doc, jira-ticket)
+  - Write the description as "What it does. Use when ..." — the deployed description decides when the AI invokes the skill
+  - Plan the ordered sections: inline text, referenced rulesets, referenced fragments
 
-  ## Step 3: Create skill.yml
+  ## Step 3: Create the skill manifest
 
-  ```yaml
-  id: verb-tool-name
-  version: 1.0.0
-  description: What this skill does in one sentence (10-500 chars)
+  Read SkillManifest.kt and derive the exact field set from it (see the engine-models instructions).
+  Study existing skills in `04_skills/` as style references: `run-detekt.yml` for a simple command skill, `confluence-doc/skill.yml` for one composing fragments and bundling template files.
 
-  # Shell command execution
-  command:
-    program: 'tool-name'
-    args: ['--flag', 'value']
-    cwd: '.'
-    env:                      # Optional env vars
-      KEY: 'value'
+  Key points from the model:
 
-  # OR MCP tool reference (mutually exclusive with command)
-  # mcp_tool: 'server:tool-name'
-
-  inputs:
-    - name: parameter_name
-      type: string            # string|number|boolean|file|directory
-      required: true
-      description: 'What this parameter controls'
-
-  outputs:
-    stdout: true
-    stderr: true
-    exit_code: true
-    files:                    # Optional output files
-      - 'report.json'
-
-  constraints:
-    - 'Tool X must be installed'
-
-  timeout_sec: 300
-
-  metadata:
-    author: "AI Tools Team"
-    created: "YYYY-MM-DD"
-  ```
+  - **sections** is an ordered list; each entry is exactly one of `text: |`, `ruleset: <ruleset-id>`, or `fragment: <fragment-id>`.
+  - **files** bundles supporting files; each entry is `path: <p>` (same source and target) or `source: <s>` + `target: <t>`.
+  - A skill without files is a single `04_skills/<id>.yml`; a skill with files lives in its own directory as `04_skills/<id>/skill.yml` with the files alongside.
 
   ## Best practices
 
-  - **One command per skill.** Don't combine lint + test + build.
-  - **Define inputs/outputs** explicitly for composability in recipes.
-  - **Set reasonable timeouts** (default 300s, increase for builds).
-  - **Document constraints/prerequisites** so agents know what's needed.
-  - **Use verb-noun ID pattern:** `run-*`, `lint-*`, `search-*`, `build-*`
-  - File location: `04_skills/<id>.yml`
+  - **One tool or workflow per skill.** Don't combine lint + test + build.
+  - **Make the text sections operational:** exact commands, expected output locations, and how to summarize results.
+  - **Reference rulesets and fragments** for content shared with other skills or prompts instead of copying it.
+  - **Document prerequisites** in the text (tool installed, service running) so the AI can check before acting.
 
-  ## Example
+  ## Example conversation
 
   User: "Run pytest with coverage"
 
   You: "Questions:
-  - Should it always generate coverage or be optional?
-  - Any specific pytest flags needed?
+  - Always with coverage, or optional?
+  - Any specific pytest flags?
   - Where should reports go?"
 
   User: "Always with coverage, HTML report in .coverage/"
 
-  You: "I'll create `run-pytest-coverage` with:
-  - Command: pytest --cov --cov-report=html:.coverage/
-  - Inputs: test path (optional)
-  - Outputs: stdout, exit_code, .coverage/ files
-  - Constraint: Python + pytest + pytest-cov installed
+  You: "I'll create `run-pytest-coverage` with one text section:
+  - Run pytest --cov --cov-report=html:.coverage/
+  - Summarize totals: passed, failed, skipped
+  - On failures, list failing test names and messages
+  - Prerequisite: Python with pytest and pytest-cov installed
   Sound good?"
+
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root).
 outputs:
   format: yaml
 metadata:
-  version: 3.0.0
+  version: 4.0.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-03-28"
+  updated: "2026-08-18"
   tags:
     - manifests
     - skills

@@ -20,7 +20,7 @@ Or. e.g.
 
 ```bash
 cd ai-tools-engine
-mv /home/blaha/.gradle/init.gradle.kts /home/blaha/.gradle/init.gradle.kts.bak; LOG_FORMAT=TEXT ./gradlew :cli:run --args="--working-dir /home/blaha/Documents/Projects/ai-tools"; mv /home/blaha/.gradle/init.gradle.kts.bak /home/blaha/.gradle/init.gradle.kts
+mv ${HOME}/.gradle/init.gradle.kts ${HOME}/.gradle/init.gradle.kts.bak; LOG_FORMAT=TEXT ./gradlew :cli:run --args="--working-dir ${HOME}/Documents/Projects/ai-tools"; mv ${HOME}/.gradle/init.gradle.kts.bak ${HOME}/.gradle/init.gradle.kts
 ```
 
 ## Options

@@ -1,0 +1,80 @@
+id: manifests-create-user-deployment
+description: Clarify user-scope setup and create a user.yml manifest aligned with the Kotlin engine
+variables:
+  - name: user_description
+    required: true
+    description: "Brief description of the global AI tool setup the user deployment should carry"
+rulesets:
+  - authoring-yaml
+  - authoring-ai
+  - authoring-manifests
+fragments:
+  - authoring-engine-models
+rules:
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "Keep the user scope lean - it applies to every session of the tool, so only truly global content belongs there"
+  - "Make empty selections explicit: an omitted block selects everything of its kind, an empty whitelist selects nothing"
+content: |
+  The user wants to create a user-scope deployment based on this description:
+
+  {{user_description}}
+
+  **Your job is to clarify and translate into a valid user deployment manifest.**
+
+  A user deployment writes artifacts into the user scope of each tool (`~/.claude`, `~/.codex`, ...) instead of into a project directory. The engine owns the generated files from then on - they are rewritten on every deploy, so the manifests become the place where the global setup is edited.
+
+  ## Step 1: Ask clarifying questions
+
+  - Which tools should this deploy for? (claude, codex, ... - or all tools configured for the run)
+  - Which rulesets should become the global instructions?
+  - Should any agents, prompts, skills, or fragments be available globally? (default to none - global scope applies everywhere)
+  - May the deploy replace its previously generated artifacts? (replace: true/false)
+
+  ## Step 2: Suggest structure
+
+  - Propose a kebab-case ID naming the setup (e.g., globals)
+  - The manifest lives as `user.yml` in its own deployment directory: `09_deployments/<name>/user.yml` - the filename names the kind, the directory names the instance
+  - Recommend explicit empty whitelists for every kind that should stay empty, with a comment saying it is deliberate
+
+  ## Step 3: Create the user deployment manifest
+
+  Read UserDeploymentManifest.kt and derive the exact field set from it (see the engine-models instructions).
+  Study `09_deployments/globals/user.yml` as a style reference before writing.
+
+  Key points from the model:
+
+  - A user deployment has no `context`, no `deploy.directory`, and no `features` - the destination is each tool's canonical per-user location.
+  - `tools` narrows which configured tools deploy it: omit the key for all of them, an empty list means none.
+  - The per-kind `filter:` lists work exactly as in a project manifest (tags, whitelist, blacklist); an omitted block selects everything of its kind.
+  - `replace` only ever removes the artifact paths this manifest generated, never the tool directories the user shares with hand-installed content.
+
+  ## Example conversation
+
+  User: "My global rules for Claude Code and Codex, nothing else"
+
+  You: "Questions:
+  - Which rulesets carry those rules? (e.g., base)
+  - Should agents, prompts, skills, or fragments deploy globally too?
+  - May the deploy replace its own previously generated files?"
+
+  User: "Just the base ruleset, nothing else, replace is fine"
+
+  You: "I'll create `09_deployments/globals/user.yml` with:
+  - tools: claude, codex
+  - rulesets: whitelist [base]
+  - agents, prompts, skills, fragments: explicit empty whitelists with a comment that the emptiness is deliberate
+  - replace: true
+  Sound good?"
+
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root) - and warn that a successful run rewrites the generated files in the tools' user scope.
+outputs:
+  format: yaml
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-08-18"
+  tags:
+    - manifests
+    - deployments
+    - user-scope
+    - yaml

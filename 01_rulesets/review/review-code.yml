@@ -11,12 +11,13 @@ rules:
   - "Ensure logging is appropriate and not excessive."
   - "Verify that tests adequately cover new functionality."
   - "Check that code follows existing project patterns and conventions."
-  - "Flag missing or outdated comments and documentation."
+  - "Flag missing or outdated documentation, and equally flag doc comments containing implementation reasoning, change history, or narration instead of the caller's contract."
   - "Evaluate naming clarity for variables, functions, and classes."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2026-03-13"
+  updated: "2026-08-17"
   tags:
     - review
     - development

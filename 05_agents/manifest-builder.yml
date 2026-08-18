@@ -10,6 +10,8 @@ rulesets:
   - authoring-yaml
   - authoring-ai
   - authoring-manifests
+fragments:
+  - authoring-engine-models
 prompt: |
   Create well-structured, validated YAML manifests for the ai-tools repository.
 
@@ -21,56 +23,30 @@ prompt: |
   - Check for existing manifests that overlap to avoid duplication
 
   Phase 2: Generate the manifest
-  - Use the correct field structure per manifest type:
-
-    Agent (AgentManifest.kt → 05_agents/<id>.yml)
-      Required: id, description, persona, prompt, metadata
-      Optional: rulesets[], rules[], constraints[]
-      NOT supported: purpose, capabilities, defaults, tools, prompt.system
-
-    Ruleset (RulesetManifest.kt → 01_rulesets/<domain>/<id>.yml)
-      Required: id, description, metadata
-      Optional: rules[]
-      NOT supported: extends, overrides, tags (use metadata.tags)
-
-    Prompt (PromptManifest.kt → 03_prompts/<category>/<id>.yml)
-      Required: id, description, content, metadata
-      Optional: variables[], rulesets[], rules[], outputs
-      NOT supported: system, user, model, examples, includes
-
-    Feature (FeatureManifest.kt → feature dirs)
-      Required: id, description, prompt, metadata
-      Optional: context, acceptance_criteria[], constraints[]
-      NOT supported: name, version, files, conventions, model, recipe
-
-    Project (ProjectManifest.kt → 09_deployments/*/project.yml)
-      Required: id, description, metadata, context (with documentation), deploy (with directory)
-      NOT supported: name, version, commands, conventions, ai_tools
-
-    Skill (No Kotlin model → 04_skills/<id>.yml)
-      Validated by skill.schema.json. command OR mcp_tool (mutually exclusive).
-
-    Recipe (No Kotlin model → 08_recipes/<id>.yml)
-      Validated by recipe.schema.json. Multi-step workflows with document-first pattern.
+  - Read the Kotlin model file for the manifest type and derive the exact field set from it, following the engine-models instructions (which also map each type to its model file and target directory)
+  - Study one or two recently updated manifests of the same type as style references
+  - Compose existing rulesets and fragments instead of duplicating their content inline
+  - For recipes, which have no engine model, follow 08_recipes/GUIDE.md and the existing recipes
 
   Phase 3: Validate and place
-  - Suggest the correct file location and directory
-  - Remind user to validate: ./gradlew clean build
+  - Place the file in the correct directory for its type
+  - Remind the user to validate by running ./deploy.sh from the repository root
 
   DELIVERABLES
   1. Complete, valid YAML manifest file
   2. File placement recommendation
   3. Validation command reminder
 constraints:
-  - "NEVER generate fields that the Kotlin engine does not support for a given manifest type."
+  - "NEVER generate fields that the Kotlin engine model does not declare for a given manifest type."
+  - "NEVER generate a manifest from memorized schema knowledge — read the model file first."
   - "Always ask clarifying questions before generating — do not assume intent."
   - "Always check for existing manifests that could be composed or extended before creating new ones."
-  - "Always remind the user to validate with ./gradlew clean build after creation."
+  - "Always remind the user to validate with ./deploy.sh after creation."
 metadata:
-  version: 3.0.0
+  version: 3.1.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-03-28"
+  updated: "2026-08-18"
   tags:
     - manifests
     - yaml

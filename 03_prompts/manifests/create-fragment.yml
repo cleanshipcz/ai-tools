@@ -1,0 +1,74 @@
+id: manifests-create-fragment
+description: Clarify shared content requirements and create a fragment.yml manifest aligned with the Kotlin engine
+variables:
+  - name: user_description
+    required: true
+    description: "Brief description of the shared content the fragment should hold"
+rulesets:
+  - authoring-yaml
+  - authoring-ai
+  - authoring-manifests
+fragments:
+  - authoring-engine-models
+rules:
+  - "Ask clarifying questions BEFORE generating the manifest"
+  - "A fragment holds reference content shared by several consumers - not rules (rulesets) and not process (prompts/agents)"
+  - "Create a fragment only when at least two consumers need the content, or when duplication is already present"
+content: |
+  The user wants to create a fragment based on this description:
+
+  {{user_description}}
+
+  **Your job is to clarify and translate into a valid fragment manifest.**
+
+  Fragments are reusable content blocks. Agents and prompts include them via their `fragments:` list; skills include them via `fragment:` sections. The engine renders the fragment's content into every deployed artifact that references it, so the content is written once and maintained in one place.
+
+  ## Step 1: Ask clarifying questions
+
+  - What content should the fragment hold? (reference material, format guides, tool documentation, shared instructions)
+  - Which manifests will reference it? (agents, prompts, skills - name them)
+  - Does this content already exist somewhere it should be extracted from?
+  - Is it stable reference material, or does it change often? (often-changing content may be better as a pointer to its source)
+
+  ## Step 2: Suggest structure
+
+  - Propose a kebab-case ID prefixed by domain, matching existing fragments (e.g., confluence-storage-format, jira-wiki-markup, authoring-engine-models)
+  - Check `02_fragments/` for existing fragments that already cover the content before creating a new one
+  - Decide the boundaries: one topic per fragment, so consumers can pick exactly what they need
+
+  ## Step 3: Create the fragment manifest
+
+  Read FragmentManifest.kt and derive the exact field set from it (see the engine-models instructions).
+  Study one or two existing fragments in `02_fragments/` as style references before writing.
+
+  ## Best practices
+
+  - **Content, not rules or process.** Rules belong in rulesets, workflows belong in prompts and agents; fragments carry the shared reference material those build on.
+  - **One topic per fragment.** Split broad content so each consumer references only what it needs.
+  - **Update the consumers.** After creating the fragment, remove the duplicated content from the manifests it was extracted from and add the fragment reference there.
+  - File location: `02_fragments/<id>.yml`
+
+  ## Example conversation
+
+  User: "Our Confluence page formatting conventions, used by two documentation prompts"
+
+  You: "Questions:
+  - Should it cover storage format markup, or writing conventions, or both?
+  - Which prompts will reference it?
+  - Is there an existing page or manifest to extract the content from?"
+
+  User: "Just writing conventions; the confluence-doc skill and docs-write-page prompt will use it"
+
+  You: "I'll create `confluence-writing-conventions` with the conventions as content, then add it to the `fragments:`/section lists of both consumers and remove the duplicated text there. Sound good?"
+
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root).
+outputs:
+  format: yaml
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-08-18"
+  tags:
+    - manifests
+    - fragments
+    - yaml

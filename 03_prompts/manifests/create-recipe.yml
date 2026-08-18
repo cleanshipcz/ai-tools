@@ -1,5 +1,5 @@
 id: manifests-create-recipe
-description: Clarify workflow steps and create a recipe.yml manifest validated by recipe.schema.json
+description: Clarify workflow steps and create a recipe.yml manifest following the recipe guide
 variables:
   - name: user_description
     required: true
@@ -13,8 +13,7 @@ rules:
   - "Recommend keeping workflows simple (3-7 steps) but allow complexity when justified"
   - "Each step should have one clear purpose"
   - "Recommend document-first pattern (analysis -> plan -> implement) for multi-step workflows"
-  - "Recipes have NO Kotlin engine model — they are processed by the TypeScript CLI"
-  - "Validate against 10_schemas/recipe.schema.json"
+  - "Recipes have NO Kotlin engine model and no automated validation — 08_recipes/GUIDE.md and the existing recipes are the structural reference"
 content: |
   The user wants to create a recipe based on this description:
 
@@ -38,7 +37,9 @@ content: |
   - Assign appropriate agents to each step
   - Apply document-first pattern if multi-step
 
-  ## Step 3: Create recipe.yml matching recipe.schema.json
+  ## Step 3: Create recipe.yml following 08_recipes/GUIDE.md
+
+  Read `08_recipes/GUIDE.md` and one or two existing recipes in `08_recipes/` before writing — they are the structural reference; there is no schema and no engine model for recipes.
 
   ```yaml
   id: workflow-name
@@ -98,7 +99,7 @@ content: |
     created: "YYYY-MM-DD"
   ```
 
-  **Step fields** (per recipe.schema.json):
+  **Step fields** (per 08_recipes/GUIDE.md):
   - Required: `id`, `agent`, `task`
   - Optional: `prompt` (prompt ID instead of task text), `inputs`, `outputDocument`,
     `includeDocuments`, `continueConversation`, `waitForConfirmation`, `condition`, `model`
@@ -132,10 +133,10 @@ content: |
 outputs:
   format: yaml
 metadata:
-  version: 3.0.0
+  version: 3.1.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-03-28"
+  updated: "2026-08-18"
   tags:
     - manifests
     - recipes

@@ -2,6 +2,7 @@ id: authoring-manifests
 description: Standards for creating ai-tools YAML manifests that align with the Kotlin engine data models
 rules:
   - "The Kotlin engine data models (AgentManifest.kt, RulesetManifest.kt, etc.) are the source of truth — never generate fields the engine does not support."
+  - "Read the Kotlin model file for the manifest type before generating; a constructor parameter with a default value is optional in YAML, every other parameter is required."
   - "Use kebab-case for all manifest IDs, matching the pattern ^[a-z0-9]+(-[a-z0-9]+)*$."
   - "Use snake_case for all variable names in prompt manifests."
   - "Version lives in metadata.version (not top-level), using semver format starting at 1.0.0."
@@ -13,16 +14,16 @@ rules:
   - "For prompt manifests: use Mustache syntax ({{variable}}) for template interpolation. Content is required."
   - "Compose existing rulesets in agents rather than duplicating rules inline. Use wildcard patterns (e.g., coding-language-.*) for language-specific rulesets."
   - "Always include the base ruleset when composing rulesets for agents."
-  - "Place manifest files in the correct directory: 01_rulesets/ for rulesets, 04_skills/ for skills, 03_prompts/<category>/ for prompts, 05_agents/ for agents, 08_recipes/ for recipes, 09_deployments/ for projects and user deployments."
+  - "Place manifest files in the correct directory: 01_rulesets/<domain>/ for rulesets, 02_fragments/ for fragments, 03_prompts/<category>/ for prompts, 04_skills/ for skills, 05_agents/ for agents, 08_recipes/ for recipes, 09_deployments/ for projects and user deployments."
   - "Before creating a manifest, check for existing manifests that could be extended or composed rather than creating duplicates."
-  - "After creating or modifying manifests, validate with ./gradlew clean build (Kotlin engine) to confirm compatibility."
+  - "After creating or modifying manifests, validate by running ./deploy.sh from the repository root — the engine parses every manifest and fails on any invalid one; ./gradlew clean build only builds the engine and does not validate manifests."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2026-03-28"
+  updated: "2026-08-18"
   tags:
     - authoring
     - manifests
     - conventions
     - validation
-    - manifests

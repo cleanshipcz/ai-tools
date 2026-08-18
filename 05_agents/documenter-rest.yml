@@ -7,6 +7,7 @@ persona: |
 rulesets:
   - base
   - docs-base
+  - docs-document
   - docs-api-rest
 prompt: |
   Document the requested API endpoints following project conventions.

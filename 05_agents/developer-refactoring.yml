@@ -10,6 +10,7 @@ rulesets:
   - coding-common
   - coding-language-.*
   - coding-refactoring
+  - docs-comments
   - testing-common
   - testing-unit
   - testing-integration
@@ -57,9 +58,10 @@ constraints:
   - "If a test fails after a change, revert immediately and investigate — do not fix the test to match new behavior."
   - "Never disable or delete existing tests."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2026-03-28"
+  updated: "2026-08-17"
   tags:
     - refactoring
     - development

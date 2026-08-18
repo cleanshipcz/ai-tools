@@ -1,0 +1,21 @@
+id: docs-meeting-notes
+description: Rules for turning meeting transcripts into notes - faithful capture of decisions, action items, and discussion from imperfect speech-to-text sources
+rules:
+  - "Capture decisions, action items, and open questions as distinct sections, never buried in prose."
+  - "Record for each action item the owner and due date when stated; mark them as unassigned or undated when not stated."
+  - "Attribute a statement to a speaker only when the transcript makes it unambiguous; otherwise attribute to the group or mark the speaker as unclear."
+  - "Paraphrase discussion; quote verbatim only when exact wording matters, such as commitments, numbers, and deadlines."
+  - "Expect speech-to-text errors: repair a garbled word or phrase only when context makes the intended meaning certain (names, technical terms, homophones), and mark the repair when the correction is significant."
+  - "Mark segments that cannot be confidently repaired as [unclear] instead of guessing; if such a segment may contain a decision or action item, list it under open questions."
+  - "Expect speaker diarization errors: when the labeled speaker contradicts the content (e.g. answers their own question), resolve from context or drop the attribution."
+  - "Drop filler words, small talk, false starts, and transcription artifacts such as duplicated fragments; never drop disagreement or unresolved points."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-08-18"
+  tags:
+    - common
+    - documentation
+    - docs
+    - meeting
+    - transcript

@@ -8,6 +8,8 @@ rulesets:
   - authoring-yaml
   - authoring-ai
   - authoring-manifests
+fragments:
+  - authoring-engine-models
 rules:
   - "Ask clarifying questions BEFORE generating the manifest"
   - "Recommend simple, focused definitions; allow complexity when justified"
@@ -27,57 +29,25 @@ content: |
   - What is this agent's main purpose? (in 1-2 sentences)
   - What domain does it work in? (coding, docs, security, planning, analysis, review, etc.)
   - What programming languages apply? (if coding-related)
-  - Should it be precise or creative? (helps set temperature)
   - What should it NOT do? (constraints)
 
   ## Step 2: Suggest structure
 
-  - Propose a kebab-case ID following the pattern: `role-specialization` (e.g., reviewer-code, analyst-bug, developer-feature)
+  - Propose a kebab-case ID following the pattern: `role-specialization` (e.g., reviewer-code, analyst-bug, developer-feature, documenter-meeting)
   - Suggest relevant rulesets (always include `base`, then domain-specific ones)
-  - Available ruleset prefixes: `coding-*`, `testing-*`, `review-*`, `security-*`
+  - Ruleset families live in `01_rulesets/` subdirectories: `coding-*`, `testing-*`, `review-*`, `security-*`, `docs-*`, `analysis-*`, `authoring-*` — list the directory for the current set before suggesting
   - Use wildcard patterns like `coding-language-.*` for language-specific rules
+  - Reference shared content blocks from `02_fragments/` via `fragments:` when reusable reference material applies
 
-  ## Step 3: Create agent.yml matching the Kotlin engine contract
+  ## Step 3: Create the agent manifest
 
-  The manifest MUST have these fields (all required by AgentManifest.kt):
+  Read AgentManifest.kt and derive the exact field set from it (see the engine-models instructions).
+  Study one or two recently updated agents in `05_agents/` as style references before writing.
 
-  ```yaml
-  id: kebab-case-name
-  description: Clear purpose statement (10-500 chars)
-  persona: |
-    WHO the agent is. Role, expertise, approach.
-    3-5 sentences for simple agents; more for specialized ones.
-  rulesets:
-    - base
-    - coding-common
-    - coding-language-.*    # wildcard patterns supported
-  prompt: |
-    WHAT the agent does and HOW. Structured process:
+  How to fill the fields:
 
-    PROCESS (DO THIS IN ORDER)
-    Phase 1: ...
-    Phase 2: ...
-
-    DELIVERABLES
-    1. ...
-  constraints:
-    - "NEVER do X"
-    - "Always verify Y before Z"
-  metadata:
-    version: 1.0.0
-    author: "AI Tools Team"
-    created: "YYYY-MM-DD"
-    tags: [domain, role]
-  ```
-
-  **Optional fields:** `rules` (inline rules, prefer rulesets instead)
-
-  **Fields NOT supported by engine:** `capabilities`, `defaults`, `tools`, `purpose`, `prompt.system`, `prompt.user_template`
-
-  ## Best practices
-
-  - **persona** = identity (WHO). Keep it focused on role and expertise.
-  - **prompt** = process (WHAT/HOW). Use structured phases with clear deliverables.
+  - **persona** = identity (WHO). Role, expertise, approach. 3-5 sentences for simple agents; more for specialized ones.
+  - **prompt** = process (WHAT/HOW). Ordered phases under a `PROCESS (DO THIS IN ORDER)` heading, followed by `DELIVERABLES` or `OUTPUT FORMAT`.
   - **constraints** = guardrails. Use NEVER/ALWAYS phrasing. 3-7 items.
   - **rulesets** = compose existing rules. Never duplicate rules that exist in a ruleset.
   - Keep agents focused on ONE role. Split broad agents into specialized ones.
@@ -102,17 +72,14 @@ content: |
   - Constraints: Never approve code with known CVE patterns
   Sound good?"
 
-  After confirmation, remind the user to validate:
-  ```bash
-  ./gradlew clean build
-  ```
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root).
 outputs:
   format: yaml
 metadata:
-  version: 3.0.0
+  version: 3.1.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-03-28"
+  updated: "2026-08-18"
   tags:
     - manifests
     - agents

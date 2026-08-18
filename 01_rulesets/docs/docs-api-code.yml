@@ -1,24 +1,23 @@
 id: docs-api-code
-description: Rules for documenting code-level APIs including functions, classes, methods, and modules
+description: Coverage rules for documenting code-level APIs including functions, classes, methods, and modules — always combine with docs-comments, which defines the doc-comment content contract
 rules:
   - "Document all public APIs, functions, classes, and methods."
-  - "Include parameter types, return types, and possible exceptions."
-  - "Provide usage examples for each public API."
+  - "Document caller-visible edge cases and limitations as part of the contract."
   - "Document function parameters: name, type, purpose, constraints."
   - "Specify return values: type, meaning, possible values."
   - "List all thrown exceptions and when they occur."
-  - "Include code examples that actually compile and run."
   - "Document side effects and state changes."
+  - "Document class invariants and contract conditions."
+  - "Provide usage examples where usage is non-obvious and verify they compile and run; skip examples for self-explanatory members."
   - "Explain time and space complexity for algorithms."
   - "Use appropriate doc comment format (JSDoc, JavaDoc, docstrings, etc.)."
-  - "Document class invariants and contract conditions."
-  - "Use inline comments for complex logic within implementations."
   - "Document configuration options and environment variables."
   - "Keep documentation accurate and up-to-date by verifying against actual implementation."
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   author: "AI Tools Team"
   created: "2025-11-17"
+  updated: "2026-08-17"
   tags:
     - common
     - documentation

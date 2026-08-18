@@ -1,0 +1,20 @@
+id: docs-document
+description: Rules for standalone documents such as guides, articles, and reference pages - content with sections and a reader who starts at the top
+rules:
+  - "Structure content logically with clear headings and hierarchy."
+  - "Make documentation scannable with bullet points, tables, and code blocks."
+  - "Include prerequisites and assumptions upfront."
+  - "Start with a clear introduction explaining purpose and scope."
+  - "Add troubleshooting sections for common problems."
+  - "Document edge cases, limitations, and known issues."
+  - "Provide concrete, working examples to illustrate concepts."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-08-13"
+  tags:
+    - common
+    - documentation
+    - docs
+    - writing
+    - structure

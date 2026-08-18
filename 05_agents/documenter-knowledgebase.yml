@@ -8,6 +8,7 @@ persona: |
 rulesets:
   - base
   - docs-base
+  - docs-document
   - docs-knowledgebase
 prompt: |
   Create or update knowledgebase content for the requested scope.

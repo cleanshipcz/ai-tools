@@ -8,6 +8,7 @@ rulesets:
   - base
   - review-base
   - review-code
+  - docs-comments
   - coding-language-.*
   - security-language-.*
   - coding-dependencies
@@ -38,9 +39,10 @@ constraints:
   - "Flag missing test coverage for new functionality."
   - "Suggest specific improvements, not just criticism."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2026-03-13"
+  updated: "2026-08-17"
   tags:
     - development
     - review

@@ -1,0 +1,34 @@
+id: authoring-engine-models
+description: Source-of-truth instructions for generating manifests that match the Kotlin engine data models
+content: |
+  The Kotlin engine data models are the single source of truth for manifest structure.
+  Before generating or editing a manifest, read the model file for its type in `ai-tools-engine/engine/src/main/kotlin/cz/cleanship/aitools/engine/models/` and derive the exact field set from it — never from memory or from schema snippets found elsewhere in the repository.
+
+  Model file and manifest location by type:
+  - Agent: AgentManifest.kt -> `05_agents/<id>.yml`
+  - Ruleset: RulesetManifest.kt -> `01_rulesets/<domain>/<id>.yml`
+  - Prompt: PromptManifest.kt -> `03_prompts/<category>/<id>.yml`
+  - Fragment: FragmentManifest.kt -> `02_fragments/<id>.yml`
+  - Skill: SkillManifest.kt -> `04_skills/<id>.yml`, or `04_skills/<id>/skill.yml` when the skill bundles supporting files
+  - Feature: FeatureManifest.kt -> `09_deployments/<deployment>/features/<id>.yml`
+  - Project: ProjectManifest.kt -> `09_deployments/<deployment>/project.yml`
+  - User deployment: UserDeploymentManifest.kt -> `09_deployments/<deployment>/user.yml`
+  - Recipe: no engine model; `08_recipes/<id>.yml`, structured per `08_recipes/GUIDE.md` and the existing recipes there
+
+  How to read a model:
+  - A constructor parameter with a default value is optional in YAML; every other parameter is required.
+  - A field that is not in the model does not exist — never generate it, whatever older templates or examples suggest.
+  - The version lives in `metadata.version` (semver); there is no top-level version field in engine-backed manifests.
+  - A `@SerialName` annotation gives the YAML key when it differs from the property name (e.g. `acceptance_criteria`).
+  - A sealed class (e.g. ProjectFilter) is a discriminated union: the YAML entry uses a `type:` key holding the subtype's `@SerialName` (e.g. `- type: tags`).
+
+  Validation: run `./deploy.sh` from the repository root. The engine parses every manifest and the run fails on any invalid one; a successful run also deploys the generated artifacts. Building the engine with `./gradlew clean build` does NOT validate these manifests — it only builds and tests the engine code itself.
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-08-18"
+  tags:
+    - authoring
+    - manifests
+    - engine
+    - validation

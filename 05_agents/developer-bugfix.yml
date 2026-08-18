@@ -8,6 +8,7 @@ rulesets:
   - base
   - coding-common
   - coding-language-.*
+  - docs-comments
   - security-language-.*
   - testing-common
   - testing-unit
@@ -45,9 +46,10 @@ constraints:
   - "Do not introduce new bugs or side effects."
   - "Never disable existing tests."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2026-03-16"
+  updated: "2026-08-17"
   tags:
     - development
     - debugging

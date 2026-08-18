@@ -9,13 +9,13 @@ rules:
   - "Search for up-to-date information and resources."
   - "Absolutely always prioritize quality over quantity. Everything should be high-grade."
   - "When I ask a question, answer it — don't act on it. Read-only investigation is fine, but change nothing until I confirm. When unsure whether I want an answer or an action, answer."
-  - "ALWAYS place temporary task-related files (plans, reports, analyses, reviews, e.g. plan.md) in the project's .tmp/\\<type\\>/ folder (e.g. .tmp/plans/, .tmp/reviews/, .tmp/analysis/) — NEVER in the repository root or any other location. Use the naming pattern <agent-id>-<target>.md (e.g. reviewer-code-auth-service.md)."
+  - "ALWAYS place temporary task-related files (plans, reports, analyses, reviews) under the project's .tmp/ folder — NEVER in the repository root or any other location. A standalone artifact goes in a folder per type (.tmp/plans/, .tmp/reviews/, .tmp/analysis/) using the naming pattern <agent-id>-<target>.md (e.g. reviewer-code-auth-service.md). When one task produces several related artifacts, group them in a per-run folder .tmp/<run-slug>/ instead (e.g. .tmp/add-user-auth/plan.md, .tmp/add-user-auth/report.md), where <run-slug> names the task or feature."
   - "Never manually wrap code, comments, strings, Markdown, JSON, YAML, or shell commands at any column width. One logical statement per line; rely on editor soft-wrap."
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   author: "AI Tools Team"
   created: "2025-01-01"
-  updated: "2026-07-29"
+  updated: "2026-08-17"
   tags:
     - common
     - foundation

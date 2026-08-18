@@ -14,7 +14,6 @@ rules:
   - "Distinguish between task-oriented how-to guides and learning-oriented tutorials."
   - "Include architecture documentation for system design."
   - "Document deployment process and requirements."
-  - "Provide troubleshooting guide for common issues."
   - "Include links to external resources and related projects."
   - "Document licensing and legal requirements."
   - "Keep README concise; link to detailed docs in separate files."
@@ -22,9 +21,10 @@ rules:
   - "Include diagrams (Mermaid) where they clarify architecture or complex concepts."
   - "Keep documentation accurate and up-to-date by verifying against actual implementation."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2025-11-17"
+  updated: "2026-08-13"
   tags:
     - common
     - documentation

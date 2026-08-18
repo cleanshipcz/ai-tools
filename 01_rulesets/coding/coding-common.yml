@@ -18,13 +18,13 @@ rules:
   - "When adding features: write tests defining behavior first, then implement (Red-Green-Refactor). Follow TDD."
   - "Everything should be a high-quality production-ready code."
   - "Preserve existing functionality unless explicitly asked to change it."
-  - "Document non-obvious decisions and trade-offs."
+  - "Document non-obvious decisions and trade-offs in inline comments at the relevant code — NEVER in doc comments (JavaDoc, KDoc, docstrings), which state only the caller's contract."
   - "Minimize code duplication."
 metadata:
-  version: 1.1.0
+  version: 1.2.0
   author: "AI Tools Team"
   created: "2025-11-15"
-  updated: "2026-07-29"
+  updated: "2026-08-17"
   tags:
     - common
     - development

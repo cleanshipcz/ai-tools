@@ -1,344 +1,48 @@
 # Manifest Creation Prompts
 
-Prompts for generating YAML manifests for the ai-tools repository.
+Prompts for creating the YAML manifests of the ai-tools repository: agents, rulesets, prompts, fragments, skills, features, projects, user deployments, and recipes.
 
-## Overview
+## How they work
 
-These prompts help you create well-structured, validated YAML manifests for various components of the ai-tools system. Each prompt follows the repository's conventions and JSON Schema requirements.
+Each prompt is a clarify-first conversation: it asks questions about intent, proposes an ID and structure, and only then generates the manifest. All of them compose the `authoring-engine-models` fragment, which makes the Kotlin engine data models (`ai-tools-engine/engine/src/main/kotlin/cz/cleanship/aitools/engine/models/`) the source of truth: the manifest is derived from the model file, never from memorized schemas.
 
-## Available Prompts
+The prompts are deployed as commands into each configured tool by `./deploy.sh` (e.g., `/manifests-create-agent` in Claude Code).
 
-### create-project
+## Available prompts
 
-**Purpose:** Generate a complete project.yml manifest
+| Prompt | Creates | Target location |
+| --- | --- | --- |
+| `manifests-create-agent` | Agent manifest | `05_agents/<id>.yml` |
+| `manifests-create-ruleset` | Ruleset manifest | `01_rulesets/<domain>/<id>.yml` |
+| `manifests-create-prompt` | Prompt manifest | `03_prompts/<category>/<id>.yml` |
+| `manifests-create-fragment` | Fragment manifest | `02_fragments/<id>.yml` |
+| `manifests-create-skill` | Skill manifest | `04_skills/<id>.yml` or `04_skills/<id>/skill.yml` |
+| `manifests-create-feature` | Feature manifest | `09_deployments/<deployment>/features/<id>.yml` |
+| `manifests-create-project` | Project manifest | `09_deployments/<deployment>/project.yml` |
+| `manifests-create-user-deployment` | User deployment manifest | `09_deployments/<deployment>/user.yml` |
+| `manifests-create-recipe` | Recipe (no engine model) | `08_recipes/<id>.yml` |
+| `manifests-duplicate-project` | Copy of an existing project setup | `ai-tools-projects/projects/<name>/` |
 
-**Use When:** Setting up a new project configuration with tech stack, commands, conventions, and AI tool preferences.
+Each `create-*` prompt takes a single `user_description` variable — a brief description of what to create; the conversation gathers the rest. `duplicate-project` takes source and destination paths instead.
 
-**Example Usage:**
+## Naming conventions
 
-```bash
-npm run use-prompt manifests/create-project
-```
-
-**Variables:**
-
-- `project_id` (required): Kebab-case project identifier
-- `project_name` (required): Human-readable project name
-- `description` (required): Brief project description (10-500 chars)
-- `overview`: Detailed project background
-- `purpose`: Primary goal of the project
-- `languages`: Programming languages used
-- `tech_stack`: Technology stack details
-- `preferred_agents`: Preferred agent IDs
-
----
-
-### create-feature
-
-**Purpose:** Generate a feature.yml manifest with context and snippets
-
-**Use When:** Documenting a feature with its architecture, files, code snippets, and recipe bindings.
-
-**Example Usage:**
-
-```bash
-npm run use-prompt manifests/create-feature
-```
-
-**Variables:**
-
-- `feature_id` (required): Kebab-case feature identifier
-- `feature_name` (required): Human-readable feature name
-- `description` (required): Brief feature description (10-500 chars)
-- `overview`: Detailed feature overview
-- `architecture`: Architecture and design notes
-- `entry_points`: Main entry point files
-- `key_files`: Important related files
-- `recipe_id`: Recipe to bind (e.g., feature-delivery)
-- `acceptance_criteria`: Acceptance criteria
-
----
-
-### create-agent
-
-**Purpose:** Generate an agent.yml manifest defining an AI agent
-
-**Use When:** Creating a new AI agent with specific expertise, rulesets, and behavioral constraints.
-
-**Example Usage:**
-
-```bash
-npm run use-prompt manifests/create-agent
-```
-
-**Variables:**
-
-- `agent_id` (required): Kebab-case agent identifier
-- `purpose` (required): Agent's purpose (10-500 chars)
-- `persona`: Detailed persona and expertise
-- `rulesets`: Ruleset IDs to include
-- `capabilities`: Required MCP capabilities
-- `temperature`: Temperature setting (0.0-2.0)
-- `tools`: Tool/skill IDs the agent can use
-
----
-
-### create-prompt
-
-**Purpose:** Generate a prompt.yml manifest with variables and templates
-
-**Use When:** Creating atomic, reusable prompts with Mustache templating support.
-
-**Example Usage:**
-
-```bash
-npm run use-prompt manifests/create-prompt
-```
-
-**Variables:**
-
-- `prompt_id` (required): Kebab-case prompt identifier
-- `description` (required): What the prompt does (10-500 chars)
-- `category`: Prompt category (refactor, qa, docs, planning, tickets, manifests)
-- `tags`: Tags for categorization
-- `variables`: Variables the prompt needs
-- `output_format`: Expected output format (markdown, json, yaml, code, text)
-
----
-
-### create-ruleset
-
-**Purpose:** Generate a ruleset.yml manifest defining coding rules and standards
-
-**Use When:** Creating reusable sets of coding rules, best practices, or standards for specific languages or domains.
-
-**Example Usage:**
-
-```bash
-npm run use-prompt manifests/create-ruleset
-```
-
-**Variables:**
-
-- `ruleset_id` (required): Kebab-case ruleset identifier
-- `description` (required): Ruleset purpose (10-500 chars)
-- `rules` (required): Description of rules to include
-- `extends`: Parent ruleset IDs to extend
-- `category`: Category (coding, security, testing, documentation)
-- `language`: Programming language if applicable
-
----
-
-### create-skill
-
-**Purpose:** Generate a skill.yml manifest for executable commands or MCP tools
-
-**Use When:** Defining tool integrations, command-line executables, or MCP tool references.
-
-**Example Usage:**
-
-```bash
-npm run use-prompt manifests/create-skill
-```
-
-**Variables:**
-
-- `skill_id` (required): Kebab-case skill identifier
-- `description` (required): What the skill does (10-500 chars)
-- `command_program`: Executable program name
-- `command_args`: Command-line arguments
-- `mcp_tool`: MCP tool ID reference
-- `timeout`: Timeout in seconds
-- `working_dir`: Working directory
-
----
-
-## Workflow
-
-### Creating a New Project
-
-1. Run the create-project prompt:
-
-   ```bash
-   npm run use-prompt manifests/create-project
-   ```
-
-2. Fill in the required variables
-
-3. Save the output to `projects/local/<project-id>/project.yml`
-
-4. Validate:
-   ```bash
-   npm run validate
-   npm run project:list
-   npm run project:generate <project-id>
-   ```
-
-### Creating a Feature
-
-1. Ensure project exists first
-
-2. Run the create-feature prompt:
-
-   ```bash
-   npm run use-prompt manifests/create-feature
-   ```
-
-3. Fill in feature details
-
-4. Save to `projects/*/features/<feature-id>/feature.yml`
-
-5. Validate and generate:
-   ```bash
-   npm run validate
-   npm run project:generate <project-id>
-   ```
-
-### Creating an Agent
-
-1. Run the create-agent prompt:
-
-   ```bash
-   npm run use-prompt manifests/create-agent
-   ```
-
-2. Define agent purpose and persona
-
-3. Select appropriate rulesets
-
-4. Save to `agents/<agent-id>.yml`
-
-5. Build and validate:
-   ```bash
-   npm run validate
-   npm run build
-   ```
-
-### Creating a Prompt
-
-1. Run the create-prompt prompt:
-
-   ```bash
-   npm run use-prompt manifests/create-prompt
-   ```
-
-2. Define prompt purpose and variables
-
-3. Write the prompt template with Mustache syntax
-
-4. Save to `prompts/<category>/<prompt-id>.yml`
-
-5. Validate and rebuild:
-
-   ```bash
-   npm run validate
-   npm run build
-   npm run prompt-library
-   ```
-
-### Creating a Ruleset
-
-1. Run the create-ruleset prompt:
-
-   ```bash
-   npm run use-prompt manifests/create-ruleset
-   ```
-
-2. Define the rules and standards
-
-3. Optionally extend existing rulesets
-
-4. Save to `rulesets/<ruleset-id>.yml`
-
-5. Validate and build:
-
-   ```bash
-   npm run validate
-   npm run build
-   ```
-
-### Creating a Skill
-
-1. Run the create-skill prompt:
-
-   ```bash
-   npm run use-prompt manifests/create-skill
-   ```
-
-2. Define command or MCP tool reference
-
-3. Specify constraints and outputs
-
-4. Save to `skills/<skill-id>.yml`
-
-5. Validate and build:
-
-   ```bash
-   npm run validate
-   npm run build
-   npm run skills
-   ```
-
-## Naming Conventions
-
-- **IDs:** kebab-case (e.g., `user-authentication`, `create-project`)
-- **Variables:** snake_case (e.g., `project_id`, `feature_name`)
-- **Versions:** Semantic versioning (e.g., `1.0.0`)
+- **IDs:** kebab-case (`^[a-z0-9]+(-[a-z0-9]+)*$`), prefixed by role or domain: `role-specialization` for agents, `domain-topic` for rulesets, `category-action` for prompts, `verb-tool` for skills.
+- **Variables:** snake_case.
+- **Versions:** semver in `metadata.version`; never top-level.
 
 ## Validation
 
-All manifests must pass JSON Schema validation:
+Run `./deploy.sh` from the repository root. The engine parses every manifest and the run fails on any invalid one; a successful run also deploys the generated artifacts. Building the engine with `./gradlew clean build` does not validate manifests.
 
-```bash
-npm run validate
-```
+Recipes are the exception: they have no engine model and no automated validation — `08_recipes/GUIDE.md` and the existing recipes are the reference.
 
-Common validation issues:
+## Related agent
 
-- ID doesn't match kebab-case pattern `^[a-z0-9]+(-[a-z0-9]+)*$`
-- Version doesn't match semver pattern `^\d+\.\d+\.\d+$`
-- Description not between 10-500 characters
-- Missing required fields
-- Variable names not in snake_case
+The **manifest-builder** agent (`05_agents/manifest-builder.yml`) provides the same interactive manifest creation for any type, backed by the same engine-models fragment.
 
-## Related Agent
+## See also
 
-Use the **manifest-builder** agent for interactive manifest creation:
-
-```bash
-# In your AI tool with agent support
-As the manifest-builder agent, help me create a new project manifest...
-```
-
-The manifest-builder agent provides:
-
-- Interactive guidance through manifest creation
-- Real-time validation
-- Best practice recommendations
-- Schema compliance checking
-- Helpful examples and suggestions
-
-## Best Practices
-
-1. **Keep Prompts Atomic:** One clear purpose per prompt
-2. **Use Mustache Syntax:** `{{variable}}` for interpolation, `{{#var}}...{{/var}}` for conditionals
-3. **Include Examples:** Show practical usage in prompt definitions
-4. **Add Metadata:** Author, created date, and tags for all manifests
-5. **Reference Shared Files:** Use includes for common components
-6. **Validate Early:** Run validation before committing
-7. **Document Thoroughly:** Clear descriptions and comprehensive context
-8. **Follow Conventions:** Use the right directory structure and naming
-
-## Schema References
-
-- **Project Schema:** `schemas/project.schema.json`
-- **Feature Schema:** `schemas/feature.schema.json`
-- **Agent Schema:** `schemas/agent.schema.json`
-- **Prompt Schema:** `schemas/prompt.schema.json`
-
-## See Also
-
-- [Main README](../../README.md) - Repository overview
-- [Prompts Guide](../README.md) - General prompt documentation
-- [Agents Guide](../../docs/AGENTS.md) - Agent system documentation
-- [Projects Guide](../../projects/README.md) - Project system documentation
+- [Main README](../../README.md) — repository overview
+- [Prompts guide](../README.md) — general prompt documentation
+- [Rulesets](../../01_rulesets/README.md) and [fragments](../../02_fragments/README.md) the prompts compose

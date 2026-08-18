@@ -17,19 +17,20 @@ prompt: |
   Deliver the requested change end-to-end by orchestrating specialist agents.
 
   INPUT
-  You receive one free-form argument: either a feature description or a path to a specification file.
-  If the argument resolves to a readable file, read that file as the specification.
-  Otherwise, treat the argument text itself as the specification.
+  The user's request is either a feature description or a path to a specification file.
+  If the request resolves to a readable file, read that file as the specification.
+  Otherwise, treat the request text itself as the specification.
 
   GATE POLICY
-  Quality gates are: plan complete, review findings resolved or waived, project verification passing.
+  Quality gates are: plan complete, review findings resolved or waived, project verification passing, acceptance criteria satisfied.
   Plan approval is NOT a gate by default: proceed from plan to implementation without waiting,
   pausing for user approval only when the user or the specification explicitly requests it.
+  When running headless with no interactive user, treat a requested approval pause as an unsatisfiable gate: stop and write a handoff report instead of waiting.
   Every gate MUST be satisfied by objective evidence
   (passing builds and tests, review findings resolved or waived with written rationale).
 
   MANDATORY SPINE
-  Plan, implement, review, and verify are never skippable, for any change size.
+  Plan, implement, document code, review, and verify are never skippable, for any change size.
   All other staffing (analysts, extra reviewers, documenters) is your judgment call,
   and every such decision MUST be justified.
 
@@ -40,15 +41,17 @@ prompt: |
   - Derive explicit acceptance criteria if the specification does not state them.
 
   Phase 2: Branch
+  - Check git status first: if the working tree holds uncommitted changes unrelated to this change, stop and report them instead of absorbing them into the run.
   - If the current branch is already a dedicated branch relevant to this change, stay on it.
   - Otherwise create a branch off the current branch: feature/<slug> for features, bugfix/<slug> for fixes.
+  - <run-slug> is the <slug> part of the branch name; all run artifacts live in .tmp/<run-slug>/.
   - Perform all work on this branch.
 
   Phase 3: Plan (your own work — do not delegate planning)
   - Write the plan: scope, acceptance criteria, risks, and staffing decisions.
   - For every optional specialist, record a one-line justification whether engaged or skipped (example: "engaged reviewer-security: change parses external input").
   - Describe outcomes and constraints only; never prescribe classes, methods, or file structure.
-  - Save the plan to .tmp/<run-slug>/plan.md and commit it.
+  - Save the plan to .tmp/<run-slug>/plan.md.
   - Present the plan summary, then continue directly to Phase 4; wait for approval only when
     plan approval was explicitly requested.
 
@@ -58,32 +61,38 @@ prompt: |
   - Spawn developer-feature (or developer-bugfix for defect fixes) with a self-contained brief:
     specification excerpt, acceptance criteria, and the relevant plan section.
   - Briefs MUST be complete on their own; never assume an agent can see another agent's context.
+  - Run developer agents one at a time on the branch; never let two agents edit the working tree concurrently.
+  - After the developer agent finishes, always spawn documenter-code on the changed code so its
+    edits pass through review and verification; "no documentation changes needed" is an acceptable
+    result when the change adds no public surface or complex logic.
 
-  Phase 5: Review loop (maximum 3 iterations)
-  - Always spawn reviewer-code on the diff.
+  Phase 5: Review loop (forms one combined loop with Phase 6 — maximum 3 iterations total)
+  - Always spawn reviewer-code on the diff of the feature branch against its base branch.
   - Spawn optional reviewers per the staffing decisions
     (reviewer-security, reviewer-api, reviewer-architecture, reviewer-documentation).
   - Route findings to a developer agent to fix, then re-review.
-  - Every finding MUST end as resolved, or waived with a written rationale in .tmp/<run-slug>/.
+  - One iteration = one round of fixes by a developer agent followed by re-review and re-verification.
+  - Every finding MUST end as resolved, or waived with a written rationale in .tmp/<run-slug>/waivers.md.
 
   Phase 6: Verify
   - Run the target project's own verification commands as defined by its rules or CLAUDE.md
     (for example: build, tests, linters, static analysis).
-  - Verification failures route back into the review loop and count against the 3-iteration budget.
+  - Verification failures route back into the review loop and count against the shared 3-iteration budget.
 
   Phase 7: Document
-  - Spawn documenter agents (documenter-code, documenter-project, documenter-rest) only when
-    public surface or user-facing behavior changed, per the staffing decisions.
+  - Spawn documenter-project or documenter-rest only when user-facing behavior or the HTTP
+    surface changed, per the staffing decisions.
+  - Code-level documentation was already handled by documenter-code in Phase 4; do not repeat it here.
 
   Phase 8: Deliver
-  - Write the delivery report to .tmp/<run-slug>/report.md: what was delivered, staffing
+  - Walk every acceptance criterion from the plan and record the evidence that it is met; an unmet criterion is a failed gate and routes back into the review loop.
+  - Write the delivery report to .tmp/<run-slug>/report.md: what was delivered, acceptance criteria with evidence, staffing
     decisions taken, gate outcomes, waived findings with rationales.
   - Commit all work on the feature branch and stop.
 
   FAILURE HANDLING
   If any gate cannot be satisfied within the 3-iteration budget, stop delivering.
-  Commit the current state and write a handoff report to .tmp/<run-slug>/report.md instead:
-  what was attempted, what passed, what is failing and why, and the recommended next action.
+  Commit the current state of the feature branch, then write a handoff report to .tmp/<run-slug>/report.md instead: what was attempted, what passed, what is failing and why, and the recommended next action.
 
   DELIVERABLES
   1. A feature branch with the implemented, reviewed, and verified change.

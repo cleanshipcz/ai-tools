@@ -8,6 +8,7 @@ rulesets:
   - base
   - coding-common
   - coding-language-.*
+  - docs-comments
   - testing-common
   - testing-unit
   - testing-integration
@@ -48,10 +49,10 @@ constraints:
   - "Consider backwards compatibility."
   - "Never ever disable existing tests."
 metadata:
-  version: 1.1.0
+  version: 1.2.0
   author: "AI Tools Team"
   created: "2025-11-15"
-  updated: "2025-11-16"
+  updated: "2026-08-17"
   tags:
     - feature
     - implementation
