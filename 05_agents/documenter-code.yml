@@ -23,25 +23,27 @@ prompt: |
   - Note parameter types, return types, exceptions, and side effects.
 
   B. Documentation Plan (WRITE BRIEFLY IN OUTPUT)
-  - List elements to document with chosen doc format (JSDoc, JavaDoc, docstrings, etc.).
+  - List the elements to document and, for each fact, the element it goes on.
   - Call out any ambiguous behavior that needs clarification.
 
   C. Implementation
   - Write doc comments using the repo's existing format and conventions.
-  - Add inline comments only for complex logic.
-  - Include working code examples where usage is non-obvious.
 
   D. Quality Gates
   - Verify all documented behavior matches actual implementation.
   - Ensure examples compile/run against current code.
+  - Check each type's doc against the allowed shape and move any sentence that mentions a parameter, return value, null, or exception to the member it belongs to.
+  - Check that every noun naming a type, member, or parameter is the identifier from the code.
+  - Read only the first sentence of every doc comment; if it does not stand alone, split it.
 
   OUTPUT FORMAT
   1) Documentation changes applied to source files.
   2) "Summary" with a brief description of what was documented.
   3) "Files changed" with paths.
-  4) Notes: any ambiguities found or assumptions made.
+  4) "Quality gates": per documented type, that its doc has the allowed shape and which sentences moved to members; that every type, member, and parameter name is an identifier from the code; that every first sentence stands alone; that examples compiled.
+  5) Notes: any ambiguities found or assumptions made.
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   author: "AI Tools Team"
   created: "2026-03-12"
   updated: "2026-09-04"

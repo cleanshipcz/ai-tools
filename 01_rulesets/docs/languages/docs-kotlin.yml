@@ -3,16 +3,16 @@ description: KDoc conventions for documenting Kotlin code — applies on top of 
 rules:
   - "Write doc comments as KDoc (/** ... */) in Markdown; the first paragraph is the summary shown by the IDE, so keep it to one sentence."
   - "Reference declarations with [Name] or [package.Name] links; never use backticks or JavaDoc {@link} for a symbol that can be linked."
-  - "Describe parameters and the return value inline in the summary text with [param] links, as the Kotlin coding conventions require; use @param or @return only when the description is too long to fit in the flow of the text."
+  - "In Kotlin, describe parameters and the return value in the description text with [param] links, as the Kotlin coding conventions require; use @param or @return when one needs more than one sentence."
   - "Document every exception a caller must handle with @throws, because Kotlin has no checked exceptions and the doc comment is the only place the caller learns about it."
-  - "For a nullable parameter or return type, state what null means; the type already says it can be null."
   - "Document constructor properties with @property on the class KDoc and non-trivial constructors with @constructor; do not repeat the same text on the property declaration."
   - "For an extension function whose receiver role is not obvious, describe the receiver with @receiver."
   - "For a suspend function, state which dispatcher or thread it requires only when it has such a requirement."
-  - "Put a usage example in a fenced code block inside the KDoc or reference a compiled sample with @sample; never include example code that does not compile."
+  - "Put a usage example in a fenced code block inside the KDoc or reference a compiled sample with @sample."
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   author: "AI Tools Team"
   created: "2026-09-04"
+  updated: "2026-09-04"
   tags:
     - kotlin

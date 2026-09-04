@@ -1,15 +1,18 @@
 id: docs-comments
 description: Content rules for doc comments (JavaDoc, KDoc, docstrings, JSDoc) — shared by agents that write or review code
 rules:
-  - "Doc comments state the caller's contract only: purpose, parameters, return value, errors, and caller-visible side effects."
+  - "Each sentence of a doc comment tells the caller one of: what the element does, what to pass, what comes back, what can fail, or what changes. Delete any sentence that does none, or that adds no fact another sentence already gives."
+  - "A type's doc comment is one sentence stating its purpose, plus at most one sentence each for invariants of its state, thread-safety, immutability, lifecycle, or resource ownership, and nothing else. Any sentence that mentions a parameter, a return value, null, or an exception belongs on a member, repeated when several members share it."
+  - "A member's contract binds callers and implementors alike; write it once, from the caller's side. How to implement it, such as which method to call, belongs in an inline comment in the implementation, never in the interface doc."
   - "Never put implementation reasoning, design decisions, or trade-offs in doc comments — put them in inline comments at the relevant code."
+  - "Identifier first: if a thing has an identifier, use it and link it where the language allows; use a plain word only for a concept that has no identifier. To use a concept another element defines, write the plain phrase and link the defining element once; never restructure the sentence around the link."
+  - "The first sentence states what the element does and stands alone. Null cases, bounds, and failure conditions go in the sentences after it. A self-explanatory member gets only the first sentence."
   - "Describe current behavior only. Never reference history, previous versions, or changes — no 'now', 'no longer', 'previously', 'was refactored to', 'newly added'."
-  - "Start every doc comment with one plain-language sentence stating what the element does. Keep length proportional to complexity; omit boilerplate sections for self-explanatory members."
   - "Add inline comments only for constraints or reasoning the code itself cannot express — never to narrate what the next line does."
   - "Provide usage examples where usage is non-obvious and verify they compile and run; skip examples for self-explanatory members."
   - "State time and space complexity only where it is not obvious and matters to the caller, such as algorithms or operations over large inputs."
 metadata:
-  version: 1.1.0
+  version: 2.0.0
   author: "AI Tools Team"
   created: "2026-08-17"
   updated: "2026-09-04"

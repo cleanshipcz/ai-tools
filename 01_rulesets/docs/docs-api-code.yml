@@ -7,11 +7,10 @@ rules:
   - "Describe what the return value means and which values it can take; state the type only when the language does not declare it."
   - "List all thrown exceptions and when they occur."
   - "Document side effects and state changes."
-  - "Document class invariants and contract conditions."
+  - "Document invariants of a type's state."
   - "Document configuration options and environment variables."
-  - "Keep documentation accurate and up-to-date by verifying against actual implementation."
 metadata:
-  version: 3.0.0
+  version: 4.0.0
   author: "AI Tools Team"
   created: "2025-11-17"
   updated: "2026-09-04"

@@ -3,7 +3,7 @@ description: JavaDoc conventions for documenting Java code — applies on top of
 rules:
   - "Write doc comments as JavaDoc (/** ... */); the first sentence ends with a period and must stand alone as the summary, because JavaDoc extracts it for index pages."
   - "Reference types and members with {@link} and mark code literals with {@code}; use HTML only for paragraph breaks (<p>) and lists."
-  - "On public API, give every parameter a @param tag and every non-void method a @return tag, because doclint reports missing ones; keep each tag to one phrase that states purpose or constraint, never the type."
+  - "In Java, on public API, give every parameter a @param tag and every non-void method a @return tag, because doclint reports missing ones; keep each tag to one phrase that states purpose or constraint, never the type."
   - "Use @throws for every exception the caller must handle, including unchecked ones such as IllegalArgumentException, and state the condition that triggers it."
   - "On an overriding method, inherit the parent documentation with {@inheritDoc} or omit the comment; never copy the parent text."
   - "Document record components with @param tags on the record declaration."
@@ -11,8 +11,9 @@ rules:
   - "Mark @deprecated with the replacement as a {@link}, and add @since when the project tracks API versions."
   - "Document a package in package-info.java when the package is a public API boundary."
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   author: "AI Tools Team"
   created: "2026-09-04"
+  updated: "2026-09-04"
   tags:
     - java

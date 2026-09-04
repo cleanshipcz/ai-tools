@@ -38,6 +38,12 @@
 
 - add support for MCPs
 
+## Fragment filtering per deployment
+
+- deployments filter agents, rulesets, and skills by tag, but every fragment reaches every deployment
+- add a `fragments` filter to project and user deployments, same shape as the ruleset filter
+- motivation: worked-example fragments per language for the documenter agents (one good KDoc for a function with a nullable return and one for a value class calibrate better than adjectives); without the filter a Kotlin example would land in Python projects
+
 ## Project-specific configuration
 
 - add support for project-specific tools (skills, prompts, rulesets, agents)
