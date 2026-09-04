@@ -9,6 +9,11 @@ Manifests are parsed in strict mode: **an unknown key fails the run**, so do not
 # First-run setup: checks prerequisites, builds the engine
 ./setup.sh
 
+# Validate every manifest without writing anything: parses, filters, resolves
+# every ruleset, fragment, and skill-file reference, and logs what a real run
+# would write where
+./deploy.sh --dry-run
+
 # Try a run first: user.yml manifests land in a scratch home instead of your own
 ./deploy.sh --user-home /tmp/try
 
@@ -29,12 +34,13 @@ cd ai-tools-engine
 
 The inner quotes in that snippet survive Gradle's own splitting of `--args`, which is what keeps a repository path containing spaces a single argument.
 
-The CLI has two options besides `--help`, and no subcommands:
+The CLI has three options besides `--help`, and no subcommands:
 
+- `--dry-run` — load, filter, and render everything exactly as a deploy would, report every failure a deploy would report, and write nothing. This is how manifests are validated.
 - `--working-dir` — the directory holding `config.yml`. Defaults to `.`; `deploy.sh` sets it to the directory it was started from.
 - `--user-home` — the home a `user.yml` deploys under. Defaults to the home of the current user. A relative value resolves against `--working-dir`, an empty value is rejected, and a home that does not exist yet is created.
 
-There is no `--dry-run` and no way to select a single manifest.
+There is no way to select a single manifest.
 `deploy.sh` forwards every argument to the CLI, except one containing a double quote — Gradle's `--args` cannot escape it, so the script refuses the argument rather than delivering a different path. Run `./gradlew :cli:run` directly for that case.
 
 ## File Naming Conventions
@@ -389,7 +395,6 @@ Use `fragments` for shared content; there is no include mechanism.
 ├── 04_skills/       # Skills (<id>.yml, or <dir>/skill.yml)
 ├── 05_agents/       # Agents
 ├── 09_deployments/  # Deployments: <deployment>/project.yml or user.yml (+ features/)
-├── 10_schemas/      # JSON schemas - STALE, not used for validation
 ├── 90_docs/         # Reference documentation
 ├── ai-tools-engine/ # The Kotlin engine
 ├── config.yml       # Engine configuration (locations + tools + env_vars)
@@ -405,14 +410,16 @@ Use `fragments` for shared content; there is no include mechanism.
 1. Create `05_agents/my-agent.yml`
 2. Reference existing rulesets and fragments by `id` or pattern
 3. Make sure it will pass the target project's filter — add a matching tag, or whitelist the id in `project.yml`
-4. Run `./deploy.sh`
-5. Check the generated `.claude/agents/my-agent.md` in the project's `deploy.directory`
+4. Validate with `./deploy.sh --dry-run`
+5. Run `./deploy.sh`
+6. Check the generated `.claude/agents/my-agent.md` in the project's `deploy.directory`
 
 ### Modify a Ruleset
 
 1. Edit the ruleset under `01_rulesets/`
 2. Bump `metadata.version` if you change behaviour
-3. Run `./deploy.sh` — every agent, prompt, and skill referencing it is rewritten
+3. Validate with `./deploy.sh --dry-run`
+4. Run `./deploy.sh` — every agent, prompt, and skill referencing it is rewritten
 
 ### Add a Skill That Ships Files
 
@@ -428,11 +435,16 @@ Use `fragments` for shared content; there is no include mechanism.
 
 ## Validation
 
-There is no standalone validation command.
-Manifests are validated when `./deploy.sh` runs, by strict YAML decoding: an unknown key, a missing required field, or a malformed version aborts the run with the offending file path.
+```bash
+./deploy.sh --dry-run
+```
 
-The JSON schemas in `10_schemas/` have drifted from the Kotlin models and are **not** used by the engine.
-Do not treat them as authoritative — the data classes in `ai-tools-engine/engine/.../models/` are.
+A dry run does everything a deploy does except write: every manifest is decoded strictly (an unknown key, a missing required field, or a malformed version fails the run naming the file), every ruleset, fragment, and skill-file reference is resolved, and the log names each artifact a real run would write and where.
+The exit status is the one a deploy would have had.
+
+A plain `./deploy.sh` validates the same way, but a successful run also deploys into every configured project and into your home. Do not use it just to validate.
+
+There are no JSON schemas: the data classes in `ai-tools-engine/engine/.../models/` are the only schema a manifest has.
 
 ## Security
 

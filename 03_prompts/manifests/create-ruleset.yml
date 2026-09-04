@@ -77,14 +77,14 @@ content: |
   - Dataclass usage patterns
   ~15 rules total. Sound good?"
 
-  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root).
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh --dry-run from the repository root).
 outputs:
   format: yaml
 metadata:
-  version: 3.1.0
+  version: 3.1.1
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-08-18"
+  updated: "2026-09-04"
   tags:
     - manifests
     - rulesets

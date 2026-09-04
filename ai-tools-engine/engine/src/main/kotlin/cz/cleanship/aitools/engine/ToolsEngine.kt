@@ -53,7 +53,16 @@ import java.io.File
  * the per-user location of its own tool - `<home>/.claude`, `<home>/.codex`. It defaults to the home of the user
  * running the engine, which is the only home a deploy is ever meant to reach; a test overrides it so that it writes
  * into a directory of its own instead.
+ * @param dryRun whether this run validates without deploying: everything is loaded, filtered and rendered as in a
+ * deploy and every failure is reported the same way, but nothing on disk is created, deleted or modified. The flag
+ * covers what the engine itself decides - the deletions of a replacing deploy, and how the run is announced - while
+ * the writes of the adapters are covered by the sink they were built with, so the [tools] of a dry run have to be
+ * built for one too - see [cz.cleanship.aitools.engine.tools.ToolFactory.create].
  */
+// Every parameter is either a collaborator or a setting of the run with a default, and the engine is composed in
+// one place; folding the settings into an object of their own would trade one count for an indirection on every
+// construction site.
+@Suppress("LongParameterList")
 class ToolsEngine(
     private val workingDirectory: File,
     private val loaderService: LoaderService = LoaderService(),
@@ -68,9 +77,16 @@ class ToolsEngine(
         CodexAdapter(),
         CursorAdapter(),
     ),
+    private val dryRun: Boolean = false,
 ) {
 
     private val telemetry = Telemetry.create(TelemetryConfig.fromEnvironment())
+
+    // The lines announcing a write before it happens are the ones a dry run would turn into a lie, so their verbs
+    // are chosen once here: a dry run then reads as the plan it is, not as a report of writes that never took place.
+    private val replacing = if (dryRun) "Would replace" else "Replacing"
+    private val writing = if (dryRun) "Would write" else "Writing"
+    private val deploying = if (dryRun) "Would deploy" else "Deploying"
 
     /**
      * Loads every manifest in [locations] and exports each project through every configured adapter, or through the
@@ -109,6 +125,9 @@ class ToolsEngine(
             ),
         ) {
             LOG.info("Processing locations {}", locations)
+            if (dryRun) {
+                LOG.info("Dry run: nothing is written, every line below reports what a deploy would do.")
+            }
             val allData = loaderService.loadAll(locations)
             LOG.info(
                 "Loaded {} agents, {} prompts, {} rulesets, {} fragments, {} skills, {} projects, {} user deployments",
@@ -149,6 +168,11 @@ class ToolsEngine(
 
             failures += exportUserDeployments(allData)
 
+            // Said before the failures are raised, so that a failing dry run is still recognisable as one: the
+            // error that follows reads the same as after a deploy, and this line is what says nothing was touched.
+            if (dryRun) {
+                LOG.info("Dry run finished: nothing was written.")
+            }
             if (failures.isNotEmpty() || allData.duplicates.isNotEmpty()) {
                 throw ExportFailedException(failures, allData.duplicates)
             }
@@ -309,9 +333,13 @@ class ToolsEngine(
                 plannedDeployment.deployment.hasArtifacts()
         }
         if (!writesSomething) return
-        LOG.info("Deploying the user scope under '{}'", userHome.absolutePath)
+        LOG.info("{} the user scope under '{}'", deploying, userHome.absolutePath)
         if (!userHome.exists()) {
-            LOG.info("The home '{}' does not exist yet and is created by this deploy.", userHome.absolutePath)
+            LOG.info(
+                "The home '{}' does not exist yet and {}.",
+                userHome.absolutePath,
+                if (dryRun) "would be created by a deploy" else "is created by this deploy",
+            )
         }
     }
 
@@ -376,9 +404,9 @@ class ToolsEngine(
             }
         }
         if (exporter.instructionsFile.exists()) {
-            LOG.warn("{}: Replacing the instructions file '{}'.", manifest.id, exporter.instructionsFile.absolutePath)
+            LOG.warn("{}: {} the instructions file '{}'.", manifest.id, replacing, exporter.instructionsFile.absolutePath)
         } else {
-            LOG.info("{}: Writing the instructions file '{}'.", manifest.id, exporter.instructionsFile.absolutePath)
+            LOG.info("{}: {} the instructions file '{}'.", manifest.id, writing, exporter.instructionsFile.absolutePath)
         }
         return name to { exporter.export(UserInstructionsContext(manifest, deployment.rulesets)) }
     }
@@ -402,11 +430,11 @@ class ToolsEngine(
         val manifest = deployment.manifest
         val exporter = target.exporter
         val toolType = target.adapter.toolType
-        LOG.info("{}: Deploying into the user scope of {} under '{}'", manifest.id, toolType.serialName, userHome.absolutePath)
+        LOG.info("{}: {} into the user scope of {} under '{}'", manifest.id, deploying, toolType.serialName, userHome.absolutePath)
         if (manifest.replace) {
             // Quoted for the same reason the project loop quotes its destination: a home can end in a character
             // that reads as part of the sentence around it.
-            LOG.warn("{}: Replacing the artifacts of this deployment under '{}'.", manifest.id, userHome.absolutePath)
+            LOG.warn("{}: {} the artifacts of this deployment under '{}'.", manifest.id, replacing, userHome.absolutePath)
         }
 
         val exports = buildList<Pair<String, () -> Unit>> {
@@ -525,9 +553,13 @@ class ToolsEngine(
         if (project.manifest.deploy.replace) {
             // The path is quoted because a resolved `deploy.directory` can legitimately end in `.`, which reads
             // as `..` when a sentence-ending period follows it - misleading in a warning about deletion.
-            LOG.warn("{}: Replacing existing agentic files in '{}'.", project.manifest.id, destination)
+            LOG.warn("{}: {} existing agentic files in '{}'.", project.manifest.id, replacing, destination)
         }
-        adapter.prepare(destination, project.manifest)
+        // Preparing is the one step of a project deploy that deletes, and it is the engine that orders it, so the
+        // engine is what leaves it out of a dry run - the warning above has already said what it would have done.
+        if (!dryRun) {
+            adapter.prepare(destination, project.manifest)
+        }
 
         val exports = buildList<Pair<String, () -> Unit>> {
             add("project '${project.manifest.id}'" to { adapter.export(destination, GlobalContext(project.manifest)) })

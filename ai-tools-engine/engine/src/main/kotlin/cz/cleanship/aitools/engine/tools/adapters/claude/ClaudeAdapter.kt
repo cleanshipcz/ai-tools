@@ -1,6 +1,5 @@
 package cz.cleanship.aitools.engine.tools.adapters.claude
 
-import cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.UserDeploymentManifest
@@ -127,7 +126,8 @@ class ClaudeAdapter(
 
         override fun export(skillContext: SkillContext) {
             if (deployment.replace) {
-                layout.skillDir(skillContext.skill.id).deleteArtifactDirectoryWithin(
+                exportService.replaceArtifactDirectory(
+                    layout.skillDir(skillContext.skill.id),
                     owned = layout.skillsDir,
                     describedBy = "skill '${skillContext.skill.id}'",
                 )

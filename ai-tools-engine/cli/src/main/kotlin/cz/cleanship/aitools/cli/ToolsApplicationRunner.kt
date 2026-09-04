@@ -13,8 +13,9 @@ fun interface ToolsApplicationRunner {
     /**
      * @param userHome the home directory the user deployments of the run are written under - see
      * [ToolsEngine]
+     * @param dryRun whether the run validates without writing anything - see [ToolsEngine]
      */
-    fun run(workingDirectory: File, userHome: File)
+    fun run(workingDirectory: File, userHome: File, dryRun: Boolean)
 }
 
 class DefaultToolsApplicationRunner(
@@ -22,19 +23,25 @@ class DefaultToolsApplicationRunner(
     private val toolAdapterFactory: ToolAdapterFactory = DefaultToolAdapterFactory,
     private val engineFactory: ToolsEngineFactory = DefaultToolsEngineFactory(),
 ) : ToolsApplicationRunner {
-    override fun run(workingDirectory: File, userHome: File) {
+    override fun run(workingDirectory: File, userHome: File, dryRun: Boolean) {
         val config = configService.loadConfig(workingDirectory)
-        val toolAdapters = config.tools.map(toolAdapterFactory::create)
-        engineFactory.create(toolAdapters, workingDirectory, config.variables, userHome).process(config.locations)
+        // Both halves of a dry run are decided here: the adapters own the writes, the engine owns the deletions of
+        // a replacing deploy and the wording of the run, and neither can stand in for the other.
+        val toolAdapters = config.tools.map { toolAdapterFactory.create(it, dryRun) }
+        engineFactory.create(toolAdapters, workingDirectory, config.variables, userHome, dryRun).process(config.locations)
     }
 }
 
 fun interface ToolAdapterFactory {
-    fun create(toolType: ToolType): ToolAdapter
+    /**
+     * @param dryRun whether the adapter writes nothing and only reports what it would write - see
+     * [ToolFactory.create]
+     */
+    fun create(toolType: ToolType, dryRun: Boolean): ToolAdapter
 }
 
 object DefaultToolAdapterFactory : ToolAdapterFactory {
-    override fun create(toolType: ToolType): ToolAdapter = ToolFactory.create(toolType)
+    override fun create(toolType: ToolType, dryRun: Boolean): ToolAdapter = ToolFactory.create(toolType, dryRun)
 }
 
 fun interface ToolsEngineProcessor {
@@ -49,12 +56,14 @@ fun interface ToolsEngineFactory {
      * `deploy.directory` with before resolving it - the same ones the `locations.*` of that config were substituted
      * with, so that one name means one directory across the whole run
      * @param userHome the `--user-home` of the run, under which the adapters write the user scope of their tool
+     * @param dryRun whether the run validates without writing anything - see [ToolsEngine]
      */
     fun create(
         tools: List<ToolAdapter>,
         workingDirectory: File,
         variables: VariableResolver,
         userHome: File,
+        dryRun: Boolean,
     ): ToolsEngineProcessor
 }
 
@@ -64,8 +73,15 @@ class DefaultToolsEngineFactory : ToolsEngineFactory {
         workingDirectory: File,
         variables: VariableResolver,
         userHome: File,
+        dryRun: Boolean,
     ): ToolsEngineProcessor {
-        val engine = ToolsEngine(workingDirectory, variables = variables, userHome = userHome, tools = tools)
+        val engine = ToolsEngine(
+            workingDirectory,
+            variables = variables,
+            userHome = userHome,
+            tools = tools,
+            dryRun = dryRun,
+        )
         return ToolsEngineProcessor { locations -> engine.process(locations) }
     }
 }

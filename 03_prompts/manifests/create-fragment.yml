@@ -61,13 +61,14 @@ content: |
 
   You: "I'll create `confluence-writing-conventions` with the conventions as content, then add it to the `fragments:`/section lists of both consumers and remove the duplicated text there. Sound good?"
 
-  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root).
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh --dry-run from the repository root).
 outputs:
   format: yaml
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   author: "AI Tools Team"
   created: "2026-08-18"
+  updated: "2026-09-04"
   tags:
     - manifests
     - fragments

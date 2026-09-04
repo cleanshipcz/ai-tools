@@ -1,0 +1,17 @@
+id: docs-language-typescript
+description: TSDoc and JSDoc conventions for documenting TypeScript code — applies on top of docs-comments and docs-api-code
+rules:
+  - "Write doc comments as /** ... */ blocks in TSDoc syntax; never put a {Type} in @param or @returns, and never repeat the declared type in words, because the TypeScript signature already carries it."
+  - "Write @param as '@param name - description' and add @returns only when the meaning of the return value is not obvious from the signature."
+  - "Use @throws for errors the caller must handle; for a function returning a Promise, describe what causes rejection."
+  - "Reference symbols with {@link Symbol}; use @typeParam to document a type parameter only when it has a constraint or meaning the name does not convey."
+  - "Document each exported member; document interface and object-type properties inline above each property, not in a list on the interface."
+  - "Describe the meaning of each variant of a union or literal type when it is not self-evident."
+  - "Document each overload signature separately and leave the implementation signature undocumented."
+  - "Mark @deprecated with the replacement as a {@link}, and put examples under @example in a fenced code block."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-09-04"
+  tags:
+    - typescript

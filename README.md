@@ -29,7 +29,6 @@ See [Not Yet Implemented](#not-yet-implemented) before looking for them.
 - `05_agents/` – agent manifests
 - `09_deployments/` – deployment manifests, each a directory containing a `project.yml` (deploys into a project directory) or a `user.yml` (deploys into the user scope of a tool), plus an optional `features/`
 - `ai-tools-engine/` – the Kotlin build engine (Gradle multi-module: `:engine`, `:cli`, `:server`, `:telemetry`)
-- `10_schemas/` – JSON schemas; **stale**, they have drifted from the engine's Kotlin models and are not used for validation
 - `90_docs/` – reference documentation
 - `91_examples/` – worked examples
 
@@ -57,14 +56,23 @@ Left over from the retired TypeScript CLI and no longer written or read by anyth
 
 2) Edit manifests, then edit `09_deployments/<deployment>/project.yml` to set `deploy.directory` and the filters, or `09_deployments/<deployment>/user.yml` to set the filters of a user-scope deployment
 
-3) Generate and deploy
+3) Validate without writing anything
+
+```bash
+./deploy.sh --dry-run
+```
+
+A dry run loads, filters, and renders every manifest exactly as a deploy does and fails on exactly what a deploy fails on — a broken ruleset or fragment reference, a duplicate id, a missing skill file, a deploy directory that cannot be resolved — but creates, deletes, and modifies nothing on disk.
+It logs the absolute path of every artifact a deploy would write, so the transcript reads as the plan of the deploy it stands in for.
+
+4) Generate and deploy
 
 ```bash
 ./deploy.sh
 ```
 
 If a `user.yml` is in play — and this repository ships one, `09_deployments/globals/user.yml` — that run also rewrites `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` from the manifest, keeping no backup of what those files held.
-Try `./deploy.sh --user-home /tmp/try` first and read what it produced there; see [User-Scope Deployments](#user-scope-deployments).
+Try `./deploy.sh --dry-run` first and read what it would write, or `./deploy.sh --user-home /tmp/try` to see the produced files in a scratch home; see [User-Scope Deployments](#user-scope-deployments).
 
 `deploy.sh` is a thin wrapper around the CLI:
 
@@ -74,10 +82,11 @@ cd ai-tools-engine && ./gradlew :cli:run --args="--working-dir \"<repository roo
 
 The inner quotes survive Gradle's own splitting of `--args`, so a repository path containing spaces stays a single argument.
 
-The CLI has two options besides `--help`, and no subcommands:
+The CLI has three options besides `--help`, and no subcommands:
 
 - `--working-dir` — the directory containing `config.yml` (and the optional `config.local.yml`). Defaults to `.`, and `deploy.sh` sets it to the directory it was started from.
 - `--user-home` — the home directory a `user.yml` deploys under. Defaults to the home of whoever runs the command; see [User-Scope Deployments](#user-scope-deployments).
+- `--dry-run` — validate and render every manifest, reporting what would be written, without writing anything. The exit status is the one a deploy would have had.
 
 Every argument you give `deploy.sh` is forwarded to the CLI, so a trial run into a scratch directory is `./deploy.sh --user-home /tmp/try`.
 The one argument it cannot forward is one containing a double quote: Gradle's `--args` has no escape mechanism for it, so `deploy.sh` refuses such an argument instead of delivering a different, still-plausible path.
@@ -335,8 +344,8 @@ These were documented previously but have no implementation in the current engin
 The CLI accepts no subcommands, so there is no command to run for any of them:
 
 - Project scaffolding and registration (`project:create`, `project:init`, `project:list`)
-- Deploying a single named project, dry runs, interactive or forced deploys
-- Standalone manifest validation — manifests are validated only as part of a deploy run, by strict YAML decoding
+- Deploying a single named project, interactive or forced deploys
+- Standalone manifest validation beyond a run — manifests are validated by strict YAML decoding as part of a run; `./deploy.sh --dry-run` is that run without the writes
 - Prompt library generation (`PROMPT_LIBRARY.md` / `.html`) and the interactive prompt filler
 - Recipe listing, running, and script generation
 - Documentation generation

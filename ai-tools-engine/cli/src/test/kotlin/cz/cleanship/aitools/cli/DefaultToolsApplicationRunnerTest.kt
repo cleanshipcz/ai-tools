@@ -65,24 +65,54 @@ class DefaultToolsApplicationRunnerTest {
             val codexAdapter = mockk<ToolAdapter>()
 
             every { configService.loadConfig(workingDirectory) } returns config
-            every { toolAdapterFactory.create(ToolType.CLAUDE) } returns claudeAdapter
-            every { toolAdapterFactory.create(ToolType.CODEX) } returns codexAdapter
+            every { toolAdapterFactory.create(ToolType.CLAUDE, dryRun = false) } returns claudeAdapter
+            every { toolAdapterFactory.create(ToolType.CODEX, dryRun = false) } returns codexAdapter
             every {
-                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome)
+                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome, dryRun = false)
             } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
-            runner.run(workingDirectory, userHome)
+            runner.run(workingDirectory, userHome, dryRun = false)
 
             // then
             verify(exactly = 1) { configService.loadConfig(workingDirectory) }
-            verify(exactly = 1) { toolAdapterFactory.create(ToolType.CLAUDE) }
-            verify(exactly = 1) { toolAdapterFactory.create(ToolType.CODEX) }
+            verify(exactly = 1) { toolAdapterFactory.create(ToolType.CLAUDE, dryRun = false) }
+            verify(exactly = 1) { toolAdapterFactory.create(ToolType.CODEX, dryRun = false) }
             // - the home of the run reaches the engine, which is what the adapters derive their user scope from
             verify(exactly = 1) {
-                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome)
+                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome, dryRun = false)
             }
+            verify(exactly = 1) { engineProcessor.process(locations) }
+        }
+
+        @Test
+        fun `should create dry-run adapters and a dry-run engine when asked for a dry run`() {
+            // given
+            // - the flag has to reach both: the adapters decide what touches the disk, the engine what it announces
+            val workingDirectory = File("workspace")
+            val userHome = File("home")
+            val locations = Locations(
+                agents = emptyList(),
+                deployments = listOf(File("deployments")),
+                prompts = emptyList(),
+                rulesets = emptyList(),
+                fragments = emptyList(),
+                skills = emptyList(),
+            )
+            val variables = VariableResolver()
+            val config = EngineConfig(locations = locations, tools = listOf(ToolType.CLAUDE), variables = variables)
+            val dryRunAdapter = mockk<ToolAdapter>()
+
+            every { configService.loadConfig(workingDirectory) } returns config
+            every { toolAdapterFactory.create(ToolType.CLAUDE, dryRun = true) } returns dryRunAdapter
+            every { engineFactory.create(listOf(dryRunAdapter), workingDirectory, variables, userHome, dryRun = true) } returns engineProcessor
+            every { engineProcessor.process(locations) } returns Unit
+
+            // when
+            runner.run(workingDirectory, userHome, dryRun = true)
+
+            // then
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
     }
@@ -112,15 +142,15 @@ class DefaultToolsApplicationRunnerTest {
             val userHome = File("home")
 
             every { configService.loadConfig(workingDirectory) } returns config
-            every { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome) } returns engineProcessor
+            every { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome, dryRun = false) } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
-            runner.run(workingDirectory, userHome)
+            runner.run(workingDirectory, userHome, dryRun = false)
 
             // then
             verify(exactly = 1) { configService.loadConfig(workingDirectory) }
-            verify(exactly = 1) { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome) }
+            verify(exactly = 1) { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome, dryRun = false) }
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
     }
@@ -136,7 +166,7 @@ class DefaultToolsApplicationRunnerTest {
             every { configService.loadConfig(workingDirectory) } throws FileNotFoundException("Missing config")
 
             // when
-            val error = runCatching { runner.run(workingDirectory, File("home")) }.exceptionOrNull()
+            val error = runCatching { runner.run(workingDirectory, File("home"), dryRun = false) }.exceptionOrNull()
 
             // then
             assertThat(error)

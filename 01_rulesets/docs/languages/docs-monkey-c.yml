@@ -1,0 +1,17 @@
+id: docs-language-monkey-c
+description: Documentation comment conventions for Monkey C in Garmin Connect IQ projects — applies on top of docs-comments and docs-api-code
+rules:
+  - "Write doc comments as //! line comments directly above the declaration, the style used throughout the Connect IQ SDK samples and read by the VS Code extension."
+  - "Document parameters as '//! @param name - description' and the return value as '//! @return description'; the Monkey Types annotation on the signature already carries the type."
+  - "Document the device capabilities a function needs (for example a Toybox module that must be checked with has) and what happens on devices without them."
+  - "State the memory cost of a class or function when it allocates objects the caller retains, because Connect IQ devices run in kilobytes of memory."
+  - "For a nullable parameter or return value, state what null means; strict type checking already shows the ? on the type."
+  - "Document callbacks with the symbol they expect, the arguments they receive, and the thread or lifecycle moment they run in."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-09-04"
+  tags:
+    - monkey-c
+    - garmin
+    - connect-iq

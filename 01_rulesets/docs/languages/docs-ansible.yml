@@ -1,0 +1,16 @@
+id: docs-language-ansible
+description: Documentation conventions for Ansible roles, playbooks, and variables — applies on top of docs-comments and docs-api-code
+rules:
+  - "Give every task, play, and block a name that states its intent; the name is the primary documentation and must read as a sentence in the run log."
+  - "Give every role a README.md with its purpose, required and optional variables with defaults, dependencies, and one example play."
+  - "Declare every role entry point in meta/argument_specs.yml with type, required, default, choices, and description for each argument."
+  - "Put a comment line above every variable in defaults/main.yml stating its purpose and allowed values."
+  - "Start every playbook with a header comment stating its purpose, target inventory, required extra-vars, and how to run it."
+  - "Comment only the reason behind a task, such as ordering constraints, workarounds, or idempotency concerns; never restate what the module call already says."
+  - "Use YAML comments for documentation; never use debug tasks to explain a playbook."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-09-04"
+  tags:
+    - ansible

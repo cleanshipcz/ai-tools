@@ -8,8 +8,11 @@ import cz.cleanship.aitools.engine.env.EnvironmentSource
 import cz.cleanship.aitools.engine.env.UnresolvedVariableException
 import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.models.Locations
+import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.services.DryRunArtifactSink
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
+import cz.cleanship.aitools.engine.tools.ToolFactory
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
@@ -1093,6 +1096,229 @@ class ToolsEngineTest {
         }
     }
 
+    /**
+     * A dry run loads, filters and renders exactly what a deploy does and reports the same failures, while nothing
+     * on disk is created, deleted or modified. The adapters come from [ToolFactory] here, the way the CLI builds
+     * them, so that the engine flag and the adapters' sink are proven to act together.
+     */
+    @Nested
+    inner class DryRun {
+
+        private val sinkAppender = ListAppender<ILoggingEvent>()
+        private lateinit var sinkLogger: Logger
+        private lateinit var dryRunEngine: ToolsEngine
+
+        @BeforeEach
+        fun setUp() {
+            dryRunEngine = ToolsEngine(
+                workspace,
+                userHome = userHome,
+                tools = listOf(ToolFactory.create(ToolType.CLAUDE, dryRun = true)),
+                dryRun = true,
+            )
+            sinkLogger = LoggerFactory.getLogger(DryRunArtifactSink::class.java) as Logger
+            sinkAppender.start()
+            sinkLogger.addAppender(sinkAppender)
+        }
+
+        @AfterEach
+        fun tearDown() {
+            sinkLogger.detachAppender(sinkAppender)
+            sinkAppender.stop()
+            sinkAppender.list.clear()
+        }
+
+        @Test
+        fun `should write nothing when every manifest of a project resolves`() {
+            // given
+            writeAgent("good-agent", "base")
+            writePrompt("good-prompt", "base")
+            writeDirectorySkill("directory-skill", "helper.md", companionFileExists = true)
+
+            // when
+            dryRunEngine.process(locations())
+
+            // then
+            assertThat(destination).doesNotExist()
+            // - and no artifact landed anywhere else under the temporary tree either
+            assertThat(
+                tempDir
+                    .toFile()
+                    .walkTopDown()
+                    .filter { it.name == "CLAUDE.md" || it.name == "SKILL.md" }
+                    .toList(),
+            ).isEmpty()
+        }
+
+        @Test
+        fun `should name the absolute target path of every artifact it would write`() {
+            // given
+            writeAgent("good-agent", "base")
+            writeDirectorySkill("directory-skill", "helper.md", companionFileExists = true)
+
+            // when
+            dryRunEngine.process(locations())
+
+            // then
+            val skillDir = destination.resolve(".claude/skills/directory-skill")
+            assertThat(sinkInfos()).anyMatch { it.contains(destination.resolve("CLAUDE.md").absolutePath) }
+            assertThat(sinkInfos()).anyMatch { it.contains(agentFile("good-agent").absolutePath) }
+            assertThat(sinkInfos()).anyMatch { it.contains(skillDir.resolve("SKILL.md").absolutePath) }
+            assertThat(sinkInfos()).anyMatch { it.contains(skillDir.resolve("helper.md").absolutePath) }
+        }
+
+        @Test
+        fun `should leave the artifacts of an earlier deploy untouched when the project replaces them`() {
+            // given
+            // - replace lets a deploy delete before it writes, which is the one step a dry run must skip outright
+            writeProject(replace = true)
+            val instructions = destination.resolve("CLAUDE.md")
+            instructions.parentFile.mkdirs()
+            instructions.writeText("From an earlier deploy.\n")
+            val stale = agentFile("stale-agent")
+            stale.parentFile.mkdirs()
+            stale.writeText("Left behind by an earlier deploy.\n")
+
+            // when
+            dryRunEngine.process(locations())
+
+            // then
+            assertThat(instructions).hasContent("From an earlier deploy.\n")
+            assertThat(stale).hasContent("Left behind by an earlier deploy.\n")
+            // - the replacement is announced as what it would do, not as something that happened
+            assertThat(warnings()).anyMatch { it.contains("test-project") && it.contains("Would replace") }
+            assertThat(warnings()).noneMatch { it.contains("Replacing existing agentic files") }
+        }
+
+        @Test
+        fun `should fail with the resolver message when an agent references an unknown ruleset`() {
+            // given
+            writeAgent("broken-agent", "missing-ruleset")
+
+            // when
+            val error = runCatching { dryRunEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("No rulesets match pattern 'missing-ruleset'")
+                .hasMessageContaining("required by agent 'broken-agent'")
+            assertThat(destination).doesNotExist()
+        }
+
+        @Test
+        fun `should fail when a skill declares a companion file that does not exist`() {
+            // given
+            writeDirectorySkill("directory-skill", "missing.md", companionFileExists = false)
+
+            // when
+            val error = runCatching { dryRunEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("missing.md")
+            assertThat(destination).doesNotExist()
+        }
+
+        @Test
+        fun `should fail naming the variable when the deploy directory references an undeclared one`() {
+            // given
+            val variableEngine = ToolsEngine(
+                workspace,
+                variables = VariableResolver(emptyMap(), emptyEnvironment),
+                tools = listOf(ToolFactory.create(ToolType.CLAUDE, dryRun = true)),
+                dryRun = true,
+            )
+            writeProject(deployDirectory = "\${MISSING_FOLDER}/custom-ai-tools")
+
+            // when
+            val error = runCatching { variableEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(DeployDirectoryResolvingException::class.java)
+                .hasMessageContaining("MISSING_FOLDER")
+        }
+
+        @Test
+        fun `should write nothing into the home when a user deployment is dry run`() {
+            // given
+            writeAgent("global-agent", "base")
+            writeDirectorySkill("global-skill", "helper.md", companionFileExists = true)
+            writeUserDeployment()
+
+            // when
+            dryRunEngine.process(locations())
+
+            // then
+            assertThat(userHome).doesNotExist()
+            // - the home is still announced, with what would happen to it
+            assertThat(infos()).anyMatch { it.contains(userHome.absolutePath) && it.contains("Would deploy") }
+            assertThat(sinkInfos()).anyMatch { it.contains(userHome.resolve(".claude/CLAUDE.md").absolutePath) }
+            assertThat(sinkInfos()).anyMatch { it.contains(userHome.resolve(".claude/agents/global-agent.md").absolutePath) }
+        }
+
+        @Test
+        fun `should leave the home untouched when a replacing user deployment is dry run`() {
+            // given
+            // - the user scope replaces per artifact inside the adapter, a delete the engine never sees directly
+            writeDirectorySkill("global-skill", "helper.md", companionFileExists = true)
+            writeUserDeployment(replace = true)
+            val instructions = userHome.resolve(".claude/CLAUDE.md")
+            instructions.parentFile.mkdirs()
+            instructions.writeText("From an earlier deploy.\n")
+            val leftover = userHome.resolve(".claude/skills/global-skill/leftover.md")
+            leftover.parentFile.mkdirs()
+            leftover.writeText("Left behind by an earlier deploy.\n")
+
+            // when
+            dryRunEngine.process(locations())
+
+            // then
+            assertThat(instructions).hasContent("From an earlier deploy.\n")
+            assertThat(leftover).hasContent("Left behind by an earlier deploy.\n")
+            assertThat(userHome.resolve(".claude/skills/global-skill/SKILL.md")).doesNotExist()
+            assertThat(warnings()).anyMatch { it.contains("globals") && it.contains("Would replace") }
+        }
+
+        @Test
+        fun `should say it was a dry run in its last line`() {
+            // given
+            writeUserDeployment()
+
+            // when
+            dryRunEngine.process(locations())
+
+            // then
+            assertThat(infos().last()).contains("Dry run").contains("nothing was written")
+        }
+
+        @Test
+        fun `should say it was a dry run before reporting the failures of the run`() {
+            // given
+            writeAgent("broken-agent", "missing-ruleset")
+
+            // when
+            runCatching { dryRunEngine.process(locations()) }
+
+            // then
+            assertThat(infos().last()).contains("Dry run")
+        }
+
+        @Test
+        fun `should not say it was a dry run when it deploys`() {
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(infos()).noneMatch { it.contains("Dry run") }
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+        }
+
+        private fun sinkInfos() = sinkAppender.list.filter { it.level == Level.INFO }.map { it.formattedMessage }
+    }
+
     private fun locations() = Locations(
         agents = listOf(workspace.resolve("agents")),
         deployments = listOf(workspace.resolve("deployments")),
@@ -1154,17 +1380,20 @@ class ToolsEngineTest {
      * @param root the configured `locations.deployments` directory to write this project under, which decides when the
      * loader reads it relative to the projects of another root
      */
+    // A test builder: every parameter is one field of the manifest with the default a test rarely needs to change.
+    @Suppress("LongParameterList")
     private fun writeProject(
         directoryName: String = "test-project",
         id: String = "test-project",
         deployDirectory: String = destination.absolutePath,
         tools: List<String>? = null,
         root: String = "deployments",
+        replace: Boolean = false,
     ) = writeYaml(
         "$root/$directoryName/project.yml",
         "id: $id\ndescription: A project\n" +
             "context:\n  documentation:\n    readme: README.md\n" +
-            "deploy:\n  directory: \"$deployDirectory\"\n" + toolsDeclaration(tools),
+            "deploy:\n  directory: \"$deployDirectory\"\n  replace: $replace\n" + toolsDeclaration(tools),
     )
 
     /**
@@ -1182,15 +1411,18 @@ class ToolsEngineTest {
      *
      * @param agentFilter the agent ids the deployment whitelists, or `null` for every agent there is
      */
+    // A test builder, see writeProject.
+    @Suppress("LongParameterList")
     private fun writeUserDeployment(
         id: String = "globals",
         directoryName: String = id,
         tools: List<String>? = listOf("claude"),
         agentFilter: List<String>? = null,
         promptFilter: List<String>? = null,
+        replace: Boolean = false,
     ) = writeYaml(
         "deployments/$directoryName/user.yml",
-        "id: $id\ndescription: A user deployment\n" + userToolsDeclaration(tools) +
+        "id: $id\ndescription: A user deployment\nreplace: $replace\n" + userToolsDeclaration(tools) +
             whitelistDeclaration("agents", agentFilter) + whitelistDeclaration("prompts", promptFilter),
     )
 

@@ -66,13 +66,14 @@ content: |
   - replace: true
   Sound good?"
 
-  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root) - and warn that a successful run rewrites the generated files in the tools' user scope.
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh --dry-run from the repository root) - and warn that ./deploy.sh without --dry-run rewrites the generated files in the tools' user scope.
 outputs:
   format: yaml
 metadata:
-  version: 1.0.0
+  version: 1.0.1
   author: "AI Tools Team"
   created: "2026-08-18"
+  updated: "2026-09-04"
   tags:
     - manifests
     - deployments

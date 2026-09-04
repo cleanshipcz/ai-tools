@@ -1,44 +1,35 @@
 package cz.cleanship.aitools.engine.services
 
 import cz.cleanship.aitools.engine.io.Output
-import cz.cleanship.aitools.engine.io.OutputStreamOutput
 import cz.cleanship.aitools.engine.models.SkillFile
 import cz.cleanship.aitools.engine.models.VersionedManifest
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.io.FileOutputStream
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
-class ExportService {
+/**
+ * Puts the artifacts of a run where they belong, after checking that they belong there.
+ *
+ * Everything that decides whether a write is legitimate lives here - where a companion file comes from, where it
+ * may land, whether an artifact directory is inside the scope that owns it - and everything that touches the disk
+ * lives in the [sink]. A dry run therefore reuses this service unchanged with a sink that writes nothing, and still
+ * fails on exactly the manifests a deploy fails on.
+ *
+ * @param sink where the artifacts go: [FileSystemArtifactSink] deploys, [DryRunArtifactSink] only reports
+ */
+class ExportService(
+    private val sink: ArtifactSink = FileSystemArtifactSink,
+) {
 
     /**
-     * Exports [entity] to [targetFile] atomically.
+     * Exports [entity] to [targetFile] through the sink of this service - see [ArtifactSink.export].
      *
-     * Content resolution happens inside [outputConsumer], so it can fail half-way through writing. To make sure a
-     * failure never ships a truncated artifact, the content is written to a temporary file in the target directory
-     * first and only moved onto [targetFile] once [outputConsumer] has completed successfully. On failure the
-     * temporary file is removed and any previously exported [targetFile] is left untouched.
-     *
-     * @throws Exception whatever [outputConsumer] throws, after the temporary file has been cleaned up
+     * @throws Exception whatever [outputConsumer] throws
      */
     fun <T : VersionedManifest> export(
         entity: T,
         targetFile: File,
         outputConsumer: (Output) -> Unit,
-    ) {
-        val targetDir = targetFile.parentFile
-        targetDir.mkdirs()
-        val temporaryFile = File.createTempFile("${targetFile.name}.", ".tmp", targetDir)
-        try {
-            OutputStreamOutput(FileOutputStream(temporaryFile)).use(outputConsumer)
-            Files.move(temporaryFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        } finally {
-            // No-op once the move above succeeded, cleans up the partial write otherwise.
-            temporaryFile.delete()
-        }
-        LOG.info("Exported ${entity.javaClass.simpleName} ${entity.id} to ${targetFile.absolutePath}")
-    }
+    ) = sink.export(entity, targetFile, outputConsumer)
 
     /**
      * Copies every companion file declared by a skill next to its generated manifest.
@@ -56,11 +47,19 @@ class ExportService {
             val sourceFile = resolveSource(skillFile.source, sourceDir)
             warnWhenSourceComesFromOutside(skillFile.source, sourceFile, sourceDir, skillId)
             val targetFile = resolveTarget(skillFile.target, targetDir)
-            targetFile.parentFile.mkdirs()
-            copySkillFile(sourceFile, targetFile)
-            LOG.info("Copied skill file {} to {}", sourceFile.absolutePath, targetFile.absolutePath)
+            requireSourceExists(sourceFile)
+            sink.copySkillFile(sourceFile, targetFile)
         }
     }
+
+    /**
+     * Removes [artifactDir] before it is written again, refusing one that is not inside [owned] - see
+     * [ArtifactSink.replaceArtifactDirectory].
+     *
+     * @throws cz.cleanship.aitools.engine.io.ArtifactPathException if [artifactDir] is not inside [owned]
+     */
+    fun replaceArtifactDirectory(artifactDir: File, owned: File, describedBy: String) =
+        sink.replaceArtifactDirectory(artifactDir, owned, describedBy)
 
     /**
      * Names a companion file that comes from somewhere other than the directory of the skill declaring it.
@@ -106,16 +105,15 @@ class ExportService {
         return resolved.toFile()
     }
 
-    private fun copySkillFile(sourceFile: File, targetFile: File) {
-        try {
-            sourceFile.copyTo(targetFile, overwrite = true)
-        } catch (ex: NoSuchFileException) {
-            // kotlin.io.NoSuchFileException means the manifest declares a file that was never written; a
-            // permission problem or any other I/O fault surfaces as a different exception and still aborts.
+    /**
+     * Checked here rather than left to the copy itself, so that a dry run - which copies nothing - reports a
+     * declared file that was never written exactly like a deploy does.
+     */
+    private fun requireSourceExists(sourceFile: File) {
+        if (!sourceFile.exists()) {
             throw SkillFileResolvingException(
                 "Skill file '${sourceFile.absolutePath}' does not exist. " +
                     "Add the file next to the skill manifest or remove it from 'files'.",
-                ex,
             )
         }
     }

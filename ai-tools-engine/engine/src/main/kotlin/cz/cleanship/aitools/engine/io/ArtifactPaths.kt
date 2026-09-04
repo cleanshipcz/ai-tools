@@ -27,6 +27,18 @@ import java.nio.file.attribute.BasicFileAttributes
  * run had already exported before it stays where it is.
  */
 fun File.deleteArtifactDirectoryWithin(owned: File, describedBy: String) {
+    checkArtifactDirectoryWithin(owned, describedBy)
+    deleteTreeWithoutFollowingLinks(toPath())
+}
+
+/**
+ * Makes sure this artifact directory really is under [owned], without touching it - the guard of
+ * [deleteArtifactDirectoryWithin] on its own. A dry run applies it in place of the deletion, so that a deploy which
+ * would be refused is refused by the dry run too.
+ *
+ * @throws ArtifactPathException if this path is not inside [owned]
+ */
+fun File.checkArtifactDirectoryWithin(owned: File, describedBy: String) {
     val ownedPath = owned.canonicalFile.toPath()
     val artifactPath = canonicalFile.toPath()
     if (artifactPath == ownedPath || !artifactPath.startsWith(ownedPath)) {
@@ -35,7 +47,6 @@ fun File.deleteArtifactDirectoryWithin(owned: File, describedBy: String) {
                 "Give the manifest an id that names a single directory.",
         )
     }
-    deleteTreeWithoutFollowingLinks(toPath())
 }
 
 /**

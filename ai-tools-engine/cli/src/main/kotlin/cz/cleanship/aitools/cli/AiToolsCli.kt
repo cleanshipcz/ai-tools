@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.options.check
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
 import cz.cleanship.aitools.engine.DeployDirectoryResolvingException
@@ -48,29 +49,56 @@ class AiToolsCli(
         .check("--user-home must name a directory, not an empty path") { it.toString().isNotEmpty() }
 
     /**
+     * Validates the manifests without deploying them: the run loads, filters and renders everything a deploy does
+     * and fails on exactly what a deploy fails on, but creates, deletes and modifies nothing on disk. It is the way
+     * to check a manifest set before letting a deploy rewrite the projects and the home it reaches.
+     */
+    private val dryRun by option(
+        "--dry-run",
+        help = "Validate and render every manifest, reporting what would be written, without writing anything.",
+    ).flag()
+
+    /**
      * Runs the export, translating the failures a manifest author can actually fix into a [CliktError] so the
      * process reports them on stderr and exits non-zero instead of reporting success.
      */
     override fun run() {
         try {
-            runner.run(workingDir.toFile(), workingDir.toFile().resolveDeclaredPath(userHome.toString()))
+            runner.run(workingDir.toFile(), workingDir.toFile().resolveDeclaredPath(userHome.toString()), dryRun)
         } catch (ex: FileNotFoundException) {
-            throw CliktError(ex.message ?: "Missing config.yml in ${workingDir.toAbsolutePath()}", ex)
+            throw failure(ex.message ?: "Missing config.yml in ${workingDir.toAbsolutePath()}", ex)
         } catch (ex: ExportFailedException) {
-            throw CliktError(ex.message, ex)
+            throw failure(ex.message, ex)
         } catch (ex: DuplicateManifestIdException) {
-            throw CliktError(ex.message, ex)
+            throw failure(ex.message, ex)
         } catch (ex: ManifestLoadingException) {
-            throw CliktError(ex.message, ex)
+            throw failure(ex.message, ex)
         } catch (ex: VariableSubstitutionException) {
-            throw CliktError(ex.message, ex)
+            throw failure(ex.message, ex)
         } catch (ex: DeployDirectoryResolvingException) {
-            throw CliktError(ex.message, ex)
+            throw failure(ex.message, ex)
         } catch (ex: ArtifactPathException) {
-            throw CliktError(ex.message, ex)
+            throw failure(ex.message, ex)
         } catch (ex: RetiredConfigKeyException) {
-            throw CliktError(ex.message, ex)
+            throw failure(ex.message, ex)
         }
+        if (dryRun) {
+            echo(DRY_RUN_SUCCEEDED)
+        }
+    }
+
+    /**
+     * A failing dry run is still a dry run: its error reads exactly like the one a deploy reports, so the mode is
+     * said once more above it, along with the one thing the reader most wants to know - that nothing was touched.
+     */
+    private fun failure(message: String?, cause: Exception): CliktError {
+        val reported = if (dryRun) "$DRY_RUN_FAILED\n$message" else message
+        return CliktError(reported, cause)
+    }
+
+    companion object {
+        private const val DRY_RUN_SUCCEEDED = "Dry run finished: every manifest was validated and rendered, nothing was written."
+        private const val DRY_RUN_FAILED = "Dry run failed: nothing was written."
     }
 }
 

@@ -6,10 +6,13 @@ rules:
   - "Describe current behavior only. Never reference history, previous versions, or changes — no 'now', 'no longer', 'previously', 'was refactored to', 'newly added'."
   - "Start every doc comment with one plain-language sentence stating what the element does. Keep length proportional to complexity; omit boilerplate sections for self-explanatory members."
   - "Add inline comments only for constraints or reasoning the code itself cannot express — never to narrate what the next line does."
+  - "Provide usage examples where usage is non-obvious and verify they compile and run; skip examples for self-explanatory members."
+  - "State time and space complexity only where it is not obvious and matters to the caller, such as algorithms or operations over large inputs."
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2026-08-17"
+  updated: "2026-09-04"
   tags:
     - common
     - documentation

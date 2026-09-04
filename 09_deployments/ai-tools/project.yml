@@ -2,39 +2,94 @@ id: ai-tools-project
 description: A unified mono-repository for AI agent configuration - define once in YAML, deploy everywhere
 context:
   overview: |
-    A comprehensive solution for managing AI agent prompts, rules, skills, and tool configurations.
-    Keep your "source of truth" in small, typed YAML manifests and automatically generate
-    tool-specific artifacts for Windsurf, Claude Code, Cursor, GitHub Copilot, and other AI coding assistants.
+    This repository is the source of truth for AI coding-assistant configuration. Rulesets, fragments, prompts, skills, agents, and deployment manifests are YAML files, and the Kotlin engine in `ai-tools-engine/` renders them into the native files of Claude Code, Codex, GitHub Copilot, Cursor, Windsurf, and Antigravity.
 
-    The repository provides a build system that transforms unified YAML manifests into
-    tool-specific formats, ensuring consistency across different AI coding environments.
-    It includes prompts for common tasks, agents for specific roles, rulesets for coding standards,
-    skills for tool integrations, and a project system for per-project configurations.
+    The repository deploys onto itself. `CLAUDE.md`, `AGENTS.md`, `.claude/`, `.codex/`, `.github/agents/`, `.github/copilot-instructions.md`, `.cursor/`, `.windsurf/`, and `.agent/` are generated from `09_deployments/ai-tools/project.yml` and rewritten on every deploy. Never edit them: edit the manifest they come from and redeploy. The text you are reading is `context.overview` of that manifest.
+
+    ### Where things are
+
+    Live, read by the engine:
+    - `01_rulesets/<domain>/<id>.yml` - behavioural rules ("you must"). Agents and prompts compose them by id or by a regex on the id. Domains: `authoring`, `coding` (+ `languages/`), `docs`, `review`, `security`, `testing`, `analysis`; `base.yml` goes into every agent.
+    - `02_fragments/<id>.yml` - reference knowledge ("here is how X works"), composed the same way as rulesets.
+    - `03_prompts/<category>/<id>.yml` - prompts. Categories: `docs`, `manifests`, `planning`, `qa`, `refactor`, `tickets`, `shared`. Deployed as slash commands.
+    - `04_skills/<id>.yml`, or `04_skills/<id>/skill.yml` with companion files listed under `files:`.
+    - `05_agents/<id>.yml` - persona + rulesets + fragments + prompt + constraints. Ids are `<role>-<specialization>`: analyst-*, developer-*, documenter-*, reviewer-*, planner-*, expert-*, plus basic, manifest-builder, prompt-engineer, team-lead, organization-specialist, maintainer-dependencies.
+    - `09_deployments/<name>/project.yml` deploys into a project directory; `09_deployments/<name>/user.yml` deploys into the user scope of a tool (`~/.claude`, `~/.codex`). `features/` under a project holds feature manifests, rendered as workflow files.
+    - `config.yml` - manifest locations, tools to build, `env_vars`. `config.local.yml` (gitignored) replaces any list it repeats; it is where machine-private deployment locations such as `../ai-tools-projects/projects` are added.
+    - `ai-tools-engine/` - Gradle multi-module Kotlin project (`:engine`, `:cli`, `:server`, `:telemetry`). `engine/src/main/kotlin/cz/cleanship/aitools/engine/models/*Manifest.kt` are the schema of every manifest type; `tools/*Printer.kt` render an artifact; `tools/adapters/<tool>/` decide where each tool's files land; `ToolsEngine.kt` drives a run.
+
+    Kept, but not read by the engine (planned, see `PLANNED_FEATURES.md`): `07_mcp/`, `08_recipes/`, `20_evals/`, `21_redteam/`. Do not build on them and do not create content there unless asked.
+
+    Dead, left over from the retired TypeScript CLI. Ignore entirely and never cite as reference: `adapters/`, `.output/`, `.backups/`, `docs/`, `build/`, `coverage/`, `tmp/`, `.cs.recipes/`, `.claude/prompts/`, `.claude/*.json`, `PROMPT_LIBRARY.md`, `PROMPT_LIBRARY.html`, `FEATURES.md`, and in `90_docs/`: `TOOLS.md`, `USER_TOOLS.md`, `TESTING.md`, `CHANGELOG.md`, `FEATURES.md`, `AGENTS.md`. `10_schemas/` is mentioned in README.md but no longer exists. Current reference docs are listed under "Documentation files" below.
+
+    ### How a change flows
+
+    1. Edit or add a manifest. Its schema is the Kotlin model, not any example or older template: read `models/<Type>Manifest.kt` first. A constructor parameter with a default is optional in YAML, every other one is required, `@SerialName` gives the YAML key, and a key that is not in the model does not exist. Versions live in `metadata.version`.
+    2. Make sure the deployment selects it. `09_deployments/ai-tools/project.yml` picks agents, rulesets, and skills by tag and prompts by an id whitelist; a new manifest that lacks a matching tag or id is valid but never lands here.
+    3. Validate with `./deploy.sh --dry-run` from the repository root. It parses every manifest, resolves every ruleset, fragment, and skill-file reference, and writes nothing. Manifests are decoded strictly: an unknown key, a missing field, or a bad version fails the run naming the file.
+    4. The user deploys with `./deploy.sh`. That run writes into this repository, into every other project listed under `locations.deployments`, and into `~/.claude` and `~/.codex`. Never run it without `--dry-run` unless the user explicitly asks for a deploy.
+
+    Project rulesets never reach this instructions file by design: they are inlined into the agents and prompts that reference them. What every session sees is exactly `context.overview` and `context.rules` of the project manifest.
+
+    ### Task routing
+
+    | I want to... | Edit | Notes |
+    | --- | --- | --- |
+    | change what every session in this repo is told | `09_deployments/ai-tools/project.yml` -> `context.overview`, `context.rules`, `context.documentation` | lands in CLAUDE.md, AGENTS.md, `.github/copilot-instructions.md`, `.agent/rules/project.md`, `.windsurf`/`.cursor` rules |
+    | change the rules an agent follows | the ruleset under `01_rulesets/<domain>/` | one concern per ruleset, 5-20 verifiable rules; `grep -rn "<ruleset-id>" 05_agents 03_prompts` shows who consumes it; a regex reference such as `coding-language-.*` also matches |
+    | change documentation rules | `01_rulesets/docs/`: `docs-base` (all docs), `docs-document` (guides, articles), `docs-project` (README, tutorials, architecture), `docs-comments` (doc comments), `docs-api-code`, `docs-api-rest`, `docs-knowledgebase`, `docs-meeting-notes` | consumers are the `documenter-*` and `reviewer-documentation` agents and the `docs-*` prompts |
+    | change coding, testing, review, or security rules | `01_rulesets/coding/`, `testing/`, `review/`, `security/`; language-specific ones under `languages/` | tagged with the language; the ai-tools deployment selects `kotlin`, `unit`, `integration`, `testing` |
+    | add or change how manifests are authored | `01_rulesets/authoring/authoring-manifests.yml`, `authoring-ai.yml`, `authoring-yaml.yml`; `02_fragments/authoring-engine-models.yml` | these feed `manifest-builder`, `expert-ai`, and the `manifests-*` prompts |
+    | add an agent | `05_agents/<role>-<specialization>.yml`; `/manifests-create-agent` scaffolds it | compose `base` plus existing rulesets rather than inlining rules; tag it `common`, `ai`, `development`, or `documentation` to deploy here; output is `.claude/agents/<id>.md`, `.github/agents/<id>.agent.md`, `.codex/skills/agent-<id>/` |
+    | add a prompt / slash command | `03_prompts/<category>/<id>.yml`; `/manifests-create-prompt` | Mustache `{{variables}}`, snake_case names; add the id to the prompt whitelist in `project.yml` or it is not deployed; output `.claude/commands/<id>.md` |
+    | add reference material agents share | `02_fragments/<id>.yml`; `/manifests-create-fragment` | reference it from `fragments:` of an agent, prompt, or skill |
+    | add a skill | `04_skills/<id>.yml` or `04_skills/<id>/skill.yml` + files; `/manifests-create-skill` | id is `<verb>-<tool>`; tag `kotlin` or `search` to deploy here; output `.claude/skills/<id>/SKILL.md` plus copied files |
+    | deploy this setup to another project | `09_deployments/<name>/project.yml` here, or a directory added to `locations.deployments` in `config.local.yml` for a private one; `/manifests-create-project`, `/manifests-duplicate-project` | `deploy.directory` may use `${PROJECTS_FOLDER}`; `deploy.tools` narrows the tools; `replace: true` deletes each tool's directory before writing |
+    | change my global `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md` | `09_deployments/globals/user.yml`; `/manifests-create-user-deployment` | user scope inlines the selected rulesets; try `./deploy.sh --user-home /tmp/try` first |
+    | add a feature description for a project | `09_deployments/<name>/features/<id>.yml`; `/manifests-create-feature` | rendered to `.claude/workflows/feature-<id>.md` and the equivalents of other tools |
+    | change how something is rendered or where it lands | `ai-tools-engine/engine/.../tools/*Printer.kt` (content), `tools/adapters/<tool>/` (paths), `ToolsEngine.kt` (run), `services/` (loading, filtering, export) | build with `./gradlew clean build` from `ai-tools-engine/`; ktlint and detekt must pass; the build does not validate manifests |
+    | add a manifest field | the model in `models/`, then every printer and adapter test that renders it, then `QUICKREF.md` | unknown keys fail strict decoding, so the model change comes first |
+    | look up manifest syntax or a workflow | `QUICKREF.md` first, then the README of the directory, then the model file | when they disagree, the model file wins |
+
+    ### Slash commands deployed here
+
+    `/manifests-create-agent`, `/manifests-create-prompt`, `/manifests-create-ruleset`, `/manifests-create-fragment`, `/manifests-create-skill`, `/manifests-create-project`, `/manifests-create-user-deployment`, `/manifests-create-feature`, `/manifests-create-recipe`, `/manifests-duplicate-project` scaffold manifests from the Kotlin models. `/docs-*`, `/planning-*`, `/qa-*`, and `/refactor-*` are general-purpose prompts. The user invokes commands; do not run them on your own.
   documentation:
     readme: README.md
     per_topic:
-      main_docs:
+      manifests:
+        quick_reference: QUICKREF.md
+        rulesets: 01_rulesets/README.md
+        fragments: 02_fragments/README.md
         prompts: 03_prompts/README.md
-        agents: AGENTS.md
         skills: 04_skills/README.md
+        agents: 05_agents/README.md
         deployments: 09_deployments/README.md
-        recipes: 08_recipes/README.md
-        tools: 90_docs/TOOLS.md
-        user_tools: 90_docs/USER_TOOLS.md
-        testing: 90_docs/TESTING.md
-      development:
+      engine:
+        engine: ai-tools-engine/README.md
+        feature_set: 90_docs/PROJECT_SPEC.md
+        planned_features: PLANNED_FEATURES.md
+      writing:
         style_guide: 90_docs/STYLE_GUIDE.md
-        changelog: 90_docs/CHANGELOG.md
-        planned_features: 90_docs/PLANNED_FEATURES.md
-        implementation: IMPLEMENTATION.md
   rules:
-    - Verify correct output for ai-tools-engine project with running `./gradlew clean build`, focus on running ktlint and detekt
+    - "Never edit a generated file (CLAUDE.md, AGENTS.md, .claude/, .codex/, .github/agents/, .github/copilot-instructions.md, .cursor/, .windsurf/, .agent/). Change the manifest it is generated from and let the user redeploy."
+    - "Before writing or editing a manifest, read its Kotlin model in ai-tools-engine/engine/src/main/kotlin/cz/cleanship/aitools/engine/models/ and use only the fields it declares."
+    - "Before creating a manifest, look for an existing one to extend or compose; keep one concern per ruleset and compose rulesets in agents instead of duplicating rules."
+    - "Validate manifests with `./deploy.sh --dry-run` from the repository root. Never run `./deploy.sh` without `--dry-run` unless the user explicitly asks for a deploy; it writes into other projects and into the home directory."
+    - "Verify engine changes with `./gradlew clean build` run from ai-tools-engine/; ktlint and detekt must pass. If the build fails because of ~/.gradle/init.gradle.kts, move that file aside for the build and restore it afterwards."
+    - "`./gradlew clean build` builds and tests the engine only; it does not validate manifests."
+    - "Do not add content under 07_mcp/, 08_recipes/, 20_evals/, or 21_redteam/ unless asked; the engine does not read them."
+    - "Ignore the TypeScript-era leftovers named in the overview; they are not references for how anything works today."
+    - "Slash commands are run by the user, never by an agent on its own."
 deploy:
   # This project deploys onto the ai-tools repository itself.
   # Relative paths are resolved against `--working-dir`, which `deploy.sh` sets to
   # the repository root, so `.` is that root regardless of how the engine is launched.
   # Use an absolute path for any project outside this repository.
   directory: "."
+  # The generated tool directories are gitignored, so a replacing deploy is what keeps
+  # artifacts whose manifest was removed or renamed from lingering in .claude/agents and friends.
+  replace: true
   agents:
     filter:
       - type: tags
@@ -91,10 +146,10 @@ deploy:
           - manifests
           - ai
 metadata:
-  version: 1.1.0
+  version: 1.2.0
   author: cleanshipcz
   created: 2025-11-15
-  updated: 2026-08-18
+  updated: 2026-09-04
   tags:
     - ai
     - tooling

@@ -22,11 +22,12 @@ content: |
   - A `@SerialName` annotation gives the YAML key when it differs from the property name (e.g. `acceptance_criteria`).
   - A sealed class (e.g. ProjectFilter) is a discriminated union: the YAML entry uses a `type:` key holding the subtype's `@SerialName` (e.g. `- type: tags`).
 
-  Validation: run `./deploy.sh` from the repository root. The engine parses every manifest and the run fails on any invalid one; a successful run also deploys the generated artifacts. Building the engine with `./gradlew clean build` does NOT validate these manifests — it only builds and tests the engine code itself.
+  Validation: run `./deploy.sh --dry-run` from the repository root. The engine parses every manifest, resolves every ruleset, fragment, and skill-file reference, and fails on any invalid one, without writing a file. `./deploy.sh` without `--dry-run` also deploys the generated artifacts into every configured project and the user's home, so leave that to the user. Building the engine with `./gradlew clean build` does NOT validate these manifests — it only builds and tests the engine code itself.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2026-08-18"
+  updated: "2026-09-04"
   tags:
     - authoring
     - manifests

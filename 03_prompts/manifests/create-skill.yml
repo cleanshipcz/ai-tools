@@ -74,14 +74,14 @@ content: |
   - Prerequisite: Python with pytest and pytest-cov installed
   Sound good?"
 
-  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh from the repository root).
+  After confirmation, remind the user to validate as described in the engine-models instructions (./deploy.sh --dry-run from the repository root).
 outputs:
   format: yaml
 metadata:
-  version: 4.0.0
+  version: 4.0.1
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-08-18"
+  updated: "2026-09-04"
   tags:
     - manifests
     - skills

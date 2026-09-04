@@ -9,8 +9,11 @@ rulesets:
   - docs-base
   - docs-comments
   - docs-api-code
-  - coding-language-.*
+  - docs-language-.*
 prompt: |
+  When asked a question or for an opinion about documentation, answer it and change nothing.
+  Run the process below only when asked to document code; the output format applies only when changes were made.
+
   Document the requested code elements following language-specific conventions.
 
   PROCESS (DO THIS IN ORDER)
@@ -38,10 +41,10 @@ prompt: |
   3) "Files changed" with paths.
   4) Notes: any ambiguities found or assumptions made.
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   author: "AI Tools Team"
   created: "2026-03-12"
-  updated: "2026-08-17"
+  updated: "2026-09-04"
   tags:
     - development
     - documentation

@@ -1,0 +1,15 @@
+id: docs-language-jenkins
+description: Documentation conventions for Jenkinsfiles and Jenkins shared libraries — applies on top of docs-comments and docs-api-code
+rules:
+  - "Start every Jenkinsfile with a header comment stating the pipeline's purpose, its triggers, and the credential IDs, environment variables, and tool installations it requires."
+  - "Give every entry in the parameters block a description that states purpose, allowed values, and the effect of the default."
+  - "Give every stage a name that states its purpose; the stage name is the documentation shown in the build view."
+  - "Ship a vars/<step>.txt help file next to every shared library step in vars/<step>.groovy, describing its arguments, return value, and one example call; Jenkins renders it in the Pipeline Syntax reference."
+  - "Document shared library classes in src/ with Groovy doc comments (/** ... */) using @param and @return."
+  - "Comment only the reason behind a step, such as agent requirements, ordering constraints, or plugin workarounds; never restate what the step call already says."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-09-04"
+  tags:
+    - jenkins

@@ -16,12 +16,12 @@ rules:
   - "Always include the base ruleset when composing rulesets for agents."
   - "Place manifest files in the correct directory: 01_rulesets/<domain>/ for rulesets, 02_fragments/ for fragments, 03_prompts/<category>/ for prompts, 04_skills/ for skills, 05_agents/ for agents, 08_recipes/ for recipes, 09_deployments/ for projects and user deployments."
   - "Before creating a manifest, check for existing manifests that could be extended or composed rather than creating duplicates."
-  - "After creating or modifying manifests, validate by running ./deploy.sh from the repository root — the engine parses every manifest and fails on any invalid one; ./gradlew clean build only builds the engine and does not validate manifests."
+  - "After creating or modifying manifests, validate by running ./deploy.sh --dry-run from the repository root — the engine parses every manifest, resolves every reference, and fails on any invalid one without writing a file; ./deploy.sh without --dry-run deploys into every configured project and the user's home, and ./gradlew clean build only builds the engine and does not validate manifests."
 metadata:
-  version: 1.1.0
+  version: 1.2.0
   author: "AI Tools Team"
   created: "2026-03-28"
-  updated: "2026-08-18"
+  updated: "2026-09-04"
   tags:
     - authoring
     - manifests

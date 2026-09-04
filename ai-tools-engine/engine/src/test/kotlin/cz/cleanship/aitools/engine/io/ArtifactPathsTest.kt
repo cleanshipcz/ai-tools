@@ -107,6 +107,40 @@ class ArtifactPathsTest {
     }
 
     @Test
+    fun `should accept an artifact directory inside the owned one without touching it`() {
+        // given
+        // - a dry run runs the guard alone, so the directory it judges has to survive the judgement
+        val artifact = owned.resolve("a-skill")
+        artifact.mkdirs()
+        artifact.resolve("SKILL.md").writeText("content")
+
+        // when
+        artifact.checkArtifactDirectoryWithin(owned, describedBy = "skill 'a-skill'")
+
+        // then
+        assertThat(artifact.resolve("SKILL.md")).hasContent("content")
+    }
+
+    @ParameterizedTest
+    @CsvSource("../../outside", "..", "../evil", ".")
+    fun `should refuse a path that is not inside the owned directory without deleting anything`(relativePath: String) {
+        // given
+        val artifact = owned.resolve(relativePath)
+
+        // when
+        val error = runCatching {
+            artifact.checkArtifactDirectoryWithin(owned, describedBy = "skill 'escaping'")
+        }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(ArtifactPathException::class.java)
+            .hasMessageContaining("skill 'escaping'")
+        assertThat(outside.resolve("notes.md")).exists()
+        assertThat(owned).exists()
+    }
+
+    @Test
     fun `should not treat a sibling whose name starts with the owned name as being inside it`() {
         // given
         val sibling = owned.parentFile.resolve("skills-evil")

@@ -69,14 +69,23 @@ Manifests are parsed strictly: an unknown key, a missing required field, or a ma
 
 ### 2. Try it out
 
-A user deployment writes into your own home, so try it somewhere harmless first:
+Validate the manifests first, without writing anything:
+
+```bash
+./deploy.sh --dry-run
+```
+
+A dry run loads, filters, and renders every manifest exactly as a deploy does and fails on exactly what a deploy fails on, but it creates, deletes, and modifies nothing — not in the project directories, not in your home.
+It logs the absolute path of every artifact a deploy would write.
+
+To read the produced files, a user deployment can be pointed at a harmless home instead:
 
 ```bash
 ./deploy.sh --user-home /tmp/try
 ```
 
 Every argument given to `deploy.sh` is forwarded to the engine.
-A project deployment has no equivalent switch — point its `deploy.directory` at a scratch directory while experimenting.
+A project deployment has no equivalent switch — point its `deploy.directory` at a scratch directory while experimenting, or stay with `--dry-run`.
 
 ### 3. Deploy
 

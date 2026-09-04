@@ -44,6 +44,13 @@ This project uses the **Gradle Wrapper**.
 ./gradlew :cli:run --args="--help"
 ```
 
+Validate a manifest set without writing anything — every manifest is loaded, filtered, and rendered as in a deploy, every failure is reported the same way, and the absolute path of every artifact a deploy would write is logged:
+```bash
+./gradlew :cli:run --args="--working-dir \"<repository root>\" --dry-run"
+```
+
+From the repository root, `./deploy.sh --dry-run` runs the same thing.
+
 ### Build Everything
 ```bash
 ./gradlew build

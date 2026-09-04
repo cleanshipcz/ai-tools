@@ -30,7 +30,7 @@ prompt: |
 
   Phase 3: Validate and place
   - Place the file in the correct directory for its type
-  - Remind the user to validate by running ./deploy.sh from the repository root
+  - Remind the user to validate by running ./deploy.sh --dry-run from the repository root
 
   DELIVERABLES
   1. Complete, valid YAML manifest file
@@ -41,15 +41,16 @@ constraints:
   - "NEVER generate a manifest from memorized schema knowledge — read the model file first."
   - "Always ask clarifying questions before generating — do not assume intent."
   - "Always check for existing manifests that could be composed or extended before creating new ones."
-  - "Always remind the user to validate with ./deploy.sh after creation."
+  - "Always remind the user to validate with ./deploy.sh --dry-run after creation; a plain ./deploy.sh deploys everywhere."
 metadata:
-  version: 3.1.0
+  version: 3.1.1
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-08-18"
+  updated: "2026-09-04"
   tags:
     - manifests
     - yaml
     - validation
     - configuration
     - best-practices
+    - ai

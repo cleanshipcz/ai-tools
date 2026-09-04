@@ -1,0 +1,14 @@
+id: docs-language-jinja2
+description: Documentation conventions for Jinja2 templates — applies on top of docs-comments and docs-api-code
+rules:
+  - "Write template documentation in {# ... #} comments, which are stripped from the output; use a rendered comment only when the generated file itself should carry it."
+  - "Start every template with a header comment stating what it renders and which variables it expects, marking each as required or optional with its default."
+  - "Document every macro with a comment block above it stating its parameters and what it outputs."
+  - "Comment non-obvious filters, conditionals, and whitespace-control marks beside them, stating why they are needed."
+  - "Keep a managed-by header in the rendered output so readers of the generated file know where to edit."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-09-04"
+  tags:
+    - jinja2

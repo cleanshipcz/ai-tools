@@ -1,6 +1,5 @@
 package cz.cleanship.aitools.engine.tools.adapters.codex
 
-import cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.UserDeploymentManifest
@@ -156,7 +155,7 @@ class CodexAdapter(
 
         private fun replaceIfRequested(artifactDir: File, describedBy: String) {
             if (deployment.replace) {
-                artifactDir.deleteArtifactDirectoryWithin(owned = layout.skillsDir, describedBy = describedBy)
+                exportService.replaceArtifactDirectory(artifactDir, owned = layout.skillsDir, describedBy = describedBy)
             }
         }
     }

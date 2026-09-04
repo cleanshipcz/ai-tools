@@ -1,0 +1,18 @@
+id: docs-language-python
+description: Docstring conventions for documenting Python code — applies on top of docs-comments and docs-api-code
+rules:
+  - "Use one docstring style per repository (Google, NumPy, or reStructuredText); detect it from existing code and follow it, and default to Google style when the repository has none."
+  - "Write docstrings as the first statement in triple double quotes with a one-line summary, a blank line, and then details, as PEP 257 requires."
+  - "Rely on type annotations for types; repeat a type in the docstring only when the signature has no annotation."
+  - "Use the Args, Returns, Raises, and Yields sections of the chosen style; use Yields instead of Returns for generators."
+  - "Explain what *args and **kwargs accept and what a None default means when the behavior is not obvious."
+  - "Document constructor parameters where the chosen style places them: in the class docstring for Google and NumPy style, in __init__ for reStructuredText."
+  - "List the public attributes of a class in an Attributes section of the class docstring."
+  - "Give every public module a module docstring stating its purpose."
+  - "Write examples as doctest-style >>> blocks only when they run under doctest; otherwise use a fenced code block."
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-09-04"
+  tags:
+    - python
