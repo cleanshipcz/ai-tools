@@ -6,6 +6,7 @@ import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
@@ -42,7 +43,7 @@ class AntigravityAdapter(
             ---
             trigger: always_on
             glob:
-            description: ${globalContext.project.description.replace("\n", " ")}
+            description: ${Frontmatter.value(globalContext.project.description)}
             ---
             
             """.trimIndent(),
@@ -73,7 +74,7 @@ class AntigravityAdapter(
         it.appendText(
             """
             ---
-            description: ${featureContext.feature.description.replace("\n", " ")}
+            description: ${Frontmatter.value(featureContext.feature.description)}
             ---
             
             """.trimIndent(),

@@ -6,6 +6,7 @@ import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
@@ -73,7 +74,7 @@ class CodexAdapter(
             """
             ---
             name: ${promptContext.prompt.id}
-            description: ${promptContext.prompt.description.replace("\n", " ")}
+            description: ${Frontmatter.value(promptContext.prompt.description)}
             ---
 
             """.trimIndent(),
@@ -89,7 +90,7 @@ class CodexAdapter(
             """
             ---
             name: ${agentContext.agent.id}
-            description: ${agentContext.agent.description.replace("\n", " ")}
+            description: ${Frontmatter.value(agentContext.agent.description)}
             ---
 
             """.trimIndent(),
@@ -107,7 +108,7 @@ class CodexAdapter(
                 """
                 ---
                 name: ${skillContext.skill.id}
-                description: ${skillContext.skill.description.replace("\n", " ")}
+                description: ${Frontmatter.value(skillContext.skill.description)}
                 ---
 
                 """.trimIndent(),

@@ -18,6 +18,7 @@ import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.models.Version
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
@@ -85,7 +86,7 @@ class CodexAdapterTest {
         val content = targetDir.resolve("skills/prompt-${prompt.prompt.id}/SKILL.md").readText().trim()
         assertThat(content).startsWith("---")
         assertThat(content).contains("name: ${prompt.prompt.id}")
-        assertThat(content).contains("description: ${prompt.prompt.description.replace("\n", " ")}")
+        assertThat(content).contains("description: ${Frontmatter.value(prompt.prompt.description)}")
         assertThat(content).contains(expectedPrompt.trim())
     }
 
@@ -101,7 +102,7 @@ class CodexAdapterTest {
         val content = targetDir.resolve("skills/agent-${agent.id}/SKILL.md").readText().trim()
         assertThat(content).startsWith("---")
         assertThat(content).contains("name: ${agent.id}")
-        assertThat(content).contains("description: ${agent.description.replace("\n", " ")}")
+        assertThat(content).contains("description: ${Frontmatter.value(agent.description)}")
         assertThat(content).contains(expectedAgent.trim())
     }
 

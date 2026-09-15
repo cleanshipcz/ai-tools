@@ -18,6 +18,7 @@ import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.models.Version
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
@@ -98,7 +99,7 @@ class ClaudeAdapterTest {
         val content = targetDir.resolve("agents/${agent.id}.md").readText().trim()
         assertThat(content).startsWith("---")
         assertThat(content).contains("name: ${agent.id}")
-        assertThat(content).contains("description: ${agent.description.replace("\n", " ")}")
+        assertThat(content).contains("description: ${Frontmatter.value(agent.description)}")
         assertThat(content).contains(expectedAgent.trim())
     }
 

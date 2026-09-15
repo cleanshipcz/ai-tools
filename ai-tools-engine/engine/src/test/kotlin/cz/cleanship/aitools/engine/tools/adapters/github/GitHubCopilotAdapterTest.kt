@@ -118,7 +118,7 @@ class GitHubCopilotAdapterTest {
                 """
                 |---
                 |name: id#1
-                |description: Multiline description#1
+                |description: "Multiline description#1"
                 |argument-hint: <var1> [var2]
                 |---
                 """.trimMargin(),
@@ -141,7 +141,7 @@ class GitHubCopilotAdapterTest {
             """
             |---
             |name: id#1
-            |description: Multiline description#1
+            |description: "Multiline description#1"
             |---
             """.trimMargin(),
         )
@@ -216,11 +216,33 @@ class GitHubCopilotAdapterTest {
                 """
                 |---
                 |name: test-agent
-                |description: Multiline description
+                |description: "Multiline description"
                 |---
                 """.trimMargin(),
                 expectedAgent,
             ),
+        )
+    }
+
+    @Test
+    fun `should quote an agent description that contains a colon so the frontmatter stays valid YAML`() {
+        // given
+        // - a description with `: ` inside, which an unquoted scalar turns into a nested mapping
+        val description = "Orchestrate delivery of a change: plan, implement, review, then deliver (claude --agent team-lead)."
+        val agentContext = AgentContext(agent.copy(description = description), rulesets)
+
+        // when
+        adapter.export(tempDir.toFile(), agentContext)
+
+        // then
+        val content = agentsDir.resolve("${agent.id}.agent.md").readText()
+        assertThat(content).startsWith(
+            """
+            |---
+            |name: ${agent.id}
+            |description: "$description"
+            |---
+            """.trimMargin(),
         )
     }
 
@@ -292,7 +314,7 @@ class GitHubCopilotAdapterTest {
                 """
                 |---
                 |name: run-pytest
-                |description: Run Python tests with pytest
+                |description: "Run Python tests with pytest"
                 |---
                 """.trimMargin(),
                 expectedTextOnlySkill,

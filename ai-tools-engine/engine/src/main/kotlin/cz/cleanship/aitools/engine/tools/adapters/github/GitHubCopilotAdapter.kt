@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
@@ -117,7 +118,7 @@ class GitHubCopilotAdapter(
     private fun frontmatter(name: String, description: String, argumentHint: String? = null) = buildString {
         appendLine("---")
         appendLine("name: $name")
-        appendLine("description: ${description.replace("\n", " ")}")
+        appendLine("description: ${Frontmatter.value(description)}")
         if (argumentHint != null) {
             appendLine("argument-hint: $argumentHint")
         }

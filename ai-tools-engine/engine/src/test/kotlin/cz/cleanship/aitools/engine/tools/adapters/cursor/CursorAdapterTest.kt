@@ -64,7 +64,7 @@ class CursorAdapterTest {
         // then
         val content = targetDir.resolve("rules/project.mdc").readText().trim()
         assertThat(content).startsWith("---")
-        assertThat(content).contains("description: Test Project")
+        assertThat(content).contains("description: \"Test Project\"")
         assertThat(content).contains("globs: \"**/*\"")
         assertThat(content).contains("alwaysApply: true")
         assertThat(content).contains("# test-project")

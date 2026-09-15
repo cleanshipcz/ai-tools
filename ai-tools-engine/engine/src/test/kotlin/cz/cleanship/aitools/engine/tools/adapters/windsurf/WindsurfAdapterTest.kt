@@ -12,6 +12,7 @@ import cz.cleanship.aitools.engine.models.ProjectDeploy
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
@@ -81,7 +82,7 @@ class WindsurfAdapterTest {
         assertThat(workflowsDir.resolve("feature-${feature.id}.md").readText()).isEqualTo(
             """
             |---
-            |description: ${feature.description.replace("\n", " ")}
+            |description: ${Frontmatter.value(feature.description)}
             |auto_execution_mode: 3
             |---
             |

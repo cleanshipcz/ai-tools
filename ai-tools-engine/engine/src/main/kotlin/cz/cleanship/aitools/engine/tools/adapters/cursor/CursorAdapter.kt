@@ -6,6 +6,7 @@ import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
@@ -41,7 +42,7 @@ class CursorAdapter(
             it.appendText(
                 """
                 ---
-                description: ${globalContext.project.description.replace("\n", " ")}
+                description: ${Frontmatter.value(globalContext.project.description)}
                 globs: "**/*"
                 alwaysApply: true
                 ---
