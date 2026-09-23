@@ -2,6 +2,7 @@ package cz.cleanship.aitools.engine
 
 import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.env.VariableSubstitutionException
+import cz.cleanship.aitools.engine.io.ArtifactDeleteException
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
 import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
@@ -42,8 +43,6 @@ import cz.cleanship.telemetry.TelemetryConfig
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.io.IOException
-import java.nio.file.FileSystemException
 
 /**
  * @param workingDirectory the `--working-dir` of the run, the directory `config.yml` was read from. A relative `deploy.directory` resolves against it - see [resolveDeclaredPath] - so it is the same base the `locations.*` paths of that same `config.yml` already use. It is required rather than defaulted because the adapters delete under whatever it resolves to, which is not a decision to make by omission.
@@ -92,8 +91,8 @@ class ToolsEngine(
      * @throws SkillSourceOverlapException if a path the run would write a skill to, or a directory it would delete to replace it, is, lies inside, or contains the source folder of a pointer skill, which stops the run before anything is written - see [SkillSourceOverlapCheck.requireApart]
      * @throws UnreadableReplacedFolderException if a directory the run would delete to replace it is, or holds, a folder the run cannot read, which stops the run before anything is written - see [SkillSourceOverlapCheck.requireApart]
      * @throws cz.cleanship.aitools.engine.services.ManifestLoadingException if a manifest cannot be read, including a pointer skill whose `source` cannot be resolved, which stops the run before anything is written
-     * @throws IOException if a replacing deploy cannot delete an entry of a directory it replaces, which stops the run midway, naming the project, the tool and the entry
-     * @throws cz.cleanship.aitools.engine.io.ArtifactPathException if a replacing deploy would remove a path outside the directory it owns. It aborts the run where an authoring error would only fail its own manifest, because a deploy about to delete something nobody asked it to must not continue - see [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin]
+     * @throws ReplaceFailedException if a replacing deploy cannot delete an entry of a directory it replaces, which stops the run midway; for a project and for a user deployment alike, the message names the deployment, the tool and the entry
+     * @throws cz.cleanship.aitools.engine.io.ArtifactPathException if a directory a replacing user deployment would remove is not inside the directory it owns, judged by where it leads when it is a symbolic link, which stops the run before anything is written. It aborts the run where an authoring error would only fail its own manifest, because a deploy about to delete something nobody asked it to must not continue - see [SkillSourceOverlapCheck.requireApart] and [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin]
      * @throws cz.cleanship.aitools.engine.services.DuplicateManifestIdException if manifests shared by every project declare the same id, which no project can be exported around
      */
     fun process(
@@ -420,8 +419,13 @@ class ToolsEngine(
             }
         }
 
-        return exports.mapNotNull { (name, export) ->
-            exportOrCollectFailure(manifest.id, toolType, name, export)
+        return try {
+            exports.mapNotNull { (name, export) ->
+                exportOrCollectFailure(manifest.id, toolType, name, export)
+            }
+        } catch (ex: ArtifactDeleteException) {
+            // The user scope deletes inside the export of each artifact, so the failed delete surfaces here rather than from a step of its own like a project's.
+            throw ex.explained(toolType, "user deployment '${manifest.id}' under '${userHome.absolutePath}'")
         }
     }
 
@@ -600,21 +604,30 @@ class ToolsEngine(
 /**
  * Deletes what this adapter replaces in [destination] for [manifest] - see [prepare] - naming the project, the tool and the entry in the failure when an entry cannot be deleted.
  *
- * @throws IOException if an entry cannot be deleted
+ * @throws ReplaceFailedException if an entry cannot be deleted
  */
 private fun ToolAdapter.prepareOrExplain(destination: File, manifest: ProjectManifest) {
     try {
         prepare(destination, manifest)
-    } catch (ex: IOException) {
-        // The failure of a delete names only the entry, so the deployment and the tool are added here, where they are known. It still aborts the run: the directory is already half deleted, and exporting on top of what is left would hide that.
-        val entry = (ex as? FileSystemException)?.file ?: ex.message
-        throw IOException(
-            "Cannot replace the ${toolType.serialName} files of project '${manifest.id}' in '${destination.absolutePath}': deleting '$entry' failed (${ex.javaClass.simpleName}). " +
-                "The run stopped here; make that path deletable and deploy again.",
-            ex,
-        )
+    } catch (ex: ArtifactDeleteException) {
+        throw ex.explained(toolType, "project '${manifest.id}' in '${destination.absolutePath}'")
     }
 }
+
+/**
+ * Returns the failure that reports this failed delete for the files of [toolType] that [deployedBy] replaces, naming the entry that could not be deleted.
+ */
+// The failure of a delete names only the entry, so the deployment and the tool are added where they are known. It still aborts the run: the directory is already partly deleted, and exporting on top of what is left would hide that.
+private fun ArtifactDeleteException.explained(toolType: ToolType, deployedBy: String) = ReplaceFailedException(
+    "Cannot replace the ${toolType.serialName} files of $deployedBy: $message. " +
+        "The run stopped here; make that path deletable and deploy again.",
+    this,
+)
+
+/**
+ * Thrown when a replacing deploy of a project or a user deployment cannot delete an entry of a directory it replaces, which stops the run midway with that directory partly deleted.
+ */
+class ReplaceFailedException(message: String, cause: Throwable) : RuntimeException(message, cause)
 
 /**
  * Thrown before a single project of the run is exported, when the `deploy.directory` of at least one of them could not be resolved - see [ToolsEngine.resolveDeployDirectories]. Carries every failure the run found, so that an author is told about all of their broken references at once instead of one per run.

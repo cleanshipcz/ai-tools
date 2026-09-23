@@ -7,8 +7,10 @@ import ch.qos.logback.core.read.ListAppender
 import cz.cleanship.aitools.engine.env.EnvironmentSource
 import cz.cleanship.aitools.engine.env.UnresolvedVariableException
 import cz.cleanship.aitools.engine.env.VariableResolver
+import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.DryRunArtifactSink
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
@@ -29,7 +31,6 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -1386,6 +1387,170 @@ class ToolsEngineTest {
         }
 
         @Test
+        fun `should fail saying it would only unlink it when the replaced directory itself is a link to a folder holding a source folder`() {
+            // given
+            // - .claude is a link to a checkout that holds the source folder; the delete of a replacing deploy would only unlink .claude
+            // - the project selects no skill, so the replaced directory is the only path that overlaps the source folder
+            writeProject(replace = true, skillFilter = emptyList())
+            val checkout = tempDir.resolve("checkout").toFile()
+            val sourceDir = writeSourceFolderWithTemplate(checkout.resolve("skills/jira-ticket"))
+            writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val link = destination.resolve(".claude")
+            destination.mkdirs()
+            Files.createSymbolicLink(link.toPath(), checkout.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining("claude would delete '${link.absolutePath}' for project 'test-project' to replace it, and '${link.absolutePath}' is itself a link to '${checkout.toPath().toRealPath()}', which contains that folder.")
+                .hasMessageNotContaining("Deploying would overwrite or delete the files of the source.")
+            assertThat(Files.isSymbolicLink(link.toPath())).isTrue()
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - Claude and Codex replace their whole tool directory, which is the link here
+            "CLAUDE, .claude, .claude/skills/jira-ticket, CLAUDE.md, true",
+            "CLAUDE, .claude, .claude/skills/jira-ticket, CLAUDE.md, false",
+            "CODEX, .codex, .codex/skills/skill-jira-ticket, AGENTS.md, true",
+            "CODEX, .codex, .codex/skills/skill-jira-ticket, AGENTS.md, false",
+            // - GitHub Copilot replaces three folders below a .github it keeps; the prompts folder, which the skill is written into, is the link here
+            "GITHUB_COPILOT, .github/prompts, .github/prompts/skill-jira-ticket, .github/copilot-instructions.md, true",
+            "GITHUB_COPILOT, .github/prompts, .github/prompts/skill-jira-ticket, .github/copilot-instructions.md, false",
+        )
+        fun `should fail before writing anything when the replaced directory is a link leading elsewhere that sits inside the source folder`(
+            toolType: ToolType,
+            linkPath: String,
+            skillPath: String,
+            instructionsPath: String,
+            dryRun: Boolean,
+        ) {
+            // given
+            // - the project deploys into a folder inside the source folder, and its replaced directory is a link to a folder elsewhere
+            // - the deploy would unlink that link, which is an entry of the source, and then write the skill into the source
+            val sourceDir = writeSourceFolderWithTemplate(tempDir.resolve("F-src/jira-ticket").toFile())
+            writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val project = sourceDir.resolve("proj")
+            writeProject(deployDirectory = project.absolutePath, replace = true)
+            val elsewhere = tempDir.resolve("F-elsewhere").toFile()
+            elsewhere.mkdirs()
+            val link = project.resolve(linkPath)
+            link.parentFile.mkdirs()
+            Files.createSymbolicLink(link.toPath(), elsewhere.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+            val runEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ToolFactory.create(toolType, dryRun)), dryRun = dryRun)
+            val tool = toolType.serialName
+            val advice = "Deploying would overwrite or delete the files of the source. Move the directory that project 'test-project' deploys to out of the source folder, or turn off 'replace' for that deployment."
+
+            // when
+            val error = runCatching { runEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining("$tool would delete '${link.absolutePath}' for project 'test-project' to replace it, which lies inside that folder once the link '${link.absolutePath}' is removed. $advice")
+                .hasMessageContaining("$tool would write the skill 'jira-ticket' for project 'test-project' to '${project.resolve(skillPath).absolutePath}', which lies inside that folder once the link '${link.absolutePath}' is removed. $advice")
+            assertThat(Files.isSymbolicLink(link.toPath())).isTrue()
+            assertThat(elsewhere.list()).isEmpty()
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(project.resolve(instructionsPath)).doesNotExist()
+        }
+
+        @Test
+        fun `should fail with one line naming the link below the replaced directory when a skill directory installed by hand links to the source folder`() {
+            // given
+            // - .claude is a real folder the project replaces, and the plain skill is installed by hand in it as a link to its checkout
+            // - the delete unlinks that link before the skill is written, so the write lands in a fresh folder and only the link is reported
+            writeProject(replace = true)
+            val sourceDir = writeSourceFolderWithTemplate(tempDir.resolve("projects/mcp/skills/jira-ticket").toFile())
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val replaced = destination.resolve(".claude")
+            val link = replaced.resolve("skills/jira-ticket")
+            link.parentFile.mkdirs()
+            Files.createSymbolicLink(link.toPath(), sourceDir.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessage(
+                    "Refusing to deploy: 1 path(s) the run would write or delete overlap the source folder of a pointer skill; nothing was written:\n" +
+                        "  - Skill 'jira-ticket' (${manifest.absolutePath}) is read from the source folder '${sourceDir.absolutePath}', but claude would delete '${replaced.absolutePath}' for project 'test-project' to replace it, " +
+                        "and the link '${link.absolutePath}' below the directory to be replaced leads to '${sourceDir.toPath().toRealPath()}', which is that folder. " +
+                        "The deploy would only unlink it, but it refuses while a link below a replaced directory leads into a source folder. " +
+                        "Remove the link '${link.absolutePath}', or turn off 'replace' for that deployment.",
+                )
+            assertThat(Files.isSymbolicLink(link.toPath())).isTrue()
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should compare the skill of another project through a replaced link it does not own and fail before writing anything`() {
+            // given
+            // - two projects deploy into the same directory, whose .claude links to a shared folder, and 'skills' in that folder links to the folder holding the source folder
+            // - 'test-project' replaces .claude and selects no skill; 'second' keeps it and writes the skill through both links, so its path is compared through them
+            writeProject(replace = true, skillFilter = emptyList())
+            writeProject(directoryName = "second", id = "second", skillFilter = listOf("jira-ticket"))
+            val sourceParent = tempDir.resolve("shared-src").toFile()
+            val sourceDir = writeSourceFolderWithTemplate(sourceParent.resolve("jira-ticket"))
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val shared = tempDir.resolve("shared").toFile()
+            shared.mkdirs()
+            Files.createSymbolicLink(shared.resolve("skills").toPath(), sourceParent.toPath())
+            val link = destination.resolve(".claude")
+            destination.mkdirs()
+            Files.createSymbolicLink(link.toPath(), shared.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(SkillSourceOverlapException::class.java)
+            assertThat((error as SkillSourceOverlapException).overlaps.map { it.message }).containsExactly(
+                "Skill 'jira-ticket' (${manifest.absolutePath}) is read from the source folder '${sourceDir.absolutePath}', but claude would write the skill 'jira-ticket' for project 'second' to '${link.resolve("skills/jira-ticket").absolutePath}', " +
+                    "which is that folder once links are resolved. Deploying would overwrite or delete the files of the source. " +
+                    "Remove the link or folder that leads there, or deselect the skill 'jira-ticket' for that deployment.",
+            )
+            assertThat(Files.isSymbolicLink(link.toPath())).isTrue()
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should name where a replaced link leading to nothing would lead when that lies inside the source folder`() {
+            // given
+            // - .claude is a link to a folder of the source that does not exist, so it leads to nothing yet
+            writeProject(replace = true, skillFilter = emptyList())
+            val sourceDir = writeSourceFolderWithTemplate(tempDir.resolve("checkout/skills/jira-ticket").toFile())
+            writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val link = destination.resolve(".claude")
+            destination.mkdirs()
+            Files.createSymbolicLink(link.toPath(), sourceDir.resolve("missing").toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining("and '${link.absolutePath}' is itself a link to '${sourceDir.toPath().toRealPath().resolve("missing")}', which lies inside that folder.")
+            assertThat(Files.isSymbolicLink(link.toPath())).isTrue()
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+        }
+
+        @Test
         fun `should fail before writing anything when a replacing user deployment would delete a prompt directory holding a source folder`() {
             // given
             // - Codex keeps prompts as skill directories in the home, and a replacing user deploy deletes each one before writing it again
@@ -1489,8 +1654,7 @@ class ToolsEngineTest {
                 // then
                 assertThat(error)
                     .isInstanceOf(UnreadableReplacedFolderException::class.java)
-                    .hasMessageContaining("project 'test-project'")
-                    .hasMessageContaining("claude")
+                    .hasMessageContaining("claude would delete '${destination.resolve(".claude").absolutePath}' for project 'test-project' to replace it")
                     .hasMessageContaining("'${locked.absolutePath}'")
                 assertThat(earlier).hasContent("Written by an earlier deploy.\n")
                 assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
@@ -1518,13 +1682,240 @@ class ToolsEngineTest {
 
                 // then
                 assertThat(error)
-                    .isInstanceOf(IOException::class.java)
-                    .hasMessageContaining("project 'test-project'")
-                    .hasMessageContaining("claude")
-                    .hasMessageContaining("'${kept.absolutePath}'")
+                    .isInstanceOf(ReplaceFailedException::class.java)
+                    .hasMessage(
+                        "Cannot replace the claude files of project 'test-project' in '${destination.absolutePath}': deleting '${kept.absolutePath}' failed (AccessDeniedException). " +
+                            "The run stopped here; make that path deletable and deploy again.",
+                    )
             } finally {
                 readOnly.setWritable(true)
             }
+        }
+
+        @Test
+        fun `should fail naming the user deployment, the tool and the path when a replaced skill directory in the home cannot be deleted`() {
+            // given
+            // - the user scope replaces the directory of each skill it deploys, and the file below it cannot be removed
+            writeTextSkill("plain")
+            writeUserDeployment(replace = true)
+            val readOnly = userHome.resolve(".claude/skills/plain/ro")
+            readOnly.mkdirs()
+            val kept = readOnly.resolve("a.md")
+            kept.writeText("Cannot be deleted.\n")
+            readOnly.setWritable(false)
+            try {
+                // - a superuser deletes regardless of permissions, so the failure cannot be provoked there
+                assumeFalse(readOnly.canWrite())
+
+                // when
+                val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+                // then
+                assertThat(error)
+                    .isInstanceOf(ReplaceFailedException::class.java)
+                    .hasMessage(
+                        "Cannot replace the claude files of user deployment 'globals' under '${userHome.absolutePath}': deleting '${kept.absolutePath}' failed (AccessDeniedException). " +
+                            "The run stopped here; make that path deletable and deploy again.",
+                    )
+                assertThat(kept).hasContent("Cannot be deleted.\n")
+            } finally {
+                readOnly.setWritable(true)
+            }
+        }
+
+        @ParameterizedTest
+        @CsvSource("true", "false")
+        fun `should replace a replaced directory that is itself a link without reading the folder it leads to`(
+            dryRun: Boolean,
+        ) {
+            // given
+            // - .claude links into a shared folder holding a folder nobody can read; the delete only unlinks .claude and never looks behind it
+            writeProject(replace = true)
+            val shared = tempDir.resolve("shared").toFile()
+            val locked = shared.resolve("locked")
+            locked.mkdirs()
+            shared.resolve("notes.md").writeText("Kept by hand.\n")
+            val link = destination.resolve(".claude")
+            destination.mkdirs()
+            Files.createSymbolicLink(link.toPath(), shared.toPath())
+            val runEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ToolFactory.create(ToolType.CLAUDE, dryRun)), dryRun = dryRun)
+            locked.setReadable(false)
+            locked.setExecutable(false)
+            locked.setWritable(false)
+            try {
+                // - a superuser reads the folder regardless of its permissions, so the case the check must not report cannot be set up there
+                assumeFalse(locked.canRead())
+
+                // when
+                runEngine.process(locations())
+
+                // then
+                assertThat(Files.isSymbolicLink(link.toPath())).isEqualTo(dryRun)
+                assertThat(shared.list()).containsExactlyInAnyOrder("locked", "notes.md")
+                assertThat(shared.resolve("notes.md")).hasContent("Kept by hand.\n")
+                assertThat(destination.resolve("CLAUDE.md").exists()).isEqualTo(!dryRun)
+            } finally {
+                locked.setWritable(true)
+                locked.setExecutable(true)
+                locked.setReadable(true)
+            }
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            "CLAUDE, .claude, CLAUDE.md, true",
+            "CLAUDE, .claude, CLAUDE.md, false",
+            "CODEX, .codex, AGENTS.md, true",
+            "CODEX, .codex, AGENTS.md, false",
+            // - GitHub Copilot replaces three folders below a .github it keeps; the prompts folder is the link here
+            "GITHUB_COPILOT, .github/prompts, .github/copilot-instructions.md, true",
+            "GITHUB_COPILOT, .github/prompts, .github/copilot-instructions.md, false",
+        )
+        fun `should replace a replaced directory that is itself a link without comparing the links in the folder it leads to`(
+            toolType: ToolType,
+            linkPath: String,
+            instructionsPath: String,
+            dryRun: Boolean,
+        ) {
+            // given
+            // - the replaced directory links to a shared folder, and 'tools' in that folder links to the folder holding a source folder; the project selects no skill
+            // - the deploy only unlinks the replaced directory and never touches 'tools', so only where that link sits and where it leads are compared
+            writeProject(replace = true, skillFilter = emptyList())
+            val sourceParent = tempDir.resolve("G-src").toFile()
+            val sourceDir = writeSourceFolderWithTemplate(sourceParent.resolve("jira-ticket"))
+            writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val shared = tempDir.resolve("G-shared").toFile()
+            shared.mkdirs()
+            val tools = shared.resolve("tools")
+            Files.createSymbolicLink(tools.toPath(), sourceParent.toPath())
+            val link = destination.resolve(linkPath)
+            link.parentFile.mkdirs()
+            Files.createSymbolicLink(link.toPath(), shared.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+            val runEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ToolFactory.create(toolType, dryRun)), dryRun = dryRun)
+
+            // when
+            runEngine.process(locations())
+
+            // then
+            assertThat(Files.isSymbolicLink(link.toPath())).isEqualTo(dryRun)
+            assertThat(shared.list()).containsExactly("tools")
+            assertThat(Files.readSymbolicLink(tools.toPath())).isEqualTo(sourceParent.toPath())
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(destination.resolve(instructionsPath).exists()).isEqualTo(!dryRun)
+        }
+
+        @ParameterizedTest
+        @CsvSource("true", "false")
+        fun `should unlink a replaced skill directory in the home that is a link leading inside the skills folder and keep what it leads to`(
+            dryRun: Boolean,
+        ) {
+            // given
+            // - the skill 'plain' is installed in the home as a link to its development copy 'plain-dev' beside it, whose 'lib' links to the folder holding a source folder
+            // - the deploy only unlinks 'plain' and never touches 'plain-dev', so the link in it is not compared
+            writeTextSkill("plain")
+            writeUserDeployment(replace = true)
+            val sourceParent = tempDir.resolve("U-src").toFile()
+            val sourceDir = writeSourceFolderWithTemplate(sourceParent.resolve("jira-ticket"))
+            writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val skillsFolder = userHome.resolve(".claude/skills")
+            val development = skillsFolder.resolve("plain-dev")
+            development.mkdirs()
+            development.resolve("SKILL.md").writeText("Development copy.\n")
+            Files.createSymbolicLink(development.resolve("lib").toPath(), sourceParent.toPath())
+            val link = skillsFolder.resolve("plain")
+            Files.createSymbolicLink(link.toPath(), development.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+            val runEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ToolFactory.create(ToolType.CLAUDE, dryRun)), dryRun = dryRun)
+
+            // when
+            runEngine.process(locations())
+
+            // then
+            assertThat(Files.isSymbolicLink(link.toPath())).isEqualTo(dryRun)
+            // - a deploy writes the skill into a fresh folder where the link was, a dry run leaves the link leading to the development copy
+            assertThat(link.resolve("SKILL.md").readText()).contains(if (dryRun) "Development copy." else "Some skill content")
+            assertThat(development.list()).containsExactlyInAnyOrder("SKILL.md", "lib")
+            assertThat(development.resolve("SKILL.md")).hasContent("Development copy.\n")
+            assertThat(Files.readSymbolicLink(development.resolve("lib").toPath())).isEqualTo(sourceParent.toPath())
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+        }
+
+        @ParameterizedTest
+        @CsvSource("true", "false")
+        fun `should refuse a replaced skill directory in the home that is a link leading outside the skills folder, advising to remove the link`(
+            dryRun: Boolean,
+        ) {
+            // given
+            // - the skill 'plain' is installed in the home as a link to a checkout outside the skills folder, and the user deployment replaces it
+            writeTextSkill("plain")
+            writeUserDeployment(replace = true)
+            val checkout = tempDir.resolve("checkout/plain").toFile()
+            checkout.mkdirs()
+            checkout.resolve("SKILL.md").writeText("Installed by hand.\n")
+            val skillsFolder = userHome.resolve(".claude/skills")
+            skillsFolder.mkdirs()
+            val link = skillsFolder.resolve("plain")
+            Files.createSymbolicLink(link.toPath(), checkout.toPath())
+            val runEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ToolFactory.create(ToolType.CLAUDE, dryRun)), dryRun = dryRun)
+
+            // when
+            val error = runCatching { runEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ArtifactPathException::class.java)
+                .hasMessage(
+                    "Refusing to replace '${link.absolutePath}' for 'skill 'plain'': it is a symbolic link that leads to '${checkout.canonicalPath}', which is not inside '${skillsFolder.absolutePath}'. " +
+                        "Remove the link, or turn off 'replace' for that deployment.",
+                )
+            assertThat(Files.isSymbolicLink(link.toPath())).isTrue()
+            assertThat(checkout.resolve("SKILL.md")).hasContent("Installed by hand.\n")
+            // - refused before any write: neither the project, which a run exports first, nor the instructions file of the home was written
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+            assertThat(userHome.resolve(".claude/CLAUDE.md")).doesNotExist()
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            "prompt, prompt-review, prompt 'review'",
+            "agent, agent-review, agent 'review'",
+        )
+        fun `should refuse before writing anything a replaced prompt or agent directory of Codex in the home that is a link leading outside the skills folder`(
+            kind: String,
+            directoryName: String,
+            describedBy: String,
+        ) {
+            // given
+            // - Codex keeps prompts and agents as skill directories in the home; the one for 'review' is a link to a checkout outside the skills folder
+            val codexEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(CodexAdapter()))
+            if (kind == "prompt") writePrompt("review", "base") else writeAgent("review", "base")
+            writeUserDeployment(tools = listOf("codex"), replace = true)
+            val checkout = tempDir.resolve("checkout/review").toFile()
+            checkout.mkdirs()
+            val skillsFolder = userHome.resolve(".codex/skills")
+            skillsFolder.mkdirs()
+            val link = skillsFolder.resolve(directoryName)
+            Files.createSymbolicLink(link.toPath(), checkout.toPath())
+
+            // when
+            val error = runCatching { codexEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ArtifactPathException::class.java)
+                .hasMessage(
+                    "Refusing to replace '${link.absolutePath}' for '$describedBy': it is a symbolic link that leads to '${checkout.canonicalPath}', which is not inside '${skillsFolder.absolutePath}'. " +
+                        "Remove the link, or turn off 'replace' for that deployment.",
+                )
+            assertThat(Files.isSymbolicLink(link.toPath())).isTrue()
+            assertThat(checkout.list()).isEmpty()
+            assertThat(destination.resolve("AGENTS.md")).doesNotExist()
+            assertThat(userHome.resolve(".codex/AGENTS.md")).doesNotExist()
         }
     }
 

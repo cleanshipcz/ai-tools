@@ -35,11 +35,10 @@ interface ArtifactSink {
     fun copySkillFile(sourceFile: File, targetFile: File)
 
     /**
-     * Removes [artifactDir] and everything under it before it is written again, or only says that it would. Both
-     * refuse a directory that is not inside [owned] - see
-     * [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin].
+     * Removes [artifactDir] and everything under it before it is written again, or only says that it would. Both refuse a directory that is not inside [owned] - see [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin].
      *
      * @throws cz.cleanship.aitools.engine.io.ArtifactPathException if [artifactDir] is not inside [owned]
+     * @throws cz.cleanship.aitools.engine.io.ArtifactDeleteException if an entry below [artifactDir] cannot be deleted, which leaves it partly deleted; a sink that only says it would remove [artifactDir] never throws it
      */
     fun replaceArtifactDirectory(artifactDir: File, owned: File, describedBy: String)
 }

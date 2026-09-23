@@ -108,4 +108,4 @@ internal fun File.scanBelow(): DirectoryScan {
 /**
  * Returns the real path this symbolic link leads to, resolving a relative link against the folder holding it; for a link that leads to nothing, the path it would lead to.
  */
-private fun Path.linkDestination(): Path = parent.resolve(Files.readSymbolicLink(this)).toFile().realPathAllowingMissing()
+internal fun Path.linkDestination(): Path = parent.resolve(Files.readSymbolicLink(this)).toFile().realPathAllowingMissing()

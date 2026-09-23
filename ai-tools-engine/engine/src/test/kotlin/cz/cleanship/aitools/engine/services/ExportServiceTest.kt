@@ -75,6 +75,7 @@ class ExportServiceTest {
                 sourceDir,
                 skillDir,
                 skillId = "a-skill",
+                pointerSourceDirs = emptyList(),
             )
 
             // then
@@ -92,6 +93,7 @@ class ExportServiceTest {
                 sourceDir,
                 skillDir,
                 skillId = "a-skill",
+                pointerSourceDirs = emptyList(),
             )
 
             // then
@@ -109,6 +111,7 @@ class ExportServiceTest {
                 sourceDir,
                 skillDir,
                 skillId = "a-skill",
+                pointerSourceDirs = emptyList(),
             )
 
             // then
@@ -205,6 +208,7 @@ class ExportServiceTest {
                 sourceDir,
                 skillDir,
                 skillId = "a-skill",
+                pointerSourceDirs = emptyList(),
             )
 
             // then
@@ -220,7 +224,7 @@ class ExportServiceTest {
         fun `should fail with the source path when the declared skill file does not exist`() {
             // when
             val error = runCatching {
-                dryRunService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, skillDir)
+                dryRunService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, skillDir, pointerSourceDirs = emptyList())
             }.exceptionOrNull()
 
             // then
@@ -233,7 +237,7 @@ class ExportServiceTest {
         fun `should fail with the declared path when a relative skill file has no source directory`() {
             // when
             val error = runCatching {
-                dryRunService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), null, skillDir)
+                dryRunService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), null, skillDir, pointerSourceDirs = emptyList())
             }.exceptionOrNull()
 
             // then
@@ -250,6 +254,7 @@ class ExportServiceTest {
                     listOf(SkillFile(source = "helper.md", target = "../../../.bashrc")),
                     sourceDir,
                     skillDir,
+                    pointerSourceDirs = emptyList(),
                 )
             }.exceptionOrNull()
 
@@ -268,7 +273,7 @@ class ExportServiceTest {
 
             // when
             val error = runCatching {
-                dryRunService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), sourceDir, skillDirLink, skillId = "a-skill")
+                dryRunService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), sourceDir, skillDirLink, skillId = "a-skill", pointerSourceDirs = emptyList())
             }.exceptionOrNull()
 
             // then
@@ -361,6 +366,7 @@ class ExportServiceTest {
                 listOf(SkillFile(source = "payload.md", target = "../../../.bashrc")),
                 sourceDir,
                 skillDir,
+                pointerSourceDirs = emptyList(),
             )
         }.exceptionOrNull()
 
@@ -385,7 +391,7 @@ class ExportServiceTest {
 
         // when
         val error = runCatching {
-            exportService.copySkillFiles(listOf(SkillFile("templates/task.txt", "templates/task.txt")), sourceDir, skillDir, skillId = "a-skill")
+            exportService.copySkillFiles(listOf(SkillFile("templates/task.txt", "templates/task.txt")), sourceDir, skillDir, skillId = "a-skill", pointerSourceDirs = emptyList())
         }.exceptionOrNull()
 
         // then
@@ -449,6 +455,7 @@ class ExportServiceTest {
             listOf(SkillFile(source = "payload.md", target = "templates/example.md")),
             sourceDir,
             skillDir,
+            pointerSourceDirs = emptyList(),
         )
 
         // then
@@ -556,7 +563,7 @@ class ExportServiceTest {
         val targetDir = tempDir.resolve("exported").toFile()
 
         // when
-        exportService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), sourceDir, targetDir)
+        exportService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), sourceDir, targetDir, pointerSourceDirs = emptyList())
 
         // then
         assertThat(targetDir.resolve("helper.md").readText()).isEqualTo("Companion content.\n")
@@ -570,7 +577,7 @@ class ExportServiceTest {
 
         // when
         val error = runCatching {
-            exportService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), null, targetDir)
+            exportService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), null, targetDir, pointerSourceDirs = emptyList())
         }.exceptionOrNull()
 
         // then
@@ -588,7 +595,7 @@ class ExportServiceTest {
 
         // when
         val error = runCatching {
-            exportService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, targetDir)
+            exportService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, targetDir, pointerSourceDirs = emptyList())
         }.exceptionOrNull()
 
         // then
@@ -607,7 +614,7 @@ class ExportServiceTest {
 
         // when
         val error = runCatching {
-            exportService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, targetDir)
+            exportService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, targetDir, pointerSourceDirs = emptyList())
         }.exceptionOrNull()
 
         // then

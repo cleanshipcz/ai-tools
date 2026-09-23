@@ -127,7 +127,7 @@ class ClaudeAdapterTest {
         // - the source folder holding the companion file the loader listed for the skill
         val sourceDir = writeSourceBackedSkillFiles(tempDir.toFile())
         val sourceBefore = sourceDir.contentSnapshot()
-        val skillContext = SkillContext(sourceBackedSkill, sourceDir = sourceDir)
+        val skillContext = SkillContext(sourceBackedSkill, sourceDir = sourceDir, pointerSourceDirs = emptyList())
 
         // when
         claudeAdapter.export(tempDir.toFile(), skillContext)
@@ -146,7 +146,7 @@ class ClaudeAdapterTest {
         val projectDir = tempDir.resolve("project").toFile()
 
         // when
-        claudeAdapter.export(projectDir, SkillContext(sourceBackedSkill, sourceDir = sourceDir))
+        claudeAdapter.export(projectDir, SkillContext(sourceBackedSkill, sourceDir = sourceDir, pointerSourceDirs = emptyList()))
 
         // then
         val skillPaths = claudeAdapter.skillPaths(projectDir, sourceBackedSkill.id)
@@ -157,7 +157,7 @@ class ClaudeAdapterTest {
     @Test
     fun `should output a skill`() {
         // given
-        val skillContext = SkillContext(textOnlySkill)
+        val skillContext = SkillContext(textOnlySkill, pointerSourceDirs = emptyList())
 
         // when
         claudeAdapter.export(tempDir.toFile(), skillContext)
@@ -293,7 +293,7 @@ class ClaudeAdapterTest {
             val exporter = exporterFor(userDeployment)
 
             // when
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             val skillFile = claudeDir.resolve("skills/${textOnlySkill.id}/SKILL.md")
@@ -311,7 +311,7 @@ class ClaudeAdapterTest {
             val exporter = exporterFor(userDeployment)
 
             // when
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             assertThat(staleFile).exists()
@@ -326,7 +326,7 @@ class ClaudeAdapterTest {
             val exporter = exporterFor(userDeployment.copy(replace = true))
 
             // when
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             assertThat(staleFile).doesNotExist()
@@ -355,7 +355,7 @@ class ClaudeAdapterTest {
             exporter.export(UserInstructionsContext(replacingDeployment, rulesets))
             exporter.export(AgentContext(agent, rulesets))
             exporter.export(PromptContext(prompt, rulesets))
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             assertThat(neighbourSkill).hasContent("A skill installed by hand.\n")
@@ -375,7 +375,7 @@ class ClaudeAdapterTest {
             val exporter = exporterFor(userDeployment.copy(replace = true))
 
             // when
-            val error = runCatching { exporter.export(SkillContext(escapingSkill)) }.exceptionOrNull()
+            val error = runCatching { exporter.export(SkillContext(escapingSkill, pointerSourceDirs = emptyList())) }.exceptionOrNull()
 
             // then
             assertThat(neighbour).exists()
@@ -397,7 +397,7 @@ class ClaudeAdapterTest {
             val exporter = exporterFor(userDeployment.copy(replace = true))
 
             // when
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             assertThat(outsideFile).hasContent("Years of work.\n")
@@ -413,7 +413,7 @@ class ClaudeAdapterTest {
 
             // when
             exporter.export(UserInstructionsContext(userDeployment, rulesets))
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             // - the project-scope destination of the very same adapter stays empty, and so does everything else
@@ -427,7 +427,7 @@ class ClaudeAdapterTest {
             val exporter = exporterFor(userDeployment)
 
             // when
-            exporter.export(SkillContext(sourceBackedSkill, sourceDir = sourceDir))
+            exporter.export(SkillContext(sourceBackedSkill, sourceDir = sourceDir, pointerSourceDirs = emptyList()))
 
             // then
             val skillPaths = exporter.skillPaths(sourceBackedSkill.id)
@@ -477,7 +477,7 @@ class ClaudeAdapterTest {
             exporter.export(UserInstructionsContext(replacingDeployment, rulesets))
             exporter.export(AgentContext(agent, rulesets))
             exporter.export(PromptContext(prompt, rulesets))
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             val replacedPaths = exporter.replacedPaths(promptIds = listOf(prompt.id), agentIds = listOf(agent.id), skillIds = listOf(textOnlySkill.id))

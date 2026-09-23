@@ -43,7 +43,7 @@ interface ToolAdapter {
  *
  * A symbolic link among or below those paths is removed as a link; what it leads to is left untouched.
  *
- * @throws java.io.IOException if an entry cannot be deleted
+ * @throws cz.cleanship.aitools.engine.io.ArtifactDeleteException if an entry cannot be deleted
  */
 // An extension rather than an interface member, so no adapter can override it: what a replacing deploy deletes is exactly what replacedPaths names to the overlap check that runs before it.
 fun ToolAdapter.prepare(projectDir: File, project: ProjectManifest) {

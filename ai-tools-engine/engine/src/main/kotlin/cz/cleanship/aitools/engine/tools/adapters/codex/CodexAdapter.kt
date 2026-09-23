@@ -149,6 +149,8 @@ class CodexAdapter(
 
         override fun skillPaths(skillId: String): List<File> = listOf(layout.skillDir(skillId))
 
+        override val replacedWithin: File get() = layout.skillsDir
+
         override fun replacedPaths(
             promptIds: Collection<String>,
             agentIds: Collection<String>,
@@ -167,7 +169,7 @@ class CodexAdapter(
 
         private fun replaceIfRequested(artifactDir: File, describedBy: String) {
             if (deployment.replace) {
-                exportService.replaceArtifactDirectory(artifactDir, owned = layout.skillsDir, describedBy = describedBy)
+                exportService.replaceArtifactDirectory(artifactDir, owned = replacedWithin, describedBy = describedBy)
             }
         }
     }

@@ -4,6 +4,7 @@ import cz.cleanship.aitools.engine.io.PathOverlap
 import cz.cleanship.aitools.engine.io.SymbolicLink
 import cz.cleanship.aitools.engine.models.ToolType
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import java.io.File
@@ -53,6 +54,82 @@ class SkillSourceOverlapTest {
 
         // then
         assertThat(message.endsWith("Remove the link '/project/.claude/skills', or turn off 'replace' for that deployment.")).isEqualTo(throughLink)
+    }
+
+    @Test
+    fun `should say the deploy never opens what it leads to when the replaced directory itself is a link leading to the source`() {
+        // given
+        // - '/project/.claude' is itself a link to '/checkout', which holds the source folder; a replacing deploy never opens what it leads to, whether it unlinks it in a project or refuses it in the home
+        val overlap = overlap(DeployAction.Replace, SymbolicLink(File("/project/.claude"), Path.of("/checkout")))
+
+        // when
+        val message = overlap.message
+
+        // then
+        assertThat(message).isEqualTo(
+            "Skill 'jira-ticket' is read from the source folder '/checkout/skills/jira-ticket', but claude would delete '/project/.claude' for project 'demo' to replace it, " +
+                "and '/project/.claude' is itself a link to '/checkout', which contains that folder. " +
+                "A replacing deploy never opens what it leads to, but it refuses while a replaced directory links into a source folder. " +
+                "Remove the link '/project/.claude', or turn off 'replace' for that deployment.",
+        )
+    }
+
+    @Test
+    fun `should say where the skill lands once the replaced link is removed and advise moving the project when that lies inside the source folder`() {
+        // given
+        // - the project deploys inside the source folder '/src/jira-ticket', and its replaced '.claude' is a link leading elsewhere, so the skill lands in the source once that link is removed
+        val overlap = SkillSourceOverlap(
+            skillId = "jira-ticket",
+            manifestFile = null,
+            sourceDir = File("/src/jira-ticket"),
+            action = DeployAction.WriteSkill("jira-ticket"),
+            path = File("/src/jira-ticket/proj/.claude/skills/jira-ticket"),
+            link = null,
+            overlap = PathOverlap.INSIDE,
+            toolType = ToolType.CLAUDE,
+            deployedBy = "project 'demo'",
+            unlinked = File("/src/jira-ticket/proj/.claude"),
+        )
+
+        // when
+        val message = overlap.message
+
+        // then
+        assertThat(message).isEqualTo(
+            "Skill 'jira-ticket' is read from the source folder '/src/jira-ticket', but claude would write the skill 'jira-ticket' for project 'demo' to '/src/jira-ticket/proj/.claude/skills/jira-ticket', " +
+                "which lies inside that folder once the link '/src/jira-ticket/proj/.claude' is removed. " +
+                "Deploying would overwrite or delete the files of the source. " +
+                "Move the directory that project 'demo' deploys to out of the source folder, or turn off 'replace' for that deployment.",
+        )
+    }
+
+    @Test
+    fun `should say where the replaced link sits and advise moving the project when that lies inside the source folder`() {
+        // given
+        // - the replaced '.claude' is itself a link leading elsewhere, but the entry it is sits inside the source folder '/src/jira-ticket'
+        val overlap = SkillSourceOverlap(
+            skillId = "jira-ticket",
+            manifestFile = null,
+            sourceDir = File("/src/jira-ticket"),
+            action = DeployAction.Replace,
+            path = File("/src/jira-ticket/proj/.claude"),
+            link = null,
+            overlap = PathOverlap.INSIDE,
+            toolType = ToolType.CLAUDE,
+            deployedBy = "project 'demo'",
+            unlinked = File("/src/jira-ticket/proj/.claude"),
+        )
+
+        // when
+        val message = overlap.message
+
+        // then
+        assertThat(message).isEqualTo(
+            "Skill 'jira-ticket' is read from the source folder '/src/jira-ticket', but claude would delete '/src/jira-ticket/proj/.claude' for project 'demo' to replace it, " +
+                "which lies inside that folder once the link '/src/jira-ticket/proj/.claude' is removed. " +
+                "Deploying would overwrite or delete the files of the source. " +
+                "Move the directory that project 'demo' deploys to out of the source folder, or turn off 'replace' for that deployment.",
+        )
     }
 
     /**

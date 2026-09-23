@@ -77,5 +77,5 @@ data class SkillContext(
     val availableFragments: Map<String, FragmentManifest> = emptyMap(),
     val allFragments: Map<String, FragmentManifest> = availableFragments,
     val sourceDir: java.io.File? = null,
-    val pointerSourceDirs: List<java.io.File> = emptyList(),
+    val pointerSourceDirs: List<java.io.File>,
 )

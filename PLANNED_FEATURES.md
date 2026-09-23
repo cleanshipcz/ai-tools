@@ -99,7 +99,7 @@ Raised by the analysis and code review in `.delivery/project-improvements/`. Not
 
 ### `prepare()` swallows cleanup failures
 
-- **DONE** a replacing deploy deletes through `deleteTreeWithoutFollowingLinks`, which stops the run with an `IOException` naming the project, the tool, and the entry instead of ignoring a failed delete. A replaced directory holding a folder the deploy cannot read is refused before anything is written, `--dry-run` included.
+- **DONE** a replacing deploy deletes through `deleteTreeWithoutFollowingLinks`, which stops the run with a `ReplaceFailedException` naming the deployment, the tool, and the entry, for a project and a user deployment alike, instead of ignoring a failed delete. A replaced directory holding a folder the deploy cannot read is refused before anything is written, `--dry-run` included.
 
 ### Smaller items
 

@@ -104,7 +104,7 @@ class WindsurfAdapterTest {
         // - the source folder holding the companion file the loader listed for the skill
         val sourceDir = writeSourceBackedSkillFiles(tempDir.toFile())
         val sourceBefore = sourceDir.contentSnapshot()
-        val skillContext = SkillContext(sourceBackedSkill, sourceDir = sourceDir)
+        val skillContext = SkillContext(sourceBackedSkill, sourceDir = sourceDir, pointerSourceDirs = emptyList())
 
         // when
         adapter.export(tempDir.toFile(), skillContext)
@@ -125,7 +125,7 @@ class WindsurfAdapterTest {
         val projectDir = tempDir.resolve("project").toFile()
 
         // when
-        adapter.export(projectDir, SkillContext(sourceBackedSkill, sourceDir = sourceDir))
+        adapter.export(projectDir, SkillContext(sourceBackedSkill, sourceDir = sourceDir, pointerSourceDirs = emptyList()))
 
         // then
         val skillPaths = adapter.skillPaths(projectDir, sourceBackedSkill.id)
@@ -136,7 +136,7 @@ class WindsurfAdapterTest {
     @Test
     fun `should output a skill`() {
         // given
-        val skillContext = SkillContext(textOnlySkill)
+        val skillContext = SkillContext(textOnlySkill, pointerSourceDirs = emptyList())
 
         // when
         adapter.export(tempDir.toFile(), skillContext)

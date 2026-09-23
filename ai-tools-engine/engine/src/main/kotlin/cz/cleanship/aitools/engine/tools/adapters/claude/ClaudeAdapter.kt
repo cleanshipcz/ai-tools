@@ -125,6 +125,8 @@ class ClaudeAdapter(
 
         override fun skillPaths(skillId: String): List<File> = listOf(layout.skillDir(skillId))
 
+        override val replacedWithin: File get() = layout.skillsDir
+
         // Prompts and agents are single files in this layout, which a deploy overwrites rather than deletes.
         override fun replacedPaths(
             promptIds: Collection<String>,
@@ -137,7 +139,7 @@ class ClaudeAdapter(
             if (deployment.replace) {
                 exportService.replaceArtifactDirectory(
                     layout.skillDir(skillContext.skill.id),
-                    owned = layout.skillsDir,
+                    owned = replacedWithin,
                     describedBy = "skill '${skillContext.skill.id}'",
                 )
             }

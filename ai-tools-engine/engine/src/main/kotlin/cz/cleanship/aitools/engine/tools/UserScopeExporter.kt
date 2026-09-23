@@ -37,4 +37,9 @@ interface UserScopeExporter {
         agentIds: Collection<String>,
         skillIds: Collection<String>,
     ): List<File>
+
+    /**
+     * The directory every path of [replacedPaths] has to lie in, judged by where it leads when it is a symbolic link, for a replacing deploy to delete it - `<home>/.claude/skills`, `<home>/.codex/skills`.
+     */
+    val replacedWithin: File
 }

@@ -41,7 +41,7 @@ class ExportService(
         sourceDir: File?,
         targetDir: File,
         skillId: String = "",
-        pointerSourceDirs: List<File> = emptyList(),
+        pointerSourceDirs: List<File>,
     ) {
         for (skillFile in skillFiles) {
             val sourceFile = resolveSource(skillFile.source, sourceDir)
@@ -58,6 +58,7 @@ class ExportService(
      * Removes [artifactDir] before it is written again, refusing one that is not inside [owned] - see [ArtifactSink.replaceArtifactDirectory].
      *
      * @throws cz.cleanship.aitools.engine.io.ArtifactPathException if [artifactDir] is not inside [owned]
+     * @throws cz.cleanship.aitools.engine.io.ArtifactDeleteException if an entry below [artifactDir] cannot be deleted
      */
     fun replaceArtifactDirectory(artifactDir: File, owned: File, describedBy: String) =
         sink.replaceArtifactDirectory(artifactDir, owned, describedBy)

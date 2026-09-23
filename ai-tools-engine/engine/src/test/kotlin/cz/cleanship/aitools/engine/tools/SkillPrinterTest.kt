@@ -30,7 +30,7 @@ class SkillPrinterTest {
     @Test
     fun `should print skill with text-only sections`() {
         // given
-        val context = SkillContext(textOnlySkill)
+        val context = SkillContext(textOnlySkill, pointerSourceDirs = emptyList())
         val output = StringOutput()
 
         // when
@@ -48,6 +48,7 @@ class SkillPrinterTest {
         val context = SkillContext(
             skill = skillWithRuleset,
             availableRulesets = rulesets,
+            pointerSourceDirs = emptyList(),
         )
         val output = StringOutput()
 
@@ -66,6 +67,7 @@ class SkillPrinterTest {
         val context = SkillContext(
             skill = skillWithFragment,
             availableFragments = fragments,
+            pointerSourceDirs = emptyList(),
         )
         val output = StringOutput()
 
@@ -85,6 +87,7 @@ class SkillPrinterTest {
             skill = skillWithMixedSections,
             availableRulesets = rulesets,
             availableFragments = fragments,
+            pointerSourceDirs = emptyList(),
         )
         val output = StringOutput()
 
@@ -100,7 +103,7 @@ class SkillPrinterTest {
     @Test
     fun `should print skill with no sections`() {
         // given
-        val context = SkillContext(textOnlySkill.copy(sections = emptyList()))
+        val context = SkillContext(textOnlySkill.copy(sections = emptyList()), pointerSourceDirs = emptyList())
         val output = StringOutput()
 
         // when
@@ -121,6 +124,7 @@ class SkillPrinterTest {
         val context = SkillContext(
             skill = skillWithRuleset,
             availableRulesets = emptyMap(),
+            pointerSourceDirs = emptyList(),
         )
         val output = StringOutput()
 
@@ -138,6 +142,7 @@ class SkillPrinterTest {
         val context = SkillContext(
             skill = skillWithFragment,
             availableFragments = emptyMap(),
+            pointerSourceDirs = emptyList(),
         )
         val output = StringOutput()
 
@@ -152,7 +157,7 @@ class SkillPrinterTest {
     @Test
     fun `should print the body of a source-backed skill verbatim without a heading or the description`() {
         // given
-        val context = SkillContext(sourceBackedSkill)
+        val context = SkillContext(sourceBackedSkill, pointerSourceDirs = emptyList())
         val output = StringOutput()
 
         // when
@@ -167,7 +172,7 @@ class SkillPrinterTest {
     @Test
     fun `should print an empty body of a source-backed skill as nothing`() {
         // given
-        val context = SkillContext(sourceBackedSkill.copy(body = ""))
+        val context = SkillContext(sourceBackedSkill.copy(body = ""), pointerSourceDirs = emptyList())
         val output = StringOutput()
 
         // when

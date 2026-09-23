@@ -12,5 +12,5 @@ data class Project(
     /**
      * The source folder of every pointer skill of the run, whether this project selects that skill or not.
      */
-    val pointerSourceDirs: List<java.io.File> = emptyList(),
+    val pointerSourceDirs: List<java.io.File>,
 )

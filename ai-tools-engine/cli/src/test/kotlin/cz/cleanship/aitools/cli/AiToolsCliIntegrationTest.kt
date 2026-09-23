@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import cz.cleanship.aitools.engine.ExportFailedException
 import cz.cleanship.aitools.engine.ExportFailure
+import cz.cleanship.aitools.engine.ReplaceFailedException
 import cz.cleanship.aitools.engine.UnreadableReplacedFolder
 import cz.cleanship.aitools.engine.UnreadableReplacedFolderException
 import cz.cleanship.aitools.engine.io.ArtifactPathException
@@ -312,9 +313,10 @@ class AiToolsCliIntegrationTest {
     @Test
     fun `should report a failed delete as a single line without a stack trace`() {
         // given
-        // - the engine names the project, the tool and the path in the message of the failure it raises
-        val message = "Cannot replace the claude directories of project 'demo' in '/projects/demo': deleting '/projects/demo/.claude/locked/a.md' failed."
-        val cli = AiToolsCli(runner = { _, _, _ -> throw IOException(message) })
+        // - the engine names the deployment, the tool and the path in the message of the failure it raises
+        val message = "Cannot replace the claude files of project 'demo' in '/projects/demo': deleting '/projects/demo/.claude/locked/a.md' failed (AccessDeniedException)."
+        val failure = ReplaceFailedException(message, IOException("/projects/demo/.claude/locked/a.md"))
+        val cli = AiToolsCli(runner = { _, _, _ -> throw failure })
 
         // when
         val result = cli.test(arrayOf("--working-dir", tempDir.absolutePath))
@@ -322,6 +324,21 @@ class AiToolsCliIntegrationTest {
         // then
         assertThat(result.statusCode).isNotZero()
         assertThat(result.stderr.trim()).isEqualTo(message)
+    }
+
+    @Test
+    fun `should keep the full failure of an unexpected IOException rather than reduce it to its message`() {
+        // given
+        // - the message of a JDK file failure is often only a path, which on its own says neither what failed nor where
+        val failure = IOException("No such file or directory")
+        val cli = AiToolsCli(runner = { _, _, _ -> throw failure })
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        // - the exception escapes the command unchanged, so the launcher prints its type and stack trace
+        assertThat(error).isSameAs(failure)
     }
 
     @Test

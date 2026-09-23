@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
 import cz.cleanship.aitools.engine.DeployDirectoryResolvingException
 import cz.cleanship.aitools.engine.ExportFailedException
+import cz.cleanship.aitools.engine.ReplaceFailedException
 import cz.cleanship.aitools.engine.SkillSourceOverlapException
 import cz.cleanship.aitools.engine.UnreadableReplacedFolderException
 import cz.cleanship.aitools.engine.env.VariableSubstitutionException
@@ -19,7 +20,6 @@ import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
 import cz.cleanship.aitools.engine.services.RetiredConfigKeyException
 import java.io.FileNotFoundException
-import java.io.IOException
 import java.nio.file.Paths
 
 class AiToolsCli(
@@ -80,8 +80,8 @@ class AiToolsCli(
             throw failure(ex.message, ex)
         } catch (ex: UnreadableReplacedFolderException) {
             throw failure(ex.message, ex)
-        } catch (ex: IOException) {
-            // A replacing deploy that cannot delete an entry stops midway; the engine names the project, the tool and the entry, which is what the operator needs rather than a stack trace.
+        } catch (ex: ReplaceFailedException) {
+            // A replacing deploy that cannot delete an entry stops midway; for a project and a user deployment alike, the engine names the deployment, the tool and the entry, which is what the operator needs rather than a stack trace. Any other IOException is left to escape with its stack trace, because its message alone is often only a path.
             throw failure(ex.message, ex)
         }
         if (dryRun) {
