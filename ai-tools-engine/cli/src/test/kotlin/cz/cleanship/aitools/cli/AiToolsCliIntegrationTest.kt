@@ -10,6 +10,8 @@ import com.github.ajalt.clikt.core.parse
 import com.github.ajalt.clikt.testing.test
 import cz.cleanship.aitools.engine.ExportFailedException
 import cz.cleanship.aitools.engine.ExportFailure
+import cz.cleanship.aitools.engine.UnreadableReplacedFolder
+import cz.cleanship.aitools.engine.UnreadableReplacedFolderException
 import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.ToolType
@@ -25,6 +27,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
 
 class AiToolsCliIntegrationTest {
 
@@ -272,6 +276,20 @@ class AiToolsCliIntegrationTest {
     }
 
     @Test
+    fun `should resolve a user home starting with a tilde against the home of the user running the engine`() {
+        // given
+        // - a quoted value reaches the engine unexpanded by the shell, and is resolved like every other declared path
+        var recordedUserHome: File? = null
+        val cli = AiToolsCli(runner = { _, userHome, _ -> recordedUserHome = userHome })
+
+        // when
+        cli.parse(arrayOf("--working-dir", tempDir.absolutePath, "--user-home", "~/scratch-home"))
+
+        // then
+        assertThat(recordedUserHome).isEqualTo(File(System.getProperty("user.home"), "scratch-home"))
+    }
+
+    @Test
     fun `should fail with the guard message when a manifest id would escape its directory`() {
         // given
         val cli = AiToolsCli(
@@ -288,6 +306,42 @@ class AiToolsCliIntegrationTest {
         assertThat(error)
             .isInstanceOf(CliktError::class.java)
             .hasMessageContaining("Refusing to replace")
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
+    fun `should report a failed delete as a single line without a stack trace`() {
+        // given
+        // - the engine names the project, the tool and the path in the message of the failure it raises
+        val message = "Cannot replace the claude directories of project 'demo' in '/projects/demo': deleting '/projects/demo/.claude/locked/a.md' failed."
+        val cli = AiToolsCli(runner = { _, _, _ -> throw IOException(message) })
+
+        // when
+        val result = cli.test(arrayOf("--working-dir", tempDir.absolutePath))
+
+        // then
+        assertThat(result.statusCode).isNotZero()
+        assertThat(result.stderr.trim()).isEqualTo(message)
+    }
+
+    @Test
+    fun `should fail with the check message when a replaced directory holds a folder the run cannot read`() {
+        // given
+        val cli = AiToolsCli(
+            runner = { _, _, _ ->
+                throw UnreadableReplacedFolderException(
+                    listOf(UnreadableReplacedFolder(File("/projects/demo/.claude/locked"), File("/projects/demo/.claude"), ToolType.CLAUDE, "project 'demo'")),
+                )
+            },
+        )
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessageContaining("'/projects/demo/.claude/locked'")
         assertThat((error as CliktError).statusCode).isNotZero()
     }
 
@@ -332,8 +386,7 @@ class AiToolsCliIntegrationTest {
     }
 
     /**
-     * A dry run over a real manifest set: everything a deploy loads, filters and renders is loaded, filtered and
-     * rendered, and the failures are the same, while the deploy directory and the home stay exactly as they were.
+     * A dry run over a real manifest set: everything a deploy loads, filters and renders is loaded, filtered and rendered, and the failures are the same, while the deploy directory and the home stay exactly as they were.
      */
     @Nested
     inner class DryRun {
@@ -445,6 +498,33 @@ class AiToolsCliIntegrationTest {
             assertThat(userHome).doesNotExist()
         }
 
+        @Test
+        fun `should fail naming the source and the target when the skill directory in the home is a link to the source folder of a pointer skill`() {
+            // given
+            // - the layout of a home where a plain skill was installed by hand as a link to its checkout
+            val sourceDir = File(tempDir, "checkout/skills/jira-ticket")
+            sourceDir.resolve("templates").mkdirs()
+            sourceDir.resolve("SKILL.md").writeText("---\nname: jira-ticket\ndescription: Create tickets\n---\n\n# jira-ticket\n")
+            sourceDir.resolve("templates/task.txt").writeText("Task template.\n")
+            writeFile("skills/jira-ticket/skill.yml", "id: jira-ticket\nsource: \"${sourceDir.absolutePath}\"\nmetadata:\n  version: 2.0.0\n")
+            val target = userHome.resolve(".claude/skills/jira-ticket")
+            target.parentFile.mkdirs()
+            Files.createSymbolicLink(target.toPath(), sourceDir.toPath())
+
+            // when
+            val result = AiToolsCli().test(dryRunArguments())
+
+            // then
+            assertThat(result.statusCode).isNotZero()
+            assertThat(result.stderr)
+                .contains("Dry run")
+                .contains(File(tempDir, "skills/jira-ticket/skill.yml").absolutePath)
+                .contains(sourceDir.absolutePath)
+                .contains(target.absolutePath)
+            assertThat(sourceDir.resolve("SKILL.md")).hasContent("---\nname: jira-ticket\ndescription: Create tickets\n---\n\n# jira-ticket\n")
+            assertThat(sourceDir.resolve("templates/task.txt")).hasContent("Task template.\n")
+        }
+
         private fun dryRunArguments() = listOf(
             "--working-dir",
             tempDir.absolutePath,
@@ -456,8 +536,7 @@ class AiToolsCliIntegrationTest {
         private fun sinkInfos() = sinkAppender.list.filter { it.level == Level.INFO }.map { it.formattedMessage }
 
         /**
-         * Writes a manifest set exercising every kind of write a deploy makes: a replacing project with an agent and
-         * a skill carrying a companion file, and a user deployment into the home.
+         * Writes a manifest set exercising every kind of write a deploy makes: a replacing project with an agent and a skill carrying a companion file, and a user deployment into the home.
          */
         private fun writeManifestSet(agentRuleset: String) {
             writeConfig()
@@ -671,7 +750,6 @@ class AiToolsCliIntegrationTest {
 }
 
 /**
- * Renders a `${NAME}` reference into a YAML fixture. Written through a function because a Kotlin raw string cannot
- * escape the dollar of the reference itself.
+ * Renders a `${NAME}` reference into a YAML fixture. Written through a function because a Kotlin raw string cannot escape the dollar of the reference itself.
  */
 private fun variableReference(name: String) = "\${$name}"

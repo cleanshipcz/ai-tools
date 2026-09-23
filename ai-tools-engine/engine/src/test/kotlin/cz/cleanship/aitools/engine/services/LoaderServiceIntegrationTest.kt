@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine.services
 
+import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.models.InnerFeatureContext
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ManifestMetadata
@@ -11,6 +12,8 @@ import cz.cleanship.aitools.engine.models.SkillSection
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.Version
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -537,8 +540,7 @@ class LoaderServiceIntegrationTest {
         @Test
         fun `should drop the project and keep the others when two of its features share an id`() {
             // given
-            // - a project with no feature filter deploys every one of its features, so an ambiguous feature id
-            //   makes that whole project unexportable while its neighbours stay untouched
+            // - a project with no feature filter deploys every one of its features, so an ambiguous feature id makes that whole project unexportable while its neighbours stay untouched
             val directory = tempDir.resolve("projects").toFile()
             writeProject(directory.resolve("alpha"), "alpha-project")
             val firstFile = writeFeature(directory.resolve("alpha"), "first.yml", "duplicated-feature")
@@ -592,8 +594,7 @@ class LoaderServiceIntegrationTest {
         @Test
         fun `should load manifest once when the same directory is listed twice`() {
             // given
-            // - overlapping locations make findYamlFiles yield the very same file more than once,
-            //   which must not be mistaken for two manifests sharing an id
+            // - overlapping locations make findYamlFiles yield the very same file more than once, which must not be mistaken for two manifests sharing an id
             val directory = tempDir.resolve("rulesets").toFile()
             writeManifest(directory, "only.yml", "rulesets", "only-ruleset")
             val locations = locationsFor("rulesets", directory).copy(rulesets = listOf(directory, directory))
@@ -661,8 +662,7 @@ class LoaderServiceIntegrationTest {
     }
 
     /**
-     * An id names a file or a directory in every scope the engine writes to, so it has to be a name rather than a
-     * path. Checking it here covers every kind, every adapter and both scopes at once, before anything is written.
+     * An id names a file or a directory in every scope the engine writes to, so it has to be a name rather than a path. Checking it here covers every kind, every adapter and both scopes at once, before anything is written.
      */
     @Nested
     inner class ManifestIds {
@@ -942,6 +942,215 @@ class LoaderServiceIntegrationTest {
             rulesets = emptyList(),
             fragments = emptyList(),
             skills = emptyList(),
+        )
+    }
+
+    /**
+     * A skill manifest may point at a folder holding a plain SKILL.md skill instead of carrying its own content. The loaded skill is then the one that folder describes, and the folder is where its companion files are copied from.
+     */
+    @Nested
+    inner class SkillSources {
+
+        private lateinit var projectsFolder: File
+        private lateinit var skillsDir: File
+        private lateinit var sourceLoader: LoaderService
+
+        @BeforeEach
+        fun setUp() {
+            projectsFolder = tempDir.resolve("projects").toFile()
+            skillsDir = tempDir.resolve("ai-tools/04_skills").toFile()
+            sourceLoader = LoaderService(
+                SkillSourceResolver(
+                    VariableResolver(variables = mapOf("PROJECTS_FOLDER" to projectsFolder.absolutePath), environment = { null }),
+                ),
+            )
+        }
+
+        @Test
+        fun `should load a directory-based pointer skill as the skill its source folder describes`() {
+            // given
+            // - the plain skill, with a nested companion file
+            val sourceDir = writePlainSkill(projectsFolder.resolve("mcp/skills/jira-ticket"), "jira-ticket")
+            writeFile(sourceDir.resolve("templates/task.txt"), "task")
+            // - the pointer manifest, carrying only what ai-tools owns
+            writeFile(
+                skillsDir.resolve("jira-ticket/skill.yml"),
+                "id: jira-ticket\nsource: \${PROJECTS_FOLDER}/mcp/skills/jira-ticket\nmetadata:\n  version: 2.0.0\n  tags: [jira]\n",
+            )
+
+            // when
+            val allManifests = sourceLoader.loadAll(skillLocations())
+
+            // then
+            val skill = allManifests.skills.getValue("jira-ticket")
+            assertThat(skill.description).isEqualTo("The jira-ticket skill")
+            assertThat(skill.body).isEqualTo("# jira-ticket\n")
+            assertThat(skill.files).containsExactly(SkillFile("templates/task.txt", "templates/task.txt"))
+            assertThat(skill.metadata.tags).containsExactly("jira")
+            assertThat(allManifests.skillSourceDirs.getValue("jira-ticket").canonicalFile).isEqualTo(sourceDir.canonicalFile)
+        }
+
+        @Test
+        fun `should copy the companion files of a standalone pointer skill from its source folder`() {
+            // given
+            // - a standalone manifest pointing at a folder next to the skills directory
+            val sourceDir = writePlainSkill(tempDir.resolve("ai-tools/plain/confluence-doc").toFile(), "confluence-doc")
+            writeFile(
+                skillsDir.resolve("confluence-doc.yml"),
+                "id: confluence-doc\nsource: ../plain/confluence-doc\nmetadata:\n  version: 2.0.0\n",
+            )
+
+            // when
+            val allManifests = sourceLoader.loadAll(skillLocations())
+
+            // then
+            assertThat(allManifests.skills.getValue("confluence-doc").description).isEqualTo("The confluence-doc skill")
+            assertThat(allManifests.skillSourceDirs.getValue("confluence-doc").canonicalFile).isEqualTo(sourceDir.canonicalFile)
+        }
+
+        @Test
+        fun `should resolve the source when a single skill manifest is loaded`() {
+            // given
+            writePlainSkill(projectsFolder.resolve("jira-ticket"), "jira-ticket")
+            val manifestFile = writeFile(
+                skillsDir.resolve("jira-ticket/skill.yml"),
+                "id: jira-ticket\nsource: \${PROJECTS_FOLDER}/jira-ticket\nmetadata:\n  version: 2.0.0\n",
+            )
+
+            // when
+            val skill = sourceLoader.loadSkill(manifestFile)
+
+            // then
+            assertThat(skill.description).isEqualTo("The jira-ticket skill")
+            assertThat(skill.body).isEqualTo("# jira-ticket\n")
+        }
+
+        @Test
+        fun `should fail naming the manifest file and the source when the source folder does not exist`() {
+            // given
+            val manifestFile = writeFile(
+                skillsDir.resolve("jira-ticket/skill.yml"),
+                "id: jira-ticket\nsource: \${PROJECTS_FOLDER}/missing\nmetadata:\n  version: 2.0.0\n",
+            )
+
+            // when / then
+            assertThatThrownBy { sourceLoader.loadAll(skillLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(manifestFile.absolutePath)
+                .hasMessageContaining(projectsFolder.resolve("missing").absolutePath)
+        }
+
+        @Test
+        fun `should fail naming the manifest file when a pointer also declares a description`() {
+            // given
+            writePlainSkill(projectsFolder.resolve("jira-ticket"), "jira-ticket")
+            val manifestFile = writeFile(
+                skillsDir.resolve("jira-ticket/skill.yml"),
+                "id: jira-ticket\ndescription: Stale\nsource: \${PROJECTS_FOLDER}/jira-ticket\nmetadata:\n  version: 2.0.0\n",
+            )
+
+            // when / then
+            assertThatThrownBy { sourceLoader.loadAll(skillLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(manifestFile.absolutePath)
+                .hasMessageContaining("'description'")
+        }
+
+        @Test
+        fun `should fail naming the manifest file when a skill without a source declares no description`() {
+            // given
+            val manifestFile = writeFile(
+                skillsDir.resolve("run-detekt.yml"),
+                "id: run-detekt\nsections:\n  - text: Run it.\nmetadata:\n  version: 1.0.0\n",
+            )
+
+            // when / then
+            assertThatThrownBy { sourceLoader.loadAll(skillLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(manifestFile.absolutePath)
+                .hasMessageContaining("'description'")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            "'description: \"\"\n'",
+            "'description: \"   \"\n'",
+        )
+        fun `should fail naming the manifest file and the empty description when a skill without a source declares a blank one`(
+            description: String,
+        ) {
+            // given
+            // - CsvSource hands the escapes over literally, so they are turned into line breaks here
+            val manifestFile = writeFile(
+                skillsDir.resolve("run-detekt.yml"),
+                "id: run-detekt\n${description.replace("\\n", "\n")}sections:\n  - text: Run it.\nmetadata:\n  version: 1.0.0\n",
+            )
+
+            // when / then
+            assertThatThrownBy { sourceLoader.loadAll(skillLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(manifestFile.absolutePath)
+                .hasMessageContaining("empty 'description'")
+                .hasMessageNotContaining("declares no 'description'")
+        }
+
+        @Test
+        fun `should fail naming the manifest file and the SKILL md when the SKILL md cannot be read`() {
+            // given
+            val skillFile = writePlainSkill(projectsFolder.resolve("jira-ticket"), "jira-ticket").resolve("SKILL.md")
+            val manifestFile = writeFile(
+                skillsDir.resolve("jira-ticket/skill.yml"),
+                "id: jira-ticket\nsource: \${PROJECTS_FOLDER}/jira-ticket\nmetadata:\n  version: 2.0.0\n",
+            )
+            skillFile.setReadable(false)
+            // - a superuser reads the file regardless of its permissions, so the failure cannot be provoked there
+            assumeFalse(skillFile.canRead())
+
+            // when / then
+            assertThatThrownBy { sourceLoader.loadAll(skillLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageStartingWith("Failed to load ${manifestFile.absolutePath}: ")
+                .hasMessageContaining(skillFile.absolutePath)
+                .hasMessageContaining("cannot be read")
+        }
+
+        @Test
+        fun `should leave a skill without a source untouched`() {
+            // given
+            writeFile(
+                skillsDir.resolve("run-detekt.yml"),
+                "id: run-detekt\ndescription: Run Detekt\nsections:\n  - text: Run it.\nmetadata:\n  version: 1.0.0\n",
+            )
+
+            // when
+            val allManifests = sourceLoader.loadAll(skillLocations())
+
+            // then
+            val skill = allManifests.skills.getValue("run-detekt")
+            assertThat(skill.description).isEqualTo("Run Detekt")
+            assertThat(skill.body).isNull()
+            assertThat(skill.source).isNull()
+            assertThat(allManifests.skillSourceDirs).doesNotContainKey("run-detekt")
+        }
+
+        private fun writePlainSkill(directory: File, name: String): File {
+            writeFile(directory.resolve("SKILL.md"), "---\nname: $name\ndescription: The $name skill\n---\n\n# $name\n")
+            return directory
+        }
+
+        private fun writeFile(file: File, content: String): File {
+            file.parentFile.mkdirs()
+            file.writeText(content)
+            return file
+        }
+
+        private fun skillLocations() = Locations(
+            agents = emptyList(),
+            deployments = emptyList(),
+            prompts = emptyList(),
+            rulesets = emptyList(),
+            fragments = emptyList(),
+            skills = listOf(skillsDir),
         )
     }
 }

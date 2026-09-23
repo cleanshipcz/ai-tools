@@ -170,7 +170,7 @@ The one key that does merge element-wise is `env_vars`, described below.
 
 **Path Variables:**
 
-Every entry under `locations`, and every project's `deploy.directory`, may reference a variable as `${NAME}`.
+Every entry under `locations`, every project's `deploy.directory`, and the skill-level `source` of a pointer skill may reference a variable as `${NAME}`.
 Variables are declared under the top-level `env_vars` key of either config file:
 
 ```yaml
@@ -192,6 +192,8 @@ This is what makes a `project.yml` shareable. The absolute base each machine dep
 
 Substitution happens *before* the relative-vs-absolute decision above, so a variable may supply the absolute base of a value whose remainder is written as a relative fragment.
 
+After substitution, a value that is `~` or starts with `~/` resolves against the home directory of the user running the engine, so a variable may also hold a path such as `~/Documents/Projects`. `~user` is not expanded: it is read as a relative path whose first folder is named `~user`. A `~` anywhere but at the start is an ordinary part of the name.
+
 A reference to a variable that is declared nowhere aborts the run with an error naming the variable, and for a location also the config file the offending value came from.
 Every project's `deploy.directory` is resolved before any project is deployed, so a typo cannot leave you with some projects deployed and others not, and nothing is ever written to a directory literally named `${...}`.
 
@@ -200,7 +202,7 @@ Groups that are not valid references - `${1ST}`, `${A-B}`, `$NO_BRACES` - pass t
 A name consists of letters, digits, and underscores, and may not start with a digit.
 
 A user deployment declares no path at all, so nothing in a `user.yml` is substituted.
-Its destination comes from `--user-home`, which is not a variable reference and is never expanded — a literal `~` in it stays a literal `~`.
+Its destination comes from `--user-home`, whose `${...}` references are not substituted. A value that is `~` or starts with `~/` resolves against the home directory, as in any declared path; an unquoted one is usually expanded by the shell first anyway.
 
 Configs without `env_vars`, and paths without references, behave exactly as they did before.
 
@@ -245,8 +247,8 @@ metadata:
 
 Key points, all documented in full in [../QUICKREF.md](../QUICKREF.md#creating-a-project):
 
-- `deploy.directory` decides where the generated files land. A relative value resolves against `--working-dir`, so `.` means this repository's root.
-- `deploy.replace: true` wipes the output directories each tool owns inside `deploy.directory` before writing them again. There is no backup and no auto-commit; files are overwritten in place, each written atomically through a temporary file.
+- `deploy.directory` decides where the generated files land. A relative value resolves against `--working-dir`, so `.` means this repository's root; a value that is `~` or starts with `~/` resolves against the home directory.
+- `deploy.replace: true` wipes the output directories each tool owns inside `deploy.directory` before writing them again. There is no backup and no auto-commit; files are overwritten in place, each written atomically through a temporary file. The wipe removes a symbolic link inside those directories as a link and never touches what it leads to, and a run whose wipe would reach the source folder of a pointer skill fails before anything is written; see [04_skills/README.md](../04_skills/README.md#pointer-skill).
 - `deploy.tools` narrows the project to a subset of the tools configured for the run. Omitting it means all of them, `[]` means none, and naming a tool the run does not configure is a warning rather than an error.
 - Filters fold over a selection that **starts empty**: `tags` and `whitelist` add, `blacklist` subtracts, so `blacklist` must come last and an omitted or empty `filter` lets everything through.
 - A ruleset or fragment an agent references must itself survive the project's `rulesets` / `fragments` filter, otherwise that agent fails to export.
@@ -443,6 +445,12 @@ How much a collision costs depends on the kind:
 **`Found no deployment manifest under [...]`** — the configured directories hold no `project.yml` and no `user.yml`. The message lists the absolute paths that were searched.
 
 **`Cannot resolve the deploy directory of N project(s)`** — a `${NAME}` in a `deploy.directory` names a variable no `env_vars` map and no environment variable declares. Nothing is deployed until every project's directory resolves.
+
+**`Refusing to deploy: N path(s) the run would write or delete overlap the source folder of a pointer skill`** / **`Failed to load .../04_skills/<id>/skill.yml: ...`** — a skill or a replaced directory of a deployment reaches the source folder of a pointer skill, or a pointer skill cannot be read from its source folder. Both stop the run before anything is written, `--dry-run` included; see [04_skills/README.md](../04_skills/README.md#troubleshooting).
+
+**`Refusing to deploy: N folder(s) inside a directory the run would delete to replace it cannot be read`** — a directory that `replace: true` deletes holds a folder the user running the deploy cannot read, so the delete would stop midway. The run stops before anything is written, `--dry-run` included. Make the folder readable and writable, remove it, or turn off `replace` for that deployment.
+
+**`Cannot replace the <tool> files of project '<id>' in '...': deleting '...' failed`** — a replacing deploy could not delete an entry, typically a file in a folder that is not writable. The run stops at that point, and the directory is left partly deleted. Make the named path deletable and deploy again.
 
 **`Export failed for N manifest(s)`** — the list below the headline names each manifest and every tool it failed for. Everything else was still exported, and the run exits non-zero.
 

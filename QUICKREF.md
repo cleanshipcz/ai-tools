@@ -38,7 +38,7 @@ The CLI has three options besides `--help`, and no subcommands:
 
 - `--dry-run` — load, filter, and render everything exactly as a deploy would, report every failure a deploy would report, and write nothing. This is how manifests are validated.
 - `--working-dir` — the directory holding `config.yml`. Defaults to `.`; `deploy.sh` sets it to the directory it was started from.
-- `--user-home` — the home a `user.yml` deploys under. Defaults to the home of the current user. A relative value resolves against `--working-dir`, an empty value is rejected, and a home that does not exist yet is created.
+- `--user-home` — the home a `user.yml` deploys under. Defaults to the home of the current user. A relative value resolves against `--working-dir`, a value that is `~` or starts with `~/` resolves against the home directory, an empty value is rejected, and a home that does not exist yet is created.
 
 There is no way to select a single manifest.
 `deploy.sh` forwards every argument to the CLI, except one containing a double quote — Gradle's `--args` cannot escape it, so the script refuses the argument rather than delivering a different path. Run `./gradlew :cli:run` directly for that case.
@@ -48,13 +48,14 @@ There is no way to select a single manifest.
 - **IDs**: kebab-case (e.g. `reviewer-code`, `docs-summarize-pr`)
 - **Versions**: semantic versioning, `MAJOR.MINOR.PATCH` with an optional `-SUFFIX`
 - **Files**: the filename does **not** have to match the `id`, and directory nesting is purely organisational — only `id` is ever referenced. For example `01_rulesets/coding/languages/coding-kotlin.yml` declares `id: coding-language-kotlin`.
-- **Skills**: either `04_skills/<id>.yml`, or a directory `04_skills/<name>/` containing `skill.yml` plus any files it ships
+- **Skills**: either `04_skills/<id>.yml`, or a directory `04_skills/<name>/` containing `skill.yml` plus any files it ships. A pointer skill, `04_skills/<id>/skill.yml`, instead points with `source` at a plain skill folder outside this repository — see [Pointer Skill](#pointer-skill)
 - **Deployments**: a directory under a `deployments` location holding a `project.yml` (deploys into a project directory) or a `user.yml` (deploys into the user scope of a tool) — the filename names the kind, the directory names the instance
 - **IDs across kinds**: unique per kind, so a `project.yml` and a `user.yml` may share an id, while two `user.yml` files may not
 
 ## Shared Fields
 
-Every manifest requires `id`, `description`, and `metadata`:
+Every manifest requires `id`, `description`, and `metadata`.
+The one exception is a pointer skill, which declares `source`: it takes its description from the `SKILL.md` in that folder and must not declare one.
 
 ```yaml
 metadata:
@@ -93,7 +94,7 @@ rulesets:
   - base
   - coding-language-.*
 fragments:
-  - confluence-mcp-tools
+  - authoring-engine-models
 rules:
   - "An extra rule that applies only to this agent."
 prompt: |
@@ -177,11 +178,67 @@ metadata:
     - kotlin
 ```
 
-A skill has only these fields.
+A skill has only these fields, plus the skill-level `source` of a pointer skill — see [Pointer Skill](#pointer-skill).
 There is no `command`, no `timeout_sec`, and no `outputs` — the engine generates documentation, it does not execute anything.
 
 Each entry in `sections` is exactly one of `text`, `ruleset`, or `fragment`.
-Each entry in `files` is either `{ path: ... }` or `{ source: ..., target: ... }`, resolved relative to the skill's own directory.
+Each entry in `files` is either `{ path: ... }` or `{ source: ..., target: ... }`.
+A relative `path` or `source` of a `files` entry resolves against the directory holding `skill.yml`, so a skill that ships files is a directory `04_skills/<name>/`.
+These paths are taken as written: a `${NAME}` in them is not substituted, and a leading `~` is not expanded.
+A standalone `04_skills/<id>.yml` can list only absolute paths; a relative one fails that skill's export in every deployment that selects it, the other artifacts are still written, and the run then exits with a failure.
+`target` is where the file lands inside the directory of the generated skill — for Claude, `.claude/skills/<id>/`, next to `SKILL.md`.
+
+### Pointer Skill
+
+Some skills must stay a plain Claude Code skill — a folder with a `SKILL.md` and its companion files — because people who do not use ai-tools use them directly.
+A *pointer skill* keeps its one copy of the content in that folder: its manifest only points at the folder with the skill-level `source` key (not the `source` of a `files` entry) and adds what ai-tools owns: `id` and `metadata`, whose tags the deployments select on.
+Put it in `04_skills/<id>/skill.yml`; a relative `source` resolves against the folder holding the manifest.
+
+```yaml
+# 04_skills/jira-ticket/skill.yml
+id: jira-ticket
+source: ${PROJECTS_FOLDER}/jira-confluence-mcp-server/skills/jira-ticket
+metadata:
+  version: 2.0.0
+  tags:
+    - jira
+    - ticket
+    - atlassian
+```
+
+The folder `source` names must hold a `SKILL.md` that starts with a YAML frontmatter:
+
+```markdown
+---
+name: jira-ticket
+description: Create, draft, update, and link Jira tickets. Use when ...
+---
+
+# Jira tickets
+
+Instructions ...
+```
+
+- `source` may reference the `env_vars` of `config.yml` and `config.local.yml`, or an environment variable, as `${NAME}` — the same way `deploy.directory` does.
+- After substitution, a `source` that is `~` or starts with `~/` resolves against the home directory of the user running the engine, again as `deploy.directory` does. `~user` is not expanded: it is read as a relative path whose first folder is named `~user`. A `~` anywhere else is part of the name.
+- Any other relative `source` resolves against the folder holding the manifest, not against the directory `deploy.sh` runs from.
+- The manifest must not declare `description`, `sections`, or `files` together with `source`; the run fails if it does.
+- `name` in the frontmatter must equal the manifest `id`.
+- The `description` of the frontmatter becomes the description of the deployed skill.
+- Only `name` and `description` are read from the frontmatter. Any other key, such as `allowed-tools`, is not deployed, and the run logs a warning naming it.
+- The text after the frontmatter, from its first line that is not empty, is deployed unchanged. Unlike a skill declared with `sections`, it gets no generated `# <id>` heading and no repeated description, so write your own heading.
+- Every other file in the folder, including files in subfolders and hidden files, is copied into the directory of the generated skill at the same relative path — for Claude, next to `SKILL.md`. There is no list to maintain.
+- A symbolic link inside the folder is followed and deployed as the file it points at. A link that points at nothing fails the run.
+- A `SKILL.md` saved with a UTF-8 byte order mark is read like one without it; the mark is not deployed.
+
+What the engine guarantees about the source folder:
+
+> The engine only reads the source folder of a pointer skill. Before a run writes or deletes anything, `--dry-run` included, it compares two kinds of path with the source folder of every pointer skill it loaded, whether a deployment selects that skill or not: every path it would write a skill to, and every directory `replace: true` would delete (in a project, the directories each tool generates: `.claude`, `.codex`, `.cursor`, `.windsurf`, `.agent`, and for GitHub Copilot `.github/prompts`, `.github/instructions`, and `.github/agents`; in the user scope, the directory of each skill, and for Codex also of each prompt and agent, that it rewrites). The run fails if such a path is, lies inside, or contains a source folder once symbolic links are resolved, or if a symbolic link anywhere below such a path leads to a path that does. During export, every companion file is checked once more, and one whose target lands, once links are resolved, in the folder it is copied from or in the source folder of any pointer skill the run loaded fails that skill. A replacing deploy never follows a symbolic link: it removes the link and leaves what the link leads to untouched. Other writes are not compared with source folders: the files of agents, prompts, commands, and features, and the instructions files (`CLAUDE.md`, `AGENTS.md`), are written without this check, except where they sit in a directory that `replace: true` deletes. Keep every source folder outside every directory a deployment writes to.
+
+Every skill manifest is loaded on every run, whether a deployment selects it or not.
+A missing folder, a missing `SKILL.md`, a frontmatter without `name` or `description`, or a `name` that differs from the `id` therefore fails the whole run, `./deploy.sh --dry-run` included, naming the manifest to fix.
+The folder must exist on every machine that runs a deploy: where it is not checked out, no deploy runs until you check it out, point `source` or the variable it uses elsewhere, or remove the manifest.
+The messages and their fixes are listed in [04_skills/README.md](04_skills/README.md#troubleshooting).
 
 ## Creating a Project
 
@@ -247,7 +304,8 @@ This is a common cause of a manifest silently disappearing from a deploy.
 It also causes `No rulesets match pattern ... excluded by project filter`: a ruleset an agent references must itself survive the project's `rulesets` filter, or the entire agent fails to export.
 
 Relative `deploy.directory` values resolve against `--working-dir`, which `deploy.sh` sets to this repository's root, so `.` is that root — the same base the `locations` paths of `config.yml` use.
-Prefer an absolute path for anything else.
+A value that is `~` or starts with `~/` resolves against the home directory of the user running the engine instead. `~user` is not expanded: it is read as a relative path whose first folder is named `~user`.
+Prefer an absolute path, or one under `~/`, for anything else.
 
 Any `${NAME}` reference in `deploy.directory` — or in a `locations` entry — is expanded first, from the `env_vars` of `config.local.yml`, then `config.yml`, then the environment. Because expansion precedes the rule above, a variable can supply the absolute base. A variable declared nowhere fails the run before anything is deployed. See [README.md](README.md#path-variables).
 
@@ -427,6 +485,13 @@ Use `fragments` for shared content; there is no include mechanism.
 2. Put the extra files in `04_skills/my-skill/`, and list them under `files`
 3. Run `./deploy.sh` — the files are copied next to the generated `SKILL.md`
 
+### Add a Pointer Skill
+
+1. Make sure the folder holds a `SKILL.md` whose frontmatter declares `name` and `description`, and that it lies outside every directory a deployment writes to
+2. Create `04_skills/<id>/skill.yml` with `id` equal to that `name`, `source` pointing at the folder, and `metadata` with a version and the tags your deployments select on
+3. Validate with `./deploy.sh --dry-run`
+4. Run `./deploy.sh` — the body of `SKILL.md` and every other file of the folder are deployed; edit them in their own repository, never in the generated copy
+
 ### Add a Rule to Every Project You Work On
 
 1. Add the rule to a ruleset that the `rulesets` filter of your `user.yml` selects — for this repository, a ruleset tagged `global`
@@ -439,7 +504,7 @@ Use `fragments` for shared content; there is no include mechanism.
 ./deploy.sh --dry-run
 ```
 
-A dry run does everything a deploy does except write: every manifest is decoded strictly (an unknown key, a missing required field, or a malformed version fails the run naming the file), every ruleset, fragment, and skill-file reference is resolved, and the log names each artifact a real run would write and where.
+A dry run does everything a deploy does except write: every manifest is decoded strictly (an unknown key, a missing required field, or a malformed version fails the run naming the file), every ruleset, fragment, and skill-file reference is resolved, every skill `source` folder is read, and the log names each artifact a real run would write and where.
 The exit status is the one a deploy would have had.
 
 A plain `./deploy.sh` validates the same way, but a successful run also deploys into every configured project and into your home. Do not use it just to validate.
@@ -449,7 +514,7 @@ There are no JSON schemas: the data classes in `ai-tools-engine/engine/.../model
 ## Security
 
 Never commit API keys, passwords, tokens, or PII.
-`${VAR}` is interpolated in declared paths only — `locations.*` in the config files, and `deploy.directory` in `project.yml`. Everywhere else, including all generated content, a `${VAR}` is emitted literally rather than resolved, so it will not keep a secret out of the generated files.
+`${VAR}` is interpolated in declared paths only — `locations.*` in the config files, `deploy.directory` in `project.yml`, and the skill-level `source` of a pointer skill. Everywhere else, including all generated content, a `${VAR}` is emitted literally rather than resolved, so it will not keep a secret out of the generated files.
 Keep machine-local paths and settings in `config.local.yml`, which is gitignored — declare a machine-specific base path as an `env_vars` variable there and reference it from the versioned manifests.
 
 ## Getting Help
@@ -470,7 +535,9 @@ Keep machine-local paths and settings in `config.local.yml`, which is gitignored
 
 **`No rulesets match pattern 'x'`**: the pattern matched nothing. The message lists similar available ids, and flags rulesets excluded by the project's filter.
 
-**`Unresolved variable 'X'`** / **`Cannot resolve the deploy directory of N project(s)`**: a `${X}` reference in a `locations` entry or a `deploy.directory` names a variable no `env_vars` map and no environment variable declares. The message names the variable and where it was read from. Nothing is deployed until every project's directory resolves.
+**`Unresolved variable 'X'`** / **`Cannot resolve the deploy directory of N project(s)`**: a `${X}` reference in a `locations` entry, a `deploy.directory`, or the `source` of a pointer skill names a variable no `env_vars` map and no environment variable declares. The message names the variable and where it was read from. Nothing is deployed until every project's directory resolves. For a `source`, the message starts with `Failed to load <manifest>:`, and the run stops before anything is deployed.
+
+**`Refusing to deploy: N path(s) the run would write or delete overlap the source folder of a pointer skill; nothing was written`**: a path the run would write a skill to, or a directory `replace: true` would delete, is, lies inside, or contains the source folder of a pointer skill once symbolic links are resolved, or holds a symbolic link leading to such a path — typically because the generated skill directory, such as `~/.claude/skills/<id>`, is a link to the source folder. Each line below the headline names the pointer skill, its manifest, its source folder, the tool, the deployment, the path, and what the deployment would do to it. Nothing is written, and `--dry-run` fails the same way. Follow the advice at the end of the line: remove the link or folder that leads there, deselect the skill, move the source folder out of the replaced directory, or turn off `replace` for that deployment. See [Pointer Skill](#pointer-skill) for what is checked.
 
 **`Export failed for N manifest(s)`**: N manifests could not be exported; the list below the headline names each one, together with every tool it failed for. The run still exports everything else before reporting, and exits non-zero.
 

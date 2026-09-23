@@ -12,6 +12,8 @@ import cz.cleanship.aitools.engine.data.expectedTextOnlySkill
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.data.sourceBackedSkill
+import cz.cleanship.aitools.engine.data.sourceBackedSkillBody
 import cz.cleanship.aitools.engine.data.textOnlySkill
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.ProjectContext
@@ -22,11 +24,16 @@ import cz.cleanship.aitools.engine.models.PromptVariable
 import cz.cleanship.aitools.engine.models.Version
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
+import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
+import cz.cleanship.aitools.engine.tools.prepare
+import cz.cleanship.aitools.engine.utils.SOURCE_BACKED_TEMPLATE
+import cz.cleanship.aitools.engine.utils.contentSnapshot
+import cz.cleanship.aitools.engine.utils.writeSourceBackedSkillFiles
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
@@ -297,6 +304,39 @@ class GitHubCopilotAdapterTest {
         // then
         assertThat(instructionsDir.resolve("feature-${featureContext.feature.id}.instructions.md").readText())
             .isEqualTo(withApplyToHeader(expectedFeature))
+    }
+
+    @Test
+    fun `should output a source-backed skill as the frontmatter followed by the source body verbatim`() {
+        // given
+        // - the source folder holding the companion file the loader listed for the skill
+        val sourceDir = writeSourceBackedSkillFiles(tempDir.toFile())
+        val sourceBefore = sourceDir.contentSnapshot()
+        val skillContext = SkillContext(sourceBackedSkill, sourceDir = sourceDir)
+
+        // when
+        adapter.export(tempDir.toFile(), skillContext)
+
+        // then
+        val content = promptsDir.resolve("skill-${sourceBackedSkill.id}.prompt.md").readText()
+        assertThat(content).isEqualTo("---\nname: ${sourceBackedSkill.id}\ndescription: ${Frontmatter.value(sourceBackedSkill.description)}\n---\n\n" + sourceBackedSkillBody)
+        assertThat(promptsDir.resolve("skill-${sourceBackedSkill.id}").resolve("templates/task.txt")).hasContent(SOURCE_BACKED_TEMPLATE)
+        assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+    }
+
+    @Test
+    fun `should name every path the export of a skill writes among the skill paths of that skill`() {
+        // given
+        val sourceDir = writeSourceBackedSkillFiles(tempDir.toFile())
+        val projectDir = tempDir.resolve("project").toFile()
+
+        // when
+        adapter.export(projectDir, SkillContext(sourceBackedSkill, sourceDir = sourceDir))
+
+        // then
+        val skillPaths = adapter.skillPaths(projectDir, sourceBackedSkill.id)
+        val written = projectDir.walkTopDown().filter { it.isFile }.toList()
+        assertThat(written).isNotEmpty.allSatisfy { file -> assertThat(skillPaths).anyMatch { file.startsWith(it) } }
     }
 
     @Test

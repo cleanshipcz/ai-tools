@@ -9,6 +9,8 @@ import cz.cleanship.aitools.engine.data.rulesets
 import cz.cleanship.aitools.engine.data.skillWithFragment
 import cz.cleanship.aitools.engine.data.skillWithMixedSections
 import cz.cleanship.aitools.engine.data.skillWithRuleset
+import cz.cleanship.aitools.engine.data.sourceBackedSkill
+import cz.cleanship.aitools.engine.data.sourceBackedSkillBody
 import cz.cleanship.aitools.engine.data.textOnlySkill
 import cz.cleanship.aitools.engine.utils.StringOutput
 import org.assertj.core.api.Assertions.assertThat
@@ -145,5 +147,35 @@ class SkillPrinterTest {
                 printer.print(context, it)
             }
         }
+    }
+
+    @Test
+    fun `should print the body of a source-backed skill verbatim without a heading or the description`() {
+        // given
+        val context = SkillContext(sourceBackedSkill)
+        val output = StringOutput()
+
+        // when
+        output.use {
+            printer.print(context, it)
+        }
+
+        // then
+        assertThat(output.getContent()).isEqualTo(sourceBackedSkillBody)
+    }
+
+    @Test
+    fun `should print an empty body of a source-backed skill as nothing`() {
+        // given
+        val context = SkillContext(sourceBackedSkill.copy(body = ""))
+        val output = StringOutput()
+
+        // when
+        output.use {
+            printer.print(context, it)
+        }
+
+        // then
+        assertThat(output.getContent()).isEmpty()
     }
 }

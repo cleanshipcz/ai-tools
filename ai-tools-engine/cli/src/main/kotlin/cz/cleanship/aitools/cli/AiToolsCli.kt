@@ -10,6 +10,8 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
 import cz.cleanship.aitools.engine.DeployDirectoryResolvingException
 import cz.cleanship.aitools.engine.ExportFailedException
+import cz.cleanship.aitools.engine.SkillSourceOverlapException
+import cz.cleanship.aitools.engine.UnreadableReplacedFolderException
 import cz.cleanship.aitools.engine.env.VariableSubstitutionException
 import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
@@ -17,6 +19,7 @@ import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
 import cz.cleanship.aitools.engine.services.RetiredConfigKeyException
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.nio.file.Paths
 
 class AiToolsCli(
@@ -31,14 +34,9 @@ class AiToolsCli(
     ).default(Paths.get("."))
 
     /**
-     * Where a `user.yml` deploys to. It defaults to the home of whoever runs the command, which is the only home a
-     * deploy is meant to reach; the option exists so that a run can be pointed at a directory of its own instead -
-     * a trial run into a scratch directory, or a test that must never write into a real home.
+     * Where a `user.yml` deploys to. It defaults to the home of whoever runs the command, which is the only home a deploy is meant to reach; the option exists so that a run can be pointed at a directory of its own instead - a trial run into a scratch directory, or a test that must never write into a real home.
      *
-     * A relative value resolves against `--working-dir` - see [run] - which is the base every other declared path of
-     * a run uses. An empty value is rejected rather than resolved: it would silently mean "the directory the shell
-     * happens to be in", which is never what someone typing this option intends. A home that does not exist yet is
-     * allowed, because a first deploy onto a fresh machine is legitimate; the engine says so in its log.
+     * A relative value resolves against `--working-dir` - see [run] - which is the base every other declared path of a run uses. An empty value is rejected rather than resolved: it would silently mean "the directory the shell happens to be in", which is never what someone typing this option intends. A home that does not exist yet is allowed, because a first deploy onto a fresh machine is legitimate; the engine says so in its log.
      */
     private val userHome by option(
         "--user-home",
@@ -49,9 +47,7 @@ class AiToolsCli(
         .check("--user-home must name a directory, not an empty path") { it.toString().isNotEmpty() }
 
     /**
-     * Validates the manifests without deploying them: the run loads, filters and renders everything a deploy does
-     * and fails on exactly what a deploy fails on, but creates, deletes and modifies nothing on disk. It is the way
-     * to check a manifest set before letting a deploy rewrite the projects and the home it reaches.
+     * Validates the manifests without deploying them: the run loads, filters and renders everything a deploy does and fails on exactly what a deploy fails on, but creates, deletes and modifies nothing on disk. It is the way to check a manifest set before letting a deploy rewrite the projects and the home it reaches.
      */
     private val dryRun by option(
         "--dry-run",
@@ -59,8 +55,7 @@ class AiToolsCli(
     ).flag()
 
     /**
-     * Runs the export, translating the failures a manifest author can actually fix into a [CliktError] so the
-     * process reports them on stderr and exits non-zero instead of reporting success.
+     * Runs the export, translating the failures a manifest author can actually fix into a [CliktError] so the process reports them on stderr and exits non-zero instead of reporting success.
      */
     override fun run() {
         try {
@@ -77,9 +72,16 @@ class AiToolsCli(
             throw failure(ex.message, ex)
         } catch (ex: DeployDirectoryResolvingException) {
             throw failure(ex.message, ex)
+        } catch (ex: SkillSourceOverlapException) {
+            throw failure(ex.message, ex)
         } catch (ex: ArtifactPathException) {
             throw failure(ex.message, ex)
         } catch (ex: RetiredConfigKeyException) {
+            throw failure(ex.message, ex)
+        } catch (ex: UnreadableReplacedFolderException) {
+            throw failure(ex.message, ex)
+        } catch (ex: IOException) {
+            // A replacing deploy that cannot delete an entry stops midway; the engine names the project, the tool and the entry, which is what the operator needs rather than a stack trace.
             throw failure(ex.message, ex)
         }
         if (dryRun) {
@@ -88,8 +90,7 @@ class AiToolsCli(
     }
 
     /**
-     * A failing dry run is still a dry run: its error reads exactly like the one a deploy reports, so the mode is
-     * said once more above it, along with the one thing the reader most wants to know - that nothing was touched.
+     * A failing dry run is still a dry run: its error reads exactly like the one a deploy reports, so the mode is said once more above it, along with the one thing the reader most wants to know - that nothing was touched.
      */
     private fun failure(message: String?, cause: Exception): CliktError {
         val reported = if (dryRun) "$DRY_RUN_FAILED\n$message" else message

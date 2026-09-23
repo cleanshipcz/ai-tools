@@ -13,6 +13,7 @@ import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.replacing
 import java.io.File
 
 class CursorAdapter(
@@ -22,15 +23,10 @@ class CursorAdapter(
 
     override val toolType: ToolType = ToolType.CURSOR
 
-    override fun prepare(projectDir: File, project: ProjectManifest) {
-        if (project.deploy.replace) {
-            cursorDir(projectDir).deleteRecursively()
-        }
-    }
+    override fun replacedPaths(projectDir: File, project: ProjectManifest): List<File> = project.replacing(cursorDir(projectDir))
 
     /**
-     * Returns no exporter: the per-user layout of Cursor is not implemented yet, so the engine reports a
-     * user deployment naming this tool as skipped for it instead of writing anything into the home.
+     * Returns no exporter: the per-user layout of Cursor is not implemented yet, so the engine reports a user deployment naming this tool as skipped for it instead of writing anything into the home.
      */
     override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter? = null
 
@@ -55,7 +51,7 @@ class CursorAdapter(
 
     override fun export(projectDir: File, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
-        cursorDir(projectDir).resolve("commands").resolve("prompt-${promptContext.prompt.id}.md"),
+        commandsDir(projectDir).resolve("prompt-${promptContext.prompt.id}.md"),
     ) {
         printers.promptPrinter.print(promptContext, it)
     }
@@ -95,17 +91,27 @@ class CursorAdapter(
         val skillId = skillContext.skill.id
         exportService.export(
             skillContext.skill,
-            cursorDir(projectDir).resolve("commands").resolve("skill-$skillId.md"),
+            skillFile(projectDir, skillId),
         ) {
             printers.skillPrinter.print(skillContext, it)
         }
         exportService.copySkillFiles(
             skillContext.skill.files,
             skillContext.sourceDir,
-            cursorDir(projectDir).resolve("commands").resolve("skill-$skillId"),
+            skillFilesDir(projectDir, skillId),
             skillId,
+            skillContext.pointerSourceDirs,
         )
     }
+
+    override fun skillPaths(projectDir: File, skillId: String): List<File> =
+        listOf(skillFile(projectDir, skillId), skillFilesDir(projectDir, skillId))
+
+    private fun skillFile(projectDir: File, skillId: String) = commandsDir(projectDir).resolve("skill-$skillId.md")
+
+    private fun skillFilesDir(projectDir: File, skillId: String) = commandsDir(projectDir).resolve("skill-$skillId")
+
+    private fun commandsDir(projectDir: File) = cursorDir(projectDir).resolve("commands")
 
     private fun cursorDir(projectDir: File) = projectDir.resolve(".cursor")
 }

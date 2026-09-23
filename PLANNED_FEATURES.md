@@ -72,7 +72,7 @@
 - **Warn on out-of-directory skill sources for standalone skills.** `ExportService` warns when a companion file comes from outside the skill's own directory, but only when a `sourceDir` is known; a standalone `<id>.yml` skill has `sourceDir == null`, so its `files` are copied without a word (SEC-16 residual).
 - **Emit per-ruleset provenance** in the generated user-scope instructions files, so a rule in `~/.claude/CLAUDE.md` names the ruleset manifest it came from instead of being flattened into an anonymous list (SEC-7 note).
 - **Cycle detection in the loader's directory walk.** `LoaderService.findYamlFiles` uses `walkTopDown`, which follows symbolic links and has no loop detection, so a linked cycle under a configured location does not terminate (SEC-10).
-- **`HOME_FOLDER: "~"` in `config.yml` is a literal path**, not the home directory - nothing expands a tilde, so a value referencing it resolves to a directory literally named `~` (SEC-11).
+- **DONE** a leading `~` or `~/` in every declared path - `locations.*`, `deploy.directory`, the `source` of a pointer skill, and `--user-home` - resolves against the home directory, so `HOME_FOLDER: "~"` in `config.yml` is the home directory (SEC-11). See [README.md](README.md#path-variables).
 
 ## Known issues
 
@@ -99,10 +99,7 @@ Raised by the analysis and code review in `.delivery/project-improvements/`. Not
 
 ### `prepare()` swallows cleanup failures
 
-- All six adapters discard the `Boolean` returned by `deleteRecursively()`, which does not throw on failure.
-- With `deploy.replace: true`, a permission error during cleanup is silently ignored: stale files from a previous
-  run survive and mix with new output while the run reports success.
-- Pre-existing, and the one genuinely swallowed failure left in the export path.
+- **DONE** a replacing deploy deletes through `deleteTreeWithoutFollowingLinks`, which stops the run with an `IOException` naming the project, the tool, and the entry instead of ignoring a failed delete. A replaced directory holding a folder the deploy cannot read is refused before anything is written, `--dry-run` included.
 
 ### Smaller items
 

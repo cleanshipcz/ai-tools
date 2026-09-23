@@ -17,14 +17,20 @@ import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
 import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
+import cz.cleanship.aitools.engine.utils.contentSnapshot
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
 import java.nio.file.Path
 
 class ToolsEngineTest {
@@ -41,8 +47,7 @@ class ToolsEngineTest {
     private lateinit var destination: File
 
     /**
-     * The home base every engine of this class deploys the user scope under. It is a directory of the test's own
-     * temporary tree, so no test can reach the real home of whoever runs the suite.
+     * The home base every engine of this class deploys the user scope under. It is a directory of the test's own temporary tree, so no test can reach the real home of whoever runs the suite.
      */
     private lateinit var userHome: File
     private lateinit var engine: ToolsEngine
@@ -221,9 +226,7 @@ class ToolsEngineTest {
                 variables = VariableResolver(emptyMap(), emptyEnvironment),
                 tools = listOf(ClaudeAdapter()),
             )
-            // - the project that resolves and the one that does not live under separate roots, because manifests
-            //   within one directory are found in whatever order the filesystem lists them, while the roots
-            //   themselves are read in the order they are configured - so this one is provably read first
+            // - the project that resolves and the one that does not live under separate roots, because manifests within one directory are found in whatever order the filesystem lists them, while the roots themselves are read in the order they are configured - so this one is provably read first
             writeProject(deployDirectory = destination.absolutePath)
             writeProject("broken-project", "broken-project", "\${MISSING_FOLDER}/custom-ai-tools", root = "late-deployments")
             val twoProjectRoots = locations().copy(
@@ -629,8 +632,7 @@ class ToolsEngineTest {
         @Test
         fun `should export nothing when two rulesets share an id`() {
             // given
-            // - rulesets are shared by every project, and a project with no ruleset filter deploys all of them,
-            //   so exporting anything would silently ship content that lost one of its two sources
+            // - rulesets are shared by every project, and a project with no ruleset filter deploys all of them, so exporting anything would silently ship content that lost one of its two sources
             writeRuleset("base", fileName = "duplicate-of-base.yml")
             writeAgent("good-agent", "base")
 
@@ -702,9 +704,7 @@ class ToolsEngineTest {
     }
 
     /**
-     * A run that deploys nothing has to say so. The engine already refuses to be silent about a run that configures
-     * no tools, and a run that configures no deployment locations - or finds no manifest under them - is the same
-     * misconfiguration seen from the other side, most often a `config.local.yml` left on the retired key.
+     * A run that deploys nothing has to say so. The engine already refuses to be silent about a run that configures no tools, and a run that configures no deployment locations - or finds no manifest under them - is the same misconfiguration seen from the other side, most often a `config.local.yml` left on the retired key.
      */
     @Nested
     inner class NothingToDeploy {
@@ -747,8 +747,7 @@ class ToolsEngineTest {
         @Test
         fun `should not explain manifest layout when the manifests were found and dropped for an ambiguous id`() {
             // given
-            // - the only manifests of this run collide, so they were found and rejected rather than never written;
-            //   the error naming the collision already says what happened
+            // - the only manifests of this run collide, so they were found and rejected rather than never written; the error naming the collision already says what happened
             val collidingRoot = workspace.resolve("colliding")
             writeProject("alpha", "duplicated-project", root = "colliding")
             writeProject("beta", "duplicated-project", root = "colliding")
@@ -913,8 +912,7 @@ class ToolsEngineTest {
         @Test
         fun `should deploy the unaffected user deployment when another one is broken`() {
             // given
-            // - the two deploy through different tools, so each owns its own instructions file and the assertion
-            //   below does not depend on which of them the loader happened to walk last
+            // - the two deploy through different tools, so each owns its own instructions file and the assertion below does not depend on which of them the loader happened to walk last
             val multiAdapterEngine =
                 ToolsEngine(workspace, userHome = userHome, tools = listOf(ClaudeAdapter(), CodexAdapter()))
             writeAgent("broken-agent", "missing-ruleset")
@@ -1097,9 +1095,441 @@ class ToolsEngineTest {
     }
 
     /**
-     * A dry run loads, filters and renders exactly what a deploy does and reports the same failures, while nothing
-     * on disk is created, deleted or modified. The adapters come from [ToolFactory] here, the way the CLI builds
-     * them, so that the engine flag and the adapters' sink are proven to act together.
+     * A skill manifest pointing at a plain SKILL.md skill is deployed with the content of that folder, and the folder is found through the same variables of the run a deploy directory is resolved with.
+     */
+    @Nested
+    inner class SkillSources {
+
+        @Test
+        fun `should deploy a pointer skill with the body and companion files of its source folder`() {
+            // given
+            // - the plain skill lives in another repository, reached through a variable of the run
+            val projectsFolder = tempDir.resolve("projects").toFile()
+            val sourceDir = writePlainSkill(projectsFolder.resolve("mcp/skills/jira-ticket"), "jira-ticket")
+            sourceDir.resolve("templates").mkdirs()
+            sourceDir.resolve("templates/task.txt").writeText("Task template.\n")
+            writePointerSkill("jira-ticket", "\${PROJECTS_FOLDER}/mcp/skills/jira-ticket")
+            val variableEngine = ToolsEngine(
+                workspace,
+                variables = VariableResolver(mapOf("PROJECTS_FOLDER" to projectsFolder.absolutePath), emptyEnvironment),
+                userHome = userHome,
+                tools = listOf(ClaudeAdapter()),
+            )
+
+            // when
+            variableEngine.process(locations())
+
+            // then
+            val skillDir = destination.resolve(".claude/skills/jira-ticket")
+            assertThat(skillDir.resolve("SKILL.md").readText()).isEqualTo(
+                "---\nname: jira-ticket\ndescription: \"The jira-ticket skill\"\n---\n\n# jira-ticket\n\nPlain body.\n",
+            )
+            assertThat(skillDir.resolve("templates/task.txt")).hasContent("Task template.")
+        }
+
+        @Test
+        fun `should fail before writing anything naming the manifest, the source and the target when the skill directory is a link to the source folder`() {
+            // given
+            // - a generated skill directory left behind as a link to the very folder the skill is read from
+            val sourceDir = writeSourceFolderWithTemplate(tempDir.resolve("projects/mcp/skills/jira-ticket").toFile())
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            writeAgent("good-agent", "base")
+            val target = destination.resolve(".claude/skills/jira-ticket")
+            target.parentFile.mkdirs()
+            Files.createSymbolicLink(target.toPath(), sourceDir.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining(target.absolutePath)
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+            assertThat(agentFile("good-agent")).doesNotExist()
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - the generated skill directory is the source folder itself
+            ".claude/skills/jira-ticket",
+            // - the generated skill directory lies inside the source folder
+            ".claude/skills",
+            // - the generated skill directory contains the source folder
+            ".claude/skills/jira-ticket/vendor",
+        )
+        fun `should leave the source folder untouched when a replacing deploy would write its skill over it`(
+            sourceUnderDestination: String,
+        ) {
+            // given
+            // - the project replaces its .claude directory, which would delete the source folder along with it
+            writeProject(replace = true)
+            val sourceDir = writeSourceFolderWithTemplate(destination.resolve(sourceUnderDestination))
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining(destination.resolve(".claude/skills/jira-ticket").absolutePath)
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail before writing anything when the skill directory of the user scope is a link to the source folder`() {
+            // given
+            // - the home keeps the plain skill installed by hand as a link to its checkout, and a user deployment selects the pointer skill as well
+            val sourceDir = writeSourceFolderWithTemplate(tempDir.resolve("projects/mcp/skills/jira-ticket").toFile())
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            writeUserDeployment(replace = true)
+            val target = userHome.resolve(".claude/skills/jira-ticket")
+            target.parentFile.mkdirs()
+            Files.createSymbolicLink(target.toPath(), sourceDir.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining(target.absolutePath)
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(Files.isSymbolicLink(target.toPath())).isTrue()
+            // - not even the project of the same run, which is exported before the home, was written
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+            assertThat(userHome.resolve(".claude/CLAUDE.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail before writing anything when a replacing deploy would delete the source folder of a skill it does not select`() {
+            // given
+            // - the plain skill sits where Claude Code looks for the skills of a project, and the project replaces its .claude directory without selecting it
+            writeProject(replace = true, skillFilter = emptyList())
+            val sourceDir = writeSourceFolderWithTemplate(destination.resolve(".claude/skills/jira-ticket"))
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining("'${destination.resolve(".claude").absolutePath}'")
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail before writing anything when a replacing deploy would delete a source folder beside the skill directory it writes`() {
+            // given
+            // - the source folder of the selected skill sits in the replaced .claude directory, but not where the skill is written
+            writeProject(replace = true)
+            val sourceDir = writeSourceFolderWithTemplate(destination.resolve(".claude/vendor/jira-ticket"))
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining("'${destination.resolve(".claude").absolutePath}'")
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail before writing anything when the replaced directory holds a link to a folder of source folders`() {
+            // given
+            // - the skills folder of the project links to the shared checkout of plain skills, which the project does not select
+            writeProject(replace = true, skillFilter = emptyList())
+            val skillsFolder = tempDir.resolve("projects/mcp/skills").toFile()
+            val sourceDir = writeSourceFolderWithTemplate(skillsFolder.resolve("jira-ticket"))
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val link = destination.resolve(".claude/skills")
+            link.parentFile.mkdirs()
+            Files.createSymbolicLink(link.toPath(), skillsFolder.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining("'${link.absolutePath}'")
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(Files.isSymbolicLink(link.toPath())).isTrue()
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+        }
+
+        @ParameterizedTest
+        @CsvSource("true", "false")
+        fun `should fail before writing anything when a folder inside the generated skill directory links into the source folder`(
+            replace: Boolean,
+        ) {
+            // given
+            // - the generated skill directory is real, but its templates folder links back to the templates of the source
+            writeProject(replace = replace)
+            val sourceDir = writeSourceFolderWithTemplate(tempDir.resolve("projects/mcp/skills/jira-ticket").toFile())
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val link = destination.resolve(".claude/skills/jira-ticket/templates")
+            link.parentFile.mkdirs()
+            Files.createSymbolicLink(link.toPath(), sourceDir.resolve("templates").toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining("'${link.absolutePath}'")
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail before writing anything when another skill would be written through a link into the source folder`() {
+            // given
+            // - a plain skill installed by hand under another name links the directory of the in-repository skill 'other' to the source folder of 'jira-ticket'
+            val sourceDir = writeSourceFolderWithTemplate(tempDir.resolve("projects/mcp/skills/jira-ticket").toFile())
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            writeTextSkill("other")
+            val link = destination.resolve(".claude/skills/other")
+            link.parentFile.mkdirs()
+            Files.createSymbolicLink(link.toPath(), sourceDir.toPath())
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining("Skill 'jira-ticket' (${manifest.absolutePath})")
+                .hasMessageContaining("the skill 'other'")
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining("'${link.absolutePath}'")
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail before writing anything when the deploy directory climbs out of a link onto the source folder`() {
+            // given
+            // - 'lnk' leads to 'deep/inner', so the deploy directory 'lnk/../proj' is 'deep/proj' on disk, which holds the source folder where the skill is written
+            val workspaceRoot = tempDir.resolve("j").toFile()
+            workspaceRoot.resolve("deep/inner").mkdirs()
+            Files.createSymbolicLink(workspaceRoot.resolve("lnk").toPath(), workspaceRoot.resolve("deep/inner").toPath())
+            writeProject(deployDirectory = "${workspaceRoot.absolutePath}/lnk/../proj")
+            val sourceDir = writeSourceFolderWithTemplate(workspaceRoot.resolve("deep/proj/.claude/skills/jira-ticket"))
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(workspaceRoot.resolve("deep/proj/CLAUDE.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should replace the directory and keep what a link inside it leads to when that holds no source folder`() {
+            // given
+            writeProject(replace = true)
+            val sourceDir = writeSourceFolderWithTemplate(tempDir.resolve("projects/mcp/skills/jira-ticket").toFile())
+            writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val elsewhere = tempDir.resolve("elsewhere/notes.md").toFile()
+            elsewhere.parentFile.mkdirs()
+            elsewhere.writeText("Kept by hand.\n")
+            val link = destination.resolve(".claude/vendor")
+            link.parentFile.mkdirs()
+            Files.createSymbolicLink(link.toPath(), elsewhere.parentFile.toPath())
+
+            // when
+            engine.process(locations())
+
+            // then
+            assertThat(elsewhere).hasContent("Kept by hand.\n")
+            assertThat(Files.exists(link.toPath(), java.nio.file.LinkOption.NOFOLLOW_LINKS)).isFalse()
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(destination.resolve(".claude/skills/jira-ticket/SKILL.md")).exists()
+        }
+
+        @Test
+        fun `should fail before writing anything when a replacing user deployment would delete a prompt directory holding a source folder`() {
+            // given
+            // - Codex keeps prompts as skill directories in the home, and a replacing user deploy deletes each one before writing it again
+            val codexEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(CodexAdapter()))
+            writePrompt("review", "base")
+            writeUserDeployment(tools = listOf("codex"), replace = true, promptFilter = listOf("review"))
+            val promptDir = userHome.resolve(".codex/skills/prompt-review")
+            val sourceDir = writeSourceFolderWithTemplate(promptDir.resolve("vendor/jira-ticket"))
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val sourceBefore = sourceDir.contentSnapshot()
+
+            // when
+            val error = runCatching { codexEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining("'${promptDir.absolutePath}'")
+                .hasMessageContaining("user deployment 'globals'")
+            assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+            assertThat(userHome.resolve(".codex/AGENTS.md")).doesNotExist()
+        }
+
+        @Test
+        fun `should write nothing into the source folder of another pointer skill that a chain of links leads to`() {
+            // given
+            // - the project selects only 'probe'; its generated templates folder links to 'shared', and 'shared/sub' links to the source folder of 'second'
+            writeProject(skillFilter = listOf("probe"))
+            val probeSource = writePlainSkill(tempDir.resolve("src/probe").toFile(), "probe")
+            probeSource.resolve("templates/sub").mkdirs()
+            probeSource.resolve("templates/sub/s.txt").writeText("Probe template.\n")
+            writePointerSkill("probe", probeSource.absolutePath)
+            val secondSource = writePlainSkill(tempDir.resolve("src/second").toFile(), "second")
+            writePointerSkill("second", secondSource.absolutePath)
+            val shared = tempDir.resolve("shared").toFile()
+            shared.mkdirs()
+            Files.createSymbolicLink(shared.resolve("sub").toPath(), secondSource.toPath())
+            val templates = destination.resolve(".claude/skills/probe/templates")
+            templates.parentFile.mkdirs()
+            Files.createSymbolicLink(templates.toPath(), shared.toPath())
+            val secondBefore = secondSource.contentSnapshot()
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("skill 'probe'")
+                .hasMessageContaining(secondSource.absolutePath)
+            assertThat(secondSource.contentSnapshot()).isEqualTo(secondBefore)
+            assertThat(secondSource.resolve("s.txt")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail the run naming the manifest when the source folder does not exist`() {
+            // given
+            val missing = tempDir.resolve("projects/missing").toFile()
+            val manifest = writePointerSkill("jira-ticket", missing.absolutePath)
+
+            // when
+            val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(missing.absolutePath)
+            assertThat(destination).doesNotExist()
+        }
+    }
+
+    @Nested
+    inner class ReplacedDirectories {
+
+        @ParameterizedTest
+        @CsvSource("true", "false")
+        fun `should fail before deleting anything naming the project, the tool and the folder when a replaced directory holds a folder it cannot read`(
+            dryRun: Boolean,
+        ) {
+            // given
+            // - deleting the replaced .claude directory would stop at the locked folder after having deleted what came before it
+            writeProject(replace = true)
+            val earlier = destination.resolve(".claude/old.md")
+            earlier.parentFile.mkdirs()
+            earlier.writeText("Written by an earlier deploy.\n")
+            val locked = destination.resolve(".claude/locked")
+            locked.mkdirs()
+            val runEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ToolFactory.create(ToolType.CLAUDE, dryRun)), dryRun = dryRun)
+            locked.setReadable(false)
+            try {
+                // - a superuser reads the folder regardless of its permissions, so the failure cannot be provoked there
+                assumeFalse(locked.canRead())
+
+                // when
+                val error = runCatching { runEngine.process(locations()) }.exceptionOrNull()
+
+                // then
+                assertThat(error)
+                    .isInstanceOf(UnreadableReplacedFolderException::class.java)
+                    .hasMessageContaining("project 'test-project'")
+                    .hasMessageContaining("claude")
+                    .hasMessageContaining("'${locked.absolutePath}'")
+                assertThat(earlier).hasContent("Written by an earlier deploy.\n")
+                assertThat(destination.resolve("CLAUDE.md")).doesNotExist()
+            } finally {
+                locked.setReadable(true)
+            }
+        }
+
+        @Test
+        fun `should fail naming the project, the tool and the path when a replaced directory cannot be deleted`() {
+            // given
+            // - the folder can be read, so the check before the run passes, but the file in it cannot be removed
+            writeProject(replace = true)
+            val readOnly = destination.resolve(".claude/read-only")
+            readOnly.mkdirs()
+            val kept = readOnly.resolve("kept.md")
+            kept.writeText("Cannot be deleted.\n")
+            readOnly.setWritable(false)
+            try {
+                // - a superuser deletes regardless of permissions, so the failure cannot be provoked there
+                assumeFalse(readOnly.canWrite())
+
+                // when
+                val error = runCatching { engine.process(locations()) }.exceptionOrNull()
+
+                // then
+                assertThat(error)
+                    .isInstanceOf(IOException::class.java)
+                    .hasMessageContaining("project 'test-project'")
+                    .hasMessageContaining("claude")
+                    .hasMessageContaining("'${kept.absolutePath}'")
+            } finally {
+                readOnly.setWritable(true)
+            }
+        }
+    }
+
+    /**
+     * A dry run loads, filters and renders exactly what a deploy does and reports the same failures, while nothing on disk is created, deleted or modified. The adapters come from [ToolFactory] here, the way the CLI builds them, so that the engine flag and the adapters' sink are proven to act together.
      */
     @Nested
     inner class DryRun {
@@ -1219,6 +1649,77 @@ class ToolsEngineTest {
                 .isInstanceOf(ExportFailedException::class.java)
                 .hasMessageContaining("missing.md")
             assertThat(destination).doesNotExist()
+        }
+
+        @Test
+        fun `should fail naming the manifest when a pointer skill names a source folder without a SKILL md`() {
+            // given
+            val sourceDir = tempDir.resolve("projects/jira-ticket").toFile()
+            sourceDir.mkdirs()
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+
+            // when
+            val error = runCatching { dryRunEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.resolve("SKILL.md").absolutePath)
+            assertThat(destination).doesNotExist()
+        }
+
+        @Test
+        fun `should fail naming the manifest, the source and the target when the skill directory is a link to the source folder`() {
+            // given
+            val sourceDir = writeSourceFolderWithTemplate(tempDir.resolve("projects/mcp/skills/jira-ticket").toFile())
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+            val target = destination.resolve(".claude/skills/jira-ticket")
+            target.parentFile.mkdirs()
+            Files.createSymbolicLink(target.toPath(), sourceDir.toPath())
+
+            // when
+            val error = runCatching { dryRunEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining(target.absolutePath)
+        }
+
+        @Test
+        fun `should fail naming the replaced directory when a replacing deploy would delete the source folder of a skill it does not select`() {
+            // given
+            writeProject(replace = true, skillFilter = emptyList())
+            val sourceDir = writeSourceFolderWithTemplate(destination.resolve(".claude/skills/jira-ticket"))
+            val manifest = writePointerSkill("jira-ticket", sourceDir.absolutePath)
+
+            // when
+            val error = runCatching { dryRunEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillSourceOverlapException::class.java)
+                .hasMessageContaining(manifest.absolutePath)
+                .hasMessageContaining(sourceDir.absolutePath)
+                .hasMessageContaining("'${destination.resolve(".claude").absolutePath}'")
+        }
+
+        @Test
+        fun `should resolve a deploy directory starting with a tilde against the home of the user running the engine`() {
+            // given
+            // - a dry run writes nothing, so naming a directory under the real home is safe here
+            writeProject(deployDirectory = "~/.ai-tools-engine-test-destination")
+            val expected = File(System.getProperty("user.home"), ".ai-tools-engine-test-destination")
+
+            // when
+            dryRunEngine.process(locations())
+
+            // then
+            assertThat(sinkAppender.list.map { it.formattedMessage }).anyMatch { it.contains(expected.resolve("CLAUDE.md").absolutePath) }
+            assertThat(workspace.resolve("~")).doesNotExist()
         }
 
         @Test
@@ -1377,8 +1878,8 @@ class ToolsEngineTest {
     }
 
     /**
-     * @param root the configured `locations.deployments` directory to write this project under, which decides when the
-     * loader reads it relative to the projects of another root
+     * @param root the configured `locations.deployments` directory to write this project under, which decides when the loader reads it relative to the projects of another root
+     * @param skillFilter the skill ids the project whitelists, or `null` for every skill there is
      */
     // A test builder: every parameter is one field of the manifest with the default a test rarely needs to change.
     @Suppress("LongParameterList")
@@ -1389,16 +1890,17 @@ class ToolsEngineTest {
         tools: List<String>? = null,
         root: String = "deployments",
         replace: Boolean = false,
+        skillFilter: List<String>? = null,
     ) = writeYaml(
         "$root/$directoryName/project.yml",
         "id: $id\ndescription: A project\n" +
             "context:\n  documentation:\n    readme: README.md\n" +
-            "deploy:\n  directory: \"$deployDirectory\"\n  replace: $replace\n" + toolsDeclaration(tools),
+            "deploy:\n  directory: \"$deployDirectory\"\n  replace: $replace\n" + toolsDeclaration(tools) +
+            whitelistDeclaration("skills", skillFilter).lineSequence().filter { it.isNotEmpty() }.joinToString("") { "  $it\n" },
     )
 
     /**
-     * Renders the optional `deploy.tools` list: absent for `null`, an explicit empty list for an empty one, since
-     * the two mean opposite things to the engine.
+     * Renders the optional `deploy.tools` list: absent for `null`, an explicit empty list for an empty one, since the two mean opposite things to the engine.
      */
     private fun toolsDeclaration(tools: List<String>?) = when {
         tools == null -> ""
@@ -1436,8 +1938,7 @@ class ToolsEngineTest {
     }
 
     /**
-     * Renders a whitelist filter for one kind: absent for `null`, which selects everything of that kind, and an
-     * empty list of ids - which selects nothing - for an empty one.
+     * Renders a whitelist filter for one kind: absent for `null`, which selects everything of that kind, and an empty list of ids - which selects nothing - for an empty one.
      */
     private fun whitelistDeclaration(kind: String, ids: List<String>?) = when {
         ids == null -> ""
@@ -1452,6 +1953,29 @@ class ToolsEngineTest {
         "deployments/$projectDirectoryName/features/$fileName",
         "id: $id\ndescription: A feature\nprompt: A feature prompt\n",
     )
+
+    private fun writeTextSkill(id: String) = writeYaml(
+        "skills/$id.yml",
+        "id: $id\ndescription: A skill\nsections:\n  - text: Some skill content\n",
+    )
+
+    private fun writePointerSkill(id: String, source: String) = writeYaml(
+        "skills/$id/skill.yml",
+        "id: $id\nsource: \"$source\"\n",
+    )
+
+    private fun writeSourceFolderWithTemplate(directory: File): File {
+        writePlainSkill(directory, "jira-ticket")
+        directory.resolve("templates").mkdirs()
+        directory.resolve("templates/task.txt").writeText("Task template.\n")
+        return directory
+    }
+
+    private fun writePlainSkill(directory: File, name: String): File {
+        directory.mkdirs()
+        directory.resolve("SKILL.md").writeText("---\nname: $name\ndescription: The $name skill\n---\n\n# $name\n\nPlain body.\n")
+        return directory
+    }
 
     private fun writeYaml(relativePath: String, content: String): File {
         val file = workspace.resolve(relativePath)

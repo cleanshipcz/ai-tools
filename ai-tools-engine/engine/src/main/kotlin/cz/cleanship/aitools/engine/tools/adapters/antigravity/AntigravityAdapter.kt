@@ -13,6 +13,7 @@ import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.replacing
 import java.io.File
 
 class AntigravityAdapter(
@@ -22,15 +23,10 @@ class AntigravityAdapter(
 
     override val toolType: ToolType = ToolType.ANTIGRAVITY
 
-    override fun prepare(projectDir: File, project: ProjectManifest) {
-        if (project.deploy.replace) {
-            agentDir(projectDir).deleteRecursively()
-        }
-    }
+    override fun replacedPaths(projectDir: File, project: ProjectManifest): List<File> = project.replacing(agentDir(projectDir))
 
     /**
-     * Returns no exporter: the per-user layout of Antigravity is not implemented yet, so the engine reports a
-     * user deployment naming this tool as skipped for it instead of writing anything into the home.
+     * Returns no exporter: the per-user layout of Antigravity is not implemented yet, so the engine reports a user deployment naming this tool as skipped for it instead of writing anything into the home.
      */
     override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter? = null
 
@@ -86,7 +82,7 @@ class AntigravityAdapter(
         val skillId = skillContext.skill.id
         exportService.export(
             skillContext.skill,
-            rulesDir(projectDir).resolve("skill-$skillId.md"),
+            skillFile(projectDir, skillId),
         ) {
             it.appendText(ruleHeader)
             printers.skillPrinter.print(skillContext, it)
@@ -94,10 +90,18 @@ class AntigravityAdapter(
         exportService.copySkillFiles(
             skillContext.skill.files,
             skillContext.sourceDir,
-            rulesDir(projectDir).resolve("skill-$skillId"),
+            skillFilesDir(projectDir, skillId),
             skillId,
+            skillContext.pointerSourceDirs,
         )
     }
+
+    override fun skillPaths(projectDir: File, skillId: String): List<File> =
+        listOf(skillFile(projectDir, skillId), skillFilesDir(projectDir, skillId))
+
+    private fun skillFile(projectDir: File, skillId: String) = rulesDir(projectDir).resolve("skill-$skillId.md")
+
+    private fun skillFilesDir(projectDir: File, skillId: String) = rulesDir(projectDir).resolve("skill-$skillId")
 
     private fun agentDir(projectDir: File) = projectDir.resolve(".agent")
 

@@ -3,19 +3,45 @@ package cz.cleanship.aitools.engine.models
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.Transient
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
+/**
+ * A skill: instructions an assistant loads on demand, either declared in this manifest or, for a pointer skill, taken from a plain `SKILL.md` skill in the folder [source] names.
+ */
 @Serializable
 data class SkillManifest(
     override val id: String,
-    override val description: String,
+    /**
+     * What the skill does, as its generated skill files describe it.
+     *
+     * For a pointer skill, it is the `description` of the frontmatter of that folder's `SKILL.md`. A skill returned by [cz.cleanship.aitools.engine.services.LoaderService.loadSkill] always has a description that is not blank.
+     */
+    override val description: String = "", // Optional in YAML only because a pointer skill takes its description from the SKILL.md frontmatter; the loader still rejects a skill without a source that declares none.
     override val metadata: ManifestMetadata,
     val sections: List<SkillSection> = emptyList(),
+    /**
+     * The companion files copied next to the generated skill file.
+     *
+     * For a pointer skill, the loader sets it to every file of that folder other than its `SKILL.md`, each copied to the same relative path.
+     */
     val files: List<SkillFile> = emptyList(),
+    /**
+     * The folder holding a plain `SKILL.md` skill whose description, body and companion files this skill deploys, or `null` for a skill declared entirely in this manifest.
+     *
+     * It may reference the variables of the run, such as `${PROJECTS_FOLDER}`. After substitution, a path that is `~` or starts with `~/` resolves against the home directory of the user running the engine, and any other relative path against the directory of the manifest file. The loader rejects a manifest that declares it together with `description`, `sections` or `files`.
+     */
+    val source: String? = null,
+    /**
+     * The text of the `SKILL.md` of [source] after its frontmatter, starting at its first line that is not empty, which the generated skill file holds unchanged, apart from ending in a line break.
+     *
+     * It is `null` for a skill without a [source] and for a skill whose [source] the loader has not resolved yet.
+     */
+    @Transient val body: String? = null, // Transient, so only the loader sets it: a manifest declaring a body of its own could contradict its source folder.
 ) : VersionedManifest
 
 @Serializable(with = SkillSectionSerializer::class)
