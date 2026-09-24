@@ -3,6 +3,11 @@ description: My global AI tool setup
 tools:
   - claude
   - codex
+# A replacing deploy deletes the artifact directories it generates before writing them again. In the user scope that
+# means only the folders of the skills this manifest deploys (never ~/.claude or ~/.codex as a whole), and a skill
+# dropped from this manifest is not removed either way: the engine keeps no record of what it deployed earlier.
+# It stays off here so that a deploy never deletes anything under the home directory; stale artifacts are removed by hand.
+replace: false
 # The rules that used to live in a hand-written ~/.claude/CLAUDE.md. The engine owns that file from here on: it is
 # rewritten on every deploy, so these manifests are where the rules are edited.
 rulesets:
