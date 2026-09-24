@@ -173,6 +173,16 @@ class ExportServiceTest {
         }
 
         @Test
+        fun `should name a text file it would write without writing it`() {
+            // when
+            dryRunService.writeConfigFile(targetFile, "{ }\n", describedBy = "MCP servers [atlassian]")
+
+            // then
+            assertThat(targetFile.parentFile).doesNotExist()
+            assertThat(infos()).anyMatch { it.contains("Would write") && it.contains("MCP servers [atlassian]") && it.contains(targetFile.absolutePath) }
+        }
+
+        @Test
         fun `should name the absolute target path of the artifact it would write`() {
             // when
             dryRunService.export(ruleset, targetFile) { output -> output.appendLine("content") }
@@ -460,6 +470,20 @@ class ExportServiceTest {
 
         // then
         assertThat(skillDir.resolve("templates/example.md")).hasContent("Payload.\n")
+    }
+
+    @Test
+    fun `should write a text file, replacing what was there, without leaving temporary files behind`() {
+        // given
+        targetFile.parentFile.mkdirs()
+        targetFile.writeText("stale")
+
+        // when
+        exportService.writeConfigFile(targetFile, "{ }\n", describedBy = "MCP servers [atlassian]")
+
+        // then
+        assertThat(targetFile).hasContent("{ }\n")
+        assertThat(targetFile.parentFile.listFiles()).containsExactly(targetFile)
     }
 
     @Test

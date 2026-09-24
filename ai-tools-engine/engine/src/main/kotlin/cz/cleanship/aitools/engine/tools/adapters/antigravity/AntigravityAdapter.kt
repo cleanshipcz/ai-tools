@@ -13,6 +13,7 @@ import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
 import cz.cleanship.aitools.engine.tools.replacing
 import java.io.File
 
@@ -29,6 +30,11 @@ class AntigravityAdapter(
      * Returns no exporter: the per-user layout of Antigravity is not implemented yet, so the engine reports a user deployment naming this tool as skipped for it instead of writing anything into the home.
      */
     override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter? = null
+
+    /**
+     * Returns no exporter: Antigravity expands no environment variable in its MCP config file, so a secret could only reach a server by being written into it, and the engine reports the MCP servers of a project as skipped for this tool instead.
+     */
+    override fun mcpConfig(projectDir: File): McpConfigExporter? = null
 
     override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
         globalContext.project,

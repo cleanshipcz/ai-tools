@@ -240,6 +240,7 @@ deploy:
   rulesets: {}
   fragments: {}
   skills: {}
+  mcps: {}                                 # MCP servers of 07_mcp/ are opt-in: {} = every one, no block = none
   features: {}
 metadata:
   version: 1.0.0
@@ -248,10 +249,11 @@ metadata:
 Key points, all documented in full in [../QUICKREF.md](../QUICKREF.md#creating-a-project):
 
 - `deploy.directory` decides where the generated files land. A relative value resolves against `--working-dir`, so `.` means this repository's root; a value that is `~` or starts with `~/` resolves against the home directory.
-- `deploy.replace: true` wipes the output directories each tool owns inside `deploy.directory` before writing them again. There is no backup and no auto-commit; files are overwritten in place, each written atomically through a temporary file. The wipe removes a symbolic link inside those directories, or such a directory that is itself a link, as a link and never touches what it leads to, and a run whose wipe would reach the source folder of a pointer skill fails before anything is written; see [04_skills/README.md](../04_skills/README.md#pointer-skill).
+- `deploy.replace: true` wipes the output directories each tool owns inside `deploy.directory` before writing them again: `.claude`, `.windsurf`, and `.agent` as a whole; for Codex only `.codex/skills` and `.codex/features`, for Cursor only `.cursor/rules`, `.cursor/commands`, and `.cursor/features`, and for GitHub Copilot only `.github/prompts`, `.github/instructions`, and `.github/agents`. It never deletes an MCP config file (`.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`), whose server entries the engine owns one by one. There is no backup and no auto-commit; files are overwritten in place, each written atomically through a temporary file. The wipe removes a symbolic link inside those directories, or such a directory that is itself a link, as a link and never touches what it leads to, and a run whose wipe would reach the source folder of a pointer skill fails before anything is written; see [04_skills/README.md](../04_skills/README.md#pointer-skill).
 - `deploy.tools` narrows the project to a subset of the tools configured for the run. Omitting it means all of them, `[]` means none, and naming a tool the run does not configure is a warning rather than an error.
 - Filters fold over a selection that **starts empty**: `tags` and `whitelist` add, `blacklist` subtracts, so `blacklist` must come last and an omitted or empty `filter` lets everything through.
 - A ruleset or fragment an agent references must itself survive the project's `rulesets` / `fragments` filter, otherwise that agent fails to export.
+- `deploy.mcps` selects the MCP servers of `07_mcp/` that are merged into the MCP config file of each tool. MCP servers are opt-in: omitting the block selects no server, unlike every other kind, and a project that selects none never reads or writes an MCP config file; `mcps: {}` selects every server. See [07_mcp/README.md](../07_mcp/README.md).
 
 [`ai-tools/project.yml`](ai-tools/project.yml) is a worked example: it deploys onto this repository itself with `directory: "."`.
 

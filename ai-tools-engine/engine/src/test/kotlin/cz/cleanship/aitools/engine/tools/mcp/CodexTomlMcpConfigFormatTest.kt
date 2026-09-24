@@ -1,0 +1,353 @@
+package cz.cleanship.aitools.engine.tools.mcp
+
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import java.io.File
+
+class CodexTomlMcpConfigFormatTest {
+
+    private val format = CodexTomlMcpConfigFormat
+    private val file = File("/project/.codex/config.toml")
+
+    private val stdioServer = ResolvedMcpServer(
+        id = "atlassian",
+        transport = ResolvedMcpTransport.Stdio(
+            command = "/work/jira-mcp-server",
+            args = listOf("--verbose", "say \"hi\""),
+            env = linkedMapOf(
+                "JIRA_BASE_URL" to McpValue.Plain("https://jira.example.com"),
+                "JIRA_PAT" to McpValue.Secret("JIRA_PAT", required = true),
+                "CONFLUENCE_PAT" to McpValue.Secret("CONFLUENCE_PAT", required = false),
+            ),
+        ),
+    )
+
+    private val httpServer = ResolvedMcpServer(
+        id = "github",
+        transport = ResolvedMcpTransport.Http(
+            url = "https://api.githubcopilot.com/mcp/",
+            headers = linkedMapOf(
+                "Authorization" to McpValue.BearerSecret("GITHUB_TOKEN", required = true),
+                "X-Api-Key" to McpValue.Secret("API_KEY", required = true),
+                "X-Region" to McpValue.Plain("eu"),
+            ),
+        ),
+    )
+
+    @Nested
+    inner class Rendering {
+
+        @Test
+        fun `should forward secrets by name and write plain values into their own tables`() {
+            // when
+            val content = format.merge(null, listOf(stdioServer, httpServer), setOf("atlassian", "github"), file)
+
+            // then
+            assertThat(content).isEqualTo(
+                """
+                [mcp_servers.atlassian]
+                command = "/work/jira-mcp-server"
+                args = ["--verbose", "say \"hi\""]
+                env_vars = ["JIRA_PAT", "CONFLUENCE_PAT"]
+
+                [mcp_servers.atlassian.env]
+                JIRA_BASE_URL = "https://jira.example.com"
+
+                [mcp_servers.github]
+                url = "https://api.githubcopilot.com/mcp/"
+                bearer_token_env_var = "GITHUB_TOKEN"
+
+                [mcp_servers.github.http_headers]
+                X-Region = "eu"
+
+                [mcp_servers.github.env_http_headers]
+                X-Api-Key = "API_KEY"
+
+                """.trimIndent(),
+            )
+        }
+
+        @Test
+        fun `should quote an id that is not a bare key`() {
+            // given
+            val dotted =
+                ResolvedMcpServer("xbid.bobcat", ResolvedMcpTransport.Stdio(command = "server", args = emptyList(), env = emptyMap()))
+
+            // when
+            val content = format.merge(null, listOf(dotted), setOf("xbid.bobcat"), file)
+
+            // then
+            assertThat(content).isEqualTo("[mcp_servers.\"xbid.bobcat\"]\ncommand = \"server\"\n")
+        }
+    }
+
+    @Nested
+    inner class EntryOwnership {
+
+        @Test
+        fun `should append its sections after foreign content and keep every foreign byte`() {
+            // given
+            val existing =
+                """
+                # Codex settings of this project
+                model = "o3"   # the model
+
+                [mcp_servers.playwright]
+                command = "npx"
+                args = ["-y", "@playwright/mcp"]
+                """.trimIndent() + "\n"
+
+            // when
+            val content = format.merge(existing, listOf(stdioServer), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).startsWith(existing + "\n[mcp_servers.atlassian]\n")
+        }
+
+        @Test
+        fun `should replace owned sections in place and keep the comments and formatting around them`() {
+            // given
+            // - an owned server with a sub-table between foreign content, with a comment that belongs to the section after it
+            val existing =
+                """
+                model = "o3"
+
+                [mcp_servers.atlassian]
+                command = "old"   # stale
+
+                [mcp_servers.atlassian.env]
+                OLD = "1"
+
+                # The browser server, configured by hand.
+                [mcp_servers.playwright]
+                command   =   "npx"
+                [profiles.fast]
+                model = "o4-mini"
+                """.trimIndent() + "\n"
+
+            // when
+            val content = format.merge(existing, listOf(stdioServer), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).isEqualTo(
+                """
+                model = "o3"
+
+                [mcp_servers.atlassian]
+                command = "/work/jira-mcp-server"
+                args = ["--verbose", "say \"hi\""]
+                env_vars = ["JIRA_PAT", "CONFLUENCE_PAT"]
+
+                [mcp_servers.atlassian.env]
+                JIRA_BASE_URL = "https://jira.example.com"
+
+                # The browser server, configured by hand.
+                [mcp_servers.playwright]
+                command   =   "npx"
+                [profiles.fast]
+                model = "o4-mini"
+
+                """.trimIndent(),
+            )
+        }
+
+        @Test
+        fun `should remove the sections of an owned server the deployment no longer selects`() {
+            // given
+            val existing =
+                """
+                [mcp_servers.playwright]
+                command = "npx"
+
+                [mcp_servers."github"]
+                url = "https://old"
+
+                [mcp_servers.github.env_http_headers]
+                X = "Y"
+                """.trimIndent() + "\n"
+
+            // when
+            val content = format.merge(existing, emptyList(), setOf("github"), file)
+
+            // then
+            assertThat(content).isEqualTo("[mcp_servers.playwright]\ncommand = \"npx\"\n")
+        }
+
+        @Test
+        fun `should not take a header-like line inside a multi-line string for a section`() {
+            // given
+            val existing = "instructions = \"\"\"\n[mcp_servers.atlassian]\nkeep me\n\"\"\"\n"
+
+            // when
+            val content = format.merge(existing, emptyList(), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).isEqualTo(existing)
+        }
+
+        @Test
+        fun `should leave a server whose id is not owned untouched even when it shares a prefix`() {
+            // given
+            val existing = "[mcp_servers.atlassian-legacy]\ncommand = \"old\"\n"
+
+            // when
+            val content = format.merge(existing, emptyList(), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).isEqualTo(existing)
+        }
+
+        @Test
+        fun `should produce the same file when merged twice`() {
+            // given
+            val first = format.merge("# mine\nmodel = \"o3\"\n", listOf(stdioServer, httpServer), setOf("atlassian", "github"), file)
+
+            // when
+            val second = format.merge(first, listOf(stdioServer, httpServer), setOf("atlassian", "github"), file)
+
+            // then
+            assertThat(second).isEqualTo(first)
+        }
+    }
+
+    /**
+     * Inputs that are valid TOML and that a line-based splicer reads wrongly: each must either be merged with every foreign table kept, or be refused naming the file.
+     */
+    @Nested
+    inner class UntrustedContent {
+
+        @Test
+        fun `should keep the tables after an owned server whose argument holds a multi-line string delimiter`() {
+            // given
+            val existing = "[mcp_servers.atlassian]\ncommand = \"old\"\n\n[user_table]\nimportant = true\n"
+            val delimiterArgument = stdioServer.copy(transport = ResolvedMcpTransport.Stdio(command = "server", args = listOf("--motd='''hello", "say \"\"\"x"), env = emptyMap()))
+            val first = format.merge(existing, listOf(delimiterArgument), setOf("atlassian"), file)
+
+            // when
+            val second = format.merge(first, listOf(delimiterArgument), setOf("atlassian"), file)
+
+            // then
+            assertThat(second).isEqualTo(first).contains("[user_table]\nimportant = true")
+        }
+
+        @Test
+        fun `should recognize an owned server after delimiters inside a single-line string and a comment`() {
+            // given
+            val foreign = "[profiles.a]\nnote = \"it'''s\" # and \"\"\" here\nother = 'x\"\"\"y'\n"
+            val existing = "$foreign\n[mcp_servers.github]\nurl = \"https://old\"\n"
+
+            // when
+            val content = format.merge(existing, listOf(httpServer), setOf("github"), file)
+
+            // then
+            assertThat(Regex("""\[mcp_servers\.github]""").findAll(content).count()).isEqualTo(1)
+            assertThat(content).startsWith(foreign).doesNotContain("https://old")
+        }
+
+        @Test
+        fun `should keep a foreign table whose quoted key holds brackets`() {
+            // given
+            val existing = "[mcp_servers.github]\nurl = \"https://old\"\n\n[profiles.\"team[ci]\"]\napproval_policy = \"untrusted\"\n\n[profiles.safe]\nx = 1\n"
+
+            // when
+            val content = format.merge(existing, listOf(httpServer), setOf("github"), file)
+
+            // then
+            assertThat(content).contains("[profiles.\"team[ci]\"]\napproval_policy = \"untrusted\"\n\n[profiles.safe]\nx = 1")
+        }
+
+        @Test
+        fun `should recognize its own table of an id holding a bracket on the next merge`() {
+            // given
+            val bracketed =
+                ResolvedMcpServer("a]b", ResolvedMcpTransport.Stdio(command = "server", args = emptyList(), env = emptyMap()))
+            val first = format.merge("model = \"o3\"\n", listOf(bracketed), setOf("a]b"), file)
+
+            // when
+            val second = format.merge(first, listOf(bracketed), setOf("a]b"), file)
+
+            // then
+            assertThat(second).isEqualTo(first)
+            assertThat(first).contains("[mcp_servers.\"a]b\"]")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            quoteCharacter = '~',
+            value = [
+                // - an inline table under [mcp_servers]
+                "[mcp_servers]{n}github = { command = \"mine\" }{n}",
+                // - dotted keys at the root
+                "mcp_servers.github.command = \"mine\"{n}",
+                // - dotted keys under [mcp_servers]
+                "[mcp_servers]{n}github.command = \"mine\"{n}",
+                // - an array of tables
+                "[[mcp_servers.github]]{n}command = \"mine\"{n}",
+            ],
+        )
+        fun `should refuse an owned server defined other than as its own table instead of defining it twice`(
+            existing: String,
+        ) {
+            // when / then
+            assertThatThrownBy { format.merge(existing.replace("{n}", "\n"), listOf(httpServer), setOf("github"), file) }
+                .isInstanceOf(McpConfigFileException::class.java)
+                .hasMessageContaining(file.absolutePath)
+                .hasMessageContaining("'github'")
+        }
+
+        @Test
+        fun `should refuse a file that is not valid TOML without echoing any of its content`() {
+            // given
+            val existing = "token = \"sk-FOREIGN-CODEX\"\n= broken\n"
+
+            // when / then
+            assertThatThrownBy { format.merge(existing, listOf(httpServer), setOf("github"), file) }
+                .isInstanceOf(McpConfigFileException::class.java)
+                .hasMessageContaining(file.absolutePath)
+                .hasMessageContaining("line 2")
+                .hasMessageNotContaining("sk-FOREIGN-CODEX")
+        }
+
+        @Test
+        fun `should write its lines with the line ending of a CRLF file`() {
+            // given
+            val existing = "# mine\r\nmodel = \"o3\"\r\n"
+
+            // when
+            val content = format.merge(existing, listOf(stdioServer), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).startsWith(existing).endsWith("\r\n")
+            assertThat(content.replace("\r\n", "")).doesNotContain("\n")
+        }
+
+        @Test
+        fun `should keep a file without a final newline without one`() {
+            // given
+            val existing = "model = \"o3\""
+
+            // when
+            val content = format.merge(existing, listOf(stdioServer), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).startsWith("model = \"o3\"\n\n[mcp_servers.atlassian]").doesNotEndWith("\n")
+        }
+
+        @Test
+        fun `should name the owned entries an existing file holds`() {
+            // given
+            val existing = "[mcp_servers.github]\nurl = \"x\"\n[mcp_servers.playwright]\ncommand = \"npx\"\n"
+
+            // when
+            val owned = format.ownedEntriesIn(existing, setOf("github", "atlassian"), file)
+
+            // then
+            assertThat(owned).containsExactly("github")
+        }
+    }
+}

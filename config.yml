@@ -9,6 +9,8 @@ locations:
     - "02_fragments"
   skills:
     - "04_skills"
+  mcps:
+    - "07_mcp"
   deployments:
     - "09_deployments"
 

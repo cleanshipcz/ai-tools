@@ -42,6 +42,51 @@ class ConfigServiceTest {
     }
 
     @Test
+    fun `should read the mcps location from config yml when config local yml does not repeat it`(
+        @TempDir tempDir: File,
+    ) {
+        // given
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              mcps:
+                - "07_mcp"
+              agents:
+                - "agents_default"
+            """.trimIndent(),
+        )
+        File(tempDir, "config.local.yml").writeText(
+            """
+            locations:
+              agents:
+                - "agents_local"
+            """.trimIndent(),
+        )
+
+        // when
+        val config = ConfigService().loadConfig(tempDir)
+
+        // then
+        assertThat(config.locations.mcps).containsExactly(File(tempDir, "07_mcp"))
+        assertThat(config.locations.agents).containsExactly(File(tempDir, "agents_local"))
+    }
+
+    @Test
+    fun `should replace the mcps location with the list config local yml declares`(
+        @TempDir tempDir: File,
+    ) {
+        // given
+        File(tempDir, "config.yml").writeText("locations:\n  mcps:\n    - \"07_mcp\"\n")
+        File(tempDir, "config.local.yml").writeText("locations:\n  mcps:\n    - \"private_mcp\"\n")
+
+        // when
+        val config = ConfigService().loadConfig(tempDir)
+
+        // then
+        assertThat(config.locations.mcps).containsExactly(File(tempDir, "private_mcp"))
+    }
+
+    @Test
     fun `should override default config with local config`(
         @TempDir tempDir: File,
     ) {

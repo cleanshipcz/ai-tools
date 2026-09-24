@@ -4,7 +4,7 @@ context:
   overview: |
     This repository is the source of truth for AI coding-assistant configuration. Rulesets, fragments, prompts, skills, agents, and deployment manifests are YAML files, and the Kotlin engine in `ai-tools-engine/` renders them into the native files of Claude Code, Codex, GitHub Copilot, Cursor, Windsurf, and Antigravity.
 
-    The repository deploys onto itself. `CLAUDE.md`, `AGENTS.md`, `.claude/`, `.codex/`, `.github/agents/`, `.github/copilot-instructions.md`, `.cursor/`, `.windsurf/`, and `.agent/` are generated from `09_deployments/ai-tools/project.yml` and rewritten on every deploy. Never edit them: edit the manifest they come from and redeploy. The text you are reading is `context.overview` of that manifest.
+    The repository deploys onto itself. `CLAUDE.md`, `AGENTS.md`, `.claude/`, `.codex/`, `.github/agents/`, `.github/copilot-instructions.md`, `.cursor/`, `.windsurf/`, and `.agent/` are generated from `09_deployments/ai-tools/project.yml` and rewritten on every deploy. Never edit them: edit the manifest they come from and redeploy. The MCP config files `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, and `.codex/config.toml` are generated too and gitignored, because they hold values resolved on one machine; the entries named after an `07_mcp/` manifest are rewritten on every deploy, any other entry is left alone. The text you are reading is `context.overview` of that manifest.
 
     ### Where things are
 
@@ -14,19 +14,20 @@ context:
     - `03_prompts/<category>/<id>.yml` - prompts. Categories: `docs`, `manifests`, `planning`, `qa`, `refactor`, `tickets`, `shared`. Deployed as slash commands.
     - `04_skills/<id>.yml`, or `04_skills/<id>/skill.yml` with companion files listed under `files:`. A pointer skill, whose content must stay a plain `SKILL.md` folder elsewhere (e.g. `jira-ticket`), is `04_skills/<id>/skill.yml` declaring only `id`, `source: <folder>`, and `metadata`; its description, body, and every file come from that folder, and a missing or invalid folder fails every run.
     - `05_agents/<id>.yml` - persona + rulesets + fragments + prompt + constraints. Ids are `<role>-<specialization>`: analyst-*, developer-*, documenter-*, reviewer-*, planner-*, expert-*, plus basic, manifest-builder, prompt-engineer, team-lead, organization-specialist, maintainer-dependencies.
+    - `07_mcp/<id>.yml` - MCP servers. Inline (`transport` of `type: stdio` or `type: http`, plus `variables`, each declaring `secret: true|false`) or a pointer whose `source` names a `server.json` of the MCP Registry schema `2025-12-11` outside the repo (e.g. `github.yml` -> `${PROJECTS_FOLDER}/github-mcp-server`), with `select: {remote: <url>}` or `{package: <identifier>}`. Selection is opt-in: a project without a `deploy.mcps` block gets no server and its MCP config files are never touched. A deploy merges the selected servers into `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, and `.codex/config.toml` by entry: the engine owns only entries named after an MCP server manifest, keeps every other entry, verifies every edit before writing it, and writes a secret only as a reference the tool resolves from its own environment. Plain values come from `env_vars` only, never from the environment of the run. A pointer's `server.json` is untrusted data: `${` in it, a non-default `runtimeHint`, and runtime arguments other than oci `-e NAME` fail loading. Windsurf and Antigravity get no MCP config file. Codex reads `.codex/config.toml` only in a trusted project. A secret's value must be exported in the environment of the tool; `env_vars` never reaches it. See `07_mcp/README.md`.
     - `09_deployments/<name>/project.yml` deploys into a project directory; `09_deployments/<name>/user.yml` deploys into the user scope of a tool (`~/.claude`, `~/.codex`). `features/` under a project holds feature manifests, rendered as workflow files.
     - `config.yml` - manifest locations, tools to build, `env_vars`. `config.local.yml` (gitignored) replaces any list it repeats; it is where machine-private deployment locations such as `../ai-tools-projects/projects` are added.
     - `ai-tools-engine/` - Gradle multi-module Kotlin project (`:engine`, `:cli`, `:server`, `:telemetry`). `engine/src/main/kotlin/cz/cleanship/aitools/engine/models/*Manifest.kt` are the schema of every manifest type; `tools/*Printer.kt` render an artifact; `tools/adapters/<tool>/` decide where each tool's files land; `ToolsEngine.kt` drives a run.
 
-    Kept, but not read by the engine (planned, see `PLANNED_FEATURES.md`): `07_mcp/`, `08_recipes/`, `20_evals/`, `21_redteam/`. Do not build on them and do not create content there unless asked.
+    Kept, but not read by the engine (planned, see `PLANNED_FEATURES.md`): `08_recipes/`, `20_evals/`, `21_redteam/`. Do not build on them and do not create content there unless asked.
 
     Dead, left over from the retired TypeScript CLI. Ignore entirely and never cite as reference: `adapters/`, `.output/`, `.backups/`, `docs/`, `build/`, `coverage/`, `tmp/`, `.cs.recipes/`, `.claude/prompts/`, `.claude/*.json`, `PROMPT_LIBRARY.md`, `PROMPT_LIBRARY.html`, `FEATURES.md`, and in `90_docs/`: `TOOLS.md`, `USER_TOOLS.md`, `TESTING.md`, `CHANGELOG.md`, `FEATURES.md`, `AGENTS.md`. `10_schemas/` is mentioned in README.md but no longer exists. Current reference docs are listed under "Documentation files" below.
 
     ### How a change flows
 
     1. Edit or add a manifest. Its schema is the Kotlin model, not any example or older template: read `models/<Type>Manifest.kt` first. A constructor parameter with a default is optional in YAML, every other one is required, `@SerialName` gives the YAML key, and a key that is not in the model does not exist. Versions live in `metadata.version`.
-    2. Make sure the deployment selects it. `09_deployments/ai-tools/project.yml` picks agents, rulesets, and skills by tag and prompts by an id whitelist; a new manifest that lacks a matching tag or id is valid but never lands here.
-    3. Validate with `./deploy.sh --dry-run` from the repository root. It parses every manifest, resolves every ruleset, fragment, and skill-file reference, reads the folder the `source` of every pointer skill points at, checks that no path the run writes a skill to or deletes overlaps such a folder, and writes nothing. Manifests are decoded strictly: an unknown key, a missing field, or a bad version fails the run naming the file.
+    2. Make sure the deployment selects it. `09_deployments/ai-tools/project.yml` picks agents, rulesets, skills, and MCP servers by tag and prompts by an id whitelist; a new manifest that lacks a matching tag or id is valid but never lands here.
+    3. Validate with `./deploy.sh --dry-run` from the repository root. It parses every manifest, resolves every ruleset, fragment, and skill-file reference, reads the folder the `source` of every pointer skill points at and the `server.json` of every pointer MCP server, resolves the plain variables of every MCP server a deployment selects and warns about every secret one the environment does not set, checks that no path the run writes a skill to or deletes overlaps such a folder, and writes nothing. Manifests are decoded strictly: an unknown key, a missing field, or a bad version fails the run naming the file.
     4. The user deploys with `./deploy.sh`. That run writes into this repository, into every other project listed under `locations.deployments`, and into `~/.claude` and `~/.codex`. Never run it without `--dry-run` unless the user explicitly asks for a deploy.
 
     Project rulesets never reach this instructions file by design: they are inlined into the agents and prompts that reference them. What every session sees is exactly `context.overview` and `context.rules` of the project manifest.
@@ -43,8 +44,9 @@ context:
     | add an agent | `05_agents/<role>-<specialization>.yml`; `/manifests-create-agent` scaffolds it | compose `base` plus existing rulesets rather than inlining rules; tag it `common`, `ai`, `development`, or `documentation` to deploy here; output is `.claude/agents/<id>.md`, `.github/agents/<id>.agent.md`, `.codex/skills/agent-<id>/` |
     | add a prompt / slash command | `03_prompts/<category>/<id>.yml`; `/manifests-create-prompt` | Mustache `{{variables}}`, snake_case names; add the id to the prompt whitelist in `project.yml` or it is not deployed; output `.claude/commands/<id>.md` |
     | add reference material agents share | `02_fragments/<id>.yml`; `/manifests-create-fragment` | reference it from `fragments:` of an agent, prompt, or skill |
+    | add an MCP server | `07_mcp/<id>.yml`, inline or a pointer at a `server.json` | mark every token, key file and proxy URL `secret: true`; plain values come from `env_vars` only, so put machine-specific ones in `config.local.yml`; every `${NAME}` outside `command` must be a declared variable; tag it `ai-tools` to deploy here; the entry name is the id, so Claude Code names its tools `mcp__<id>__<tool>`; see `07_mcp/README.md` |
     | add a skill | `04_skills/<id>.yml` or `04_skills/<id>/skill.yml` + files, or a pointer skill: `04_skills/<id>/skill.yml` with `source:` pointing at a plain skill folder outside the repo; `/manifests-create-skill` | id is `<verb>-<tool>`; for a pointer skill, the id must equal the `name` in the `SKILL.md` frontmatter, and `description`, `sections`, and `files` are not allowed; tag `kotlin` or `search` to deploy here; output `.claude/skills/<id>/SKILL.md` plus copied files |
-    | deploy this setup to another project | `09_deployments/<name>/project.yml` here, or a directory added to `locations.deployments` in `config.local.yml` for a private one; `/manifests-create-project`, `/manifests-duplicate-project` | `deploy.directory` may use `${PROJECTS_FOLDER}`; `deploy.tools` narrows the tools; `replace: true` deletes the directories each tool generates before writing (for GitHub Copilot only `.github/prompts`, `.github/instructions`, `.github/agents`) |
+    | deploy this setup to another project | `09_deployments/<name>/project.yml` here, or a directory added to `locations.deployments` in `config.local.yml` for a private one; `/manifests-create-project`, `/manifests-duplicate-project` | `deploy.directory` may use `${PROJECTS_FOLDER}`; `deploy.tools` narrows the tools; `replace: true` deletes the directories each tool generates before writing (for Codex only `.codex/skills` and `.codex/features`, for Cursor only `.cursor/rules`, `.cursor/commands`, `.cursor/features`, for GitHub Copilot only `.github/prompts`, `.github/instructions`, `.github/agents`) and never an MCP config file; `deploy.mcps` selects MCP servers, none of them when omitted (opt-in) |
     | change my global `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md` | `09_deployments/globals/user.yml`; `/manifests-create-user-deployment` | user scope inlines the selected rulesets; try `./deploy.sh --user-home /tmp/try` first |
     | add a feature description for a project | `09_deployments/<name>/features/<id>.yml`; `/manifests-create-feature` | rendered to `.claude/workflows/feature-<id>.md` and the equivalents of other tools |
     | change how something is rendered or where it lands | `ai-tools-engine/engine/.../tools/*Printer.kt` (content), `tools/adapters/<tool>/` (paths), `ToolsEngine.kt` (run), `services/` (loading, filtering, export) | build with `./gradlew clean build` from `ai-tools-engine/`; ktlint and detekt must pass; the build does not validate manifests |
@@ -63,6 +65,7 @@ context:
         fragments: 02_fragments/README.md
         prompts: 03_prompts/README.md
         skills: 04_skills/README.md
+        mcps: 07_mcp/README.md
         agents: 05_agents/README.md
         deployments: 09_deployments/README.md
       engine:
@@ -78,7 +81,8 @@ context:
     - "Validate manifests with `./deploy.sh --dry-run` from the repository root. Never run `./deploy.sh` without `--dry-run` unless the user explicitly asks for a deploy; it writes into other projects and into the home directory."
     - "Verify engine changes with `./gradlew clean build` run from ai-tools-engine/; ktlint and detekt must pass. If the build fails because of ~/.gradle/init.gradle.kts, move that file aside for the build and restore it afterwards."
     - "`./gradlew clean build` builds and tests the engine only; it does not validate manifests."
-    - "Do not add content under 07_mcp/, 08_recipes/, 20_evals/, or 21_redteam/ unless asked; the engine does not read them."
+    - "Do not add content under 08_recipes/, 20_evals/, or 21_redteam/ unless asked; the engine does not read them."
+    - "Never write the value of a secret into an MCP server manifest, config.yml, or config.local.yml; declare the variable `secret: true` and let each tool read it from its environment."
     - "Ignore the TypeScript-era leftovers named in the overview; they are not references for how anything works today."
     - "Slash commands are run by the user, never by an agent on its own."
 deploy:
@@ -132,6 +136,12 @@ deploy:
         tags:
           - kotlin
           - search
+  # MCP servers are opt-in: unlike every other block, a project without an `mcps` block gets none of them, and its MCP config files are never read or written. This repository takes the servers tagged `ai-tools`.
+  mcps:
+    filter:
+      - type: tags
+        tags:
+          - ai-tools
   rulesets:
     filter:
       - type: tags
@@ -146,10 +156,10 @@ deploy:
           - manifests
           - ai
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   author: cleanshipcz
   created: 2025-11-15
-  updated: 2026-09-04
+  updated: 2026-09-24
   tags:
     - ai
     - tooling

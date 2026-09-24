@@ -22,6 +22,7 @@ data class ConfigManifest(
  * rejected by [cz.cleanship.aitools.engine.services.ConfigService] instead of being dropped as an unknown key -
  * `config.local.yml` is gitignored, so no rename in the repository can reach the one on another machine, and a
  * silently dropped list means a run that deploys nothing and reports success.
+ * @param mcps the directories holding the MCP server manifests of the run - see [McpServerManifest]. Omitting it loads no MCP server, so no deployment writes an MCP config file.
  */
 @Serializable
 data class LocationsConfig(
@@ -32,4 +33,5 @@ data class LocationsConfig(
     val rulesets: List<String>? = null,
     val fragments: List<String>? = null,
     val skills: List<String>? = null,
+    val mcps: List<String>? = null,
 )

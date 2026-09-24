@@ -11,10 +11,13 @@ import java.io.File
  * deploy never touches beyond the artifacts it writes inside it
  * @param instructionsFile the memory file Claude Code reads for this scope, which sits beside `.claude` in a project
  * and inside it in the user scope
+ * @param mcpConfigFile the file Claude Code reads the MCP servers of this scope from: `.mcp.json` beside `.claude` in a
+ * project, `~/.claude.json` in the user scope
  */
 internal class ClaudeLayout(
     val toolDir: File,
     val instructionsFile: File,
+    val mcpConfigFile: File,
 ) {
     /** The directory holding every skill of this scope, which a deploy writes into but never removes. */
     val skillsDir: File get() = toolDir.resolve("skills")
@@ -31,11 +34,12 @@ internal class ClaudeLayout(
         fun ofProject(projectDir: File) = ClaudeLayout(
             toolDir = projectDir.resolve(CLAUDE_DIR),
             instructionsFile = projectDir.resolve(INSTRUCTIONS_FILE),
+            mcpConfigFile = projectDir.resolve(".mcp.json"),
         )
 
         fun ofUser(userHome: File): ClaudeLayout {
             val toolDir = userHome.resolve(CLAUDE_DIR)
-            return ClaudeLayout(toolDir, instructionsFile = toolDir.resolve(INSTRUCTIONS_FILE))
+            return ClaudeLayout(toolDir, instructionsFile = toolDir.resolve(INSTRUCTIONS_FILE), mcpConfigFile = userHome.resolve(".claude.json"))
         }
 
         private const val CLAUDE_DIR = ".claude"

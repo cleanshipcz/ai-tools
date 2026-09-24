@@ -10,8 +10,8 @@ import java.io.File
  * Codex has one shape for everything it can be asked to do, so agents and prompts are skills here too, told apart
  * from each other by the prefix of their directory.
  *
- * @param toolDir the `.codex` directory of this scope, which a project deploy may replace as a whole and a user
- * deploy never touches beyond the artifacts it writes inside it
+ * @param toolDir the `.codex` directory of this scope, whose generated directories a replacing project deploy
+ * deletes and which a user deploy never touches beyond the artifacts it writes inside it
  * @param instructionsFile the instructions file Codex reads for this scope, which sits beside `.codex` in a project
  * and inside it in the user scope
  */
@@ -25,7 +25,13 @@ internal class CodexLayout(
 
     fun promptDir(promptId: String): File = skillsDir.resolve("prompt-$promptId")
 
-    fun featureFile(featureId: String): File = toolDir.resolve("features").resolve("feature-$featureId.md")
+    fun featureFile(featureId: String): File = featuresDir.resolve("feature-$featureId.md")
+
+    /** The directory holding every feature of this scope. */
+    val featuresDir: File get() = toolDir.resolve("features")
+
+    /** The configuration file Codex reads for this scope, which holds its MCP servers among other settings of the user. */
+    val mcpConfigFile: File get() = toolDir.resolve("config.toml")
 
     /** The directory holding every skill-shaped artifact of this scope, which a deploy writes into but never removes. */
     val skillsDir: File get() = toolDir.resolve("skills")

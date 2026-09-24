@@ -13,6 +13,9 @@ import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.mcp.JsonMcpConfigFormat
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileExporter
 import cz.cleanship.aitools.engine.tools.replacing
 import java.io.File
 
@@ -23,7 +26,12 @@ class CursorAdapter(
 
     override val toolType: ToolType = ToolType.CURSOR
 
-    override fun replacedPaths(projectDir: File, project: ProjectManifest): List<File> = project.replacing(cursorDir(projectDir))
+    // The directories this adapter generates, not `.cursor` as a whole: `.cursor/mcp.json` holds the MCP servers, and the user's own among them, beside them.
+    override fun replacedPaths(projectDir: File, project: ProjectManifest): List<File> =
+        project.replacing(rulesDir(projectDir), commandsDir(projectDir), featuresDir(projectDir))
+
+    override fun mcpConfig(projectDir: File): McpConfigExporter =
+        McpConfigFileExporter(cursorDir(projectDir).resolve("mcp.json"), JsonMcpConfigFormat.CURSOR, exportService, projectDir)
 
     /**
      * Returns no exporter: the per-user layout of Cursor is not implemented yet, so the engine reports a user deployment naming this tool as skipped for it instead of writing anything into the home.
@@ -33,7 +41,7 @@ class CursorAdapter(
     override fun export(projectDir: File, globalContext: GlobalContext) {
         exportService.export(
             globalContext.project,
-            cursorDir(projectDir).resolve("rules").resolve("project.mdc"),
+            rulesDir(projectDir).resolve("project.mdc"),
         ) {
             it.appendText(
                 """
@@ -58,7 +66,7 @@ class CursorAdapter(
 
     override fun export(projectDir: File, agentContext: AgentContext) = exportService.export(
         agentContext.agent,
-        cursorDir(projectDir).resolve("rules").resolve("agent-${agentContext.agent.id}.mdc"),
+        rulesDir(projectDir).resolve("agent-${agentContext.agent.id}.mdc"),
     ) {
         it.appendText(
             """
@@ -73,7 +81,7 @@ class CursorAdapter(
 
     override fun export(projectDir: File, featureContext: FeatureContext) = exportService.export(
         featureContext.feature,
-        cursorDir(projectDir).resolve("features").resolve("feature-${featureContext.feature.id}.md"),
+        featuresDir(projectDir).resolve("feature-${featureContext.feature.id}.md"),
     ) {
         it.appendText(
             """
@@ -110,8 +118,12 @@ class CursorAdapter(
     private fun skillFile(projectDir: File, skillId: String) = commandsDir(projectDir).resolve("skill-$skillId.md")
 
     private fun skillFilesDir(projectDir: File, skillId: String) = commandsDir(projectDir).resolve("skill-$skillId")
-
-    private fun commandsDir(projectDir: File) = cursorDir(projectDir).resolve("commands")
-
-    private fun cursorDir(projectDir: File) = projectDir.resolve(".cursor")
 }
+
+private fun cursorDir(projectDir: File) = projectDir.resolve(".cursor")
+
+private fun commandsDir(projectDir: File) = cursorDir(projectDir).resolve("commands")
+
+private fun rulesDir(projectDir: File) = cursorDir(projectDir).resolve("rules")
+
+private fun featuresDir(projectDir: File) = cursorDir(projectDir).resolve("features")

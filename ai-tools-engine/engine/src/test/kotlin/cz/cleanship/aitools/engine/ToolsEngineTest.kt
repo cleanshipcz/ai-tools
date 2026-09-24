@@ -1414,11 +1414,12 @@ class ToolsEngineTest {
 
         @ParameterizedTest
         @CsvSource(
-            // - Claude and Codex replace their whole tool directory, which is the link here
+            // - Claude replaces its whole tool directory, which is the link here
             "CLAUDE, .claude, .claude/skills/jira-ticket, CLAUDE.md, true",
             "CLAUDE, .claude, .claude/skills/jira-ticket, CLAUDE.md, false",
-            "CODEX, .codex, .codex/skills/skill-jira-ticket, AGENTS.md, true",
-            "CODEX, .codex, .codex/skills/skill-jira-ticket, AGENTS.md, false",
+            // - Codex replaces the folders it generates below a .codex it keeps for config.toml; the skills folder, which the skill is written into, is the link here
+            "CODEX, .codex/skills, .codex/skills/skill-jira-ticket, AGENTS.md, true",
+            "CODEX, .codex/skills, .codex/skills/skill-jira-ticket, AGENTS.md, false",
             // - GitHub Copilot replaces three folders below a .github it keeps; the prompts folder, which the skill is written into, is the link here
             "GITHUB_COPILOT, .github/prompts, .github/prompts/skill-jira-ticket, .github/copilot-instructions.md, true",
             "GITHUB_COPILOT, .github/prompts, .github/prompts/skill-jira-ticket, .github/copilot-instructions.md, false",
@@ -1766,8 +1767,9 @@ class ToolsEngineTest {
         @CsvSource(
             "CLAUDE, .claude, CLAUDE.md, true",
             "CLAUDE, .claude, CLAUDE.md, false",
-            "CODEX, .codex, AGENTS.md, true",
-            "CODEX, .codex, AGENTS.md, false",
+            // - Codex replaces the folders it generates below a .codex it keeps for config.toml; the skills folder is the link here
+            "CODEX, .codex/skills, AGENTS.md, true",
+            "CODEX, .codex/skills, AGENTS.md, false",
             // - GitHub Copilot replaces three folders below a .github it keeps; the prompts folder is the link here
             "GITHUB_COPILOT, .github/prompts, .github/copilot-instructions.md, true",
             "GITHUB_COPILOT, .github/prompts, .github/copilot-instructions.md, false",
@@ -2211,6 +2213,334 @@ class ToolsEngineTest {
         private fun sinkInfos() = sinkAppender.list.filter { it.level == Level.INFO }.map { it.formattedMessage }
     }
 
+    @Nested
+    inner class McpServers {
+
+        // - the config of the run declares the base URL, the environment of the run carries the secret; neither is a real value
+        private val mcpVariables = VariableResolver(
+            variables = mapOf("JIRA_BASE_URL" to "https://jira.example.com"),
+            environment = { name -> mapOf("JIRA_PAT" to SECRET_VALUE)[name] },
+        )
+
+        private fun engineFor(vararg toolTypes: ToolType, dryRun: Boolean = false, variables: VariableResolver = mcpVariables) = ToolsEngine(
+            workspace,
+            variables = variables,
+            userHome = userHome,
+            tools = toolTypes.map { ToolFactory.create(it, dryRun) },
+            dryRun = dryRun,
+        )
+
+        @BeforeEach
+        fun selectAtlassian() {
+            // - MCP servers are opt-in, so the project of these tests names the one it deploys
+            writeProject(mcpFilter = listOf("atlassian"))
+        }
+
+        @Test
+        fun `should write the selected servers into the MCP file of every tool that supports them, with secrets only as references`() {
+            // given
+            writeAtlassianServer()
+
+            // when
+            engineFor(*ToolType.entries.toTypedArray()).process(locations())
+
+            // then
+            val claude = destination.resolve(".mcp.json").readText()
+            val vsCode = destination.resolve(".vscode/mcp.json").readText()
+            val cursor = destination.resolve(".cursor/mcp.json").readText()
+            val codex = destination.resolve(".codex/config.toml").readText()
+            assertThat(claude).contains("\"JIRA_PAT\": \"\${JIRA_PAT}\"")
+            assertThat(vsCode).contains("\"JIRA_PAT\": \"\${env:JIRA_PAT}\"")
+            assertThat(cursor).contains("\"JIRA_PAT\": \"\${env:JIRA_PAT}\"")
+            assertThat(codex).contains("env_vars = [\"JIRA_PAT\"]")
+            assertThat(listOf(claude, vsCode, cursor, codex)).allSatisfy {
+                assertThat(it).doesNotContain(SECRET_VALUE).contains("https://jira.example.com")
+            }
+        }
+
+        @ParameterizedTest
+        @CsvSource("windsurf", "antigravity")
+        fun `should report a tool without MCP support as skipped for the servers a project selects`(tool: String) {
+            // given
+            writeAtlassianServer()
+
+            // when
+            engineFor(ToolType.entries.single { it.serialName == tool }).process(locations())
+
+            // then
+            assertThat(warnings()).anyMatch { it.contains("test-project") && it.contains(tool) && it.contains("MCP") && it.contains("atlassian") }
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - no mcps block at all
+            "false",
+            // - an mcps block selecting nothing
+            "true",
+        )
+        fun `should not touch any MCP config file of a project that selects no server`(emptyWhitelist: Boolean) {
+            // given
+            writeAtlassianServer()
+            writeProject(mcpFilter = if (emptyWhitelist) emptyList() else null)
+            // - a hand-written entry named like an MCP manifest of the run, in the compact layout a rewrite would change
+            val mcpFile = destination.resolve(".mcp.json")
+            mcpFile.parentFile.mkdirs()
+            val existing = """{"mcpServers":{"atlassian":{"command":"mine"},"playwright":{"command":"npx"}}}"""
+            mcpFile.writeText(existing)
+
+            // when
+            engineFor(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR).process(locations())
+
+            // then
+            assertThat(mcpFile).hasContent(existing)
+            assertThat(destination.resolve(".vscode/mcp.json")).doesNotExist()
+            assertThat(destination.resolve(".cursor/mcp.json")).doesNotExist()
+            assertThat(destination.resolve(".codex/config.toml")).doesNotExist()
+            assertThat(warnings()).noneMatch { it.contains("MCP") }
+        }
+
+        @Test
+        fun `should remove an owned server the project does not select and keep a server added by hand`() {
+            // given
+            // - inside a project that selects servers, an entry named after any MCP manifest of the run is the engine's
+            writeAtlassianServer()
+            writeYaml("mcps/other.yml", "id: other\ndescription: Other\ntransport:\n  type: stdio\n  command: other-server\n")
+            writeProject(mcpFilter = listOf("other"))
+            val mcpFile = destination.resolve(".mcp.json")
+            mcpFile.parentFile.mkdirs()
+            mcpFile.writeText("""{ "mcpServers": { "atlassian": { "command": "old" }, "playwright": { "command": "npx" } } }""")
+
+            // when
+            engineFor(ToolType.CLAUDE).process(locations())
+
+            // then
+            assertThat(mcpFile)
+                .content()
+                .doesNotContain("atlassian")
+                .contains("playwright")
+                .contains("other-server")
+        }
+
+        @Test
+        fun `should keep the MCP files and the servers added by hand when a replacing project is deployed`() {
+            // given
+            writeAtlassianServer()
+            writeProject(replace = true, mcpFilter = listOf("atlassian"))
+            val codexConfig = destination.resolve(".codex/config.toml")
+            codexConfig.parentFile.mkdirs()
+            codexConfig.writeText("# mine\n[mcp_servers.playwright]\ncommand = \"npx\"\n")
+            val cursorConfig = destination.resolve(".cursor/mcp.json")
+            cursorConfig.parentFile.mkdirs()
+            cursorConfig.writeText("""{ "mcpServers": { "playwright": { "command": "npx" } } }""")
+
+            // when
+            engineFor(ToolType.CODEX, ToolType.CURSOR).process(locations())
+
+            // then
+            assertThat(codexConfig).content().startsWith("# mine\n[mcp_servers.playwright]\ncommand = \"npx\"\n").contains("[mcp_servers.atlassian]")
+            assertThat(cursorConfig).content().contains("playwright").contains("atlassian")
+        }
+
+        @Test
+        fun `should fail naming the server and the variable when a required plain variable is declared nowhere, and still export the rest`() {
+            // given
+            writeAtlassianServer(extraVariable = "  - name: CONFLUENCE_BASE_URL\n    description: Base URL\n    secret: false\n")
+
+            // when
+            val error = runCatching { engineFor(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'CONFLUENCE_BASE_URL'")
+            // - the failure is labelled with the server that failed, not with the file holding every server of the project
+            assertThat((error as ExportFailedException).failures.map { it.manifest }).containsExactly("MCP server 'atlassian'")
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(destination.resolve(".mcp.json")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail only the project whose MCP config file links outside it, naming the file and the target, and write the rest`() {
+            // given
+            writeAtlassianServer()
+            val outside = tempDir.resolve("home/.claude.json").toFile()
+            outside.parentFile.mkdirs()
+            outside.writeText("""{"mcpServers":{}}""")
+            destination.mkdirs()
+            Files.createSymbolicLink(destination.resolve(".mcp.json").toPath(), outside.toPath())
+
+            // when
+            val error = runCatching { engineFor(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining(destination.resolve(".mcp.json").absolutePath)
+                .hasMessageContaining(outside.canonicalPath)
+            assertThat(outside).hasContent("""{"mcpServers":{}}""")
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+        }
+
+        @Test
+        fun `should resolve a leading tilde of a stdio command against the real home, whatever the user home of the run`() {
+            // given
+            writeYaml("mcps/atlassian.yml", "id: atlassian\ndescription: Jira\ntransport:\n  type: stdio\n  command: ~/bin/jira-mcp-server\n")
+
+            // when
+            engineFor(ToolType.CLAUDE).process(locations())
+
+            // then
+            val content = destination.resolve(".mcp.json").readText()
+            assertThat(content).contains(File(System.getProperty("user.home"), "bin/jira-mcp-server").absolutePath).doesNotContain(userHome.absolutePath)
+        }
+
+        @Test
+        fun `should name the MCP file of every supporting tool and write nothing in a dry run`() {
+            // given
+            writeAtlassianServer()
+            val sinkAppender = ListAppender<ILoggingEvent>()
+            val sinkLogger = LoggerFactory.getLogger(DryRunArtifactSink::class.java) as Logger
+            sinkAppender.start()
+            sinkLogger.addAppender(sinkAppender)
+
+            // when
+            try {
+                engineFor(*ToolType.entries.toTypedArray(), dryRun = true).process(locations())
+            } finally {
+                sinkLogger.detachAppender(sinkAppender)
+                sinkAppender.stop()
+            }
+
+            // then
+            val sinkInfos = sinkAppender.list.map { it.formattedMessage }
+            listOf(".mcp.json", ".vscode/mcp.json", ".cursor/mcp.json", ".codex/config.toml").forEach { path ->
+                assertThat(sinkInfos).anyMatch { it.contains("MCP servers [atlassian]") && it.contains(destination.resolve(path).absolutePath) }
+                assertThat(destination.resolve(path)).doesNotExist()
+            }
+        }
+
+        /**
+         * Every way a value of the deploying shell or of the config could reach an MCP config file, a log line or an error: each either renders a reference only, or fails, and the value appears nowhere.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - a header marked secret only on the outside, holding a bearer token variable not marked itself: rendered as a reference
+            "outer-secret-bearer, reference, ATLASSIAN_TOKEN",
+            // - an environment variable marked secret on the outside whose value puts the secret into other text
+            "outer-secret-composed-environment, refused-at-load, ATLASSIAN_KEY",
+            // - one variable derived as plain text in the url and as a secret in a header
+            "conflicting-secrecy, refused-at-load, ATLASSIAN_TOKEN",
+            // - a server json holding a reference in the syntax of the engine
+            "literal-reference, refused-at-load, X-Key",
+            // - a server json holding a reference in the syntax of VS Code and Cursor
+            "tool-reference, refused-at-load, X-Env",
+            // - an inline manifest referencing a variable it does not declare
+            "undeclared-reference, refused-at-load, GITHUB_TOKEN",
+            // - a plain variable only the deploying shell exports: left out
+            "environment-plain-value, omitted, EXAMPLE_TOKEN",
+            // - a TLS verification flag only the deploying shell exports: left out
+            "environment-tls-flag, omitted, JIRA_VERIFY_SSL",
+            // - a plain value of the config carrying a reference a tool would expand
+            "nested-config-value, refused-at-export, NESTED_PROXY",
+        )
+        fun `should never write, log or report a value of the environment or the config`(
+            scenario: String,
+            outcome: String,
+            name: String,
+        ) {
+            // given
+            val rootAppender = ListAppender<ILoggingEvent>()
+            val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) as Logger
+            rootAppender.start()
+            rootLogger.addAppender(rootAppender)
+            val variables = VariableResolver(
+                variables = mapOf("NESTED_PROXY" to "http://user:$LEAKED_VALUE@proxy/\${X}"),
+                environment = { name -> if (name in LEAKING_NAMES) LEAKED_VALUE else null },
+            )
+            writeLeakScenario(scenario)
+
+            // when
+            val error = try {
+                runCatching { engineFor(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR, variables = variables).process(locations()) }.exceptionOrNull()
+            } finally {
+                rootLogger.detachAppender(rootAppender)
+                rootAppender.stop()
+            }
+
+            // then
+            val written = destination
+                .walkTopDown()
+                .filter { it.isFile }
+                .map { it.readText() }
+                .toList()
+            val logged = rootAppender.list.flatMap { event ->
+                listOfNotNull(event.formattedMessage) + generateSequence(event.throwableProxy) { it.cause }.mapNotNull { it.message }
+            }
+            val reported = generateSequence(error) { it.cause }.mapNotNull { it.message }.toList()
+            assertThat(written + logged + reported).noneMatch { it.contains(LEAKED_VALUE) }
+            // - and each scenario ends the way it is meant to, so a refusal for an unrelated reason cannot pass for safety
+            val claude = destination.resolve(".mcp.json")
+            when (outcome) {
+                "reference" -> {
+                    assertThat(error).isNull()
+                    assertThat(claude).content().contains("\${$name}")
+                }
+                "omitted" -> {
+                    assertThat(error).isNull()
+                    assertThat(claude).content().contains("\"atlassian\"").doesNotContain(name)
+                }
+                "refused-at-load" -> {
+                    assertThat(error).isInstanceOf(ManifestLoadingException::class.java).hasMessageContaining(name)
+                    assertThat(claude).doesNotExist()
+                }
+                else -> {
+                    assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'$name'")
+                    assertThat(claude).doesNotExist()
+                }
+            }
+        }
+
+        private fun writeLeakScenario(scenario: String) {
+            val schema = "\"\$schema\": \"https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json\", \"name\": \"x\", \"description\": \"d\", \"version\": \"1\""
+
+            fun pointer(serverJson: String) {
+                val folder = tempDir.resolve("servers/$scenario").toFile()
+                folder.mkdirs()
+                folder.resolve("server.json").writeText("{$schema, $serverJson}")
+                writeYaml("mcps/atlassian.yml", "id: atlassian\nsource: \"${folder.absolutePath}\"\n")
+            }
+
+            fun remote(url: String, headers: String) = pointer("\"remotes\": [{\"type\": \"streamable-http\", \"url\": \"$url\", \"variables\": {\"token\": {}}, \"headers\": [$headers]}]")
+
+            fun inline(transport: String, variables: String = "") = writeYaml("mcps/atlassian.yml", "id: atlassian\ndescription: d\ntransport:\n$transport$variables")
+            when (scenario) {
+                "outer-secret-bearer" -> remote("https://x/mcp", "{\"name\": \"Authorization\", \"isSecret\": true, \"value\": \"Bearer {token}\", \"variables\": {\"token\": {\"isRequired\": true}}}")
+                "outer-secret-composed-environment" -> pointer(
+                    "\"packages\": [{\"registryType\": \"npm\", \"identifier\": \"x\", \"transport\": {\"type\": \"stdio\"}, " +
+                        "\"environmentVariables\": [{\"name\": \"API\", \"isSecret\": true, \"value\": \"key={key}\", \"variables\": {\"key\": {\"isRequired\": true}}}]}]",
+                )
+                "conflicting-secrecy" -> remote("https://x/{token}/mcp", "{\"name\": \"Authorization\", \"value\": \"Bearer {token}\", \"variables\": {\"token\": {\"isSecret\": true}}}")
+                "literal-reference" -> remote("https://x/mcp", "{\"name\": \"X-Key\", \"value\": \"\${DEMO_KEY}\"}")
+                "tool-reference" -> remote("https://x/mcp", "{\"name\": \"X-Env\", \"value\": \"\${env:AWS_SECRET_ACCESS_KEY}\"}")
+                "undeclared-reference" -> inline("  type: stdio\n  command: server\n  args: ['--token=\${GITHUB_TOKEN}']\n")
+                "environment-plain-value" -> inline("  type: stdio\n  command: server\n", "variables:\n  - name: EXAMPLE_TOKEN\n    description: t\n    secret: false\n    required: false\n")
+                "environment-tls-flag" -> inline("  type: stdio\n  command: server\n", "variables:\n  - name: JIRA_VERIFY_SSL\n    description: t\n    secret: false\n    required: false\n")
+                "nested-config-value" -> inline("  type: stdio\n  command: server\n", "variables:\n  - name: NESTED_PROXY\n    description: t\n    secret: false\n")
+                else -> error("Unknown scenario $scenario")
+            }
+        }
+
+        private fun writeAtlassianServer(extraVariable: String = "") = writeYaml(
+            "mcps/atlassian.yml",
+            "id: atlassian\ndescription: Jira and Confluence\n" +
+                "transport:\n  type: stdio\n  command: jira-mcp-server\n" +
+                "variables:\n" +
+                "  - name: JIRA_PAT\n    description: Token\n    secret: true\n" +
+                "  - name: JIRA_BASE_URL\n    description: Base URL\n    secret: false\n" +
+                extraVariable,
+        )
+    }
+
     private fun locations() = Locations(
         agents = listOf(workspace.resolve("agents")),
         deployments = listOf(workspace.resolve("deployments")),
@@ -2218,6 +2548,7 @@ class ToolsEngineTest {
         rulesets = listOf(workspace.resolve("rulesets")),
         fragments = emptyList(),
         skills = listOf(workspace.resolve("skills")),
+        mcps = listOf(workspace.resolve("mcps")),
     )
 
     private fun agentFile(id: String) = destination.resolve(".claude/agents/$id.md")
@@ -2271,6 +2602,7 @@ class ToolsEngineTest {
     /**
      * @param root the configured `locations.deployments` directory to write this project under, which decides when the loader reads it relative to the projects of another root
      * @param skillFilter the skill ids the project whitelists, or `null` for every skill there is
+     * @param mcpFilter the MCP server ids the project whitelists, or `null` for every MCP server there is
      */
     // A test builder: every parameter is one field of the manifest with the default a test rarely needs to change.
     @Suppress("LongParameterList")
@@ -2282,12 +2614,13 @@ class ToolsEngineTest {
         root: String = "deployments",
         replace: Boolean = false,
         skillFilter: List<String>? = null,
+        mcpFilter: List<String>? = null,
     ) = writeYaml(
         "$root/$directoryName/project.yml",
         "id: $id\ndescription: A project\n" +
             "context:\n  documentation:\n    readme: README.md\n" +
             "deploy:\n  directory: \"$deployDirectory\"\n  replace: $replace\n" + toolsDeclaration(tools) +
-            whitelistDeclaration("skills", skillFilter).lineSequence().filter { it.isNotEmpty() }.joinToString("") { "  $it\n" },
+            (whitelistDeclaration("skills", skillFilter) + whitelistDeclaration("mcps", mcpFilter)).lineSequence().filter { it.isNotEmpty() }.joinToString("") { "  $it\n" },
     )
 
     /**
@@ -2373,5 +2706,17 @@ class ToolsEngineTest {
         file.parentFile.mkdirs()
         file.writeText(content + "metadata:\n  version: 1.0.0\n")
         return file
+    }
+
+    companion object {
+        /** A value only the environment of a test run carries for a secret variable, which no generated file may ever contain. */
+        private const val SECRET_VALUE = "s3cr3t-value-that-must-never-be-written"
+
+        /** A value the environment or the config of a leak scenario carries, which no file, log line or error may ever contain. */
+        private const val LEAKED_VALUE = "leaked-4f1c9e"
+
+        /** The names the environment of a leak scenario carries [LEAKED_VALUE] under. */
+        private val LEAKING_NAMES =
+            setOf("GITHUB_TOKEN", "ATLASSIAN_TOKEN", "ATLASSIAN_KEY", "DEMO_KEY", "AWS_SECRET_ACCESS_KEY", "EXAMPLE_TOKEN", "JIRA_VERIFY_SSL", "X")
     }
 }

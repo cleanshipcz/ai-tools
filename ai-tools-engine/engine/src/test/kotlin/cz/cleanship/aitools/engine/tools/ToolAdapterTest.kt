@@ -30,8 +30,9 @@ class ToolAdapterTest {
         "ANTIGRAVITY, .agent",
         "GITHUB_COPILOT, .github/prompts;.github/instructions;.github/agents",
         "CLAUDE, .claude",
-        "CODEX, .codex",
-        "CURSOR, .cursor",
+        // - Codex and Cursor keep their MCP config file, .codex/config.toml and .cursor/mcp.json, beside the directories they generate
+        "CODEX, .codex/skills;.codex/features",
+        "CURSOR, .cursor/rules;.cursor/commands;.cursor/features",
     )
     fun `should name the directories of its tool as the paths a replacing project deploy deletes`(
         toolType: ToolType,
@@ -119,6 +120,7 @@ class ToolAdapterTest {
         val replacedPaths = adapter.replacedPaths(projectDir, manifest)
         // - every replaced path is a link to a folder of its own outside the project
         val outsideFiles = replacedPaths.mapIndexed { index, replaced ->
+            replaced.parentFile.mkdirs()
             val outsideFile = writeFile(tempDir.resolve("outside-$index/SKILL.md"))
             Files.createSymbolicLink(replaced.toPath(), outsideFile.parentFile.toPath())
             outsideFile
@@ -130,6 +132,58 @@ class ToolAdapterTest {
         // then
         assertThat(outsideFiles).allSatisfy { assertThat(it).hasContent("Written by hand.\n") }
         assertThat(replacedPaths).allSatisfy { assertThat(Files.exists(it.toPath(), LinkOption.NOFOLLOW_LINKS)).isFalse() }
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "GITHUB_COPILOT, .vscode/mcp.json",
+        "CLAUDE, .mcp.json",
+        "CODEX, .codex/config.toml",
+        "CURSOR, .cursor/mcp.json",
+    )
+    fun `should name the MCP config file its tool reads in a project`(toolType: ToolType, expected: String) {
+        // given
+        val projectDir = tempDir.resolve("project")
+        val adapter = ToolFactory.create(toolType)
+
+        // when
+        val exporter = adapter.mcpConfig(projectDir)
+
+        // then
+        assertThat(exporter?.file).isEqualTo(projectDir.resolve(expected))
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ToolType::class, names = ["WINDSURF", "ANTIGRAVITY"])
+    fun `should name no MCP config file for a tool whose MCP support is not implemented`(toolType: ToolType) {
+        // given
+        val adapter = ToolFactory.create(toolType)
+
+        // when
+        val exporter = adapter.mcpConfig(tempDir.resolve("project"))
+
+        // then
+        assertThat(exporter).isNull()
+    }
+
+    @ParameterizedTest
+    @EnumSource(ToolType::class)
+    fun `should keep every MCP config file when the project replaces`(toolType: ToolType) {
+        // given
+        // - the MCP config file of every tool, each holding servers the user added by hand next to the owned ones
+        val projectDir = tempDir.resolve("project")
+        val mcpFiles = listOf(".mcp.json", ".vscode/mcp.json", ".cursor/mcp.json", ".codex/config.toml")
+            .map { writeFile(projectDir.resolve(it)) }
+        val adapter = ToolFactory.create(toolType)
+        val manifest = project(replace = true)
+        // - an earlier export left a file in every replaced path
+        adapter.replacedPaths(projectDir, manifest).forEach { writeFile(it.resolve("stale.md")) }
+
+        // when
+        adapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(mcpFiles).allSatisfy { assertThat(it).hasContent("Written by hand.\n") }
     }
 
     private fun project(replace: Boolean) = ProjectManifest(

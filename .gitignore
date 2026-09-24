@@ -119,5 +119,12 @@ AGENTS.md
 .codex/
 CLAUDE.md
 
+# Generated MCP config files: they hold non-secret values resolved on this machine, so they are not shared.
+# .codex/, .cursor and .vscode/ are ignored above already; the paths are named here so the intent survives a change there.
+.mcp.json
+.vscode/mcp.json
+.cursor/mcp.json
+.codex/config.toml
+
 # Local configuration
 config.local.yml

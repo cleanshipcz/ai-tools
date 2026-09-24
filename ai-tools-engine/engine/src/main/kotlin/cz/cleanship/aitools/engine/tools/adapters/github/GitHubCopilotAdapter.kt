@@ -15,6 +15,9 @@ import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.mcp.JsonMcpConfigFormat
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileExporter
 import cz.cleanship.aitools.engine.tools.replacing
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -36,6 +39,10 @@ class GitHubCopilotAdapter(
      * Returns no exporter: the per-user layout of GitHub Copilot is not implemented yet, so the engine reports a user deployment naming this tool as skipped for it instead of writing anything into the home.
      */
     override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter? = null
+
+    // VS Code also reads a portable `.mcp.json`, but that is the file of Claude Code; `.vscode/mcp.json` is the one only Copilot reads, so the two tools never contend for an entry.
+    override fun mcpConfig(projectDir: File): McpConfigExporter =
+        McpConfigFileExporter(projectDir.resolve(".vscode").resolve("mcp.json"), JsonMcpConfigFormat.VS_CODE, exportService, projectDir)
 
     override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
         globalContext.project,
@@ -118,13 +125,6 @@ class GitHubCopilotAdapter(
         appendLine("---")
     }
 
-    /**
-     * Renders the declared variables in manifest order as `<required>` and `[optional]` hints, or null when the prompt declares none - `argument-hint` is then omitted from the frontmatter entirely.
-     */
-    private fun argumentHint(variables: List<PromptVariable>) = variables
-        .takeIf { it.isNotEmpty() }
-        ?.joinToString(" ") { if (it.required) "<${it.name}>" else "[${it.name}]" }
-
     companion object {
         private val LOG = LoggerFactory.getLogger(GitHubCopilotAdapter::class.java)
 
@@ -144,3 +144,10 @@ class GitHubCopilotAdapter(
 private fun skillFile(promptsDir: File, skillId: String) = promptsDir.resolve("skill-$skillId.prompt.md")
 
 private fun skillFilesDir(promptsDir: File, skillId: String) = promptsDir.resolve("skill-$skillId")
+
+/**
+ * Renders the declared variables in manifest order as `<required>` and `[optional]` hints, or null when the prompt declares none - `argument-hint` is then omitted from the frontmatter entirely.
+ */
+private fun argumentHint(variables: List<PromptVariable>) = variables
+    .takeIf { it.isNotEmpty() }
+    ?.joinToString(" ") { if (it.required) "<${it.name}>" else "[${it.name}]" }

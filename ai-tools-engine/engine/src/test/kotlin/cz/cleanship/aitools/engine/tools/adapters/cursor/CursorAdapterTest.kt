@@ -165,12 +165,19 @@ class CursorAdapterTest {
     }
 
     @Test
-    fun `prepare should delete cursor directory when replace is true`() {
+    fun `prepare should delete the generated cursor directories and keep the MCP config file when replace is true`() {
         // given
         val projectDir = tempDir.toFile()
         val cursorDir = projectDir.resolve(".cursor")
-        cursorDir.mkdirs()
-        File(cursorDir, "some-file.txt").writeText("content")
+        // - every directory this adapter generates holds a file of an earlier export
+        val generated = listOf("rules", "commands", "features").map { cursorDir.resolve(it) }
+        generated.forEach {
+            it.mkdirs()
+            File(it, "some-file.txt").writeText("content")
+        }
+        // - the MCP config file, whose entries the engine owns one by one, sits beside them
+        val mcpConfig = cursorDir.resolve("mcp.json")
+        mcpConfig.writeText("kept")
 
         val manifest = mockk<ProjectManifest>()
         val deploy = mockk<ProjectDeploy>()
@@ -181,7 +188,8 @@ class CursorAdapterTest {
         adapter.prepare(projectDir, manifest)
 
         // then
-        assertThat(cursorDir).doesNotExist()
+        assertThat(generated).allSatisfy { assertThat(it).doesNotExist() }
+        assertThat(mcpConfig).hasContent("kept")
     }
 
     @Test

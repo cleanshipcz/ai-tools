@@ -1,0 +1,15 @@
+id: github
+# A pointer: description, transport, and variables come from the server.json of the github/github-mcp-server checkout.
+# The remote Streamable HTTP endpoint is selected rather than the OCI package: its only variable is the Authorization header,
+# which every tool can fill from the environment, while the package passes its token inside a docker argument, which Codex cannot.
+# The header becomes the secret variable GITHUB_AUTHORIZATION; export it as "Bearer <token>" before starting a tool.
+source: ${PROJECTS_FOLDER}/github-mcp-server
+select:
+  remote: https://api.githubcopilot.com/mcp/
+metadata:
+  version: 1.0.0
+  author: cleanshipcz
+  created: 2026-09-24
+  tags:
+    - ai-tools
+    - github

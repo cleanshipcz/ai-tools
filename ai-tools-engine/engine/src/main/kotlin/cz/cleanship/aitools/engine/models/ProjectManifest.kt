@@ -41,7 +41,8 @@ data class ProjectDocumentationItem(
  * `config.yml`, the same base its `locations.*` paths use - so `.` means that directory itself and the value does not
  * shift with the working directory of the JVM process.
  * An absolute value is used exactly as written, which is what a project outside the manifest repository wants.
- * @param replace whether a deploy may delete the directories it generates before writing them again
+ * @param replace whether a deploy may delete the directories it generates before writing them again. It never deletes an MCP config file: the engine owns only the entries of such a file that are named after an MCP server manifest of the run.
+ * @param mcps which MCP servers the project deploys, or `null` for none. MCP servers are opt-in, unlike every other kind: their entries land in files other repositories commit, and a tool starts the processes they name, so a project that declares no block, or a block that selects no server, never reads or writes an MCP config file.
  * @param tools which of the tools configured for the run deploy this project. Omitting it - not emptying it - means
  * every configured tool, so a project that says nothing keeps following the tool list of the run, while an empty
  * list deliberately restricts the project to no tool at all. A `tools:` key with no value under it decodes to null
@@ -60,6 +61,7 @@ data class ProjectDeploy(
     val rulesets: ProjectRulesets = ProjectRulesets(),
     val fragments: ProjectFragments = ProjectFragments(),
     val skills: ProjectSkills = ProjectSkills(),
+    val mcps: ProjectMcps? = null,
 )
 
 @Serializable
@@ -89,6 +91,16 @@ data class ProjectFragments(
 
 @Serializable
 data class ProjectSkills(
+    val filter: List<ProjectFilter> = emptyList(),
+)
+
+/**
+ * Which MCP servers a project deploys into the MCP config file of each tool, selected by [filter] like every other kind; an empty [filter] selects every server.
+ *
+ * Unlike every other block of [ProjectDeploy], leaving it out selects no server: see [ProjectDeploy.mcps].
+ */
+@Serializable
+data class ProjectMcps(
     val filter: List<ProjectFilter> = emptyList(),
 )
 

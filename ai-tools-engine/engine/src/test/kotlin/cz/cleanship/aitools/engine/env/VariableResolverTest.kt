@@ -284,4 +284,82 @@ class VariableResolverTest {
             assertThat((error as UnexpandedReferenceException).variable).isEqualTo("HOME")
         }
     }
+
+    @Nested
+    inner class Lookup {
+
+        @Test
+        fun `should return the declared value before the value of the environment`() {
+            // given
+            environmentVariables["JIRA_BASE_URL"] = "https://from-environment"
+            val resolver = VariableResolver(mapOf("JIRA_BASE_URL" to "https://from-config"), environment)
+
+            // when
+            val value = resolver.valueOf("JIRA_BASE_URL")
+
+            // then
+            assertThat(value).isEqualTo("https://from-config")
+        }
+
+        @Test
+        fun `should return the value of the environment when nothing declares the name`() {
+            // given
+            environmentVariables["JIRA_VERIFY_SSL"] = "false"
+            val resolver = VariableResolver(emptyMap(), environment)
+
+            // when
+            val value = resolver.valueOf("JIRA_VERIFY_SSL")
+
+            // then
+            assertThat(value).isEqualTo("false")
+        }
+
+        @Test
+        fun `should return null when neither the config nor the environment carries the name`() {
+            // given
+            val resolver = VariableResolver(emptyMap(), environment)
+
+            // when
+            val value = resolver.valueOf("HTTPS_PROXY")
+
+            // then
+            assertThat(value).isNull()
+        }
+
+        @Test
+        fun `should read a config value from the config files only, never from the environment`() {
+            // given
+            environmentVariables["JIRA_VERIFY_SSL"] = "false"
+            val resolver = VariableResolver(mapOf("JIRA_BASE_URL" to "https://from-config"), environment)
+
+            // when
+            val declared = resolver.configValueOf("JIRA_BASE_URL")
+            val exported = resolver.configValueOf("JIRA_VERIFY_SSL")
+
+            // then
+            assertThat(declared).isEqualTo("https://from-config")
+            assertThat(exported).isNull()
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - set in the environment
+            "ENVIRONMENT_ONLY, true",
+            // - declared by the config only, which the tools starting a server never read
+            "CONFIG_ONLY, false",
+            // - set nowhere
+            "NOWHERE, false",
+        )
+        fun `should tell whether the environment of the run carries a name`(name: String, expected: Boolean) {
+            // given
+            environmentVariables["ENVIRONMENT_ONLY"] = "value"
+            val resolver = VariableResolver(mapOf("CONFIG_ONLY" to "value"), environment)
+
+            // when
+            val set = resolver.isSetInEnvironment(name)
+
+            // then
+            assertThat(set).isEqualTo(expected)
+        }
+    }
 }

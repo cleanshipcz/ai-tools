@@ -30,6 +30,17 @@ class ExportService(
     ) = sink.export(entity, targetFile, outputConsumer)
 
     /**
+     * Writes [content] to the config file [targetFile] through the sink of this service - see [ArtifactSink.writeConfigFile].
+     *
+     * @param describedBy what [content] holds, as the log line names it
+     */
+    fun writeConfigFile(
+        targetFile: File,
+        content: String,
+        describedBy: String,
+    ) = sink.writeConfigFile(targetFile, content, describedBy)
+
+    /**
      * Copies every companion file declared by a skill next to its generated manifest.
      *
      * @param sourceDir the folder a relative companion file is copied from: the source folder of a pointer skill, the directory of a directory-based skill, or `null` for a standalone skill file

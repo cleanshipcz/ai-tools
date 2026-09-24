@@ -21,6 +21,7 @@ See [Not Yet Implemented](#not-yet-implemented) before looking for them.
 - Network access on the first build, so Gradle can fetch dependencies and, if you have no local JDK 21, provision the JVM 21 toolchain the engine targets
 - Node/npm only if you want to build the optional `:server` module, whose frontend is built with Vite
 - A checkout of the `jira-confluence-mcp-server` repository, by default at `~/Documents/Projects/jira-confluence-mcp-server`. The pointer skills `jira-ticket`, `confluence-doc`, and `confluence-search` are read from its `skills/` folder, found through `${PROJECTS_FOLDER}/jira-confluence-mcp-server/skills/<id>`, and every run loads every skill manifest. Without the checkout, every run fails, `./deploy.sh --dry-run` included. If your checkout sits elsewhere, link it into `${PROJECTS_FOLDER}`, for example `ln -s <your checkout> ~/Documents/Projects/jira-confluence-mcp-server`. You can instead set `PROJECTS_FOLDER` under `env_vars` in `config.local.yml` to the folder that holds it, but every `deploy.directory` that uses `${PROJECTS_FOLDER}` then moves with it, and a deployment with `replace: true` deletes its tool folders at the new location; do that only when your projects live in that folder too. See [Path variables](#path-variables) and [04_skills/README.md](04_skills/README.md#pointer-skill).
+- A checkout of the `github/github-mcp-server` repository at `~/Documents/Projects/github-mcp-server`, found through `${PROJECTS_FOLDER}/github-mcp-server`. The MCP server manifest `07_mcp/github.yml` reads its `server.json`, and every run loads every MCP server manifest, so without the checkout every run fails, `./deploy.sh --dry-run` included. See [07_mcp/README.md](07_mcp/README.md).
 
 ## Repository Layout
 - `01_rulesets/` – reusable rule sets, referenced by regex on their `id`
@@ -28,6 +29,7 @@ See [Not Yet Implemented](#not-yet-implemented) before looking for them.
 - `03_prompts/` – prompt manifests
 - `04_skills/` – skill manifests, as `<id>.yml` or as a directory containing `skill.yml`; a pointer skill instead points with `source` at a plain skill folder outside this repository (see [04_skills/README.md](04_skills/README.md#pointer-skill))
 - `05_agents/` – agent manifests
+- `07_mcp/` – MCP server manifests, declared inline or as a pointer with `source` at a `server.json` outside this repository (see [07_mcp/README.md](07_mcp/README.md))
 - `09_deployments/` – deployment manifests, each a directory containing a `project.yml` (deploys into a project directory) or a `user.yml` (deploys into the user scope of a tool), plus an optional `features/`
 - `ai-tools-engine/` – the Kotlin build engine (Gradle multi-module: `:engine`, `:cli`, `:server`, `:telemetry`)
 - `90_docs/` – reference documentation
@@ -35,12 +37,11 @@ See [Not Yet Implemented](#not-yet-implemented) before looking for them.
 
 Source of truth retained, engine support pending:
 
-- `07_mcp/` – MCP servers and presets
 - `08_recipes/` – multi-agent workflow recipes
 - `20_evals/` – evaluation datasets and suites
 - `21_redteam/` – security and jailbreak test cases
 
-The engine does not read any of these four directories.
+The engine does not read any of these three directories.
 They are kept so the content is not lost, and are tracked in [PLANNED_FEATURES.md](PLANNED_FEATURES.md).
 
 Left over from the retired TypeScript CLI and no longer written or read by anything:
@@ -63,7 +64,7 @@ Left over from the retired TypeScript CLI and no longer written or read by anyth
 ./deploy.sh --dry-run
 ```
 
-A dry run loads, filters, and renders every manifest exactly as a deploy does and fails on exactly what a deploy fails on — a broken ruleset or fragment reference, a duplicate id, a missing skill file, the `source` folder of a pointer skill that is missing or has no valid `SKILL.md`, a path the run would write or delete that overlaps such a folder, a deploy directory that cannot be resolved — but creates, deletes, and modifies nothing on disk.
+A dry run loads, filters, and renders every manifest exactly as a deploy does and fails on exactly what a deploy fails on — a broken ruleset or fragment reference, a duplicate id, a missing skill file, the `source` folder of a pointer skill that is missing or has no valid `SKILL.md`, a path the run would write or delete that overlaps such a folder, the `server.json` of a pointer MCP server that is missing or invalid, a required plain MCP variable that resolves nowhere, a deploy directory that cannot be resolved — but creates, deletes, and modifies nothing on disk.
 It logs the absolute path of every artifact a deploy would write, so the transcript reads as the plan of the deploy it stands in for.
 
 4) Generate and deploy
@@ -128,8 +129,12 @@ A ruleset or fragment referenced by an agent must itself survive the project's `
 
 Features live in `features/<feature>.yml` next to `project.yml` and are exported as per-tool workflow or instruction files.
 
-Set `deploy.replace: true` to wipe a tool's output directory before writing.
-Every adapter honours the flag, the GitHub Copilot one included: with `replace: true` it clears `.github/prompts/`, `.github/instructions/`, and `.github/agents/`, which it owns entirely, and with `replace: false` it leaves them alone — so files left there by a retired naming scheme survive and have to be removed by hand.
+Set `deploy.replace: true` to wipe a tool's output directories before writing.
+Claude clears `.claude/`, Windsurf `.windsurf/`, and Antigravity `.agent/`. Codex clears only `.codex/skills/` and `.codex/features/`, Cursor only `.cursor/rules/`, `.cursor/commands/`, and `.cursor/features/`, because `.codex/config.toml` and `.cursor/mcp.json` hold MCP servers beside them. GitHub Copilot clears `.github/prompts/`, `.github/instructions/`, and `.github/agents/`, which it owns entirely.
+With `replace: false` every adapter leaves its directories alone, so files left there by a retired naming scheme survive and have to be removed by hand.
+A replacing deploy never deletes an MCP config file; the engine owns only the server entries of such a file that are named after an MCP server manifest of the run.
+
+MCP servers are opt-in: a project selects them with a `deploy.mcps` block, a project without one gets none and its MCP config files are never touched, and the selected servers land in `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, and `.codex/config.toml`, with every secret written as a reference the tool resolves from its own environment — see [07_mcp/README.md](07_mcp/README.md).
 
 There is no backup and no auto-commit step.
 Generated files are overwritten in place, though each file is written atomically via a temporary file, so an interrupted run cannot leave a half-written artifact.
@@ -142,7 +147,7 @@ One run reports every collision it found, names the id and both files, and exits
 How much a collision costs depends on the kind of manifest:
 
 - Two projects sharing an id, two user deployments sharing an id, or two features of the same project sharing an id, cost only the deployment(s) that carry them. Those are not exported, every other deployment is deployed as usual, and the run still fails at the end.
-- Two agents, prompts, rulesets, fragments, or skills sharing an id stop the whole run before anything is written. They are shared by every project, and a project that does not filter that kind deploys all of it, so dropping the colliding pair would silently ship every project without content it never excluded.
+- Two agents, prompts, rulesets, fragments, skills, or MCP servers sharing an id stop the whole run before anything is written. They are shared by every project, and a project that does not filter that kind deploys all of it, so dropping the colliding pair would silently ship every project without content it never excluded.
 
 Ids are indexed per kind, so a `project.yml` and a `user.yml` are free to declare the same id — they are separate manifests of separate scopes, and nothing ever has to choose between them.
 
@@ -276,12 +281,14 @@ Verified against the adapters in `ai-tools-engine/engine/.../tools/adapters/`. A
 | `antigravity` | `.agent/rules/project.md`, `.agent/rules/agent-<id>.md`, `.agent/rules/prompt-<id>.md`, `.agent/rules/skill-<id>.md`, `.agent/workflows/feature-<id>.md` |
 | `cursor` | `.cursor/rules/project.mdc`, `.cursor/rules/agent-<id>.mdc`, `.cursor/commands/prompt-<id>.md`, `.cursor/commands/skill-<id>.md`, `.cursor/features/feature-<id>.md` |
 
+MCP servers a project selects are merged into one more file per tool: `.mcp.json` for `claude`, `.vscode/mcp.json` for `github_copilot`, `.cursor/mcp.json` for `cursor`, and `.codex/config.toml` for `codex`. `windsurf` and `antigravity` write no MCP config file, and the run warns that the servers are not deployed for them.
+
 ## Configuration
 
 The engine reads `config.yml` from the directory given by `--working-dir` — the repository root — and merges `config.local.yml` over it if present.
 `config.local.yml` is gitignored and intended for machine-local overrides.
 
-Merging happens per individual key: each of the six entries under `locations`, and the `tools` list, is replaced wholesale when present in `config.local.yml`.
+Merging happens per individual key: each of the seven entries under `locations`, and the `tools` list, is replaced wholesale when present in `config.local.yml`.
 Lists are never appended to, so a local `deployments:` list must repeat any default entry you still want.
 The `env_vars` map is the exception — it merges per variable, so a local declaration overrides that one variable and leaves the rest of the shared map in place.
 
@@ -292,6 +299,7 @@ locations:
   rulesets:  ["01_rulesets"]
   fragments: ["02_fragments"]
   skills:    ["04_skills"]
+  mcps:      ["07_mcp"]
   deployments: ["09_deployments"]
 
 tools:
@@ -312,7 +320,8 @@ An individual project can narrow itself down to a subset of them with `deploy.to
 
 ### Path variables
 
-The optional top-level `env_vars` key declares variables that every `locations` entry and every project's `deploy.directory` may reference as `${NAME}`:
+The optional top-level `env_vars` key declares variables that every `locations` entry, every project's `deploy.directory`, and the `source` of every pointer skill and pointer MCP server may reference as `${NAME}`.
+An MCP server manifest reads its plain variables from them only, never from the environment of the run, and writes their values into the generated MCP config files; secret MCP variables are never read — see [07_mcp/README.md](07_mcp/README.md#secret-and-plain-variables).
 
 ```yaml
 env_vars:
@@ -330,7 +339,7 @@ The typical use is the one above: the machine-specific absolute base lives in th
 
 References are expanded before a path is judged relative or absolute, which is what lets a variable carry an absolute base for a value whose remainder is written as a fragment.
 
-After expansion, a path that is `~` or starts with `~/` resolves against the home directory of the user running the engine. This applies to every `locations` entry, every `deploy.directory`, the skill-level `source` of a pointer skill, and `--user-home`, so the committed `PROJECTS_FOLDER: "~/Documents/Projects"` works without a local override. `~user` is not expanded: it is read as a relative path whose first folder is named `~user`. A `~` anywhere but at the start is an ordinary part of the name. The paths of a `files` entry of a skill are neither substituted nor expanded.
+After expansion, a path that is `~` or starts with `~/` resolves against the home directory of the user running the engine. This applies to every `locations` entry, every `deploy.directory`, the skill-level `source` of a pointer skill, the `source` of a pointer MCP server, the `command` of a stdio MCP server, and `--user-home`, so the committed `PROJECTS_FOLDER: "~/Documents/Projects"` works without a local override. `~user` is not expanded: it is read as a relative path whose first folder is named `~user`. A `~` anywhere but at the start is an ordinary part of the name. The paths of a `files` entry of a skill are neither substituted nor expanded.
 
 A reference to a variable declared nowhere fails the run, naming the variable — and, for a location, the file that declared the offending value.
 Every project's `deploy.directory` is resolved up front, before any project is deployed, so a broken reference cannot leave a run half-deployed, and nothing is ever written to a directory literally named `${...}`.
@@ -354,7 +363,9 @@ The CLI accepts no subcommands, so there is no command to run for any of them:
 - Documentation generation
 - Evaluation suite runner
 - `diff` and `clean` utilities
-- MCP server configuration output, in either scope — a `user.yml` has no `mcps` block
+- MCP server configuration in the user scope — a `user.yml` has no `mcps` block — and MCP servers attached to a single agent
+- MCP server configuration for `windsurf` and `antigravity`
+- Allow and deny lists for the tools of an MCP server, and a secrets manager as the source of secret MCP variables — today a secret comes only from the environment of the tool
 - User-scope deployment for `windsurf`, `antigravity`, `github_copilot`, and `cursor` — a `user.yml` deploys through `claude` and `codex` only, and names the tools it skipped
 - A ledger of what a deploy wrote, and with it the removal of artifacts a manifest no longer selects — see [User-Scope Deployments](#user-scope-deployments)
 - Deploy backups and auto-commit

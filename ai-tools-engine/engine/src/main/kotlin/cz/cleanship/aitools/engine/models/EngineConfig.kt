@@ -20,6 +20,7 @@ data class EngineConfig(
  * @param deployments the directories holding the deployment manifests of the run, of both kinds: a `project.yml`
  * deploys into a project directory - see [ProjectManifest] - and a `user.yml` into the user scope of each tool -
  * see [UserDeploymentManifest]. One list feeds both, because a directory that holds one kind usually holds the other.
+ * @param mcps the directories holding the MCP server manifests of the run - see [McpServerManifest]
  */
 data class Locations(
     val agents: List<File>,
@@ -28,4 +29,5 @@ data class Locations(
     val rulesets: List<File>,
     val fragments: List<File>,
     val skills: List<File>,
+    val mcps: List<File> = emptyList(),
 )

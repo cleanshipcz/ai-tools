@@ -123,6 +123,7 @@ class ConfigService(
             rulesets = resolve("rulesets") { it.rulesets },
             fragments = resolve("fragments") { it.fragments },
             skills = resolve("skills") { it.skills },
+            mcps = resolve("mcps") { it.mcps },
         )
     }
 

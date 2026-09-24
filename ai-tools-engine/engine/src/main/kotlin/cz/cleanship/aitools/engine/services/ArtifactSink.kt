@@ -11,6 +11,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.PosixFilePermissions
 
 /**
  * Where the artifacts of a run end up: on disk in a deploy, nowhere in a dry run.
@@ -33,6 +34,15 @@ interface ArtifactSink {
      * Copies the companion file [sourceFile], which exists, onto [targetFile], or only says that it would.
      */
     fun copySkillFile(sourceFile: File, targetFile: File)
+
+    /**
+     * Writes [content] to the config file [targetFile], replacing what it held, or only says that it would.
+     *
+     * A config file is one the user owns alongside the engine: an existing one keeps its permission bits. [targetFile] is the file itself, never a symbolic link; the caller decides where a link at a config path may lead.
+     *
+     * @param describedBy what [content] holds, as the log line names it
+     */
+    fun writeConfigFile(targetFile: File, content: String, describedBy: String)
 
     /**
      * Removes [artifactDir] and everything under it before it is written again, or only says that it would. Both refuse a directory that is not inside [owned] - see [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin].
@@ -59,17 +69,43 @@ object FileSystemArtifactSink : ArtifactSink {
      * @throws Exception whatever [outputConsumer] throws, after the temporary file has been cleaned up
      */
     override fun <T : VersionedManifest> export(entity: T, targetFile: File, outputConsumer: (Output) -> Unit) {
+        writeAtomically(targetFile) { OutputStreamOutput(FileOutputStream(it)).use(outputConsumer) }
+        LOG.info("Exported ${entity.javaClass.simpleName} ${entity.id} to ${targetFile.absolutePath}")
+    }
+
+    /**
+     * Writes [content] to [targetFile] atomically, the way [export] writes an artifact. An existing file keeps its permission bits: the temporary file is created with them, before any content is written into it.
+     */
+    override fun writeConfigFile(targetFile: File, content: String, describedBy: String) {
+        val permissions = targetFile.takeIf { it.exists() }?.let { runCatching { Files.getPosixFilePermissions(it.toPath()) }.getOrNull() }
+        targetFile.parentFile.mkdirs()
+        val temporaryFile = if (permissions == null) {
+            File.createTempFile("${targetFile.name}.", ".tmp", targetFile.parentFile).toPath()
+        } else {
+            Files.createTempFile(targetFile.parentFile.toPath(), "${targetFile.name}.", ".tmp", PosixFilePermissions.asFileAttribute(permissions))
+        }
+        try {
+            // The attribute of createTempFile is narrowed by the umask, so the bits are set once more, still before the content is written.
+            permissions?.let { Files.setPosixFilePermissions(temporaryFile, it) }
+            Files.writeString(temporaryFile, content)
+            Files.move(temporaryFile, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(temporaryFile)
+        }
+        LOG.info("Wrote {} to {}", describedBy, targetFile.absolutePath)
+    }
+
+    private fun writeAtomically(targetFile: File, write: (File) -> Unit) {
         val targetDir = targetFile.parentFile
         targetDir.mkdirs()
         val temporaryFile = File.createTempFile("${targetFile.name}.", ".tmp", targetDir)
         try {
-            OutputStreamOutput(FileOutputStream(temporaryFile)).use(outputConsumer)
+            write(temporaryFile)
             Files.move(temporaryFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
         } finally {
             // No-op once the move above succeeded, cleans up the partial write otherwise.
             temporaryFile.delete()
         }
-        LOG.info("Exported ${entity.javaClass.simpleName} ${entity.id} to ${targetFile.absolutePath}")
     }
 
     override fun copySkillFile(sourceFile: File, targetFile: File) {
@@ -100,6 +136,10 @@ object DryRunArtifactSink : ArtifactSink {
 
     override fun copySkillFile(sourceFile: File, targetFile: File) {
         LOG.info("Would copy skill file {} to {}", sourceFile.absolutePath, targetFile.absolutePath)
+    }
+
+    override fun writeConfigFile(targetFile: File, content: String, describedBy: String) {
+        LOG.info("Would write {} to {}", describedBy, targetFile.absolutePath)
     }
 
     override fun replaceArtifactDirectory(artifactDir: File, owned: File, describedBy: String) {

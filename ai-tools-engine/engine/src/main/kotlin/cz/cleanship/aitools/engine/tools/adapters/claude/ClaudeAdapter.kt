@@ -14,6 +14,9 @@ import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserInstructionsContext
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.mcp.JsonMcpConfigFormat
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileExporter
 import cz.cleanship.aitools.engine.tools.replacing
 import java.io.File
 
@@ -56,6 +59,10 @@ class ClaudeAdapter(
 
     override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter =
         ClaudeUserScopeExporter(ClaudeLayout.ofUser(userHome), deployment)
+
+    // `.mcp.json` sits beside `.claude`, so the replaced `.claude` never holds it.
+    override fun mcpConfig(projectDir: File): McpConfigExporter =
+        McpConfigFileExporter(ClaudeLayout.ofProject(projectDir).mcpConfigFile, JsonMcpConfigFormat.CLAUDE_CODE, exportService, projectDir)
 
     private fun exportPrompt(layout: ClaudeLayout, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,

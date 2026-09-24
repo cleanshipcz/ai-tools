@@ -17,6 +17,7 @@ import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
+import cz.cleanship.aitools.engine.services.McpServerReader
 import cz.cleanship.aitools.engine.services.SkillFileResolvingException
 import cz.cleanship.aitools.engine.services.SkillSourceResolver
 import cz.cleanship.aitools.engine.tools.AgentContext
@@ -35,6 +36,9 @@ import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
 import cz.cleanship.aitools.engine.tools.adapters.github.GitHubCopilotAdapter
 import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileException
+import cz.cleanship.aitools.engine.tools.mcp.McpServerResolver
+import cz.cleanship.aitools.engine.tools.mcp.McpServerResolvingException
 import cz.cleanship.aitools.engine.tools.narrowedTo
 import cz.cleanship.aitools.engine.tools.prepare
 import cz.cleanship.telemetry.SpanKind
@@ -47,8 +51,8 @@ import java.io.File
 /**
  * @param workingDirectory the `--working-dir` of the run, the directory `config.yml` was read from. A relative `deploy.directory` resolves against it - see [resolveDeclaredPath] - so it is the same base the `locations.*` paths of that same `config.yml` already use. It is required rather than defaulted because the adapters delete under whatever it resolves to, which is not a decision to make by omission.
  * @param variables the variables of the run, which `deploy.directory` is substituted with before it is resolved - see [VariableResolver]. They are the ones the config files of the run declared, so a project manifest reads the same variables the `locations.*` of that run did. The default declares none and falls back to the environment of the process, which is what an engine built without a config sees.
- * @param loaderService reads the manifests of the run. The default one substitutes the `source` of a skill with [variables].
- * @param userHome the home directory a [UserDeploymentManifest] is deployed under, from which each adapter derives the per-user location of its own tool - `<home>/.claude`, `<home>/.codex`. It defaults to the home of the user running the engine, which is the only home a deploy is ever meant to reach; a test overrides it so that it writes into a directory of its own instead.
+ * @param loaderService reads the manifests of the run. The default one substitutes the `source` of a skill and of an MCP server with [variables].
+ * @param userHome the home directory a [UserDeploymentManifest] is deployed under, from which each adapter derives the per-user location of its own tool - `<home>/.claude`, `<home>/.codex`. A leading `~` of a declared path - a `source`, the command of a stdio MCP server - stands for the real home of the user running the engine instead, whatever this is. It defaults to the home of the user running the engine, which is the only home a deploy is ever meant to reach; a test overrides it so that it writes into a directory of its own instead.
  * @param dryRun whether this run validates without deploying: everything is loaded, filtered and rendered as in a deploy and every failure is reported the same way, but nothing on disk is created, deleted or modified. The flag covers what the engine itself decides - the deletions of a replacing deploy, and how the run is announced - while the writes of the adapters are covered by the sink they were built with, so the [tools] of a dry run have to be built for one too - see [cz.cleanship.aitools.engine.tools.ToolFactory.create].
  */
 // Every parameter is either a collaborator or a setting of the run with a default, and the engine is composed in one place; folding the settings into an object of their own would trade one count for an indirection on every construction site.
@@ -56,9 +60,10 @@ import java.io.File
 class ToolsEngine(
     private val workingDirectory: File,
     private val variables: VariableResolver = VariableResolver(),
-    private val loaderService: LoaderService = LoaderService(SkillSourceResolver(variables)),
-    private val filterService: FilterService = FilterService(),
     private val userHome: File = File(System.getProperty("user.home")),
+    private val loaderService: LoaderService =
+        LoaderService(SkillSourceResolver(variables), McpServerReader(variables)),
+    private val filterService: FilterService = FilterService(),
     private val tools: List<ToolAdapter> = listOf(
         WindsurfAdapter(),
         AntigravityAdapter(),
@@ -73,6 +78,8 @@ class ToolsEngine(
     private val telemetry = Telemetry.create(TelemetryConfig.fromEnvironment())
 
     private val skillSourceOverlapCheck = SkillSourceOverlapCheck(filterService, tools, userHome)
+
+    private val mcpServerResolver = McpServerResolver(variables)
 
     // The lines announcing a write before it happens are the ones a dry run would turn into a lie, so their verbs are chosen once here: a dry run then reads as the plan it is, not as a report of writes that never took place.
     private val replacing = if (dryRun) "Would replace" else "Replacing"
@@ -111,12 +118,13 @@ class ToolsEngine(
             }
             val allData = loaderService.loadAll(locations)
             LOG.info(
-                "Loaded {} agents, {} prompts, {} rulesets, {} fragments, {} skills, {} projects, {} user deployments",
+                "Loaded {} agents, {} prompts, {} rulesets, {} fragments, {} skills, {} MCP servers, {} projects, {} user deployments",
                 allData.agents.size,
                 allData.prompts.size,
                 allData.rulesets.size,
                 allData.fragments.size,
                 allData.skills.size,
+                allData.mcps.size,
                 allData.projects.size,
                 allData.userDeployments.size,
             )
@@ -132,6 +140,7 @@ class ToolsEngine(
             skillSourceOverlapCheck.requireApart(allData, destinations)
 
             val failures = mutableListOf<ExportFailure>()
+            val mcpServers = McpConfigExportPlanner(mcpServerResolver)
             for (projectManifest in allData.projects.values) {
                 // Selecting before the project is assembled keeps a project that exports through no tool out of the log entirely, rather than bracketing it in the lines that report a deploy which never happened.
                 val adapters =
@@ -141,7 +150,7 @@ class ToolsEngine(
                 val project = assembleProject(projectManifest, allData)
                 val destination = destinations.getValue(projectManifest.id)
                 for (adapter in adapters) {
-                    failures += exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments)
+                    failures += exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments, mcpServers)
                 }
                 LOG.info("Processing project {} completed", projectManifest.id)
             }
@@ -230,6 +239,12 @@ class ToolsEngine(
             skills = filteredSkills,
             skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
             pointerSourceDirs = allData.pointerSourceDirs,
+            // MCP servers are opt-in: a project that declares no mcps block selects none, where every other kind would select all.
+            mcps = projectManifest.deploy.mcps
+                ?.let { filterService.filter(allData.mcps.values, it.filter) }
+                .orEmpty()
+                .associateBy { it.id },
+            ownedMcpIds = allData.mcps.keys,
         )
     }
 
@@ -493,6 +508,7 @@ class ToolsEngine(
         destination: File,
         allRulesets: Map<String, RulesetManifest>,
         allFragments: Map<String, FragmentManifest>,
+        mcpServers: McpConfigExportPlanner,
     ): List<ExportFailure> {
         LOG.info("{}: Exporting via adapter {}", project.manifest.id, adapter.toolType)
         if (project.manifest.deploy.replace) {
@@ -541,6 +557,7 @@ class ToolsEngine(
                     },
                 )
             }
+            mcpServers.exportFor(project, adapter, destination)?.let(::add)
         }
 
         return exports.mapNotNull { (manifest, export) ->
@@ -551,7 +568,7 @@ class ToolsEngine(
     /**
      * Runs a single [export], turning an authoring error into a reportable [ExportFailure] instead of letting it abort the remaining exports.
      *
-     * Only the deliberately named exceptions a manifest author causes are collected: an unresolvable ruleset or fragment reference, and a companion file a skill manifest declares but does not ship. Everything else - a programming fault, an out-of-memory error or a permission problem on the output directory - is not an authoring error, so it is left to propagate and abort the run loudly instead of being reported as one more broken manifest.
+     * Only the deliberately named exceptions a manifest author causes are collected: an unresolvable ruleset or fragment reference, a companion file a skill manifest declares but does not ship, an MCP server whose variables cannot be resolved, and an existing MCP config file that cannot be merged without losing part of it. Everything else - a programming fault, an out-of-memory error or a permission problem on the output directory - is not an authoring error, so it is left to propagate and abort the run loudly instead of being reported as one more broken manifest.
      *
      * @return the failure that stopped this manifest, or `null` when it was exported successfully
      */
@@ -571,6 +588,14 @@ class ToolsEngine(
         ExportFailure(deploymentId, toolType, manifest, ex)
     } catch (ex: SkillFileResolvingException) {
         LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
+        ExportFailure(deploymentId, toolType, manifest, ex)
+    } catch (ex: McpServerResolvingException) {
+        // Named after the server that failed rather than after the file, which holds every server of the project.
+        val server = "MCP server '${ex.serverId}'"
+        LOG.error("{}: {} could not be exported for {}: {}", deploymentId, server, toolType, ex.message)
+        ExportFailure(deploymentId, toolType, server, ex)
+    } catch (ex: McpConfigFileException) {
+        LOG.error("{}: {} could not be exported for {}: {}", deploymentId, manifest, toolType, ex.message)
         ExportFailure(deploymentId, toolType, manifest, ex)
     } catch (ex: ContendedInstructionsFileException) {
         // Reported once for the file, above; collected here so the run of every claimant fails rather than succeeding having quietly written nothing.
