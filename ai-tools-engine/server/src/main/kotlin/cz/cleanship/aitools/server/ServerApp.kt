@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.path
 import cz.cleanship.aitools.engine.services.ConfigService
 import cz.cleanship.aitools.engine.services.LoaderService
+import cz.cleanship.aitools.engine.services.SkillSourceResolver
 import cz.cleanship.aitools.server.api.startBackend
 import cz.cleanship.aitools.server.services.PromptService
 import cz.cleanship.telemetry.Telemetry
@@ -29,8 +30,8 @@ class ServerCommand : CliktCommand(name = "ai-tools-server") {
     override fun run() = runBlocking {
         val promptService = telemetry.inSpan("server-init") {
             val configService = ConfigService()
-            val loaderService = LoaderService()
             val config = configService.loadConfig(workingDir.toFile())
+            val loaderService = LoaderService(SkillSourceResolver(config.variables))
             val allManifests = loaderService.loadAll(config.locations)
             log.info("Loaded {} prompts", allManifests.prompts.size)
             PromptService(allManifests.prompts)

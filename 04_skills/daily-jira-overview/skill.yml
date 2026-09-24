@@ -1,16 +1,12 @@
 # The content, description, and companion files live in the plain skill of the jira-confluence-mcp-server repository, which people without ai-tools use directly; this manifest only adds what ai-tools owns.
-id: confluence-doc
-source: ${PROJECTS_FOLDER}/jira-confluence-mcp-server/skills/confluence-doc
+id: daily-jira-overview
+source: ${PROJECTS_FOLDER}/jira-confluence-mcp-server/skills/daily-jira-overview
 metadata:
   version: 2.0.0
   author: "AI Tools Team"
-  created: "2025-01-01"
+  created: "2026-09-23"
   updated: "2026-09-23"
   tags:
-    - confluence
+    - jira
+    - ticket
     - atlassian
-    - documentation
-    - runbook
-    - design-doc
-    - adr
-    - incident-report

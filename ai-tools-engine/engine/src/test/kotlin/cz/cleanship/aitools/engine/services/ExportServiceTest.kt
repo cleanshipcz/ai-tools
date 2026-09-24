@@ -7,6 +7,7 @@ import ch.qos.logback.core.read.ListAppender
 import cz.cleanship.aitools.engine.data.ruleset
 import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.models.SkillFile
+import cz.cleanship.aitools.engine.utils.contentSnapshot
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 
 class ExportServiceTest {
@@ -32,9 +34,7 @@ class ExportServiceTest {
     }
 
     /**
-     * A companion file may legitimately come from outside the skill's own directory - an absolute `source` is a
-     * documented shape - but in the user scope it lands in `~/.claude/skills/<id>/`, a directory whose purpose is to
-     * be read into an agent's context. Such a copy is therefore named in the transcript rather than made quietly.
+     * A companion file may legitimately come from outside the skill's own directory - an absolute `source` is a documented shape - but in the user scope it lands in `~/.claude/skills/<id>/`, a directory whose purpose is to be read into an agent's context. Such a copy is therefore named in the transcript rather than made quietly.
      */
     @Nested
     inner class SourcesFromOutsideTheSkill {
@@ -75,6 +75,7 @@ class ExportServiceTest {
                 sourceDir,
                 skillDir,
                 skillId = "a-skill",
+                pointerSourceDirs = emptyList(),
             )
 
             // then
@@ -92,6 +93,7 @@ class ExportServiceTest {
                 sourceDir,
                 skillDir,
                 skillId = "a-skill",
+                pointerSourceDirs = emptyList(),
             )
 
             // then
@@ -109,6 +111,7 @@ class ExportServiceTest {
                 sourceDir,
                 skillDir,
                 skillId = "a-skill",
+                pointerSourceDirs = emptyList(),
             )
 
             // then
@@ -120,9 +123,7 @@ class ExportServiceTest {
     }
 
     /**
-     * A dry run goes through the same service as a deploy and differs only in its sink: every artifact is still
-     * rendered and every companion file still resolved, so every authoring error a deploy reports is reported here
-     * too, while nothing reaches the disk.
+     * A dry run goes through the same service as a deploy and differs only in its sink: every artifact is still rendered and every companion file still resolved, so every authoring error a deploy reports is reported here too, while nothing reaches the disk.
      */
     @Nested
     inner class DryRun {
@@ -207,6 +208,7 @@ class ExportServiceTest {
                 sourceDir,
                 skillDir,
                 skillId = "a-skill",
+                pointerSourceDirs = emptyList(),
             )
 
             // then
@@ -222,7 +224,7 @@ class ExportServiceTest {
         fun `should fail with the source path when the declared skill file does not exist`() {
             // when
             val error = runCatching {
-                dryRunService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, skillDir)
+                dryRunService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, skillDir, pointerSourceDirs = emptyList())
             }.exceptionOrNull()
 
             // then
@@ -235,7 +237,7 @@ class ExportServiceTest {
         fun `should fail with the declared path when a relative skill file has no source directory`() {
             // when
             val error = runCatching {
-                dryRunService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), null, skillDir)
+                dryRunService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), null, skillDir, pointerSourceDirs = emptyList())
             }.exceptionOrNull()
 
             // then
@@ -252,6 +254,7 @@ class ExportServiceTest {
                     listOf(SkillFile(source = "helper.md", target = "../../../.bashrc")),
                     sourceDir,
                     skillDir,
+                    pointerSourceDirs = emptyList(),
                 )
             }.exceptionOrNull()
 
@@ -259,6 +262,25 @@ class ExportServiceTest {
             assertThat(error)
                 .isInstanceOf(SkillFileResolvingException::class.java)
                 .hasMessageContaining("../../../.bashrc")
+        }
+
+        @Test
+        fun `should refuse a skill file whose target resolves through a link into the folder it is copied from`() {
+            // given
+            val skillDirLink = tempDir.resolve("home/.claude/skills/linked-skill").toFile()
+            skillDirLink.parentFile.mkdirs()
+            Files.createSymbolicLink(skillDirLink.toPath(), sourceDir.toPath())
+
+            // when
+            val error = runCatching {
+                dryRunService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), sourceDir, skillDirLink, skillId = "a-skill", pointerSourceDirs = emptyList())
+            }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(SkillFileResolvingException::class.java)
+                .hasMessageContaining(skillDirLink.resolve("helper.md").absolutePath)
+            assertThat(sourceDir.resolve("helper.md")).hasContent("Next to the manifest.\n")
         }
 
         @Test
@@ -344,6 +366,7 @@ class ExportServiceTest {
                 listOf(SkillFile(source = "payload.md", target = "../../../.bashrc")),
                 sourceDir,
                 skillDir,
+                pointerSourceDirs = emptyList(),
             )
         }.exceptionOrNull()
 
@@ -352,6 +375,70 @@ class ExportServiceTest {
             .isInstanceOf(SkillFileResolvingException::class.java)
             .hasMessageContaining("../../../.bashrc")
         assertThat(victim).hasContent("Untouched.\n")
+    }
+
+    @Test
+    fun `should refuse to copy a skill file whose target resolves through a link into the folder it is copied from`() {
+        // given
+        // - the templates folder of the generated skill is a link back into the source, so copying onto it would first delete the source file
+        val sourceDir = tempDir.resolve("skill-source").toFile()
+        sourceDir.resolve("templates").mkdirs()
+        sourceDir.resolve("templates/task.txt").writeText("Task.\n")
+        val skillDir = tempDir.resolve("home/.claude/skills/a-skill").toFile()
+        skillDir.mkdirs()
+        Files.createSymbolicLink(skillDir.resolve("templates").toPath(), sourceDir.resolve("templates").toPath())
+        val before = sourceDir.contentSnapshot()
+
+        // when
+        val error = runCatching {
+            exportService.copySkillFiles(listOf(SkillFile("templates/task.txt", "templates/task.txt")), sourceDir, skillDir, skillId = "a-skill", pointerSourceDirs = emptyList())
+        }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(SkillFileResolvingException::class.java)
+            .hasMessageContaining("a-skill")
+            .hasMessageContaining(skillDir.resolve("templates/task.txt").absolutePath)
+            .hasMessageContaining(sourceDir.absolutePath)
+        assertThat(sourceDir.contentSnapshot()).isEqualTo(before)
+    }
+
+    @Test
+    fun `should refuse to copy a skill file whose target resolves through a chain of links into the source folder of another pointer skill`() {
+        // given
+        // - the templates folder of the generated skill links to 'shared', whose 'sub' folder links to the source folder of the pointer skill 'second'
+        val sourceDir = tempDir.resolve("src/probe").toFile()
+        sourceDir.resolve("templates/sub").mkdirs()
+        sourceDir.resolve("templates/sub/s.txt").writeText("Probe.\n")
+        val otherSource = tempDir.resolve("src/second").toFile()
+        otherSource.mkdirs()
+        otherSource.resolve("SKILL.md").writeText("Second.\n")
+        val shared = tempDir.resolve("shared").toFile()
+        shared.mkdirs()
+        Files.createSymbolicLink(shared.resolve("sub").toPath(), otherSource.toPath())
+        val skillDir = tempDir.resolve("project/.claude/skills/probe").toFile()
+        skillDir.mkdirs()
+        Files.createSymbolicLink(skillDir.resolve("templates").toPath(), shared.toPath())
+        val before = otherSource.contentSnapshot()
+
+        // when
+        val error = runCatching {
+            exportService.copySkillFiles(
+                listOf(SkillFile("templates/sub/s.txt", "templates/sub/s.txt")),
+                sourceDir,
+                skillDir,
+                skillId = "probe",
+                pointerSourceDirs = listOf(sourceDir, otherSource),
+            )
+        }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(SkillFileResolvingException::class.java)
+            .hasMessageContaining("probe")
+            .hasMessageContaining(skillDir.resolve("templates/sub/s.txt").absolutePath)
+            .hasMessageContaining(otherSource.absolutePath)
+        assertThat(otherSource.contentSnapshot()).isEqualTo(before)
     }
 
     @Test
@@ -368,6 +455,7 @@ class ExportServiceTest {
             listOf(SkillFile(source = "payload.md", target = "templates/example.md")),
             sourceDir,
             skillDir,
+            pointerSourceDirs = emptyList(),
         )
 
         // then
@@ -475,7 +563,7 @@ class ExportServiceTest {
         val targetDir = tempDir.resolve("exported").toFile()
 
         // when
-        exportService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), sourceDir, targetDir)
+        exportService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), sourceDir, targetDir, pointerSourceDirs = emptyList())
 
         // then
         assertThat(targetDir.resolve("helper.md").readText()).isEqualTo("Companion content.\n")
@@ -489,7 +577,7 @@ class ExportServiceTest {
 
         // when
         val error = runCatching {
-            exportService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), null, targetDir)
+            exportService.copySkillFiles(listOf(SkillFile("helper.md", "helper.md")), null, targetDir, pointerSourceDirs = emptyList())
         }.exceptionOrNull()
 
         // then
@@ -507,12 +595,35 @@ class ExportServiceTest {
 
         // when
         val error = runCatching {
-            exportService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, targetDir)
+            exportService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, targetDir, pointerSourceDirs = emptyList())
         }.exceptionOrNull()
 
         // then
         assertThat(error)
             .isInstanceOf(SkillFileResolvingException::class.java)
             .hasMessageContaining(sourceDir.resolve("missing.md").absolutePath)
+    }
+
+    @Test
+    fun `should advise both a skill declaring its files and a pointer skill when a declared skill file does not exist`() {
+        // given
+        // - the service cannot tell which kind of skill it copies for, so the advice has to fit both
+        val sourceDir = tempDir.resolve("skill").toFile()
+        sourceDir.mkdirs()
+        val targetDir = tempDir.resolve("exported").toFile()
+
+        // when
+        val error = runCatching {
+            exportService.copySkillFiles(listOf(SkillFile("missing.md", "missing.md")), sourceDir, targetDir, pointerSourceDirs = emptyList())
+        }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(SkillFileResolvingException::class.java)
+            .hasMessage(
+                "Skill file '${sourceDir.resolve("missing.md").absolutePath}' does not exist. " +
+                    "For a skill that declares 'files', add the file or remove it from 'files'. " +
+                    "For a pointer skill, the file was removed from its source folder while the run was going on; run again.",
+            )
     }
 }

@@ -2,6 +2,7 @@ package cz.cleanship.aitools.engine
 
 import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.env.VariableSubstitutionException
+import cz.cleanship.aitools.engine.io.ArtifactDeleteException
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
 import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
@@ -17,6 +18,7 @@ import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
 import cz.cleanship.aitools.engine.services.SkillFileResolvingException
+import cz.cleanship.aitools.engine.services.SkillSourceResolver
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.FragmentResolvingException
@@ -33,6 +35,8 @@ import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
 import cz.cleanship.aitools.engine.tools.adapters.github.GitHubCopilotAdapter
 import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
+import cz.cleanship.aitools.engine.tools.narrowedTo
+import cz.cleanship.aitools.engine.tools.prepare
 import cz.cleanship.telemetry.SpanKind
 import cz.cleanship.telemetry.Telemetry
 import cz.cleanship.telemetry.TelemetryConfig
@@ -41,33 +45,19 @@ import org.slf4j.LoggerFactory
 import java.io.File
 
 /**
- * @param workingDirectory the `--working-dir` of the run, the directory `config.yml` was read from. A relative
- * `deploy.directory` resolves against it - see [resolveDeclaredPath] - so it is the same base the `locations.*`
- * paths of that same `config.yml` already use. It is required rather than defaulted because the adapters delete
- * under whatever it resolves to, which is not a decision to make by omission.
- * @param variables the variables of the run, which `deploy.directory` is substituted with before it is resolved -
- * see [VariableResolver]. They are the ones the config files of the run declared, so a project manifest reads the
- * same variables the `locations.*` of that run did. The default declares none and falls back to the environment of
- * the process, which is what an engine built without a config sees.
- * @param userHome the home directory a [UserDeploymentManifest] is deployed under, from which each adapter derives
- * the per-user location of its own tool - `<home>/.claude`, `<home>/.codex`. It defaults to the home of the user
- * running the engine, which is the only home a deploy is ever meant to reach; a test overrides it so that it writes
- * into a directory of its own instead.
- * @param dryRun whether this run validates without deploying: everything is loaded, filtered and rendered as in a
- * deploy and every failure is reported the same way, but nothing on disk is created, deleted or modified. The flag
- * covers what the engine itself decides - the deletions of a replacing deploy, and how the run is announced - while
- * the writes of the adapters are covered by the sink they were built with, so the [tools] of a dry run have to be
- * built for one too - see [cz.cleanship.aitools.engine.tools.ToolFactory.create].
+ * @param workingDirectory the `--working-dir` of the run, the directory `config.yml` was read from. A relative `deploy.directory` resolves against it - see [resolveDeclaredPath] - so it is the same base the `locations.*` paths of that same `config.yml` already use. It is required rather than defaulted because the adapters delete under whatever it resolves to, which is not a decision to make by omission.
+ * @param variables the variables of the run, which `deploy.directory` is substituted with before it is resolved - see [VariableResolver]. They are the ones the config files of the run declared, so a project manifest reads the same variables the `locations.*` of that run did. The default declares none and falls back to the environment of the process, which is what an engine built without a config sees.
+ * @param loaderService reads the manifests of the run. The default one substitutes the `source` of a skill with [variables].
+ * @param userHome the home directory a [UserDeploymentManifest] is deployed under, from which each adapter derives the per-user location of its own tool - `<home>/.claude`, `<home>/.codex`. It defaults to the home of the user running the engine, which is the only home a deploy is ever meant to reach; a test overrides it so that it writes into a directory of its own instead.
+ * @param dryRun whether this run validates without deploying: everything is loaded, filtered and rendered as in a deploy and every failure is reported the same way, but nothing on disk is created, deleted or modified. The flag covers what the engine itself decides - the deletions of a replacing deploy, and how the run is announced - while the writes of the adapters are covered by the sink they were built with, so the [tools] of a dry run have to be built for one too - see [cz.cleanship.aitools.engine.tools.ToolFactory.create].
  */
-// Every parameter is either a collaborator or a setting of the run with a default, and the engine is composed in
-// one place; folding the settings into an object of their own would trade one count for an indirection on every
-// construction site.
+// Every parameter is either a collaborator or a setting of the run with a default, and the engine is composed in one place; folding the settings into an object of their own would trade one count for an indirection on every construction site.
 @Suppress("LongParameterList")
 class ToolsEngine(
     private val workingDirectory: File,
-    private val loaderService: LoaderService = LoaderService(),
-    private val filterService: FilterService = FilterService(),
     private val variables: VariableResolver = VariableResolver(),
+    private val loaderService: LoaderService = LoaderService(SkillSourceResolver(variables)),
+    private val filterService: FilterService = FilterService(),
     private val userHome: File = File(System.getProperty("user.home")),
     private val tools: List<ToolAdapter> = listOf(
         WindsurfAdapter(),
@@ -82,37 +72,28 @@ class ToolsEngine(
 
     private val telemetry = Telemetry.create(TelemetryConfig.fromEnvironment())
 
-    // The lines announcing a write before it happens are the ones a dry run would turn into a lie, so their verbs
-    // are chosen once here: a dry run then reads as the plan it is, not as a report of writes that never took place.
+    private val skillSourceOverlapCheck = SkillSourceOverlapCheck(filterService, tools, userHome)
+
+    // The lines announcing a write before it happens are the ones a dry run would turn into a lie, so their verbs are chosen once here: a dry run then reads as the plan it is, not as a report of writes that never took place.
     private val replacing = if (dryRun) "Would replace" else "Replacing"
     private val writing = if (dryRun) "Would write" else "Writing"
     private val deploying = if (dryRun) "Would deploy" else "Deploying"
 
     /**
-     * Loads every manifest in [locations] and exports each project through every configured adapter, or through the
-     * subset a project narrows itself down to with `deploy.tools` - see [selectAdapters]. The user deployments of the
-     * run follow the projects, each into the per-user location of the tools it names - see [exportUserDeployments].
+     * Loads every manifest in [locations] and exports each project through every configured adapter, or through the subset a project narrows itself down to with `deploy.tools` - see [selectAdapters]. The user deployments of the run follow the projects, each into the per-user location of the tools it names - see [exportUserDeployments].
      *
-     * Failure policy: COLLECT-ALL-THEN-FAIL. An unresolvable ruleset or fragment reference fails only the single
-     * manifest that carries it; every remaining manifest, adapter and project is still exported, and all failures
-     * are reported together in one [ExportFailedException] at the very end. A manifest author therefore sees every
-     * broken reference in a single run instead of rediscovering them one at a time. Because [ExportService] writes
-     * atomically, no half-written artifact is left behind by a manifest that failed.
+     * Failure policy: COLLECT-ALL-THEN-FAIL. An unresolvable ruleset or fragment reference fails only the single manifest that carries it; every remaining manifest, adapter and project is still exported, and all failures are reported together in one [ExportFailedException] at the very end. A manifest author therefore sees every broken reference in a single run instead of rediscovering them one at a time. Because [ExportService] writes atomically, no half-written artifact is left behind by a manifest that failed.
      *
-     * A project whose own id or feature ids collide is not exported at all - see [LoaderService.loadAll] - and is
-     * reported through the same [ExportFailedException], so a single ambiguous id cannot stop the projects that
-     * have nothing to do with it.
+     * A project whose own id or feature ids collide is not exported at all - see [LoaderService.loadAll] - and is reported through the same [ExportFailedException], so a single ambiguous id cannot stop the projects that have nothing to do with it.
      *
-     * @throws ExportFailedException if at least one manifest could not be exported or at least one project was
-     * left out because its ids collide
-     * @throws DeployDirectoryResolvingException if a `deploy.directory` references a variable that nothing declares,
-     * which stops the run before a single project is exported - see [resolveDeployDirectories]
-     * @throws cz.cleanship.aitools.engine.io.ArtifactPathException if a replacing deploy would remove a path outside
-     * the directory it owns. It aborts the run where an authoring error would only fail its own manifest, because a
-     * deploy about to delete something nobody asked it to must not continue - see
-     * [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin]
-     * @throws cz.cleanship.aitools.engine.services.DuplicateManifestIdException if manifests shared by every
-     * project declare the same id, which no project can be exported around
+     * @throws ExportFailedException if at least one manifest could not be exported or at least one project was left out because its ids collide
+     * @throws DeployDirectoryResolvingException if a `deploy.directory` references a variable that nothing declares, which stops the run before a single project is exported - see [resolveDeployDirectories]
+     * @throws SkillSourceOverlapException if a path the run would write a skill to, or a directory it would delete to replace it, is, lies inside, or contains the source folder of a pointer skill, which stops the run before anything is written - see [SkillSourceOverlapCheck.requireApart]
+     * @throws UnreadableReplacedFolderException if a directory the run would delete to replace it is, or holds, a folder the run cannot read, which stops the run before anything is written - see [SkillSourceOverlapCheck.requireApart]
+     * @throws cz.cleanship.aitools.engine.services.ManifestLoadingException if a manifest cannot be read, including a pointer skill whose `source` cannot be resolved, which stops the run before anything is written
+     * @throws ReplaceFailedException if a replacing deploy cannot delete an entry of a directory it replaces, which stops the run midway; for a project and for a user deployment alike, the message names the deployment, the tool and the entry
+     * @throws cz.cleanship.aitools.engine.io.ArtifactPathException if a directory a replacing user deployment would remove is not inside the directory it owns, judged by where it leads when it is a symbolic link, which stops the run before anything is written. It aborts the run where an authoring error would only fail its own manifest, because a deploy about to delete something nobody asked it to must not continue - see [SkillSourceOverlapCheck.requireApart] and [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin]
+     * @throws cz.cleanship.aitools.engine.services.DuplicateManifestIdException if manifests shared by every project declare the same id, which no project can be exported around
      */
     fun process(
         locations: Locations,
@@ -141,19 +122,18 @@ class ToolsEngine(
             )
             allData.duplicates.forEach { LOG.error("Not exporting the deployment(s) affected by an ambiguous id. {}", it.message) }
 
-            // A run with no adapters exports nothing at all, and every project below is skipped before it reaches a
-            // log line, so the misconfiguration is named here rather than leaving the run silent and successful.
+            // A run with no adapters exports nothing at all, and every project below is skipped before it reaches a log line, so the misconfiguration is named here rather than leaving the run silent and successful.
             if (tools.isEmpty()) {
                 LOG.warn("This run configures no tools, so no project is exported. Declare the tools to build under 'tools:' in config.yml, or in config.local.yml, which replaces that list.")
             }
             warnWhenNothingToDeploy(locations, allData)
 
             val destinations = resolveDeployDirectories(allData.projects.values)
+            skillSourceOverlapCheck.requireApart(allData, destinations)
 
             val failures = mutableListOf<ExportFailure>()
             for (projectManifest in allData.projects.values) {
-                // Selecting before the project is assembled keeps a project that exports through no tool out of the
-                // log entirely, rather than bracketing it in the lines that report a deploy which never happened.
+                // Selecting before the project is assembled keeps a project that exports through no tool out of the log entirely, rather than bracketing it in the lines that report a deploy which never happened.
                 val adapters =
                     selectAdapters(projectManifest.id, projectManifest.deploy.tools, toolsField = "deploy.tools", subject = "project")
                 if (adapters.isEmpty()) continue
@@ -168,8 +148,7 @@ class ToolsEngine(
 
             failures += exportUserDeployments(allData)
 
-            // Said before the failures are raised, so that a failing dry run is still recognisable as one: the
-            // error that follows reads the same as after a deploy, and this line is what says nothing was touched.
+            // Said before the failures are raised, so that a failing dry run is still recognisable as one: the error that follows reads the same as after a deploy, and this line is what says nothing was touched.
             if (dryRun) {
                 LOG.info("Dry run finished: nothing was written.")
             }
@@ -180,40 +159,27 @@ class ToolsEngine(
     }
 
     /**
-     * Names a run that has nothing to deploy, for the same reason a run configuring no tools is named: a deploy that
-     * writes nothing and reports success reads exactly like one that worked.
+     * Names a run that has nothing to deploy, for the same reason a run configuring no tools is named: a deploy that writes nothing and reports success reads exactly like one that worked.
      *
-     * The likeliest cause is a `config.local.yml` left on the retired `locations.projects` key - which
-     * [cz.cleanship.aitools.engine.services.ConfigService] rejects outright when it can see it - or a location
-     * pointing at a directory that has since moved.
+     * The likeliest cause is a `config.local.yml` left on the retired `locations.projects` key - which [cz.cleanship.aitools.engine.services.ConfigService] rejects outright when it can see it - or a location pointing at a directory that has since moved.
      */
     private fun warnWhenNothingToDeploy(locations: Locations, allData: AllManifests) {
         val foundNothing = allData.projects.isEmpty() && allData.userDeployments.isEmpty()
         when {
             locations.deployments.isEmpty() ->
                 LOG.warn("This run configures no deployment locations, so nothing is deployed. Declare the directories holding your project.yml and user.yml files under 'locations.deployments' in config.yml, or in config.local.yml, which replaces that list.")
-            // Manifests dropped for an ambiguous id are already absent from allData, and each collision was reported
-            // above. Explaining where manifests go to someone whose manifests were found and rejected would be
-            // misdirection, so that run is left with the error that actually describes it.
+            // Manifests dropped for an ambiguous id are already absent from allData, and each collision was reported above. Explaining where manifests go to someone whose manifests were found and rejected would be misdirection, so that run is left with the error that actually describes it.
             foundNothing && allData.duplicates.isEmpty() ->
                 LOG.warn("Found no deployment manifest under {}, so nothing is deployed. A project is a directory holding a project.yml, a user deployment one holding a user.yml.", locations.deployments.map { it.absolutePath })
         }
     }
 
     /**
-     * Resolves the directory every manifest of [projects] deploys to: the variables of the run are expanded first -
-     * see [VariableResolver] - and what they produced is resolved by [resolveDeclaredPath] afterwards, so a variable
-     * is free to supply the absolute base a relative value would otherwise be denied.
+     * Resolves the directory every manifest of [projects] deploys to: the variables of the run are expanded first - see [VariableResolver] - and what they produced is resolved by [resolveDeclaredPath] afterwards, so a variable is free to supply the absolute base a relative value would otherwise be denied.
      *
-     * Every project is resolved before any project is exported, and one failure stops the whole run. A deploy may
-     * delete the directories it generates before writing them again, so a run that cannot finish must not have
-     * already replaced the projects that happened to be read first - which is why this cannot sit in the export loop,
-     * where the order the manifests were found in would decide how much of the run had happened. It also reaches the
-     * projects that export through no adapter at all, which that loop skips before it would look at their directory.
+     * Every project is resolved before any project is exported, and one failure stops the whole run. A deploy may delete the directories it generates before writing them again, so a run that cannot finish must not have already replaced the projects that happened to be read first - which is why this cannot sit in the export loop, where the order the manifests were found in would decide how much of the run had happened. It also reaches the projects that export through no adapter at all, which that loop skips before it would look at their directory.
      *
-     * The run stops rather than collecting the failure like the authoring errors of [exportOrCollectFailure], because
-     * a variable nothing declares is a fault in the configuration of the run rather than in one manifest. Every such
-     * failure is still gathered first, so an author fixing their variables is told about all of them at once.
+     * The run stops rather than collecting the failure like the authoring errors of [exportOrCollectFailure], because a variable nothing declares is a fault in the configuration of the run rather than in one manifest. Every such failure is still gathered first, so an author fixing their variables is told about all of them at once.
      *
      * @return the directory each project deploys to, by project id
      * @throws DeployDirectoryResolvingException if at least one declared directory could not be resolved
@@ -237,8 +203,7 @@ class ToolsEngine(
     }
 
     /**
-     * Builds the project that is exported: every manifest of [allData] that survives the filter [projectManifest]
-     * declares for its kind, indexed by id.
+     * Builds the project that is exported: every manifest of [allData] that survives the filter [projectManifest] declares for its kind, indexed by id.
      */
     private fun assembleProject(projectManifest: ProjectManifest, allData: AllManifests): Project {
         val projectFeatures = allData.features[projectManifest] ?: emptyMap()
@@ -264,24 +229,21 @@ class ToolsEngine(
                 .associateBy { it.id },
             skills = filteredSkills,
             skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
+            pointerSourceDirs = allData.pointerSourceDirs,
         )
     }
 
     /**
      * Exports every user deployment of [allData] into [userHome], through the adapters its `tools` list selects.
      *
-     * It mirrors the project loop above, minus the parts a user scope does not have: there is no directory to resolve
-     * - each adapter knows the per-user location of its own tool - and no features to deploy. A tool the engine has
-     * no user-scope layout for is reported rather than passed over, so a manifest naming it is never dropped without
-     * a word - see [ToolAdapter.userScope].
+     * It mirrors the project loop above, minus the parts a user scope does not have: there is no directory to resolve - each adapter knows the per-user location of its own tool - and no features to deploy. A tool the engine has no user-scope layout for is reported rather than passed over, so a manifest naming it is never dropped without a word - see [ToolAdapter.userScope].
      *
      * @return the failures collected while exporting, which the caller reports together with those of the projects
      */
     private fun exportUserDeployments(allData: AllManifests): List<ExportFailure> {
         if (allData.userDeployments.isEmpty()) return emptyList()
 
-        // Selecting for every manifest first keeps `selectAdapters` - which warns - to one call per manifest, and is
-        // what lets the contention below be decided before anything has been written.
+        // Selecting for every manifest first keeps `selectAdapters` - which warns - to one call per manifest, and is what lets the contention below be decided before anything has been written.
         val selections = allData.userDeployments.values
             .map { manifest ->
                 manifest to selectAdapters(manifest.id, manifest.tools, toolsField = "tools", subject = "user deployment")
@@ -293,9 +255,7 @@ class ToolsEngine(
         }
         val contendedInstructions = reportContendedInstructionsFiles(targets)
 
-        // A manifest every selected tool lacks a user scope for has no targets at all, and is left out here rather
-        // than bracketed by a pair of log lines reporting a deploy that never happened - the skip was reported per
-        // tool above. Assembling is pure filtering, so it can happen before the home is announced.
+        // A manifest every selected tool lacks a user scope for has no targets at all, and is left out here rather than bracketed by a pair of log lines reporting a deploy that never happened - the skip was reported per tool above. Assembling is pure filtering, so it can happen before the home is announced.
         val targetsByDeployment = targets.groupBy { it.manifest.id }
         val planned = selections.mapNotNull { (manifest, _) ->
             targetsByDeployment[manifest.id]?.let { PlannedUserDeployment(assembleUserDeployment(manifest, allData), it) }
@@ -323,9 +283,7 @@ class ToolsEngine(
     /**
      * Names the home a user deploy is about to write into, and says when that home does not exist yet.
      *
-     * It is deliberately the last thing decided before the exports run: a run can select tools that turn out to have
-     * no user scope, or manifests that turn out to contend for the only file they carry, and announcing the home
-     * before either is known would report a deploy - and the creation of a directory - that never happens.
+     * It is deliberately the last thing decided before the exports run: a run can select tools that turn out to have no user scope, or manifests that turn out to contend for the only file they carry, and announcing the home before either is known would report a deploy - and the creation of a directory - that never happens.
      */
     private fun announceHome(planned: List<PlannedUserDeployment>, contendedInstructions: Set<File>) {
         val writesSomething = planned.any { plannedDeployment ->
@@ -344,8 +302,7 @@ class ToolsEngine(
     }
 
     /**
-     * Returns how [adapter] would deploy [manifest], or `null` when this tool has no user-scope layout - which is
-     * reported here rather than passed over, so a manifest naming it is never dropped without a word.
+     * Returns how [adapter] would deploy [manifest], or `null` when this tool has no user-scope layout - which is reported here rather than passed over, so a manifest naming it is never dropped without a word.
      */
     private fun userScopeTarget(manifest: UserDeploymentManifest, adapter: ToolAdapter): UserScopeTarget? {
         val exporter = adapter.userScope(userHome, manifest)
@@ -363,10 +320,7 @@ class ToolsEngine(
     /**
      * Returns the instructions files that more than one manifest claims, having reported each of them.
      *
-     * A tool reads one instructions file per home, so two manifests deploying to the same tool both own
-     * `<home>/.claude/CLAUDE.md` and the one processed last would silently decide what every session on the machine
-     * reads. No winner is picked, mirroring what [LoaderService] does with a contested id: both are reported, the
-     * file neither may own is left alone, and the artifacts they do not contend for are still deployed.
+     * A tool reads one instructions file per home, so two manifests deploying to the same tool both own `<home>/.claude/CLAUDE.md` and the one processed last would silently decide what every session on the machine reads. No winner is picked, mirroring what [LoaderService] does with a contested id: both are reported, the file neither may own is left alone, and the artifacts they do not contend for are still deployed.
      */
     private fun reportContendedInstructionsFiles(targets: List<UserScopeTarget>): Set<File> = targets
         .groupBy { it.instructionsFile }
@@ -383,10 +337,7 @@ class ToolsEngine(
     /**
      * Returns the export of the instructions file of one deployment, named the way every other export of the run is.
      *
-     * The path is logged before it is written rather than left to be derived from the home: this is the one file the
-     * engine takes over from the user, and a replacement of something already there is worth a warning of its own.
-     * A manifest that does not own the file - because another one claims it too - keeps its place in the list and
-     * fails there, so the contention is reported against the manifest that caused it.
+     * The path is logged before it is written rather than left to be derived from the home: this is the one file the engine takes over from the user, and a replacement of something already there is worth a warning of its own. A manifest that does not own the file - because another one claims it too - keeps its place in the list and fails there, so the contention is reported against the manifest that caused it.
      */
     private fun instructionsExport(
         deployment: UserDeployment,
@@ -412,12 +363,9 @@ class ToolsEngine(
     }
 
     /**
-     * Exports every manifest of [deployment] into the user scope of [target], isolating each of them the way
-     * [exportAdapter] isolates the manifests of a project.
+     * Exports every manifest of [deployment] into the user scope of [target], isolating each of them the way [exportAdapter] isolates the manifests of a project.
      *
-     * @param ownsInstructionsFile whether this manifest may write the instructions file of the tool, which is false
-     * when another manifest claims the same file - see [reportContendedInstructionsFiles]. The contention is
-     * reported as a failure of this manifest, so the run cannot end successfully having written neither.
+     * @param ownsInstructionsFile whether this manifest may write the instructions file of the tool, which is false when another manifest claims the same file - see [reportContendedInstructionsFiles]. The contention is reported as a failure of this manifest, so the run cannot end successfully having written neither.
      * @return the failures collected while exporting, empty when everything was exported
      */
     private fun exportUserAdapter(
@@ -432,8 +380,7 @@ class ToolsEngine(
         val toolType = target.adapter.toolType
         LOG.info("{}: {} into the user scope of {} under '{}'", manifest.id, deploying, toolType.serialName, userHome.absolutePath)
         if (manifest.replace) {
-            // Quoted for the same reason the project loop quotes its destination: a home can end in a character
-            // that reads as part of the sentence around it.
+            // Quoted for the same reason the project loop quotes its destination: a home can end in a character that reads as part of the sentence around it.
             LOG.warn("{}: {} the artifacts of this deployment under '{}'.", manifest.id, replacing, userHome.absolutePath)
         }
 
@@ -464,6 +411,7 @@ class ToolsEngine(
                                 deployment.fragments,
                                 allFragments,
                                 sourceDir = deployment.skillSourceDirs[skill.id],
+                                pointerSourceDirs = deployment.pointerSourceDirs,
                             ),
                         )
                     },
@@ -471,14 +419,18 @@ class ToolsEngine(
             }
         }
 
-        return exports.mapNotNull { (name, export) ->
-            exportOrCollectFailure(manifest.id, toolType, name, export)
+        return try {
+            exports.mapNotNull { (name, export) ->
+                exportOrCollectFailure(manifest.id, toolType, name, export)
+            }
+        } catch (ex: ArtifactDeleteException) {
+            // The user scope deletes inside the export of each artifact, so the failed delete surfaces here rather than from a step of its own like a project's.
+            throw ex.explained(toolType, "user deployment '${manifest.id}' under '${userHome.absolutePath}'")
         }
     }
 
     /**
-     * Builds the user deployment that is exported: every manifest of [allData] that survives the filter [manifest]
-     * declares for its kind, indexed by id - the user-scope counterpart of [assembleProject].
+     * Builds the user deployment that is exported: every manifest of [allData] that survives the filter [manifest] declares for its kind, indexed by id - the user-scope counterpart of [assembleProject].
      */
     private fun assembleUserDeployment(manifest: UserDeploymentManifest, allData: AllManifests): UserDeployment {
         val filteredSkills = filterService
@@ -500,22 +452,16 @@ class ToolsEngine(
                 .associateBy { it.id },
             skills = filteredSkills,
             skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
+            pointerSourceDirs = allData.pointerSourceDirs,
         )
     }
 
     /**
-     * Returns the configured adapters that deploy the manifest [manifestId], narrowed to [declaredTools] when it
-     * declares any. Both kinds of deployment manifest narrow themselves the same way, under the key [toolsField] -
-     * `deploy.tools` for a project, `tools` for a user deployment - which the warnings quote back to their author.
+     * Returns the configured adapters that deploy the manifest [manifestId], narrowed to [declaredTools] when it declares any. Both kinds of deployment manifest narrow themselves the same way, under the key [toolsField] - `deploy.tools` for a project, `tools` for a user deployment - which the warnings quote back to their author.
      *
-     * A declared tool the run does not configure is warned about rather than failed on: the tools configured for the
-     * run decide which adapters exist at all, and a manifest travels between runs that configure different sets of
-     * them, so the two lists disagreeing is a difference in scope rather than a broken manifest. Narrowing to nothing
-     * is warned about for the same reason it is allowed - a [subject] that exports through no tool is a deliberate
-     * but silent outcome, and a silent one is worth saying out loud.
+     * A declared tool the run does not configure is warned about rather than failed on: the tools configured for the run decide which adapters exist at all, and a manifest travels between runs that configure different sets of them, so the two lists disagreeing is a difference in scope rather than a broken manifest. Narrowing to nothing is warned about for the same reason it is allowed - a [subject] that exports through no tool is a deliberate but silent outcome, and a silent one is worth saying out loud.
      *
-     * The warning quotes the unavailable tools in the spelling a manifest writes them, not as Kotlin constants, so
-     * that an author can search their own YAML for the word the engine just told them about.
+     * The warning quotes the unavailable tools in the spelling a manifest writes them, not as Kotlin constants, so that an author can search their own YAML for the word the engine just told them about.
      */
     private fun selectAdapters(
         manifestId: String,
@@ -529,7 +475,7 @@ class ToolsEngine(
         if (unavailable.isNotEmpty()) {
             LOG.warn("{}: {} names {}, which this run does not configure. Leaving the tool(s) out of this deploy.", manifestId, toolsField, unavailable.map { it.serialName })
         }
-        val selected = tools.filter { it.toolType in declared }
+        val selected = tools.narrowedTo(declared)
         if (selected.isEmpty()) {
             LOG.warn("{}: {} selects none of the configured tools, so the {} is not exported.", manifestId, toolsField, subject)
         }
@@ -537,8 +483,7 @@ class ToolsEngine(
     }
 
     /**
-     * Exports every manifest of [project] through [adapter], isolating each manifest so that one broken reference
-     * cannot skip the manifests behind it.
+     * Exports every manifest of [project] through [adapter], isolating each manifest so that one broken reference cannot skip the manifests behind it.
      *
      * @return the failures collected while exporting, empty when everything was exported
      */
@@ -551,14 +496,12 @@ class ToolsEngine(
     ): List<ExportFailure> {
         LOG.info("{}: Exporting via adapter {}", project.manifest.id, adapter.toolType)
         if (project.manifest.deploy.replace) {
-            // The path is quoted because a resolved `deploy.directory` can legitimately end in `.`, which reads
-            // as `..` when a sentence-ending period follows it - misleading in a warning about deletion.
+            // The path is quoted because a resolved `deploy.directory` can legitimately end in `.`, which reads as `..` when a sentence-ending period follows it - misleading in a warning about deletion.
             LOG.warn("{}: {} existing agentic files in '{}'.", project.manifest.id, replacing, destination)
         }
-        // Preparing is the one step of a project deploy that deletes, and it is the engine that orders it, so the
-        // engine is what leaves it out of a dry run - the warning above has already said what it would have done.
+        // Preparing is the one step of a project deploy that deletes, and it is the engine that orders it, so the engine is what leaves it out of a dry run - the warning above has already said what it would have done.
         if (!dryRun) {
-            adapter.prepare(destination, project.manifest)
+            adapter.prepareOrExplain(destination, project.manifest)
         }
 
         val exports = buildList<Pair<String, () -> Unit>> {
@@ -592,6 +535,7 @@ class ToolsEngine(
                                 project.fragments,
                                 allFragments,
                                 sourceDir = project.skillSourceDirs[skill.id],
+                                pointerSourceDirs = project.pointerSourceDirs,
                             ),
                         )
                     },
@@ -605,14 +549,9 @@ class ToolsEngine(
     }
 
     /**
-     * Runs a single [export], turning an authoring error into a reportable [ExportFailure] instead of letting it
-     * abort the remaining exports.
+     * Runs a single [export], turning an authoring error into a reportable [ExportFailure] instead of letting it abort the remaining exports.
      *
-     * Only the deliberately named exceptions a manifest author causes are collected: an unresolvable ruleset or
-     * fragment reference, and a companion file a skill manifest declares but does not ship. Everything else -
-     * a programming fault, an out-of-memory error or a permission problem on the output directory - is not an
-     * authoring error, so it is left to propagate and abort the run loudly instead of being reported as one more
-     * broken manifest.
+     * Only the deliberately named exceptions a manifest author causes are collected: an unresolvable ruleset or fragment reference, and a companion file a skill manifest declares but does not ship. Everything else - a programming fault, an out-of-memory error or a permission problem on the output directory - is not an authoring error, so it is left to propagate and abort the run loudly instead of being reported as one more broken manifest.
      *
      * @return the failure that stopped this manifest, or `null` when it was exported successfully
      */
@@ -634,14 +573,12 @@ class ToolsEngine(
         LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
         ExportFailure(deploymentId, toolType, manifest, ex)
     } catch (ex: ContendedInstructionsFileException) {
-        // Reported once for the file, above; collected here so the run of every claimant fails rather than
-        // succeeding having quietly written nothing.
+        // Reported once for the file, above; collected here so the run of every claimant fails rather than succeeding having quietly written nothing.
         ExportFailure(deploymentId, toolType, manifest, ex)
     }
 
     /**
-     * A user deployment with its artifacts selected and its destinations known, before anything has been written.
-     * Having both is what lets the run say whether it is about to write at all - see [announceHome].
+     * A user deployment with its artifacts selected and its destinations known, before anything has been written. Having both is what lets the run say whether it is about to write at all - see [announceHome].
      */
     private data class PlannedUserDeployment(
         val deployment: UserDeployment,
@@ -649,8 +586,7 @@ class ToolsEngine(
     )
 
     /**
-     * One tool deploying one user deployment: the exporter it will write through, kept beside the manifest and the
-     * adapter it came from so that the destinations of a whole run can be compared before any of them is written.
+     * One tool deploying one user deployment: the exporter it will write through, kept beside the manifest and the adapter it came from so that the destinations of a whole run can be compared before any of them is written.
      */
     private data class UserScopeTarget(
         val manifest: UserDeploymentManifest,
@@ -666,9 +602,35 @@ class ToolsEngine(
 }
 
 /**
- * Thrown before a single project of the run is exported, when the `deploy.directory` of at least one of them could
- * not be resolved - see [ToolsEngine.resolveDeployDirectories]. Carries every failure the run found, so that an
- * author is told about all of their broken references at once instead of one per run.
+ * Deletes what this adapter replaces in [destination] for [manifest] - see [prepare] - naming the project, the tool and the entry in the failure when an entry cannot be deleted.
+ *
+ * @throws ReplaceFailedException if an entry cannot be deleted
+ */
+private fun ToolAdapter.prepareOrExplain(destination: File, manifest: ProjectManifest) {
+    try {
+        prepare(destination, manifest)
+    } catch (ex: ArtifactDeleteException) {
+        throw ex.explained(toolType, "project '${manifest.id}' in '${destination.absolutePath}'")
+    }
+}
+
+/**
+ * Returns the failure that reports this failed delete for the files of [toolType] that [deployedBy] replaces, naming the entry that could not be deleted.
+ */
+// The failure of a delete names only the entry, so the deployment and the tool are added where they are known. It still aborts the run: the directory is already partly deleted, and exporting on top of what is left would hide that.
+private fun ArtifactDeleteException.explained(toolType: ToolType, deployedBy: String) = ReplaceFailedException(
+    "Cannot replace the ${toolType.serialName} files of $deployedBy: $message. " +
+        "The run stopped here; make that path deletable and deploy again.",
+    this,
+)
+
+/**
+ * Thrown when a replacing deploy of a project or a user deployment cannot delete an entry of a directory it replaces, which stops the run midway with that directory partly deleted.
+ */
+class ReplaceFailedException(message: String, cause: Throwable) : RuntimeException(message, cause)
+
+/**
+ * Thrown before a single project of the run is exported, when the `deploy.directory` of at least one of them could not be resolved - see [ToolsEngine.resolveDeployDirectories]. Carries every failure the run found, so that an author is told about all of their broken references at once instead of one per run.
  */
 class DeployDirectoryResolvingException(
     val failures: List<VariableSubstitutionException>,
@@ -680,17 +642,14 @@ class DeployDirectoryResolvingException(
     )
 
 /**
- * Thrown for each user deployment that claims an instructions file another one claims too. A tool reads one such
- * file per home, so there is nothing to merge and no winner to pick - see
- * [ToolsEngine.reportContendedInstructionsFiles].
+ * Thrown for each user deployment that claims an instructions file another one claims too. A tool reads one such file per home, so there is nothing to merge and no winner to pick - see [ToolsEngine.reportContendedInstructionsFiles].
  */
 class ContendedInstructionsFileException(message: String) : RuntimeException(message)
 
 /**
  * A single manifest that could not be exported, together with the resolution failure that stopped it.
  *
- * @param deploymentId the deployment the manifest was exported for - a project or a user deployment, both of which
- * export through the same isolation
+ * @param deploymentId the deployment the manifest was exported for - a project or a user deployment, both of which export through the same isolation
  */
 data class ExportFailure(
     val deploymentId: String,
@@ -700,9 +659,7 @@ data class ExportFailure(
 )
 
 /**
- * Thrown by [ToolsEngine.process] once every project has been processed, when at least one manifest failed to
- * export or a project was left unexported because its ids collide. Carries the original resolver messages so the
- * caller can report every broken reference and every collision at once.
+ * Thrown by [ToolsEngine.process] once every project has been processed, when at least one manifest failed to export or a project was left unexported because its ids collide. Carries the original resolver messages so the caller can report every broken reference and every collision at once.
  */
 class ExportFailedException(
     val failures: List<ExportFailure>,
@@ -710,9 +667,7 @@ class ExportFailedException(
 ) : RuntimeException(
         buildString {
             if (failures.isNotEmpty()) {
-                // A broken manifest fails once per adapter, so counting the failures would report a single broken
-                // agent as six problems with the six tools of config.yml. The count is therefore over the distinct
-                // manifests, while the body still lists every adapter that could not export them.
+                // A broken manifest fails once per adapter, so counting the failures would report a single broken agent as six problems with the six tools of config.yml. The count is therefore over the distinct manifests, while the body still lists every adapter that could not export them.
                 val brokenManifests = failures.distinctBy { it.deploymentId to it.manifest }.size
                 append("Export failed for $brokenManifests manifest(s):")
                 failures.forEach { failure ->

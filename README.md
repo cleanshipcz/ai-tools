@@ -20,12 +20,13 @@ See [Not Yet Implemented](#not-yet-implemented) before looking for them.
 - A JDK 17 or newer on `PATH` (the Gradle 9 wrapper needs it to start)
 - Network access on the first build, so Gradle can fetch dependencies and, if you have no local JDK 21, provision the JVM 21 toolchain the engine targets
 - Node/npm only if you want to build the optional `:server` module, whose frontend is built with Vite
+- A checkout of the `jira-confluence-mcp-server` repository, by default at `~/Documents/Projects/jira-confluence-mcp-server`. The pointer skills `jira-ticket`, `confluence-doc`, and `confluence-search` are read from its `skills/` folder, found through `${PROJECTS_FOLDER}/jira-confluence-mcp-server/skills/<id>`, and every run loads every skill manifest. Without the checkout, every run fails, `./deploy.sh --dry-run` included. If your checkout sits elsewhere, link it into `${PROJECTS_FOLDER}`, for example `ln -s <your checkout> ~/Documents/Projects/jira-confluence-mcp-server`. You can instead set `PROJECTS_FOLDER` under `env_vars` in `config.local.yml` to the folder that holds it, but every `deploy.directory` that uses `${PROJECTS_FOLDER}` then moves with it, and a deployment with `replace: true` deletes its tool folders at the new location; do that only when your projects live in that folder too. See [Path variables](#path-variables) and [04_skills/README.md](04_skills/README.md#pointer-skill).
 
 ## Repository Layout
 - `01_rulesets/` – reusable rule sets, referenced by regex on their `id`
 - `02_fragments/` – reusable content blocks shared by agents, prompts, and skills
 - `03_prompts/` – prompt manifests
-- `04_skills/` – skill manifests, as `<id>.yml` or as a directory containing `skill.yml`
+- `04_skills/` – skill manifests, as `<id>.yml` or as a directory containing `skill.yml`; a pointer skill instead points with `source` at a plain skill folder outside this repository (see [04_skills/README.md](04_skills/README.md#pointer-skill))
 - `05_agents/` – agent manifests
 - `09_deployments/` – deployment manifests, each a directory containing a `project.yml` (deploys into a project directory) or a `user.yml` (deploys into the user scope of a tool), plus an optional `features/`
 - `ai-tools-engine/` – the Kotlin build engine (Gradle multi-module: `:engine`, `:cli`, `:server`, `:telemetry`)
@@ -62,7 +63,7 @@ Left over from the retired TypeScript CLI and no longer written or read by anyth
 ./deploy.sh --dry-run
 ```
 
-A dry run loads, filters, and renders every manifest exactly as a deploy does and fails on exactly what a deploy fails on — a broken ruleset or fragment reference, a duplicate id, a missing skill file, a deploy directory that cannot be resolved — but creates, deletes, and modifies nothing on disk.
+A dry run loads, filters, and renders every manifest exactly as a deploy does and fails on exactly what a deploy fails on — a broken ruleset or fragment reference, a duplicate id, a missing skill file, the `source` folder of a pointer skill that is missing or has no valid `SKILL.md`, a path the run would write or delete that overlaps such a folder, a deploy directory that cannot be resolved — but creates, deletes, and modifies nothing on disk.
 It logs the absolute path of every artifact a deploy would write, so the transcript reads as the plan of the deploy it stands in for.
 
 4) Generate and deploy
@@ -101,7 +102,7 @@ A project is a directory under a configured `deployments` location containing `p
 `deploy.directory` sets where its generated files land.
 
 Relative `deploy.directory` values resolve against `--working-dir`, the same base the `locations` paths of `config.yml` use — so `.` means the root of this repository and the value does not change with the launcher.
-Use an absolute path for any project outside this repository.
+Use an absolute path, or one starting with `~/`, for any project outside this repository.
 `deploy.directory` may also reference a variable declared under `env_vars` in the config files, as `${NAME}`; the reference is expanded before the value is judged relative or absolute, so the variable can supply the absolute base — see [Path variables](#path-variables).
 
 Filters select which manifests reach a project. Each of `agents`, `prompts`, `rulesets`, `fragments`, `skills`, and `features` accepts a list of filters of type `tags`, `whitelist`, or `blacklist`:
@@ -328,6 +329,8 @@ A name is looked up in the `env_vars` of `config.local.yml` first, then in those
 The typical use is the one above: the machine-specific absolute base lives in the gitignored `config.local.yml`, and the shared `project.yml` files only name the variable, so the same manifest works on a machine whose checkout sits somewhere else.
 
 References are expanded before a path is judged relative or absolute, which is what lets a variable carry an absolute base for a value whose remainder is written as a fragment.
+
+After expansion, a path that is `~` or starts with `~/` resolves against the home directory of the user running the engine. This applies to every `locations` entry, every `deploy.directory`, the skill-level `source` of a pointer skill, and `--user-home`, so the committed `PROJECTS_FOLDER: "~/Documents/Projects"` works without a local override. `~user` is not expanded: it is read as a relative path whose first folder is named `~user`. A `~` anywhere but at the start is an ordinary part of the name. The paths of a `files` entry of a skill are neither substituted nor expanded.
 
 A reference to a variable declared nowhere fails the run, naming the variable — and, for a location, the file that declared the offending value.
 Every project's `deploy.directory` is resolved up front, before any project is deployed, so a broken reference cannot leave a run half-deployed, and nothing is ever written to a directory literally named `${...}`.

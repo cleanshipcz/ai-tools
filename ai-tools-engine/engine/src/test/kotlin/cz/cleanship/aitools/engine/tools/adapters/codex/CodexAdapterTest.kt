@@ -6,6 +6,8 @@ import cz.cleanship.aitools.engine.data.expectedPrompt
 import cz.cleanship.aitools.engine.data.feature
 import cz.cleanship.aitools.engine.data.prompt
 import cz.cleanship.aitools.engine.data.rulesets
+import cz.cleanship.aitools.engine.data.sourceBackedSkill
+import cz.cleanship.aitools.engine.data.sourceBackedSkillBody
 import cz.cleanship.aitools.engine.data.textOnlySkill
 import cz.cleanship.aitools.engine.data.userDeployment
 import cz.cleanship.aitools.engine.io.ArtifactPathException
@@ -24,6 +26,10 @@ import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.UserInstructionsContext
+import cz.cleanship.aitools.engine.tools.prepare
+import cz.cleanship.aitools.engine.utils.SOURCE_BACKED_TEMPLATE
+import cz.cleanship.aitools.engine.utils.contentSnapshot
+import cz.cleanship.aitools.engine.utils.writeSourceBackedSkillFiles
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
@@ -119,9 +125,42 @@ class CodexAdapterTest {
     }
 
     @Test
+    fun `should output a source-backed skill as the frontmatter followed by the source body verbatim`() {
+        // given
+        // - the source folder holding the companion file the loader listed for the skill
+        val sourceDir = writeSourceBackedSkillFiles(tempDir.toFile())
+        val sourceBefore = sourceDir.contentSnapshot()
+        val skillContext = SkillContext(sourceBackedSkill, sourceDir = sourceDir, pointerSourceDirs = emptyList())
+
+        // when
+        adapter.export(tempDir.toFile(), skillContext)
+
+        // then
+        val content = targetDir.resolve("skills/skill-${sourceBackedSkill.id}/SKILL.md").readText()
+        assertThat(content).isEqualTo("---\nname: ${sourceBackedSkill.id}\ndescription: ${Frontmatter.value(sourceBackedSkill.description)}\n---\n\n" + sourceBackedSkillBody)
+        assertThat(targetDir.resolve("skills/skill-${sourceBackedSkill.id}").resolve("templates/task.txt")).hasContent(SOURCE_BACKED_TEMPLATE)
+        assertThat(sourceDir.contentSnapshot()).isEqualTo(sourceBefore)
+    }
+
+    @Test
+    fun `should name every path the export of a skill writes among the skill paths of that skill`() {
+        // given
+        val sourceDir = writeSourceBackedSkillFiles(tempDir.toFile())
+        val projectDir = tempDir.resolve("project").toFile()
+
+        // when
+        adapter.export(projectDir, SkillContext(sourceBackedSkill, sourceDir = sourceDir, pointerSourceDirs = emptyList()))
+
+        // then
+        val skillPaths = adapter.skillPaths(projectDir, sourceBackedSkill.id)
+        val written = projectDir.walkTopDown().filter { it.isFile }.toList()
+        assertThat(written).isNotEmpty.allSatisfy { file -> assertThat(skillPaths).anyMatch { file.startsWith(it) } }
+    }
+
+    @Test
     fun `should output a skill`() {
         // given
-        val skillContext = SkillContext(textOnlySkill)
+        val skillContext = SkillContext(textOnlySkill, pointerSourceDirs = emptyList())
 
         // when
         adapter.export(tempDir.toFile(), skillContext)
@@ -177,8 +216,7 @@ class CodexAdapterTest {
     }
 
     /**
-     * The user scope writes into the per-user configuration of Codex. Every test here points the home base at a
-     * temporary directory: the real home of whoever runs the suite is never read and never written.
+     * The user scope writes into the per-user configuration of Codex. Every test here points the home base at a temporary directory: the real home of whoever runs the suite is never read and never written.
      */
     @Nested
     inner class UserScope {
@@ -257,7 +295,7 @@ class CodexAdapterTest {
             val exporter = exporterFor(userDeployment)
 
             // when
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             val skillFile = codexDir.resolve("skills/skill-${textOnlySkill.id}/SKILL.md")
@@ -274,7 +312,7 @@ class CodexAdapterTest {
             val exporter = exporterFor(userDeployment.copy(replace = true))
 
             // when
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             assertThat(staleFile).doesNotExist()
@@ -295,7 +333,7 @@ class CodexAdapterTest {
             exporter.export(UserInstructionsContext(replacingDeployment, rulesets))
             exporter.export(AgentContext(agent, rulesets))
             exporter.export(PromptContext(prompt, rulesets))
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             assertThat(neighbourSkill).hasContent("A skill installed by hand.\n")
@@ -304,8 +342,7 @@ class CodexAdapterTest {
         @Test
         fun `should delete nothing when the id of a skill climbs out of the skills directory`() {
             // given
-            // - nothing validates a manifest id today, so a replacing deploy must not follow one out of its own
-            //   directory: the delete is the single irreversible thing this engine does
+            // - nothing validates a manifest id today, so a replacing deploy must not follow one out of its own directory: the delete is the single irreversible thing this engine does
             val neighbour = userHome.resolve("unrelated/notes.md")
             neighbour.parentFile.mkdirs()
             neighbour.writeText("Not written by any deploy.\n")
@@ -314,7 +351,7 @@ class CodexAdapterTest {
             val exporter = exporterFor(userDeployment.copy(replace = true))
 
             // when
-            val error = runCatching { exporter.export(SkillContext(escapingSkill)) }.exceptionOrNull()
+            val error = runCatching { exporter.export(SkillContext(escapingSkill, pointerSourceDirs = emptyList())) }.exceptionOrNull()
 
             // then
             assertThat(neighbour).exists()
@@ -330,10 +367,83 @@ class CodexAdapterTest {
 
             // when
             exporter.export(UserInstructionsContext(userDeployment, rulesets))
-            exporter.export(SkillContext(textOnlySkill))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
 
             // then
             assertThat(tempDir.toFile().listFiles()!!.map { it.name }).containsExactly("home")
+        }
+
+        @Test
+        fun `should name every path the export of a skill writes among the skill paths of that skill`() {
+            // given
+            val sourceDir = writeSourceBackedSkillFiles(tempDir.toFile())
+            val exporter = exporterFor(userDeployment)
+
+            // when
+            exporter.export(SkillContext(sourceBackedSkill, sourceDir = sourceDir, pointerSourceDirs = emptyList()))
+
+            // then
+            val skillPaths = exporter.skillPaths(sourceBackedSkill.id)
+            val written = userHome.walkTopDown().filter { it.isFile }.toList()
+            assertThat(written).isNotEmpty.allSatisfy { file -> assertThat(skillPaths).anyMatch { file.startsWith(it) } }
+        }
+
+        @Test
+        fun `should name the directory of every prompt, agent and skill as the paths a replacing deploy deletes`() {
+            // given
+            val exporter = exporterFor(userDeployment.copy(replace = true))
+
+            // when
+            val replacedPaths = exporter.replacedPaths(promptIds = listOf(prompt.id), agentIds = listOf(agent.id), skillIds = listOf(textOnlySkill.id))
+
+            // then
+            assertThat(replacedPaths).containsExactly(
+                codexDir.resolve("skills/prompt-${prompt.id}"),
+                codexDir.resolve("skills/agent-${agent.id}"),
+                codexDir.resolve("skills/skill-${textOnlySkill.id}"),
+            )
+        }
+
+        @Test
+        fun `should name no path when the deployment does not replace`() {
+            // given
+            val exporter = exporterFor(userDeployment)
+
+            // when
+            val replacedPaths = exporter.replacedPaths(promptIds = listOf(prompt.id), agentIds = listOf(agent.id), skillIds = listOf(textOnlySkill.id))
+
+            // then
+            assertThat(replacedPaths).isEmpty()
+        }
+
+        @Test
+        fun `should delete nothing outside the replaced paths when a replacing deploy exports every kind of artifact`() {
+            // given
+            val replacingDeployment = userDeployment.copy(replace = true)
+            val exporter = exporterFor(replacingDeployment)
+            // - stale files inside every directory an export of these artifacts rewrites, and one beside them
+            val staleFiles = listOf(
+                "skills/prompt-${prompt.id}/stale.md",
+                "skills/agent-${agent.id}/stale.md",
+                "skills/skill-${textOnlySkill.id}/stale.md",
+                "skills/hand-made/SKILL.md",
+            ).map { relative -> writeStale(codexDir.resolve(relative)) }
+
+            // when
+            exporter.export(UserInstructionsContext(replacingDeployment, rulesets))
+            exporter.export(AgentContext(agent, rulesets))
+            exporter.export(PromptContext(prompt, rulesets))
+            exporter.export(SkillContext(textOnlySkill, pointerSourceDirs = emptyList()))
+
+            // then
+            val replacedPaths = exporter.replacedPaths(promptIds = listOf(prompt.id), agentIds = listOf(agent.id), skillIds = listOf(textOnlySkill.id))
+            assertThat(staleFiles.filterNot { it.exists() }).hasSize(3).allSatisfy { deleted -> assertThat(replacedPaths).anyMatch { deleted.startsWith(it) } }
+        }
+
+        private fun writeStale(file: File): File {
+            file.parentFile.mkdirs()
+            file.writeText("Stale.\n")
+            return file
         }
 
         private fun exporterFor(deployment: UserDeploymentManifest) =

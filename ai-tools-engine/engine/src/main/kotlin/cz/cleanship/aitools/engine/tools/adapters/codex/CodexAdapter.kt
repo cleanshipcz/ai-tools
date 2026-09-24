@@ -14,6 +14,7 @@ import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserInstructionsContext
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.replacing
 import java.io.File
 
 class CodexAdapter(
@@ -23,11 +24,7 @@ class CodexAdapter(
 
     override val toolType: ToolType = ToolType.CODEX
 
-    override fun prepare(projectDir: File, project: ProjectManifest) {
-        if (project.deploy.replace) {
-            CodexLayout.ofProject(projectDir).toolDir.deleteRecursively()
-        }
-    }
+    override fun replacedPaths(projectDir: File, project: ProjectManifest): List<File> = project.replacing(CodexLayout.ofProject(projectDir).toolDir)
 
     override fun export(projectDir: File, globalContext: GlobalContext) {
         exportService.export(
@@ -62,6 +59,9 @@ class CodexAdapter(
 
     override fun export(projectDir: File, skillContext: SkillContext) =
         exportSkill(CodexLayout.ofProject(projectDir), skillContext)
+
+    override fun skillPaths(projectDir: File, skillId: String): List<File> =
+        listOf(CodexLayout.ofProject(projectDir).skillDir(skillId))
 
     override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter =
         CodexUserScopeExporter(CodexLayout.ofUser(userHome), deployment)
@@ -115,15 +115,13 @@ class CodexAdapter(
             )
             printers.skillPrinter.print(skillContext, it)
         }
-        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir, skillContext.skill.id)
+        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir, skillContext.skill.id, skillContext.pointerSourceDirs)
     }
 
     /**
      * Writes [deployment] into `<home>/.codex`, rendering exactly what a project deploy renders - see [CodexLayout].
      *
-     * The instructions file is owned by the engine and overwritten on every deploy. Everything else the home holds is
-     * left alone: a replacing deploy rewrites the directory of each artifact it deploys, never the `skills` directory
-     * around them, so a skill the user wrote by hand survives.
+     * The instructions file is owned by the engine and overwritten on every deploy. Everything else the home holds is left alone: a replacing deploy rewrites the directory of each artifact it deploys, never the `skills` directory around them, so a skill the user wrote by hand survives.
      */
     private inner class CodexUserScopeExporter(
         private val layout: CodexLayout,
@@ -149,6 +147,21 @@ class CodexAdapter(
             exportAgent(layout, agentContext)
         }
 
+        override fun skillPaths(skillId: String): List<File> = listOf(layout.skillDir(skillId))
+
+        override val replacedWithin: File get() = layout.skillsDir
+
+        override fun replacedPaths(
+            promptIds: Collection<String>,
+            agentIds: Collection<String>,
+            skillIds: Collection<String>,
+        ): List<File> =
+            if (deployment.replace) {
+                promptIds.map { layout.promptDir(it) } + agentIds.map { layout.agentDir(it) } + skillIds.map { layout.skillDir(it) }
+            } else {
+                emptyList()
+            }
+
         override fun export(skillContext: SkillContext) {
             replaceIfRequested(layout.skillDir(skillContext.skill.id), "skill '${skillContext.skill.id}'")
             exportSkill(layout, skillContext)
@@ -156,7 +169,7 @@ class CodexAdapter(
 
         private fun replaceIfRequested(artifactDir: File, describedBy: String) {
             if (deployment.replace) {
-                exportService.replaceArtifactDirectory(artifactDir, owned = layout.skillsDir, describedBy = describedBy)
+                exportService.replaceArtifactDirectory(artifactDir, owned = replacedWithin, describedBy = describedBy)
             }
         }
     }

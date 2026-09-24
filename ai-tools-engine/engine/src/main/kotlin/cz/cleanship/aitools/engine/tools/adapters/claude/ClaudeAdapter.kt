@@ -14,6 +14,7 @@ import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserInstructionsContext
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.replacing
 import java.io.File
 
 class ClaudeAdapter(
@@ -23,11 +24,7 @@ class ClaudeAdapter(
 
     override val toolType: ToolType = ToolType.CLAUDE
 
-    override fun prepare(projectDir: File, project: ProjectManifest) {
-        if (project.deploy.replace) {
-            ClaudeLayout.ofProject(projectDir).toolDir.deleteRecursively()
-        }
-    }
+    override fun replacedPaths(projectDir: File, project: ProjectManifest): List<File> = project.replacing(ClaudeLayout.ofProject(projectDir).toolDir)
 
     override fun export(projectDir: File, globalContext: GlobalContext) {
         exportService.export(
@@ -53,6 +50,9 @@ class ClaudeAdapter(
 
     override fun export(projectDir: File, skillContext: SkillContext) =
         exportSkill(ClaudeLayout.ofProject(projectDir), skillContext)
+
+    override fun skillPaths(projectDir: File, skillId: String): List<File> =
+        listOf(ClaudeLayout.ofProject(projectDir).skillDir(skillId))
 
     override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter =
         ClaudeUserScopeExporter(ClaudeLayout.ofUser(userHome), deployment)
@@ -97,15 +97,13 @@ class ClaudeAdapter(
             )
             printers.skillPrinter.print(skillContext, it)
         }
-        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir, skillContext.skill.id)
+        exportService.copySkillFiles(skillContext.skill.files, skillContext.sourceDir, skillDir, skillContext.skill.id, skillContext.pointerSourceDirs)
     }
 
     /**
      * Writes [deployment] into `<home>/.claude`, rendering exactly what a project deploy renders - see [ClaudeLayout].
      *
-     * The instructions file is owned by the engine and overwritten on every deploy. Everything else the home holds is
-     * left alone: a replacing deploy rewrites the directory of each skill it deploys, never the `skills` directory
-     * around them, so a skill the user wrote by hand survives.
+     * The instructions file is owned by the engine and overwritten on every deploy. Everything else the home holds is left alone: a replacing deploy rewrites the directory of each skill it deploys, never the `skills` directory around them, so a skill the user wrote by hand survives.
      */
     private inner class ClaudeUserScopeExporter(
         private val layout: ClaudeLayout,
@@ -125,11 +123,23 @@ class ClaudeAdapter(
 
         override fun export(agentContext: AgentContext) = exportAgent(layout, agentContext)
 
+        override fun skillPaths(skillId: String): List<File> = listOf(layout.skillDir(skillId))
+
+        override val replacedWithin: File get() = layout.skillsDir
+
+        // Prompts and agents are single files in this layout, which a deploy overwrites rather than deletes.
+        override fun replacedPaths(
+            promptIds: Collection<String>,
+            agentIds: Collection<String>,
+            skillIds: Collection<String>,
+        ): List<File> =
+            if (deployment.replace) skillIds.map { layout.skillDir(it) } else emptyList()
+
         override fun export(skillContext: SkillContext) {
             if (deployment.replace) {
                 exportService.replaceArtifactDirectory(
                     layout.skillDir(skillContext.skill.id),
-                    owned = layout.skillsDir,
+                    owned = replacedWithin,
                     describedBy = "skill '${skillContext.skill.id}'",
                 )
             }

@@ -170,7 +170,7 @@ The one key that does merge element-wise is `env_vars`, described below.
 
 **Path Variables:**
 
-Every entry under `locations`, and every project's `deploy.directory`, may reference a variable as `${NAME}`.
+Every entry under `locations`, every project's `deploy.directory`, and the skill-level `source` of a pointer skill may reference a variable as `${NAME}`.
 Variables are declared under the top-level `env_vars` key of either config file:
 
 ```yaml
@@ -192,6 +192,8 @@ This is what makes a `project.yml` shareable. The absolute base each machine dep
 
 Substitution happens *before* the relative-vs-absolute decision above, so a variable may supply the absolute base of a value whose remainder is written as a relative fragment.
 
+After substitution, a value that is `~` or starts with `~/` resolves against the home directory of the user running the engine, so a variable may also hold a path such as `~/Documents/Projects`. `~user` is not expanded: it is read as a relative path whose first folder is named `~user`. A `~` anywhere but at the start is an ordinary part of the name.
+
 A reference to a variable that is declared nowhere aborts the run with an error naming the variable, and for a location also the config file the offending value came from.
 Every project's `deploy.directory` is resolved before any project is deployed, so a typo cannot leave you with some projects deployed and others not, and nothing is ever written to a directory literally named `${...}`.
 
@@ -200,7 +202,7 @@ Groups that are not valid references - `${1ST}`, `${A-B}`, `$NO_BRACES` - pass t
 A name consists of letters, digits, and underscores, and may not start with a digit.
 
 A user deployment declares no path at all, so nothing in a `user.yml` is substituted.
-Its destination comes from `--user-home`, which is not a variable reference and is never expanded — a literal `~` in it stays a literal `~`.
+Its destination comes from `--user-home`, whose `${...}` references are not substituted. A value that is `~` or starts with `~/` resolves against the home directory, as in any declared path; an unquoted one is usually expanded by the shell first anyway.
 
 Configs without `env_vars`, and paths without references, behave exactly as they did before.
 
@@ -245,8 +247,8 @@ metadata:
 
 Key points, all documented in full in [../QUICKREF.md](../QUICKREF.md#creating-a-project):
 
-- `deploy.directory` decides where the generated files land. A relative value resolves against `--working-dir`, so `.` means this repository's root.
-- `deploy.replace: true` wipes the output directories each tool owns inside `deploy.directory` before writing them again. There is no backup and no auto-commit; files are overwritten in place, each written atomically through a temporary file.
+- `deploy.directory` decides where the generated files land. A relative value resolves against `--working-dir`, so `.` means this repository's root; a value that is `~` or starts with `~/` resolves against the home directory.
+- `deploy.replace: true` wipes the output directories each tool owns inside `deploy.directory` before writing them again. There is no backup and no auto-commit; files are overwritten in place, each written atomically through a temporary file. The wipe removes a symbolic link inside those directories, or such a directory that is itself a link, as a link and never touches what it leads to, and a run whose wipe would reach the source folder of a pointer skill fails before anything is written; see [04_skills/README.md](../04_skills/README.md#pointer-skill).
 - `deploy.tools` narrows the project to a subset of the tools configured for the run. Omitting it means all of them, `[]` means none, and naming a tool the run does not configure is a warning rather than an error.
 - Filters fold over a selection that **starts empty**: `tags` and `whitelist` add, `blacklist` subtracts, so `blacklist` must come last and an omitted or empty `filter` lets everything through.
 - A ruleset or fragment an agent references must itself survive the project's `rulesets` / `fragments` filter, otherwise that agent fails to export.
@@ -334,6 +336,7 @@ Known limitations:
 
 - Removing an artifact from a `user.yml` leaves its previously deployed copy behind in the home until you delete it by hand. The engine keeps no ledger of what it wrote, so it cannot tell a stale artifact from one you installed yourself.
 - `replace: true` reaches per-artifact paths only. Parent directories and hand-made neighbours are never touched.
+- A directory to be replaced that is a symbolic link is removed as a link when it leads inside the skills folder of the tool or leads nowhere; one leading to an existing folder or file outside that folder, or to that folder itself, fails the run before anything is written.
 
 ### Choosing the home
 
@@ -444,6 +447,12 @@ How much a collision costs depends on the kind:
 
 **`Cannot resolve the deploy directory of N project(s)`** — a `${NAME}` in a `deploy.directory` names a variable no `env_vars` map and no environment variable declares. Nothing is deployed until every project's directory resolves.
 
+**`Refusing to deploy: N path(s) the run would write or delete overlap the source folder of a pointer skill`** / **`Failed to load .../04_skills/<id>/skill.yml: ...`** — a skill or a replaced directory of a deployment reaches the source folder of a pointer skill, or a pointer skill cannot be read from its source folder. Both stop the run before anything is written, `--dry-run` included; see [04_skills/README.md](../04_skills/README.md#troubleshooting).
+
+**`Refusing to deploy: N folder(s) inside a directory the run would delete to replace it cannot be read`** — a directory that `replace: true` deletes is or holds a folder the user running the deploy cannot read, so the delete would stop midway. The run stops before anything is written, `--dry-run` included. Make the folder readable and writable, remove it, or turn off `replace` for that deployment. An empty folder that cannot be read is refused too, because the delete never removes a folder it cannot open; remove such a folder yourself. A replaced directory that is itself a symbolic link is not checked for unreadable folders, because the deploy never opens what it leads to. In a project, the deploy unlinks it. In a user deployment, the deploy unlinks it when it leads inside the skills folder of the tool or leads nowhere, and otherwise refuses it before anything is written with `Refusing to replace '...' for '...': it is a symbolic link that leads to '...'`. For such a directory, only the link itself is compared with the source folders of pointer skills: where it sits and where it leads, not the links in the folder it leads to.
+
+**`Cannot replace the <tool> files of project '<id>' in '...': deleting '...' failed`** / **`Cannot replace the <tool> files of user deployment '<id>' under '...': deleting '...' failed`** — a replacing deploy could not delete an entry, typically a file in a folder that is not writable. The message names the deployment, the tool, and the entry, and ends with `The run stopped here; make that path deletable and deploy again.` The run stops at that point and leaves the directory partly deleted. Projects are exported before user deployments: when a user deployment fails, every project of the run, and the user-scope files exported before the failed one, are already written; when a project fails, the projects and tools exported before it are. `--dry-run` does not delete, so it does not report this.
+
 **`Export failed for N manifest(s)`** — the list below the headline names each manifest and every tool it failed for. Everything else was still exported, and the run exits non-zero.
 
 **`No rulesets match pattern 'x'`** — the pattern matched nothing. The message says whether a match exists but was excluded by the deployment's `rulesets` filter.
@@ -454,7 +463,9 @@ How much a collision costs depends on the kind:
 
 **`Invalid manifest id '...'`** — an id must name a single file or directory: no path separators, no `.` or `..`, not empty. It becomes the name of what the adapters write, so the check runs at load time for every manifest kind, and the run fails naming the file before anything is written.
 
-**`Refusing to replace '...': it is not inside '...'`** — a user deploy with `replace: true` found one of its artifact paths in the home resolving outside the directory it owns, which in practice means a directory that has been replaced by a symlink pointing elsewhere. The run aborts and that check deletes nothing. Inspect the named path in the home rather than the manifest.
+**`Refusing to replace '...' for '...': it is a symbolic link that leads to '...', which is not inside '...'`** — a user deploy with `replace: true` would rewrite a directory in the home, such as `~/.claude/skills/<id>`, that is a symbolic link leading outside the skills folder of the tool, typically a skill installed by hand as a link to a checkout. The deploy judges the link by where it leads, so it refuses it rather than unlinking it; a link that leads inside the skills folder, or leads nowhere, is unlinked instead. The run fails before anything is written, and `--dry-run` fails the same way. Remove the link, or turn off `replace` for that deployment.
+
+**`Refusing to replace '...' for '...': it is not inside '...'`** — a user deploy with `replace: true` found an artifact path in the home that is not a symbolic link and lies outside the directory it owns, or is that directory itself. Id validation rejects such an id before anything is written, so this points at an id that bypassed it. Give the manifest an id that names a single directory, as the message advises. The run fails before anything is written, and `--dry-run` fails the same way.
 
 **A manifest does not show up in the output** — check the filters of the deployment. A manifest with no matching tag and no whitelist entry is skipped silently, and a `blacklist` placed before the filter it was meant to trim removes nothing.
 

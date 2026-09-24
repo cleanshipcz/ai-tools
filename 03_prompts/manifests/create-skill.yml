@@ -22,7 +22,7 @@ content: |
 
   **Your job is to clarify and translate into a valid skill manifest.**
 
-  Skills are reusable instruction packages. The engine assembles each one from its sections and deploys it as a SKILL.md the AI tool loads when the skill triggers.
+  Skills are reusable instruction packages. The engine assembles each one from its sections, or takes it from a plain skill folder for a pointer skill, and deploys it as a SKILL.md the AI tool loads when the skill triggers.
 
   ## Step 1: Ask clarifying questions
 
@@ -31,8 +31,13 @@ content: |
   - What are the exact commands or steps, including where output lands?
   - Does it need supporting files? (templates, reference documents)
   - Does shared content already exist as a ruleset or fragment it should reference?
+  - Does the skill already exist as a plain Claude Code skill folder (a `SKILL.md` with `name` and `description` frontmatter) that must stay usable outside ai-tools? Then the manifest only points at it with `source`.
 
   ## Step 2: Suggest structure
+
+  For a pointer skill (the content stays in a plain skill folder), skip the rest of this step: the id is the `name` of the `SKILL.md` frontmatter, and the description and the body come from that folder, so ask for neither. Confirm instead that the folder lies outside every directory a deployment writes to, and exists on every machine that deploys.
+
+  Otherwise:
 
   - Propose a kebab-case ID: verb-tool for command skills (run-pytest, search-repo), domain-tool for broader ones (confluence-doc, jira-ticket)
   - Write the description as "What it does. Use when ..." — the deployed description decides when the AI invokes the skill
@@ -41,13 +46,14 @@ content: |
   ## Step 3: Create the skill manifest
 
   Read SkillManifest.kt and derive the exact field set from it (see the engine-models instructions).
-  Study existing skills in `04_skills/` as style references: `run-detekt.yml` for a simple command skill, `confluence-doc/skill.yml` for one composing fragments and bundling template files.
+  Study existing skills in `04_skills/` as style references: `run-detekt.yml` for a simple command skill, `docx-export/skill.yml` for one bundling a supporting file, and `jira-ticket/skill.yml` for a pointer to a plain skill folder. No existing skill composes ruleset or fragment sections, so write those from the syntax below.
 
   Key points from the model:
 
   - **sections** is an ordered list; each entry is exactly one of `text: |`, `ruleset: <ruleset-id>`, or `fragment: <fragment-id>`.
   - **files** bundles supporting files; each entry is `path: <p>` (same source and target) or `source: <s>` + `target: <t>`.
-  - A skill without files is a single `04_skills/<id>.yml`; a skill with files lives in its own directory as `04_skills/<id>/skill.yml` with the files alongside.
+  - **source** (the skill-level key, not the `source` of a `files` entry) makes the manifest a pointer skill: it points at a plain skill folder instead. Its `SKILL.md` frontmatter `name` must equal the manifest `id`, its `description` becomes the skill description, the text after the frontmatter, from its first line that is not empty, is deployed unchanged, and every other file in the folder is copied along. Only `name` and `description` are read from the frontmatter; any other key, such as `allowed-tools`, is not deployed. A pointer skill declares only `id`, `source`, and `metadata` — never `description`, `sections`, or `files`. `source` may use `${NAME}` variables from `env_vars` or the environment, and a value that is `~` or starts with `~/` resolves against the home directory; any other relative path resolves against the folder holding the manifest. Every skill manifest is loaded on every run, so the folder must exist on every machine that deploys, and a missing or broken folder fails every run.
+  - A skill is a single `04_skills/<id>.yml` when it has no files, `04_skills/<id>/skill.yml` with the files alongside when it bundles some, or, for a pointer skill, a `04_skills/<id>/skill.yml` holding only `id`, `source`, and `metadata`.
 
   ## Best practices
 
@@ -78,10 +84,10 @@ content: |
 outputs:
   format: yaml
 metadata:
-  version: 4.0.1
+  version: 4.1.0
   author: "AI Tools Team"
   created: "2025-11-16"
-  updated: "2026-09-04"
+  updated: "2026-09-23"
   tags:
     - manifests
     - skills

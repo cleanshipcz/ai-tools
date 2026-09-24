@@ -13,6 +13,10 @@ data class UserDeployment(
     val fragments: Map<String, FragmentManifest>,
     val skills: Map<String, SkillManifest>,
     val skillSourceDirs: Map<String, java.io.File> = emptyMap(),
+    /**
+     * The source folder of every pointer skill of the run, whether this deployment selects that skill or not.
+     */
+    val pointerSourceDirs: List<java.io.File>,
 ) {
     /**
      * Whether this deployment writes anything besides the instructions file. Rulesets and fragments are not counted:

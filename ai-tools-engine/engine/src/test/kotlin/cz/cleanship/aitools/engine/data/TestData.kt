@@ -426,6 +426,28 @@ val skillWithFiles = SkillManifest(
     ),
 )
 
+// The body of a plain SKILL.md as the loader keeps it: from the first line after the frontmatter that is not empty, with the heading its author wrote. The engine must neither add a heading of its own nor repeat the description.
+val sourceBackedSkillBody =
+    """
+    # Source-backed skill
+
+    Use the template in templates/task.txt.
+    """.trimIndent() + "\n"
+
+val sourceBackedSkill = SkillManifest(
+    id = "source-backed-skill",
+    description = "Description read from the SKILL.md frontmatter",
+    source = "\${PROJECTS_FOLDER}/plain-skills/source-backed-skill",
+    body = sourceBackedSkillBody,
+    files = listOf(
+        SkillFile(source = "templates/task.txt", target = "templates/task.txt"),
+    ),
+    metadata = ManifestMetadata(
+        version = Version("2.0.0"),
+        tags = setOf("jira"),
+    ),
+)
+
 val fragment = FragmentManifest(
     id = "test-fragment",
     description =
