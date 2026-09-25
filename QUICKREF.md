@@ -36,7 +36,7 @@ The inner quotes in that snippet survive Gradle's own splitting of `--args`, whi
 
 The CLI has three options besides `--help`, and no subcommands:
 
-- `--dry-run` — load, filter, and render everything exactly as a deploy would, report every failure a deploy would report, and write nothing. This is how manifests are validated.
+- `--dry-run` — load, filter, and render everything exactly as a deploy would, report every failure a deploy would report except a file a tool cannot write (see [Validation](#validation)), and write nothing. This is how manifests are validated.
 - `--working-dir` — the directory holding `config.yml`. Defaults to `.`; `deploy.sh` sets it to the directory it was started from.
 - `--user-home` — the home a `user.yml` deploys under. Defaults to the home of the current user. A relative value resolves against `--working-dir`, a value that is `~` or starts with `~/` resolves against the home directory, an empty value is rejected, and a home that does not exist yet is created.
 
@@ -187,6 +187,7 @@ A relative `path` or `source` of a `files` entry resolves against the directory 
 These paths are taken as written: a `${NAME}` in them is not substituted, and a leading `~` is not expanded.
 A standalone `04_skills/<id>.yml` can list only absolute paths; a relative one fails that skill's export in every deployment that selects it, the other artifacts are still written, and the run then exits with a failure.
 `target` is where the file lands inside the directory of the generated skill — for Claude, `.claude/skills/<id>/`, next to `SKILL.md`.
+A listed file must exist, be a regular file, and be readable. Otherwise that skill fails, in a dry run as in a deploy, with `Skill file '<source>' does not exist. ...`, `Skill file '<source>' is not a regular file. Declare a file, or remove it from 'files'.`, or `Skill file '<source>' cannot be read. Make it readable, or remove it from 'files'.` A failed copy leaves the earlier copy at the target as it was. See [04_skills/README.md](04_skills/README.md#troubleshooting).
 
 ### Pointer Skill
 
@@ -247,25 +248,19 @@ A project selects it with `deploy.mcps`, and every deploy merges it into `.mcp.j
 Windsurf and Antigravity get no MCP config file; the run warns that the servers are not deployed for them.
 The full reference is [07_mcp/README.md](07_mcp/README.md).
 
-An inline server declares how to start or reach it, and the variables it needs. This is a shortened `07_mcp/atlassian.yml`:
+An inline server declares how to start or reach it, and the variables it needs. This is an excerpt of the example in [07_mcp/README.md](07_mcp/README.md#an-inline-server), which shows the optional `args` and `env` too:
 
 ```yaml
 id: atlassian
-description: Jira and Confluence through the local jira-confluence-mcp-server
+description: Jira and Confluence through the local jira-confluence-mcp-server.
 transport:
-  type: stdio                   # stdio | http
+  type: stdio
   command: ${PROJECTS_FOLDER}/jira-confluence-mcp-server/.venv/bin/jira-mcp-server
-  args: []                      # optional
-  env: {}                       # optional fixed values
-variables:                      # optional
+variables:                     # optional
   - name: JIRA_PAT
-    description: Jira personal access token
-    secret: true                # required, no default
-    required: false             # optional, default true
-  - name: JIRA_BASE_URL
-    description: Base URL of Jira
-    secret: false
-    required: false
+    description: Jira personal access token.
+    secret: true               # required: true or false, there is no default
+    required: false            # optional, default true
 metadata:
   version: 1.0.0
   tags: [ai-tools]
@@ -299,17 +294,30 @@ metadata:
 ```
 
 - `${NAME}` in `args`, `env`, `url`, and `headers` must name a declared variable. Any other `${` fails loading: an undeclared name, `${NAME:-default}`, `${env:NAME}`, `${input:id}`, or a nested reference.
-- `command` is a path, resolved like a pointer `source`: `${NAME}` in it is a variable of the run (`env_vars` or the environment of the run), never a declared variable, and a leading `~/` is the home of the user running the engine, whatever `--user-home` the run uses.
+- `command` is a path. `${NAME}` in it is a variable of the run (`env_vars` or the environment of the run), never a declared variable. A bare `~` or a leading `~/` is the home of the user running the engine, whatever `--user-home` the run uses. A relative command, such as `uvx`, is written as it is, for the tool to find on its `PATH`.
 - A stdio server receives every declared variable in its environment under its own name; an http server receives the ones its `url` and `headers` reference.
-- A secret variable (`secret: true`) is never read. It is written as `${NAME}` for Claude Code (`${NAME:-}` when optional), `${env:NAME}` for VS Code and Cursor, and in `env_vars`, `bearer_token_env_var`, or `env_http_headers` for Codex.
-- The value of a secret must be in the environment of the tool process, such as the shell you start `claude` or `codex` from. `env_vars` of `config.local.yml` is not enough: the engine reads it only while deploying and never reads a secret, so the value never reaches the tool. A deploy does not need the value; every run warns about each secret of a selected server that the environment of the run does not set.
+- The engine never uses the value of a secret variable (`secret: true`); it only checks whether the environment of the run sets it. It is written as `${NAME}` for Claude Code (`${NAME:-}` when optional), `${env:NAME}` for VS Code and Cursor, and in `env_vars`, `bearer_token_env_var`, or `env_http_headers` for Codex.
+- The value of a secret must be in the environment of the tool process, such as the shell you start `claude` or `codex` from. `env_vars` of `config.local.yml` is not enough: the engine reads it only while deploying and never uses the value of a secret, so the value never reaches the tool. A deploy does not need the value; every run warns about each secret of a selected server that the environment of the run does not set.
 - Because Codex has no `${NAME}` expansion, a secret may appear only in the environment of a stdio server, or as a whole header value `${NAME}` or `Authorization: Bearer ${NAME}` of an http server. Anywhere else fails the run.
-- A plain variable (`secret: false`) is resolved at deploy time from `env_vars` of the config files only, never from the environment of the run, and written as its value. A required one `env_vars` does not declare fails the MCP config files of every project that selects the server; an optional one is left out.
+- A plain variable (`secret: false`) is resolved at deploy time from `env_vars` of the config files only, never from the environment of the run, and written as its value. A required one `env_vars` does not declare fails the MCP config files of every project that selects the server. An optional one it does not declare is left out, unless it is used in `args` or `url`, which fails the same way.
 - MCP servers are opt-in: a project without a `deploy.mcps` block selects none, unlike every other kind, and a project that selects none never reads or writes any MCP config file. `mcps: {}` selects every MCP server manifest.
-- A pointer's `server.json` is data: text holding `${` fails loading, a variable is secret when it or any input around it is `isSecret`, a `runtimeHint` must be the runner of the registry type, and the only runtime argument accepted is `-e NAME` of an `oci` package. The package identifier and version must follow the grammar of their registry, environment variable names that configure the runner or loader (such as `DOCKER_*`, `NPM_*`, `NODE_*`, `UV_*`, `PIP_*`, `PYTHON*`, `LD_*`, `*_PROXY`, `PATH`) and connection-level headers are refused, and a remote url must be https when it sends a secret header and never carry a user or password. Every run logs the names of the variables each pointer passes and sets, never a value; the full lists are in [07_mcp/README.md](07_mcp/README.md#a-pointer-server).
-- Every `.yml` and `.yaml` file under `07_mcp/`, at any depth, is loaded as an MCP server manifest.
+- A pointer's `server.json` is data. The full rules are in [07_mcp/README.md](07_mcp/README.md#a-pointer-server):
+  - Text holding `${` fails loading.
+  - A variable is secret when it or any input around it is `isSecret`.
+  - A `runtimeHint` must be the runner of the registry type.
+  - The only runtime argument accepted is `-e NAME` of an `oci` package.
+  - The package identifier and version must follow the grammar of their registry.
+  - An environment variable the file sets, forwards, or derives is refused when its name configures the runner or loader, such as `DOCKER_*`, `NPM_*`, `NODE_*`, `UV_*`, `PIP_*`, `PYTHON*`, `LD_*`, `*_PROXY`, or `PATH`.
+  - A header that controls the connection or overrides authentication other than `Authorization` is refused.
+  - Every run logs the names of the variables each pointer passes and sets, never a value.
+- The url of every http server must start with `http://` or `https://` followed by a host. A url that starts with written text is checked when loading. That text must include at least the start of the host, so `https://mcp.${DOMAIN}/mcp` passes and `https://${HOST}/mcp` fails. A url that starts with a variable, such as `${BASE}/mcp`, is checked once resolved. The url must not carry a user or password. When the server sends a secret header, the url must start with `https://` as written. See the [URL rules](07_mcp/README.md#url-rules).
+- Every `.yml` and `.yaml` file under a directory of `locations.mcps` (`07_mcp/` by default), at any depth, is loaded as an MCP server manifest.
 - In a project that selects servers, the engine owns the entries named after any MCP server manifest of the run. It keeps every other entry, removes an owned entry the project does not select, rewrites an owned entry in full, and never deletes an MCP config file, `replace: true` included.
-- Every edit is verified before it is written: the file must parse, foreign content must stay unchanged, and the owned entries must be exactly the selected servers; otherwise the file is left untouched and the project fails for that tool. A rewritten file keeps its permission bits. A file is written only inside the project once links are resolved, a linked parent directory such as `.codex` included; anything else at the path that is not a regular file fails that project and tool without being opened.
+- Every edit is verified before it is written: the file must parse, foreign content must stay unchanged, and the owned entries must be exactly the selected servers. Otherwise the file is left untouched and the project fails for that tool.
+- A rewritten file keeps its permission bits.
+- An MCP config file is written only inside the project once links are resolved, a linked parent directory such as `.codex` included. A link at the file or above it that leads outside the project, nowhere, or in a loop fails that project and tool, in a dry run as in a deploy.
+- Anything at the path of an MCP config file that is not a regular file fails that project and tool without being opened. So does anything above it that is not a directory, in a dry run as in a deploy.
+- Any other file a tool cannot write in a project, such as one under a broken `.claude` or `.github`, or under a broken `.codex` of a project that selects no MCP server, is found only by a real deploy. There it fails that project and tool: no further files of that tool are written in that project, and every other tool and project is still deployed.
 - The four MCP config files hold plain values resolved on one machine. They are gitignored in this repository; add them to the `.gitignore` of every other project that selects servers. See [what a deploy lets a tool start](07_mcp/README.md#what-a-deploy-lets-a-tool-start) before you select a server.
 - User scope, per-agent attachment, Windsurf, tool allow and deny lists, and a secrets manager are not supported yet; see [PLANNED_FEATURES.md](PLANNED_FEATURES.md#mcps).
 
@@ -589,7 +597,10 @@ Use `fragments` for shared content; there is no include mechanism.
 ```
 
 A dry run does everything a deploy does except write: every manifest is decoded strictly (an unknown key, a missing required field, or a malformed version fails the run naming the file), every ruleset, fragment, and skill-file reference is resolved, every skill `source` folder and every MCP `server.json` is read, the plain variables of every MCP server a project selects are resolved, and the log names each artifact and MCP config file a real run would write and where. A secret MCP variable of a selected server that the environment of the run does not set is warned about, by name only, and does not fail the run.
-The exit status is the one a deploy would have had.
+The exit status is the one a deploy would have had, with one exception: a file a tool cannot write.
+A dry run never writes, so it finds a broken tool directory only through the MCP config file in it: a `.codex`, `.vscode` or `.cursor` that is a link leading nowhere or in a loop, or that is not a directory, in a project that selects MCP servers.
+A broken `.claude`, `.github`, `.windsurf` or `.agent`, a broken `.codex` or `.cursor` in a project that selects no MCP server, and any write the file system refuses, such as into a read-only directory, are found only by a real deploy.
+In a real deploy, a file a tool cannot write fails only that project and tool. No further files of that tool are written in that project, every other tool and project is still deployed, and the run exits non-zero listing every failure.
 
 A plain `./deploy.sh` validates the same way, but a successful run also deploys into every configured project and into your home. Do not use it just to validate.
 
@@ -598,8 +609,8 @@ There are no JSON schemas: the data classes in `ai-tools-engine/engine/.../model
 ## Security
 
 Never commit API keys, passwords, tokens, or PII.
-`${VAR}` is interpolated in declared paths — `locations.*` in the config files, `deploy.directory` in `project.yml`, and the `source` of a pointer skill or pointer MCP server — and in the transport of an MCP server manifest. Everywhere else, including all other generated content, a `${VAR}` is emitted literally rather than resolved.
-In an MCP server manifest, mark every secret `secret: true`: the engine never reads its value and writes only a reference each tool resolves from its own environment. A variable marked `secret: false` is read from `env_vars` of the config files only, never from the environment of the run, and written into the generated MCP config files as its value. No failure message repeats a value or the content of a file.
+`${VAR}` is interpolated in declared paths — `locations.*` in the config files, `deploy.directory` in `project.yml`, and the `source` of a pointer skill or pointer MCP server — and in the `command` of a stdio MCP server. In the rest of an MCP transport, `${NAME}` must name a declared variable; see below. Everywhere else, including all other generated content, a `${VAR}` is emitted literally rather than resolved.
+In an MCP server manifest, mark every secret `secret: true`: the engine never uses its value and writes only a reference each tool resolves from its own environment. A variable marked `secret: false` is read from `env_vars` of the config files only, never from the environment of the run, and written into the generated MCP config files as its value. No failure message repeats a value or the content of a file.
 Keep machine-local paths and settings in `config.local.yml`, which is gitignored — declare a machine-specific base path as an `env_vars` variable there and reference it from the versioned manifests.
 
 ## Getting Help
@@ -630,9 +641,17 @@ Keep machine-local paths and settings in `config.local.yml`, which is gitignored
 
 **`MCP server '<id>' needs the variable '<NAME>' ...`**: a required plain MCP variable is not declared under `env_vars:`. Declare it in `config.local.yml`, mark it `required: false`, or mark it `secret: true` to pass it from the environment of the tool; exporting it in the shell of the deploy does not help. The MCP config files of the projects selecting that server are not written, everything else is, and the run exits non-zero.
 
+**`MCP server '<id>' uses the optional variable '<NAME>' in ..., which 'env_vars:' of config.yml and config.local.yml do not declare, and ... cannot be left out. Declare it under 'env_vars:'.`**: an optional plain MCP variable is used in `args` or `url`, which cannot be left out. Declare it under `env_vars:` in `config.local.yml`. The MCP config files of the projects selecting that server are not written, everything else is, and the run exits non-zero.
+
 **`MCP server '<id>' references the secret variable '<NAME>' in ...`**: a secret is used where a tool would need its value in the file. See [Creating an MCP Server](#creating-an-mcp-server) for where a secret may appear. It comes from loading, prefixed with `Failed to load <file>:`, and stops the whole run before anything is written. The same refusal ending in `where it would have to be written as a value.` is a safeguard behind loading that a manifest cannot reach; if you see it, report it.
 
 **`... is not valid JSON at offset <n>, so the engine leaves it untouched`** / **`... is not valid TOML at line <n>`** / **`... declares the key '<key>' twice`** / **`... defines the MCP server '<id>' ... other than as a table`**: an existing MCP config file cannot be edited without losing part of it. Fix or remove it, and deploy again. The other artifacts of the run are still written, and the run exits non-zero. More messages are listed in [07_mcp/README.md](07_mcp/README.md#troubleshooting).
+
+**`'<file>' is reached through the symbolic link '<link>', which leads to '<target>' and cannot be followed (<exception>), so the engine leaves it untouched.`**: the MCP config file, or a directory above it such as `.codex`, `.vscode` or `.cursor`, is a link that leads nowhere or in a loop. Repair or remove the link. That project fails for that tool, and the rest of the run is still written. In a real deploy, a tool that writes other files into that directory first, such as Codex agents or the Cursor rules, fails there instead, with the `cannot be written` message below.
+
+**`'<file>' lies below '<path>', which is not a directory, so the engine leaves it untouched. Remove what is at that path, and deploy again.`**: something other than a directory, such as a regular file named `.codex`, sits where the directory of the MCP config file belongs. Remove or rename it. That project fails for that tool, and the rest of the run is still written. In a real deploy, a tool that writes other files into that directory first fails there instead, with the message below.
+
+**`[<project> | <TOOL> | <manifest>] '<path>' cannot be written (<class>[: <reason>]), so the engine writes no further <tool> files of project '<project>' in this run. Repair or remove what is at that path, and deploy again.`**: a real deploy could not write a file of that tool in that project, for example because `.claude`, `.codex`, `.cursor` or `.github` is a link that leads nowhere or in a loop, is a regular file, or is a read-only directory. The line is listed under `Export failed for N manifest(s)`, and `<manifest>` is the export that hit it, such as `agent 'basic'`. `<reason>` is the reason the operating system gave, such as `No such file or directory`, `Not a directory` or `Permission denied`, when it is known. A failure that did not come from writing a file reads `'<path>' cannot be accessed (<class>[: <reason>])`, or `A file cannot be accessed (<class>[: <reason>])` when no path is known. Repair or remove what is at that path, and deploy again. The files of that tool written before the failure stay in place; every other tool and project is still deployed. A dry run writes nothing, so it reports this only through the MCP config file in `.codex`, `.vscode` or `.cursor`, and only when the project selects MCP servers. In a user deployment, a file that cannot be written stops the run instead, and the CLI prints `'<path>' cannot be written (<class>[: <reason>])` as one line.
 
 **`<tool> has no MCP support in this engine`**: a project selects MCP servers and the run configures `windsurf` or `antigravity`. The servers are deployed for the other tools.
 

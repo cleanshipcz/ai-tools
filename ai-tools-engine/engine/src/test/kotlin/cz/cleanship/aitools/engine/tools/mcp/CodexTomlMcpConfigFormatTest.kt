@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.tomlj.Toml
 import java.io.File
 
 class CodexTomlMcpConfigFormatTest {
@@ -348,6 +349,118 @@ class CodexTomlMcpConfigFormatTest {
 
             // then
             assertThat(owned).containsExactly("github")
+        }
+    }
+
+    /**
+     * An edit keeps every foreign byte, writes its own lines with the line ending most lines of the file use, keeps a missing final newline missing, and always leaves valid TOML, whatever mix of LF and CRLF the file uses.
+     */
+    @Nested
+    inner class LineEndings {
+
+        @ParameterizedTest
+        @CsvSource(
+            "lf, true",
+            "lf, false",
+            "crlf, true",
+            "crlf, false",
+            "mixed-lf, true",
+            "mixed-lf, false",
+            "mixed-crlf, true",
+            "mixed-crlf, false",
+        )
+        fun `should append the tables of a first deploy as valid TOML in the line ending most lines use`(
+            style: String,
+            finalNewline: Boolean,
+        ) {
+            // given
+            val existing = withEndings(listOf("# mine", "model = \"o3\"", "", "[other]", "x = 1"), style, finalNewline)
+
+            // when
+            val content = format.merge(existing, listOf(stdioServer), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).startsWith(existing)
+            assertThat(content.endsWith("\n")).isEqualTo(finalNewline)
+            assertThat(Toml.parse(content).errors()).isEmpty()
+            assertWrittenIn(dominantOf(style), content.substring(existing.length))
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            "lf, true",
+            "lf, false",
+            "crlf, true",
+            "crlf, false",
+            "mixed-lf, true",
+            "mixed-lf, false",
+            "mixed-crlf, true",
+            "mixed-crlf, false",
+        )
+        fun `should replace the table of a redeploy in the middle as valid TOML in the line ending most lines use`(
+            style: String,
+            finalNewline: Boolean,
+        ) {
+            // given
+            val existing = withEndings(
+                listOf("# mine", "model = \"o3\"", "", "[mcp_servers.atlassian]", "command = \"old\"", "", "[other]", "x = 1"),
+                style,
+                finalNewline,
+            )
+            val head = existing.substring(0, existing.indexOf("[mcp_servers.atlassian]"))
+            val tail = existing.substring(existing.indexOf("[other]"))
+
+            // when
+            val content = format.merge(existing, listOf(stdioServer), setOf("atlassian"), file)
+
+            // then
+            assertThat(content)
+                .startsWith(head)
+                .endsWith(tail)
+                .contains("command = \"/work/jira-mcp-server\"")
+                .doesNotContain("\"old\"")
+            assertThat(Toml.parse(content).errors()).isEmpty()
+            assertWrittenIn(dominantOf(style), content.substring(head.length, content.length - tail.length))
+        }
+
+        @Test
+        fun `should edit a file with mixed line endings and no final newline`() {
+            // given
+            // - the layout a review found refused: most lines end in LF, one in CRLF, and the last has no line ending
+            val existing = "# my settings\nmodel = \"o3\"\r\n\n[mcp_servers.mine]\ncommand = \"x\""
+
+            // when
+            val content = format.merge(existing, listOf(stdioServer), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).startsWith(existing).doesNotEndWith("\n")
+            assertThat(Toml.parse(content).errors()).isEmpty()
+            assertWrittenIn("\n", content.substring(existing.length))
+        }
+
+        /**
+         * Joins [lines] with the endings of [style]: all LF, all CRLF, or mostly one with a single line of the other; the last line gets none unless [finalNewline].
+         */
+        private fun withEndings(lines: List<String>, style: String, finalNewline: Boolean): String {
+            val endings = lines.indices.map { index ->
+                when (style) {
+                    "lf" -> "\n"
+                    "crlf" -> "\r\n"
+                    "mixed-lf" -> if (index == 1) "\r\n" else "\n"
+                    else -> if (index == 1) "\n" else "\r\n"
+                }
+            }
+            return lines.zip(endings).joinToString("") { (line, ending) -> line + ending }.let { if (finalNewline) it else it.removeSuffix(endings.last()) }
+        }
+
+        private fun dominantOf(style: String) = if (style == "crlf" || style == "mixed-crlf") "\r\n" else "\n"
+
+        private fun assertWrittenIn(ending: String, written: String) {
+            if (ending == "\r\n") {
+                assertThat(written.replace("\r\n", "")).doesNotContain("\n").doesNotContain("\r")
+            } else {
+                assertThat(written).doesNotContain("\r")
+            }
         }
     }
 }

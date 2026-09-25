@@ -1,7 +1,6 @@
 id: github
 # A pointer: description, transport, and variables come from the server.json of the github/github-mcp-server checkout.
-# The remote Streamable HTTP endpoint is selected rather than the OCI package: its only variable is the Authorization header,
-# which every tool can fill from the environment, while the package passes its token inside a docker argument, which Codex cannot.
+# The remote Streamable HTTP endpoint is selected rather than the OCI package. The remote's only variable is the Authorization header, which every tool can fill from the environment. The package passes its token as the runtime argument -e GITHUB_PERSONAL_ACCESS_TOKEN={token}, which loading refuses because only -e NAME is accepted.
 # The header becomes the secret variable GITHUB_AUTHORIZATION; export it as "Bearer <token>" before starting a tool.
 source: ${PROJECTS_FOLDER}/github-mcp-server
 select:

@@ -821,6 +821,38 @@ class McpServerReaderTest {
                 .hasMessageContaining("'$name'")
         }
 
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - a positional argument the user provides, named after the id and its hint, which makes git run a chosen command
+                "git | positional | GIT_SSH_COMMAND",
+                // - a placeholder of a package argument, named after the id and the placeholder, which runs code in npx
+                "node | placeholder | NODE_OPTIONS",
+                // - a header without a value, named after the id and the header, which routes every request of the process
+                "github | header | GITHUB_HTTPS_PROXY",
+            ],
+        )
+        fun `should refuse a variable name derived from the id and a key of the server json that configures the runner or the loader`(
+            id: String,
+            derivation: String,
+            name: String,
+        ) {
+            // given
+            when (derivation) {
+                "positional" -> writePackage("""{"type": "positional", "valueHint": "ssh_command"}""")
+                "placeholder" -> writePackage("""{"type": "named", "name": "--options", "value": "{options}", "variables": {"options": {"description": "Options"}}}""")
+                else -> writeRemote("""{"name": "Https-Proxy", "description": "Proxy"}""")
+            }
+            val manifest = pointer(select = null, source = "\${PROJECTS_FOLDER}/server").copy(id = id)
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerSourceException::class.java)
+                .hasMessageContaining(serverFile().absolutePath)
+                .hasMessageContaining("'$name'")
+        }
+
         @Test
         fun `should forward a secret the server json names and name it in the log without its value`() {
             // given
@@ -940,6 +972,93 @@ class McpServerReaderTest {
                 .hasMessageNotContaining("tok-USERINFO")
                 .hasMessageNotContaining("b.example")
         }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - no scheme at all, which no tool can connect to
+            "mcp.example.com/mcp",
+            // - a scheme other than http and https
+            "ftp://mcp.example.com/mcp",
+            // - a scheme and no host, the host being left to a variable
+            "https://{d}{HOST}/mcp",
+            // - a scheme followed by an empty host
+            "https://?x",
+            "https://:443/mcp",
+            "https://#mcp.example.com",
+        )
+        fun `should refuse an inline http url that does not start with http or https and a host, without repeating it`(
+            url: String,
+        ) {
+            // given
+            val manifest = inlineHttp(url.replace("{d}", "$"))
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'inline'")
+                .hasMessageContaining("'http://' or 'https://'")
+                .hasMessageNotContaining("mcp.example.com")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - a literal url of either scheme, matched without regard to case
+            "https://mcp.example.com/mcp",
+            "http://mcp.example.com/mcp",
+            "HTTPS://mcp.example.com/mcp",
+            // - a url that starts with a variable, which is judged once resolved
+            "{d}{HOST}/mcp",
+            // - a url whose scheme and host are written and whose path comes from a variable
+            "https://mcp.example.com/{d}{HOST}",
+        )
+        fun `should accept an inline http url that starts with http or https and a host, or with a variable`(
+            url: String,
+        ) {
+            // given
+            val manifest = inlineHttp(url.replace("{d}", "$"))
+
+            // when
+            val server = reader.read(manifest, manifestFile)
+
+            // then
+            assertThat(server.transport).isInstanceOf(McpServerTransport.Http::class.java)
+        }
+
+        @Test
+        fun `should tell the author to write the host when the url writes its scheme and takes its host from a variable`() {
+            // given
+            val manifest = inlineHttp("https://\${HOST}/mcp")
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessage(
+                    "MCP server 'inline' has a 'url' that writes its scheme but takes its host from a variable. Write the host after 'http://' or 'https://', or start the url with the variable, which is then checked once resolved.",
+                )
+        }
+
+        @Test
+        fun `should refuse a remote url of a server json that has no scheme, without repeating it`() {
+            // given
+            writeServerJson(
+                """{"${'$'}schema": "$SCHEMA", "name": "x", "description": "d", "version": "1", "remotes": [{"type": "streamable-http", "url": "mcp.example.com/mcp"}]}""",
+            )
+
+            // when / then
+            assertThatThrownBy { readServer() }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'github'")
+                .hasMessageContaining("'http://' or 'https://'")
+                .hasMessageNotContaining("mcp.example.com")
+        }
+
+        private fun inlineHttp(url: String) = McpServerManifest(
+            id = "inline",
+            description = "d",
+            metadata = ManifestMetadata(version = Version("1.0.0")),
+            transport = McpTransport.Http(url = url),
+            variables = if ("\${HOST}" in url) listOf(McpVariable("HOST", "Host", secret = false)) else emptyList(),
+        )
 
         @Test
         fun `should refuse an inline http url carrying userinfo`() {
@@ -1081,6 +1200,32 @@ class McpServerReaderTest {
             assertThatThrownBy { readServer() }
                 .isInstanceOf(InvalidMcpServerSourceException::class.java)
                 .hasMessageContaining("declares no package and no remote")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            nullValues = ["absent"],
+            value = [
+                // - no description at all, though the registry schema requires one
+                "absent",
+                // - an empty description
+                "''",
+                // - a description of white space only
+                "' '",
+            ],
+        )
+        fun `should fail naming the server json when it provides no description`(description: String?) {
+            // given
+            val field = description?.let { "\"description\": \"$it\", " }.orEmpty()
+            writeServerJson(
+                """{"${'$'}schema": "$SCHEMA", "name": "x", $field"version": "1", "remotes": [{"type": "streamable-http", "url": "https://example.com/mcp"}]}""",
+            )
+
+            // when / then
+            assertThatThrownBy { readServer() }
+                .isInstanceOf(InvalidMcpServerSourceException::class.java)
+                .hasMessageContaining(serverFile().absolutePath)
+                .hasMessageContaining("'description'")
         }
 
         @Test

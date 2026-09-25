@@ -16,6 +16,7 @@ import cz.cleanship.aitools.engine.UnreadableReplacedFolderException
 import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.services.ArtifactWriteException
 import cz.cleanship.aitools.engine.services.DryRunArtifactSink
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
@@ -30,6 +31,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.NotDirectoryException
 
 class AiToolsCliIntegrationTest {
 
@@ -324,6 +326,22 @@ class AiToolsCliIntegrationTest {
         // then
         assertThat(result.statusCode).isNotZero()
         assertThat(result.stderr.trim()).isEqualTo(message)
+    }
+
+    @Test
+    fun `should report a file the run cannot write as a single line without a stack trace`() {
+        // given
+        // - a user-scope export stops the run with the file it could not write, which the engine names in the message
+        val target = tempDir.resolve("home/.claude/skills/jira-ticket/template.txt")
+        val failure = ArtifactWriteException(target, NotDirectoryException(target.parentFile.path))
+        val cli = AiToolsCli(runner = { _, _, _ -> throw failure })
+
+        // when
+        val result = cli.test(arrayOf("--working-dir", tempDir.absolutePath))
+
+        // then
+        assertThat(result.statusCode).isNotZero()
+        assertThat(result.stderr.trim()).isEqualTo("'${target.absolutePath}' cannot be written (NotDirectoryException)")
     }
 
     @Test

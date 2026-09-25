@@ -64,7 +64,12 @@ Left over from the retired TypeScript CLI and no longer written or read by anyth
 ./deploy.sh --dry-run
 ```
 
-A dry run loads, filters, and renders every manifest exactly as a deploy does and fails on exactly what a deploy fails on — a broken ruleset or fragment reference, a duplicate id, a missing skill file, the `source` folder of a pointer skill that is missing or has no valid `SKILL.md`, a path the run would write or delete that overlaps such a folder, the `server.json` of a pointer MCP server that is missing or invalid, a required plain MCP variable that resolves nowhere, a deploy directory that cannot be resolved — but creates, deletes, and modifies nothing on disk.
+A dry run loads, filters, and renders every manifest exactly as a deploy does, but creates, deletes, and modifies nothing on disk.
+It fails on what a deploy fails on — a broken ruleset or fragment reference, a duplicate id, a skill file that is missing, unreadable, or not a regular file, the `source` folder of a pointer skill that is missing or has no valid `SKILL.md`, a path the run would write or delete that overlaps such a folder, the `server.json` of a pointer MCP server that is missing or invalid, a required plain MCP variable that resolves nowhere, an MCP config file behind a link that leads outside the project, nowhere, or in a loop, or a deploy directory that cannot be resolved.
+The exception is a file a tool cannot write.
+A dry run never writes, so it finds a broken tool directory only through the MCP config file in it: a `.codex`, `.vscode` or `.cursor` that is a link leading nowhere or in a loop, or that is not a directory, in a project that selects MCP servers.
+A broken `.claude`, `.github`, `.windsurf` or `.agent`, a broken `.codex` or `.cursor` in a project that selects no MCP server, and any write the file system refuses, such as into a read-only directory, are found only by a real deploy.
+In a real deploy, a file a tool cannot write fails only that project and tool: no further files of that tool are written in that project, every other tool and project is still deployed, and the run exits non-zero listing every failure. In a user deployment, a file that cannot be written stops the run instead, and the CLI prints `'<path>' cannot be written (<class>[: <reason>])` as one line; the projects and the user-scope files exported before it are already written.
 It logs the absolute path of every artifact a deploy would write, so the transcript reads as the plan of the deploy it stands in for.
 
 4) Generate and deploy
@@ -88,7 +93,7 @@ The CLI has three options besides `--help`, and no subcommands:
 
 - `--working-dir` — the directory containing `config.yml` (and the optional `config.local.yml`). Defaults to `.`, and `deploy.sh` sets it to the directory it was started from.
 - `--user-home` — the home directory a `user.yml` deploys under. Defaults to the home of whoever runs the command; see [User-Scope Deployments](#user-scope-deployments).
-- `--dry-run` — validate and render every manifest, reporting what would be written, without writing anything. The exit status is the one a deploy would have had.
+- `--dry-run` — validate and render every manifest, reporting what would be written, without writing anything. The exit status is the one a deploy would have had, except for a file a tool cannot write that only a real deploy finds; see step 3 above.
 
 Every argument you give `deploy.sh` is forwarded to the CLI, so a trial run into a scratch directory is `./deploy.sh --user-home /tmp/try`.
 The one argument it cannot forward is one containing a double quote: Gradle's `--args` has no escape mechanism for it, so `deploy.sh` refuses such an argument instead of delivering a different, still-plausible path.
@@ -147,7 +152,7 @@ One run reports every collision it found, names the id and both files, and exits
 How much a collision costs depends on the kind of manifest:
 
 - Two projects sharing an id, two user deployments sharing an id, or two features of the same project sharing an id, cost only the deployment(s) that carry them. Those are not exported, every other deployment is deployed as usual, and the run still fails at the end.
-- Two agents, prompts, rulesets, fragments, skills, or MCP servers sharing an id stop the whole run before anything is written. They are shared by every project, and a project that does not filter that kind deploys all of it, so dropping the colliding pair would silently ship every project without content it never excluded.
+- Two agents, prompts, rulesets, fragments, skills, or MCP servers sharing an id stop the whole run before anything is written. They are shared by every project. A project that does not filter agents, prompts, rulesets, fragments, or skills deploys all of them, and one MCP server manifest can be selected by many projects. So dropping the colliding pair would silently ship projects without content they never excluded.
 
 Ids are indexed per kind, so a `project.yml` and a `user.yml` are free to declare the same id — they are separate manifests of separate scopes, and nothing ever has to choose between them.
 
@@ -320,8 +325,8 @@ An individual project can narrow itself down to a subset of them with `deploy.to
 
 ### Path variables
 
-The optional top-level `env_vars` key declares variables that every `locations` entry, every project's `deploy.directory`, and the `source` of every pointer skill and pointer MCP server may reference as `${NAME}`.
-An MCP server manifest reads its plain variables from them only, never from the environment of the run, and writes their values into the generated MCP config files; secret MCP variables are never read — see [07_mcp/README.md](07_mcp/README.md#secret-and-plain-variables).
+The optional top-level `env_vars` key declares variables that every `locations` entry, every project's `deploy.directory`, the `source` of every pointer skill and pointer MCP server, and the `command` of every stdio MCP server may reference as `${NAME}`.
+An MCP server manifest reads its plain variables from them only, never from the environment of the run, and writes their values into the generated MCP config files; the value of a secret MCP variable is never used — see [07_mcp/README.md](07_mcp/README.md#secret-and-plain-variables).
 
 ```yaml
 env_vars:

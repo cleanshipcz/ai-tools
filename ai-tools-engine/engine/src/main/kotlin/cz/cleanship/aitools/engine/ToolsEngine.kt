@@ -15,11 +15,13 @@ import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.UserDeployment
 import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.models.serialName
+import cz.cleanship.aitools.engine.services.ArtifactWriteException
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
 import cz.cleanship.aitools.engine.services.McpServerReader
 import cz.cleanship.aitools.engine.services.SkillFileResolvingException
 import cz.cleanship.aitools.engine.services.SkillSourceResolver
+import cz.cleanship.aitools.engine.services.failureDescription
 import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.FragmentResolvingException
@@ -47,6 +49,8 @@ import cz.cleanship.telemetry.TelemetryConfig
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.IOException
+import java.nio.file.FileSystemException
 
 /**
  * @param workingDirectory the `--working-dir` of the run, the directory `config.yml` was read from. A relative `deploy.directory` resolves against it - see [resolveDeclaredPath] - so it is the same base the `locations.*` paths of that same `config.yml` already use. It is required rather than defaulted because the adapters delete under whatever it resolves to, which is not a decision to make by omission.
@@ -500,6 +504,8 @@ class ToolsEngine(
     /**
      * Exports every manifest of [project] through [adapter], isolating each manifest so that one broken reference cannot skip the manifests behind it.
      *
+     * A file other than the MCP config file that cannot be written ends the export of [adapter] for [project] with one failure naming that file, and leaves the files written before it in place; a failed delete stops the run with [ReplaceFailedException]. A dry run writes no file, so it finds a tool directory that is a dangling or looping link, or not a directory, only through the MCP config file in it, and not at all for a project that selects no MCP server; any other write failure, such as a read-only directory, only a deploy finds.
+     *
      * @return the failures collected while exporting, empty when everything was exported
      */
     private fun exportAdapter(
@@ -520,55 +526,29 @@ class ToolsEngine(
             adapter.prepareOrExplain(destination, project.manifest)
         }
 
-        val exports = buildList<Pair<String, () -> Unit>> {
-            add("project '${project.manifest.id}'" to { adapter.export(destination, GlobalContext(project.manifest)) })
-            project.agents.values.forEach { agent ->
-                add(
-                    "agent '${agent.id}'" to {
-                        adapter.export(destination, AgentContext(agent, project.rulesets, allRulesets, project.fragments, allFragments))
-                    },
-                )
+        val failures = mutableListOf<ExportFailure>()
+        for ((manifest, export) in adapter.projectExports(project, destination, allRulesets, allFragments, mcpServers)) {
+            try {
+                exportOrCollectFailure(project.manifest.id, adapter.toolType, manifest, export)?.let(failures::add)
+            } catch (ex: ArtifactDeleteException) {
+                // A failed delete leaves a directory partly deleted, which must stop the run wherever an adapter deletes, never become one more collected failure.
+                throw ex.explained(adapter.toolType, "project '${project.manifest.id}' in '${destination.absolutePath}'")
+            } catch (ex: IOException) {
+                // Most write failures come from the tool directory itself, such as a '.codex' that is a dangling link or a regular file, so the tool is stopped at the first one rather than failing once per file; the failure says that no further files of the tool are written.
+                val stopped = ToolExportStoppedException(project.manifest.id, adapter.toolType, ex)
+                LOG.error("{}: {} could not be exported for {}: {}", project.manifest.id, manifest, adapter.toolType, stopped.message)
+                LOG.debug("{}: the failure that stopped {}", project.manifest.id, adapter.toolType, ex)
+                failures += ExportFailure(project.manifest.id, adapter.toolType, manifest, stopped)
+                break
             }
-            project.prompts.values.forEach { prompt ->
-                add(
-                    "prompt '${prompt.id}'" to {
-                        adapter.export(destination, PromptContext(prompt, project.rulesets, allRulesets, project.fragments, allFragments))
-                    },
-                )
-            }
-            project.features.values.forEach { feature ->
-                add("feature '${feature.id}'" to { adapter.export(destination, FeatureContext(feature)) })
-            }
-            project.skills.values.forEach { skill ->
-                add(
-                    "skill '${skill.id}'" to {
-                        adapter.export(
-                            destination,
-                            SkillContext(
-                                skill,
-                                project.rulesets,
-                                allRulesets,
-                                project.fragments,
-                                allFragments,
-                                sourceDir = project.skillSourceDirs[skill.id],
-                                pointerSourceDirs = project.pointerSourceDirs,
-                            ),
-                        )
-                    },
-                )
-            }
-            mcpServers.exportFor(project, adapter, destination)?.let(::add)
         }
-
-        return exports.mapNotNull { (manifest, export) ->
-            exportOrCollectFailure(project.manifest.id, adapter.toolType, manifest, export)
-        }
+        return failures
     }
 
     /**
      * Runs a single [export], turning an authoring error into a reportable [ExportFailure] instead of letting it abort the remaining exports.
      *
-     * Only the deliberately named exceptions a manifest author causes are collected: an unresolvable ruleset or fragment reference, a companion file a skill manifest declares but does not ship, an MCP server whose variables cannot be resolved, and an existing MCP config file that cannot be merged without losing part of it. Everything else - a programming fault, an out-of-memory error or a permission problem on the output directory - is not an authoring error, so it is left to propagate and abort the run loudly instead of being reported as one more broken manifest.
+     * Only the deliberately named exceptions of one manifest or one file are collected: an unresolvable ruleset or fragment reference, a companion file a skill manifest declares but does not ship or that cannot be read, an MCP server whose variables cannot be resolved, every failure of an MCP config file (an [McpConfigFileException]), and an instructions file two user deployments claim. An [IOException] of any other artifact propagates to the caller: a project export collects it for the whole tool - see [exportAdapter] - except a failed delete, which stops the run like a user deployment stops it on any of them. Everything else - a programming fault or an out-of-memory error - is left to propagate and abort the run loudly instead of being reported as one more broken manifest.
      *
      * @return the failure that stopped this manifest, or `null` when it was exported successfully
      */
@@ -627,6 +607,55 @@ class ToolsEngine(
 }
 
 /**
+ * Returns every export of [project] through this adapter into [destination], each named after the manifest it writes, in the order they run: the project, its agents, prompts, features and skills, and last its MCP config file when it selects servers.
+ */
+private fun ToolAdapter.projectExports(
+    project: Project,
+    destination: File,
+    allRulesets: Map<String, RulesetManifest>,
+    allFragments: Map<String, FragmentManifest>,
+    mcpServers: McpConfigExportPlanner,
+): List<Pair<String, () -> Unit>> = buildList {
+    add("project '${project.manifest.id}'" to { export(destination, GlobalContext(project.manifest)) })
+    project.agents.values.forEach { agent ->
+        add(
+            "agent '${agent.id}'" to {
+                export(destination, AgentContext(agent, project.rulesets, allRulesets, project.fragments, allFragments))
+            },
+        )
+    }
+    project.prompts.values.forEach { prompt ->
+        add(
+            "prompt '${prompt.id}'" to {
+                export(destination, PromptContext(prompt, project.rulesets, allRulesets, project.fragments, allFragments))
+            },
+        )
+    }
+    project.features.values.forEach { feature ->
+        add("feature '${feature.id}'" to { export(destination, FeatureContext(feature)) })
+    }
+    project.skills.values.forEach { skill ->
+        add(
+            "skill '${skill.id}'" to {
+                export(
+                    destination,
+                    SkillContext(
+                        skill,
+                        project.rulesets,
+                        allRulesets,
+                        project.fragments,
+                        allFragments,
+                        sourceDir = project.skillSourceDirs[skill.id],
+                        pointerSourceDirs = project.pointerSourceDirs,
+                    ),
+                )
+            },
+        )
+    }
+    mcpServers.exportFor(project, this@projectExports, destination)?.let(::add)
+}
+
+/**
  * Deletes what this adapter replaces in [destination] for [manifest] - see [prepare] - naming the project, the tool and the entry in the failure when an entry cannot be deleted.
  *
  * @throws ReplaceFailedException if an entry cannot be deleted
@@ -670,6 +699,27 @@ class DeployDirectoryResolvingException(
  * Thrown for each user deployment that claims an instructions file another one claims too. A tool reads one such file per home, so there is nothing to merge and no winner to pick - see [ToolsEngine.reportContendedInstructionsFiles].
  */
 class ContendedInstructionsFileException(message: String) : RuntimeException(message)
+
+/**
+ * The cause of the [ExportFailure] that records the [IOException] which stopped the export of [toolType] for the project [projectId], naming the file that could not be written or accessed and never its content.
+ */
+class ToolExportStoppedException(
+    val projectId: String,
+    val toolType: ToolType,
+    cause: IOException,
+) : RuntimeException(
+        "${cause.describedWrite()}, so the engine writes no further ${toolType.serialName} files of project '$projectId' in this run. Repair or remove what is at that path, and deploy again.",
+        cause,
+    )
+
+/**
+ * Names the file this failure was for, its class and the reason the operating system gave - see [failureDescription]; the rest of the message of an [IOException] is not repeated, since it may name another path.
+ */
+private fun IOException.describedWrite(): String = when {
+    this is ArtifactWriteException -> message.orEmpty()
+    this is FileSystemException && file != null -> "'$file' cannot be accessed (${failureDescription()})"
+    else -> "A file cannot be accessed (${failureDescription()})"
+}
 
 /**
  * A single manifest that could not be exported, together with the resolution failure that stopped it.

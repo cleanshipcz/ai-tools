@@ -132,9 +132,12 @@ class McpServerResolverTest {
             )
 
             // when / then
+            // - the only remedy that works is a value in the config: marking the variable required fails with the message for a required one instead
             assertThatThrownBy { resolver.resolve(server) }
                 .isInstanceOf(McpServerResolvingException::class.java)
                 .hasMessageContaining("'PROXY'")
+                .hasMessageEndingWith("Declare it under 'env_vars:'.")
+                .hasMessageNotContaining("required: true")
         }
 
         @Test
@@ -238,14 +241,15 @@ class McpServerResolverTest {
             delimiter = '|',
             value = [
                 // - credentials in the url, which every tool would write and send
-                "https://user:pw-CONFIG-SECRET@host.example/mcp | false",
+                "https://user:pw-CONFIG-SECRET@host.example/mcp | false | Give 'BASE' a value in 'env_vars:' that makes the url start with 'http://' or 'https://' followed by a host, without a backslash or credentials.",
                 // - a secret header sent in clear text
-                "http://host.example/mcp | true",
+                "http://host.example/mcp | true | Give 'BASE' a value in 'env_vars:' that makes the url start with 'https://'.",
             ],
         )
         fun `should refuse a resolved url that carries userinfo or sends a secret header in clear text, without repeating it`(
             url: String,
             secretHeader: Boolean,
+            remedy: String,
         ) {
             // given
             val resolver = McpServerResolver(VariableResolver(variables = mapOf("BASE" to url), environment = { null }))
@@ -260,8 +264,93 @@ class McpServerResolverTest {
             assertThatThrownBy { resolver.resolve(server) }
                 .isInstanceOf(McpServerResolvingException::class.java)
                 .hasMessageContaining("'remote'")
+                .hasMessageContaining("'BASE'")
+                .hasMessageEndingWith(remedy)
                 .hasMessageNotContaining("host.example")
                 .hasMessageNotContaining("pw-CONFIG-SECRET")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - no scheme at all, which no tool can connect to
+            "host.example/mcp",
+            // - a scheme other than http and https
+            "ftp://host.example/mcp",
+            "ws://host.example/mcp",
+        )
+        fun `should refuse a url resolved from the config without an http or https scheme, naming the server and the variable but not the value`(
+            url: String,
+        ) {
+            // given
+            val resolver = McpServerResolver(VariableResolver(variables = mapOf("BASE" to url), environment = { null }))
+            val server = server(
+                McpServerTransport.Http(url = McpText(listOf(McpTextPart.Variable("BASE"))), headers = emptyMap()),
+                McpVariable("BASE", "Base", secret = false),
+            )
+
+            // when / then
+            assertThatThrownBy { resolver.resolve(server) }
+                .isInstanceOf(McpServerResolvingException::class.java)
+                .hasMessageContaining("'remote'")
+                .hasMessageContaining("'BASE'")
+                .hasMessageEndingWith("Give 'BASE' a value in 'env_vars:' that makes the url start with 'http://' or 'https://' followed by a host, without a backslash or credentials.")
+                .hasMessageNotContaining("host.example")
+        }
+
+        @Test
+        fun `should end with one remedy naming the required form when a url that references no variable is refused`() {
+            // given
+            // - a server the loader did not build, since the loader refuses such a url already
+            val server =
+                server(McpServerTransport.Http(url = McpText.literal("https://user:pw@host.example/mcp"), headers = emptyMap()))
+
+            // when / then
+            assertThatThrownBy { resolver.resolve(server) }
+                .isInstanceOf(McpServerResolvingException::class.java)
+                .hasMessageStartingWith("MCP server 'remote' resolves its 'url' to one that carries credentials, which every tool would write into its config file and send.")
+                .hasMessageEndingWith(" Write a 'url' that starts with 'http://' or 'https://' followed by a host, without a backslash or credentials.")
+                .hasMessageNotContaining("Pass them")
+                .hasMessageNotContaining("host.example")
+        }
+
+        @Test
+        fun `should name a variable once in the remedy when the url references it more than once`() {
+            // given
+            val resolver =
+                McpServerResolver(VariableResolver(variables = mapOf("BASE" to "host.example"), environment = { null }))
+            val server = server(
+                McpServerTransport.Http(url = McpText(listOf(McpTextPart.Variable("BASE"), McpTextPart.Literal("/"), McpTextPart.Variable("BASE"))), headers = emptyMap()),
+                McpVariable("BASE", "Base", secret = false),
+            )
+
+            // when / then
+            assertThatThrownBy { resolver.resolve(server) }
+                .isInstanceOf(McpServerResolvingException::class.java)
+                .hasMessageContaining("resolves its 'url' from 'BASE' to one that")
+                .hasMessageEndingWith("Give 'BASE' a value in 'env_vars:' that makes the url start with 'http://' or 'https://' followed by a host, without a backslash or credentials.")
+                .hasMessageNotContaining("host.example")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - plain http is accepted for a server that sends no secret
+            "http://host.example/mcp",
+            // - the scheme is matched without regard to case, as every tool does
+            "HTTPS://host.example/mcp",
+        )
+        fun `should accept a url resolved from the config with an http or https scheme`(url: String) {
+            // given
+            val resolver = McpServerResolver(VariableResolver(variables = mapOf("BASE" to url), environment = { null }))
+            val server = server(
+                McpServerTransport.Http(url = McpText(listOf(McpTextPart.Variable("BASE"))), headers = emptyMap()),
+                McpVariable("BASE", "Base", secret = false),
+            )
+
+            // when
+            val resolved = resolver.resolve(server)
+
+            // then
+            assertThat((resolved.transport as ResolvedMcpTransport.Http).url).isEqualTo(url)
         }
 
         @Test

@@ -40,7 +40,7 @@ class McpServerReader(
      *
      * @param manifestFile the file [manifest] was read from, whose directory a relative `source` resolves against
      * @throws InvalidMcpServerManifestException if an inline server lacks a transport or a description, declares a `select`, or references anything but a declared variable; if its `command` references a declared variable or a variable of the run nothing declares; or if the server, inline or derived, breaks a rule of [requireValid]
-     * @throws InvalidMcpServerSourceException if a pointer server also declares a `description`, `transport` or `variables`; if its `source` cannot be substituted or leads to no readable `server.json`; if that file is not valid JSON, is not of the schema [SUPPORTED_SCHEMA], or declares no package and no remote; if `select` names both, names one the file does not declare, or is missing while the file declares more than one; if the selected remote is not Streamable HTTP, or the selected package is not a stdio package of `npm`, `pypi` or `oci`; if its `runtimeHint` is not the runner of its registry; if its identifier or version does not follow the grammar of its registry - see [PackageRegistry]; if it has a runtime argument other than `-e NAME` of an `oci` package; if it sets or forwards an environment variable, or sends a header, of the names the engine refuses; if a named argument has no value or a positional one has neither a value nor a value hint; if its text holds `${`; or if it derives one variable both as secret and as not secret
+     * @throws InvalidMcpServerSourceException if a pointer server also declares a `description`, `transport` or `variables`; if its `source` cannot be substituted or leads to no readable `server.json`; if that file is not valid JSON, is not of the schema [SUPPORTED_SCHEMA], has a blank `description`, or declares no package and no remote; if `select` names both, names one the file does not declare, or is missing while the file declares more than one; if the selected remote is not Streamable HTTP, or the selected package is not a stdio package of `npm`, `pypi` or `oci`; if its `runtimeHint` is not the runner of its registry; if its identifier or version does not follow the grammar of its registry - see [PackageRegistry]; if it has a runtime argument other than `-e NAME` of an `oci` package; if it sets or forwards an environment variable, derives a variable, or sends a header, of the names the engine refuses; if a named argument has no value or a positional one has neither a value nor a value hint; if its text holds `${`; or if it derives one variable both as secret and as not secret
      */
     fun read(manifest: McpServerManifest, manifestFile: File): McpServer {
         val server = if (manifest.source == null) readInline(manifest) else readPointer(manifest, manifestFile)
@@ -96,6 +96,9 @@ class McpServerReader(
         requireNoInlineContent(manifest)
         val serverFile = resolveServerFile(manifest, requireNotNull(manifest.source), manifestFile)
         val serverJson = read(serverFile)
+        if (serverJson.description.isBlank()) {
+            throw InvalidMcpServerSourceException("'${serverFile.absolutePath}' provides no 'description', and a pointer server takes its description from there. Point 'source' at a $SERVER_FILE that describes the server.")
+        }
         val derivation = Derivation(manifest.id, serverFile)
         val transport = when (val candidate = select(manifest, serverJson, serverFile)) {
             is Candidate.Package -> derivation.stdio(candidate.value)
@@ -361,13 +364,17 @@ class McpServerReader(
          */
         private fun requireAllowedName(name: String) {
             if (DENIED_ENVIRONMENT.any { it.matches(name) }) {
-                fail("It sets or forwards the environment variable '$name', which configures the runner, the loader or the connection of the process a tool starts, so the engine refuses it.")
+                fail("It sets, forwards or derives the environment variable '$name', which configures the runner, the loader or the connection of the process a tool starts, so the engine refuses it.")
             }
         }
 
+        /**
+         * Returns the name of the variable derived from [key] of the file, named after [serverId], having checked it like every other environment variable name the file contributes.
+         */
         private fun prefixed(key: String): String {
             val name = "${serverId}_$key".uppercase().replace(NOT_IN_NAME, "_")
-            return if (name.first().isDigit()) "_$name" else name
+            // The id alone is the repository's, but together with a key of the file it can spell a name such as GIT_SSH_COMMAND, and every variable of a stdio server reaches its environment.
+            return (if (name.first().isDigit()) "_$name" else name).also(::requireAllowedName)
         }
 
         private fun fail(problem: String): Nothing = throw InvalidMcpServerSourceException("'${serverFile.absolutePath}': $problem")
@@ -398,7 +405,7 @@ class McpServerReader(
         private const val POSITIONAL = "positional"
 
         /**
-         * Environment variable names a `server.json` may not set or forward, matched without regard to case: they configure docker or podman, npm, Node.js, uv, pip, Python, the dynamic loader, glibc, git, TLS or proxies, or the paths and configuration directories a process runs with.
+         * Environment variable names a `server.json` may not set, forward or derive, matched without regard to case: they configure docker or podman, npm, Node.js, uv, pip, Python, the dynamic loader, glibc, git, TLS or proxies, or the paths and configuration directories a process runs with.
          */
         private val DENIED_ENVIRONMENT = listOf(
             "DOCKER_.*",

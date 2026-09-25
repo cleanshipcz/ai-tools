@@ -6,6 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import cz.cleanship.aitools.engine.services.DryRunArtifactSink
 import cz.cleanship.aitools.engine.services.ExportService
+import cz.cleanship.aitools.engine.services.FileSystemArtifactSink
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -18,7 +19,9 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
 
 class McpConfigFileExporterTest {
@@ -310,6 +313,95 @@ class McpConfigFileExporterTest {
             .hasMessageContaining(configFile.absolutePath)
             .hasMessageContaining(outsideDir.canonicalPath)
         assertThat(outside).hasContent(existing)
+    }
+
+    /**
+     * A linked tool directory that leads nowhere fails as its config file, in a dry run exactly as in a deploy, and nothing is created on the way: neither the file, nor its temporary file, nor the missing target.
+     */
+    @ParameterizedTest
+    @CsvSource(
+        // - the link leads to a directory that no longer exists, such as a moved dotfiles folder
+        "dangling, false",
+        "dangling, true",
+        // - the same, written relative to the directory of the link, which is named as the path it stands for
+        "relative, false",
+        "relative, true",
+        // - the link leads to a second link that leads back to it
+        "looping, false",
+        "looping, true",
+    )
+    fun `should fail naming the file and where the link leads when the tool directory is a link that cannot be followed`(
+        kind: String,
+        dryRun: Boolean,
+    ) {
+        // given
+        projectDir.mkdirs()
+        val codexDir = projectDir.resolve(".codex")
+        val leadsTo = when (kind) {
+            "looping" -> projectDir.resolve("loop").also { Files.createSymbolicLink(it.toPath(), codexDir.toPath()) }
+            else -> tempDir.resolve("out/missing")
+        }
+        Files.createSymbolicLink(codexDir.toPath(), if (kind == "relative") Path.of("../out/missing") else leadsTo.toPath())
+        val configFile = codexDir.resolve("config.toml")
+        val sink = if (dryRun) DryRunArtifactSink else FileSystemArtifactSink
+        val exporter = McpConfigFileExporter(configFile, CodexTomlMcpConfigFormat, ExportService(sink), projectDir)
+
+        // when / then
+        assertThatThrownBy { exporter.export(McpContext(listOf(server), setOf("atlassian"))) }
+            .isInstanceOf(McpConfigFileException::class.java)
+            .hasMessageContaining("'${configFile.absolutePath}'")
+            .hasMessageContaining("'${leadsTo.absolutePath}'")
+        assertThat(projectDir.list()).containsExactlyInAnyOrderElementsOf(if (kind == "looping") listOf(".codex", "loop") else listOf(".codex"))
+        assertThat(tempDir.resolve("out")).doesNotExist()
+        assertThat(logAppender.list).noneMatch { it.formattedMessage.contains("Would write") }
+    }
+
+    @ParameterizedTest
+    @CsvSource("false", "true")
+    fun `should fail naming the file and what lies at the tool directory when it is not a directory, in a dry run as in a deploy`(
+        dryRun: Boolean,
+    ) {
+        // given
+        // - a regular file where the tool directory belongs, so the directory of the config file cannot be created
+        projectDir.mkdirs()
+        val codexFile = projectDir.resolve(".codex")
+        codexFile.writeText("not a directory\n")
+        val configFile = codexFile.resolve("config.toml")
+        val sink = if (dryRun) DryRunArtifactSink else FileSystemArtifactSink
+        val exporter = McpConfigFileExporter(configFile, CodexTomlMcpConfigFormat, ExportService(sink), projectDir)
+
+        // when / then
+        assertThatThrownBy { exporter.export(McpContext(listOf(server), setOf("atlassian"))) }
+            .isInstanceOf(McpConfigFileException::class.java)
+            .hasMessage(
+                "'${configFile.absolutePath}' lies below '${codexFile.toPath().toRealPath()}', which is not a directory, so the engine leaves it untouched. Remove what is at that path, and deploy again.",
+            )
+        assertThat(codexFile).hasContent("not a directory\n")
+        assertThat(logAppender.list).noneMatch { it.formattedMessage.contains("Would write") }
+    }
+
+    @Test
+    fun `should fail naming the file when the config file cannot be written`() {
+        // given
+        // - a tool directory the user may read but not write, so no temporary file can be created in it
+        val codexDir = projectDir.resolve(".codex")
+        codexDir.mkdirs()
+        Files.setPosixFilePermissions(codexDir.toPath(), PosixFilePermissions.fromString("r-xr-xr-x"))
+        val configFile = codexDir.resolve("config.toml")
+        val exporter = McpConfigFileExporter(configFile, CodexTomlMcpConfigFormat, ExportService(), projectDir)
+
+        // when / then
+        try {
+            // - a user who may write anywhere, such as root, cannot be refused a write
+            assumeTrue(!Files.isWritable(codexDir.toPath()))
+            assertThatThrownBy { exporter.export(McpContext(listOf(server), setOf("atlassian"))) }
+                .isInstanceOf(McpConfigFileException::class.java)
+                .hasMessageContaining("'${configFile.absolutePath}' cannot be written")
+                .hasCauseInstanceOf(IOException::class.java)
+            assertThat(codexDir.list()).isEmpty()
+        } finally {
+            Files.setPosixFilePermissions(codexDir.toPath(), PosixFilePermissions.fromString("rwxr-xr-x"))
+        }
     }
 
     @Test

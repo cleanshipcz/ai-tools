@@ -298,4 +298,43 @@ class JsonMcpConfigFormatTest {
         .jsonObject
         .getValue(key)
         .jsonObject
+
+    /**
+     * A JSON config file is written again as a whole, so whatever mix of LF and CRLF it uses and whether it ends in a newline, the merge reads it and keeps every foreign entry.
+     */
+    @ParameterizedTest
+    @CsvSource(
+        "lf, true",
+        "lf, false",
+        "crlf, true",
+        "crlf, false",
+        "mixed, true",
+        "mixed, false",
+    )
+    fun `should merge into a file of any line ending and with or without a final newline`(
+        style: String,
+        finalNewline: Boolean,
+    ) {
+        // given
+        val formats = listOf(JsonMcpConfigFormat.CLAUDE_CODE, JsonMcpConfigFormat.VS_CODE, JsonMcpConfigFormat.CURSOR)
+        val endings = (0 until 5).map { index -> if (style == "crlf" || (style == "mixed" && index % 2 == 0)) "\r\n" else "\n" }
+        // - one file per format, holding a foreign entry under the key that format reads
+        val existing = formats.associateWith { format ->
+            val key = if (format === JsonMcpConfigFormat.VS_CODE) "servers" else "mcpServers"
+            val lines = listOf("{", "  \"$key\": {", "    \"mine\": { \"command\": \"npx\" }", "  }", "}")
+            lines.zip(endings).joinToString("") { (line, ending) -> line + ending }.let { if (finalNewline) it else it.removeSuffix(endings.last()) }
+        }
+
+        // when
+        val contents = existing.map { (format, text) -> format.merge(text, listOf(stdioServer), setOf("atlassian"), file) }
+
+        // then
+        assertThat(contents).hasSize(3).allSatisfy {
+            assertThat(it)
+                .contains("\"mine\"")
+                .contains("\"atlassian\"")
+                .endsWith("}\n")
+                .doesNotContain("\r")
+        }
+    }
 }

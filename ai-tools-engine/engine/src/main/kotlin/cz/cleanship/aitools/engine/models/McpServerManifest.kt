@@ -57,7 +57,7 @@ sealed class McpTransport {
     /**
      * A server the tool starts as a local process and talks to over its standard input and output.
      *
-     * @property command the executable, resolved like the `source` of a pointer: `${NAME}` is a variable of the run, from `env_vars` of the config files or the environment of the run, and a leading `~/` is expanded against the home directory of the user running the engine, whatever `--user-home` the run uses
+     * @property command the executable: `${NAME}` is a variable of the run, from `env_vars` of the config files or the environment of the run, never a declared variable; a bare `~` or a leading `~/` is expanded against the home directory of the user running the engine, whatever `--user-home` the run uses; and a relative command, such as `uvx`, is kept as written, for the tool to find on its `PATH`
      * @property args the arguments passed to [command]; none may reference a secret variable
      * @property env fixed environment variables passed to the server besides its declared variables; no key may be the name of a declared variable, and no value may reference a secret one
      */
@@ -72,7 +72,7 @@ sealed class McpTransport {
     /**
      * A remote server the tool reaches over Streamable HTTP.
      *
-     * @property url the endpoint; it may not reference a secret variable
+     * @property url the endpoint, which starts with `http://` or `https://`, in any case, and a host; a url that starts with a variable must resolve to one that does. It may not reference a secret variable
      * @property headers the headers sent with every request; a secret variable may be referenced only as a whole value, `${NAME}`, or as the bearer token of `Authorization`, `Bearer ${NAME}`
      */
     @Serializable
@@ -89,7 +89,7 @@ sealed class McpTransport {
  * @property name the name of the environment variable, matching `[A-Za-z_][A-Za-z0-9_]*`
  * @property description what the variable holds
  * @property secret whether the value is a secret: a secret variable is never read by the engine and is rendered as a reference each tool resolves from its own environment; any other variable is read from `env_vars` of the config files only, never from the environment of the run, and written as its value
- * @property required whether a server cannot run without it: a required variable that is not secret and that `env_vars` does not declare fails the MCP config files of every deployment that selects the server, while an optional one is left out. It defaults to `true`
+ * @property required whether a server cannot run without it: a required variable that is not secret and that `env_vars` does not declare fails the MCP config files of every deployment that selects the server, while an optional one is left out, unless it is used in `args` or `url`, which fails the same way. It defaults to `true`
  */
 @Serializable
 data class McpVariable(

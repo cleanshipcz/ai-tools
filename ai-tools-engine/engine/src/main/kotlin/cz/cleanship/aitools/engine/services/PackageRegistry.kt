@@ -3,7 +3,7 @@ package cz.cleanship.aitools.engine.services
 /**
  * A package registry of the MCP Registry `server.json`, with the one runner a package of it starts with and the grammar its package names and versions must follow.
  *
- * Nothing a `server.json` contributes to a command is used before it matches the grammar of its registry, and none of the grammars admits text that starts with `-`, holds whitespace, or names another package, so no text of the file reaches a position where the runner reads its own options.
+ * The identifier and version a `server.json` contributes to a command are used only once they match the grammar of its registry, and none of the grammars admits text that starts with `-`, holds whitespace, or names another package, so no text of the file reaches a position where the runner reads its own options.
  */
 internal enum class PackageRegistry(
     val registryType: String,

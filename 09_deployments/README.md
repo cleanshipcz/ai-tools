@@ -75,7 +75,9 @@ Validate the manifests first, without writing anything:
 ./deploy.sh --dry-run
 ```
 
-A dry run loads, filters, and renders every manifest exactly as a deploy does and fails on exactly what a deploy fails on, but it creates, deletes, and modifies nothing — not in the project directories, not in your home.
+A dry run loads, filters, and renders every manifest exactly as a deploy does, but it creates, deletes, and modifies nothing — not in the project directories, not in your home.
+It fails on what a deploy fails on, with one exception: a file a tool cannot write. A dry run finds a broken tool directory only through the MCP config file in it, so a broken `.claude` or `.github`, and any write the file system refuses, such as into a read-only directory, are found only by a real deploy; see [README.md](../README.md#common-workflow).
+In a real deploy, such a file fails only that project and tool, and every other tool and project is still deployed. In a user deployment, a file that cannot be written stops the run instead, and the CLI prints `'<path>' cannot be written (<class>[: <reason>])` as one line; the projects and the user-scope files exported before it are already written.
 It logs the absolute path of every artifact a deploy would write.
 
 To read the produced files, a user deployment can be pointed at a harmless home instead:

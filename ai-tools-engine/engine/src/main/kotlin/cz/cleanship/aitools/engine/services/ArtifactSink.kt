@@ -8,7 +8,10 @@ import cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin
 import cz.cleanship.aitools.engine.models.VersionedManifest
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.FileOutputStream
+import java.io.IOException
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermissions
@@ -16,22 +19,23 @@ import java.nio.file.attribute.PosixFilePermissions
 /**
  * Where the artifacts of a run end up: on disk in a deploy, nowhere in a dry run.
  *
- * It is the only thing that separates the two kinds of run. [ExportService] resolves and validates exactly the same
- * way for both and hands the sink a target that is already known to be legitimate, so a dry run reports every
- * failure a deploy would - a printer that cannot resolve a reference, a companion file that does not exist, an
- * artifact directory outside its scope - and differs from a deploy in nothing but the writes.
+ * It is the only thing that separates the two kinds of run. [ExportService] resolves and validates exactly the same way for both and hands the sink a target that is already known to be legitimate, so a dry run reports every failure a deploy would - a printer that cannot resolve a reference, a companion file that does not exist or cannot be read, an artifact directory outside its scope - and differs from a deploy in nothing but the writes. A write the file system refuses is therefore found only by a deploy: a dry run finds a tool directory that is a dangling or looping link, or not a directory, only through the MCP config file in it, which is checked before anything is written, and a read-only directory not at all.
  */
 interface ArtifactSink {
 
     /**
      * Renders [entity] through [outputConsumer] into [targetFile], or only renders it.
      *
-     * @throws Exception whatever [outputConsumer] throws
+     * @throws ArtifactWriteException naming [targetFile] if it or the directory holding it cannot be written; a sink that only renders never throws it
+     * @throws Exception whatever else [outputConsumer] throws
      */
     fun <T : VersionedManifest> export(entity: T, targetFile: File, outputConsumer: (Output) -> Unit)
 
     /**
      * Copies the companion file [sourceFile], which exists, onto [targetFile], or only says that it would.
+     *
+     * @throws SkillFileResolvingException naming [sourceFile] if it cannot be read, which leaves [targetFile] as it was; a sink that only says it would copy never throws it
+     * @throws ArtifactWriteException naming [targetFile] if it or the directory holding it cannot be written; a sink that only says it would copy never throws it
      */
     fun copySkillFile(sourceFile: File, targetFile: File)
 
@@ -41,6 +45,7 @@ interface ArtifactSink {
      * A config file is one the user owns alongside the engine: an existing one keeps its permission bits. [targetFile] is the file itself, never a symbolic link; the caller decides where a link at a config path may lead.
      *
      * @param describedBy what [content] holds, as the log line names it
+     * @throws java.io.IOException if [targetFile] or the directory holding it cannot be written, which leaves [targetFile] as it was; a sink that only says it would write never throws it
      */
     fun writeConfigFile(targetFile: File, content: String, describedBy: String)
 
@@ -66,10 +71,11 @@ object FileSystemArtifactSink : ArtifactSink {
      * first and only moved onto [targetFile] once [outputConsumer] has completed successfully. On failure the
      * temporary file is removed and any previously exported [targetFile] is left untouched.
      *
-     * @throws Exception whatever [outputConsumer] throws, after the temporary file has been cleaned up
+     * @throws ArtifactWriteException naming [targetFile] if it or the directory holding it cannot be written
+     * @throws Exception whatever else [outputConsumer] throws, after the temporary file has been cleaned up
      */
     override fun <T : VersionedManifest> export(entity: T, targetFile: File, outputConsumer: (Output) -> Unit) {
-        writeAtomically(targetFile) { OutputStreamOutput(FileOutputStream(it)).use(outputConsumer) }
+        writingTo(targetFile) { writeAtomically(targetFile) { OutputStreamOutput(FileOutputStream(it)).use(outputConsumer) } }
         LOG.info("Exported ${entity.javaClass.simpleName} ${entity.id} to ${targetFile.absolutePath}")
     }
 
@@ -80,9 +86,9 @@ object FileSystemArtifactSink : ArtifactSink {
         val permissions = targetFile.takeIf { it.exists() }?.let { runCatching { Files.getPosixFilePermissions(it.toPath()) }.getOrNull() }
         targetFile.parentFile.mkdirs()
         val temporaryFile = if (permissions == null) {
-            File.createTempFile("${targetFile.name}.", ".tmp", targetFile.parentFile).toPath()
+            File.createTempFile(temporaryPrefix(targetFile), ".tmp", targetFile.parentFile).toPath()
         } else {
-            Files.createTempFile(targetFile.parentFile.toPath(), "${targetFile.name}.", ".tmp", PosixFilePermissions.asFileAttribute(permissions))
+            Files.createTempFile(targetFile.parentFile.toPath(), temporaryPrefix(targetFile), ".tmp", PosixFilePermissions.asFileAttribute(permissions))
         }
         try {
             // The attribute of createTempFile is narrowed by the umask, so the bits are set once more, still before the content is written.
@@ -95,10 +101,13 @@ object FileSystemArtifactSink : ArtifactSink {
         LOG.info("Wrote {} to {}", describedBy, targetFile.absolutePath)
     }
 
+    // File.createTempFile refuses a prefix of fewer than three characters, so a short name such as 'a' is padded; it keeps File.createTempFile, whose file takes the default permissions an artifact is written with, where Files.createTempFile would make it readable by its owner only.
+    private fun temporaryPrefix(targetFile: File): String = "${targetFile.name}.".padEnd(MIN_TEMPORARY_PREFIX, '_')
+
     private fun writeAtomically(targetFile: File, write: (File) -> Unit) {
         val targetDir = targetFile.parentFile
         targetDir.mkdirs()
-        val temporaryFile = File.createTempFile("${targetFile.name}.", ".tmp", targetDir)
+        val temporaryFile = File.createTempFile(temporaryPrefix(targetFile), ".tmp", targetDir)
         try {
             write(temporaryFile)
             Files.move(temporaryFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
@@ -108,14 +117,53 @@ object FileSystemArtifactSink : ArtifactSink {
         }
     }
 
+    /**
+     * Copies [sourceFile] onto [targetFile] atomically, the way [export] writes an artifact, so a copy that fails at any point leaves the earlier [targetFile] as it was.
+     */
     override fun copySkillFile(sourceFile: File, targetFile: File) {
-        targetFile.parentFile.mkdirs()
-        sourceFile.copyTo(targetFile, overwrite = true)
+        // A failure to open or to read the source names the source, even in the middle of the copy, so it is never reported as a target that cannot be written.
+        val source = try {
+            Files.newInputStream(sourceFile.toPath())
+        } catch (ex: IOException) {
+            throw sourceUnreadable(sourceFile, ex)
+        }
+        source.use { input ->
+            writingTo(targetFile) {
+                writeAtomically(targetFile) { temporaryFile ->
+                    FileOutputStream(temporaryFile).use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val read = try {
+                                input.read(buffer)
+                            } catch (ex: IOException) {
+                                throw sourceUnreadable(sourceFile, ex)
+                            }
+                            if (read < 0) break
+                            output.write(buffer, 0, read)
+                        }
+                    }
+                }
+            }
+        }
         LOG.info("Copied skill file {} to {}", sourceFile.absolutePath, targetFile.absolutePath)
+    }
+
+    private fun sourceUnreadable(sourceFile: File, ex: IOException) =
+        SkillFileResolvingException("Skill file '${sourceFile.absolutePath}' cannot be read (${ex.failureDescription()}). Make it readable, or remove it from 'files'.", ex)
+
+    /**
+     * Runs [write], naming [targetFile] in any [IOException] it throws, which on its own often names neither the file nor its directory.
+     */
+    private fun writingTo(targetFile: File, write: () -> Unit) = try {
+        write()
+    } catch (ex: IOException) {
+        throw ArtifactWriteException(targetFile, ex)
     }
 
     override fun replaceArtifactDirectory(artifactDir: File, owned: File, describedBy: String) =
         artifactDir.deleteArtifactDirectoryWithin(owned, describedBy)
+
+    private const val MIN_TEMPORARY_PREFIX = 3
 
     private val LOG = LoggerFactory.getLogger(FileSystemArtifactSink::class.java)
 }
@@ -149,3 +197,29 @@ object DryRunArtifactSink : ArtifactSink {
 
     private val LOG = LoggerFactory.getLogger(DryRunArtifactSink::class.java)
 }
+
+/**
+ * Thrown when the artifact [targetFile] cannot be written, naming it, the class of the failure that stopped the write and the reason the operating system gave, never content.
+ */
+// An IOException, so a caller that lets a failed write propagate, such as the user-scope export, handles it like any other failed write.
+class ArtifactWriteException(
+    val targetFile: File,
+    cause: IOException,
+) : IOException("'${targetFile.absolutePath}' cannot be written (${cause.failureDescription()})", cause)
+
+/**
+ * Returns the class of this failure, followed by the reason the operating system gave for it when one is known, such as `NotDirectoryException` or `IOException: Not a directory`; a path or any other text of the message is never included.
+ */
+internal fun IOException.failureDescription(): String = osReason()?.let { "${javaClass.simpleName}: $it" } ?: javaClass.simpleName
+
+// A FileSystemException carries the reason apart from its paths; a FileNotFoundException ends its message with it in parentheses; a plain IOException of the JDK file code is the reason alone. Anything that could be a path or quote a value is dropped.
+private fun IOException.osReason(): String? = when {
+    this is FileSystemException -> reason
+    this is FileNotFoundException -> message?.let { TRAILING_REASON.find(it)?.groupValues?.get(1) }
+    javaClass == IOException::class.java -> message
+    else -> null
+}?.takeIf { PLAIN_REASON.matches(it) }
+
+private val TRAILING_REASON = Regex("""\(([^()]+)\)$""")
+
+private val PLAIN_REASON = Regex("""[A-Za-z][A-Za-z ,-]*""")

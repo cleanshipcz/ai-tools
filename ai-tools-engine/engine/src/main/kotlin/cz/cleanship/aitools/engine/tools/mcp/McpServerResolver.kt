@@ -25,7 +25,7 @@ class McpServerResolver(
      *
      * A stdio server receives every declared variable in its environment after its fixed `env` entries. An optional plain variable the config does not declare is left out, and so is an `env` entry or header that references it. A secret variable the environment of the run does not carry is logged as a warning naming it, never its value. No message names a value.
      *
-     * @throws McpServerResolvingException naming the server and the variable if a required plain variable is not declared by the config; if an optional one that is not is part of an argument or the url, which cannot be left out; if a plain value holds `${`, which a tool would expand; or if a secret variable is referenced anywhere a tool would need its value written, which a server returned by [cz.cleanship.aitools.engine.services.LoaderService.loadMcpServer] never does
+     * @throws McpServerResolvingException naming the server and the variable if a required plain variable is not declared by the config; if an optional one that is not is part of an argument or the url, which cannot be left out; if a plain value holds `${`, which a tool would expand; if the resolved `url` does not start with `http://` or `https://` and a host, holds a backslash, carries credentials, or is not https while a header is secret; or if a secret variable is referenced anywhere a tool would need its value written, which a server returned by [cz.cleanship.aitools.engine.services.LoaderService.loadMcpServer] never does
      */
     fun resolve(server: McpServer): ResolvedMcpServer {
         warnAboutUnsetSecrets(server)
@@ -70,13 +70,28 @@ class McpServerResolver(
             val headers = LinkedHashMap<String, McpValue>()
             transport.headers.forEach { (name, header) -> header(name, header)?.let { headers[name] = it } }
             val url = checkNotNull(text(transport.url, "'url'", omissible = false))
-            // A url resolved from a variable is checked here, where its value is known; the url itself is never repeated.
+            // The loader judges only the written start of a url, so the whole url is judged here, where its value is known; neither the url nor a value is ever repeated.
+            val urlProblem = url.urlProblem()
+            val urlVariables = transport.url.variableNames.distinct()
+            val fromVariables = if (urlVariables.isEmpty()) "" else urlVariables.joinToString(prefix = " from ") { "'$it'" }
             val problem = when {
-                url.urlProblem() != null -> "MCP server '${server.id}' resolves its 'url' to one that ${url.urlProblem()}."
-                headers.values.any { it !is McpValue.Plain } && !url.isHttps() -> "MCP server '${server.id}' sends a secret header, but its 'url' resolves to one that is not https."
+                urlProblem != null ->
+                    "MCP server '${server.id}' resolves its 'url'$fromVariables to one that ${urlProblem.description}. " +
+                        urlRemedy(urlVariables, "'http://' or 'https://' followed by a host, without a backslash or credentials")
+                headers.values.any { it !is McpValue.Plain } && !url.isHttps() ->
+                    "MCP server '${server.id}' sends a secret header, but its 'url' resolves$fromVariables to one that is not https. " + urlRemedy(urlVariables, "'https://'")
                 else -> return ResolvedMcpTransport.Http(url = url, headers = headers)
             }
             throw McpServerResolvingException(server.id, problem)
+        }
+
+        /**
+         * Returns the one remedy of a refused url: a value in `env_vars` for each of [urlVariables], or the url written in the manifest when it references none, starting with [form].
+         */
+        private fun urlRemedy(urlVariables: List<String>, form: String): String = when (urlVariables.size) {
+            0 -> "Write a 'url' that starts with $form."
+            1 -> "Give '${urlVariables.single()}' a value in 'env_vars:' that makes the url start with $form."
+            else -> "Give ${urlVariables.joinToString { "'$it'" }} values in 'env_vars:' that make the url start with $form."
         }
 
         private fun environmentValue(variable: McpVariable): McpValue? = if (variable.secret) {
@@ -132,7 +147,7 @@ class McpServerResolver(
                 omissible -> return null
                 else ->
                     "MCP server '${server.id}' uses the optional variable '${variable.name}' in $place, which 'env_vars:' of config.yml and config.local.yml do not declare, and $place cannot be left out. " +
-                        "Declare it, or mark it 'required: true'."
+                        "Declare it under 'env_vars:'."
             }
             throw McpServerResolvingException(server.id, problem)
         }

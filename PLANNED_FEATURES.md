@@ -36,20 +36,26 @@
 
 ## MCPs
 
-- **DONE** MCP server manifests in `07_mcp/`, inline or as a pointer at a `server.json` of the MCP Registry schema `2025-12-11`, selected by `deploy.mcps` of a project and merged entry by entry into `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, and `.codex/config.toml`; secrets are written as references only. See [07_mcp/README.md](07_mcp/README.md).
-- **User scope.** `user.yml` gains `mcps.filter`; entries land in `~/.claude.json` (`mcpServers`) and `~/.codex/config.toml` with the same entry-level ownership as the project scope, never rewriting anything else in those files.
-- **Per-agent attachment.** `AgentManifest` gains `mcps: [id]`, rendered to the `mcpServers` of a Claude Code subagent, the MCP configuration of a Codex agent, and `tools: [<server>/*]` of a Copilot agent; Cursor and Windsurf, which have no per-agent mechanism, report it as skipped.
+- **DONE** MCP server manifests in `07_mcp/`, inline or as a pointer at a `server.json` of the MCP Registry schema `2025-12-11`. A project selects them with `deploy.mcps`, and a deploy merges them entry by entry into `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, and `.codex/config.toml`. Secrets are written as references only. See [07_mcp/README.md](07_mcp/README.md).
+
+### Run 2
+
+- **User scope.** A `user.yml` selects MCP servers with `mcps.filter`. They land in `~/.claude.json` (`mcpServers`) and `~/.codex/config.toml`, with the same entry-level ownership as the project scope. A deploy changes nothing else in those files. In `~/.claude.json`, which Claude Code rewrites while it runs, every byte outside `mcpServers` is kept.
+- **Per-agent attachment.** An agent manifest names the MCP servers it uses. They are rendered to the `mcpServers` of a Claude Code subagent, the MCP configuration of a Codex agent, and `tools: [<server>/*]` of a Copilot agent. Cursor and Windsurf have no per-agent mechanism, so the run reports the attachment as skipped for them. An agent that attaches a server its deployment does not select fails the run.
 - **Windsurf**, project and user scope, once the conflicting official paths (`.devin/mcp_config.json` and `~/.config/devin/...` against `~/.codeium/windsurf/mcp_config.json`) are settled against the installed version. Antigravity stays unsupported while it expands no environment variable in its MCP config file.
-- **A secrets manager as the default value source.** A manifest declares how each secret variable is obtained, a secrets manager (candidates: `pass`/gopass, 1Password `op`, Bitwarden `bws`, libsecret) by default and the shell environment as the fallback. A stdio server is launched through the manager so no tool sees the value in a file; for a remote server, the tool itself is launched through the manager, and OAuth is preferred where the server supports it.
+- **Pinning a pointer server.** A change of its `server.json` fails the run until the author accepts it. The dry run prints the command line a deploy would write.
+- **A ledger of written MCP entries.** With opt-in selection, removing a project's `mcps` block leaves the entries an earlier deploy wrote. With a ledger, a deploy removes them and owns only what it wrote.
+- **Containment of every generated file.** Only MCP config files are checked to lie inside the project once symbolic links are resolved. Agents, prompts, skills, and features written through a linked tool directory are not checked. To be revisited together with the user scope.
+- **A dry run finds every broken tool directory.** In a real deploy, a tool directory that is a link leading nowhere or in a loop, or that is not a directory, already fails only its project and tool. A dry run finds it only through the MCP config file in `.codex`, `.vscode` or `.cursor`, and only when the project selects MCP servers. It does not find a broken `.claude`, `.github`, `.windsurf` or `.agent`, nor a broken `.codex` or `.cursor` in a project that selects no MCP server.
+
+### Run 3
+
+- **A secrets manager as the default source of secret values**, with the shell environment as the fallback. Candidates are `pass`/gopass, 1Password `op`, Bitwarden `bws`, and libsecret. A manifest declares how each secret variable is obtained. A stdio server is launched through the manager, so no tool sees the value in a file. For a remote server, the tool itself is launched through the manager, and OAuth is preferred where the server supports it.
+
+### Not scheduled
+
 - **Tool allow and deny lists** per server: Codex `enabled_tools` / `disabled_tools`, Claude Code `permissions`, Cursor `mcpAllowlist`, and the equivalents of the other tools.
 - **A `/manifests-create-mcp` prompt** that scaffolds an MCP server manifest from `McpServerManifest.kt`.
-- **Pinning a pointer server** (SEC-2): the manifest records a hash of its `server.json` or of the rendered entry, a mismatch fails the run until the author updates the pin, and the dry run prints the command line it would write.
-- **A ledger of written MCP entries** (SEC-6): with opt-in selection, removing a project's `mcps` block leaves the entries an earlier deploy wrote; a ledger would let a deploy remove them and own only what it wrote.
-- **Split rendering from merging** (ARCH-4): each format becomes an entry renderer and a file merger, so per-agent attachment can render a server without a config file.
-- **MCP export on `UserScopeExporter`** (ARCH-5), built from `ClaudeLayout.mcpConfigFile` and `CodexLayout.mcpConfigFile`, which already carry the user-scope paths.
-- **Byte-range merge for `~/.claude.json`** (ARCH-6): replace only the `mcpServers` object, located by a position-reporting parser, and keep every other byte of a file Claude Code rewrites while it runs.
-- **Run-level MCP resolution** (ARCH-7): resolve servers once for the project loop, the user loop and agent rendering, and fail an agent that attaches a server its deployment does not select.
-- **A value-source seam and a launcher transform** (ARCH-9, ARCH-10): a secrets manager plugs in behind "where does variable X come from", and a launcher wraps a resolved stdio server; how a secret is obtained is a new optional field, not a change of `secret`.
 
 ## Fragment filtering per deployment
 

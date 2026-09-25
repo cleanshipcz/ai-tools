@@ -76,7 +76,7 @@ internal fun parseText(serverId: String, value: String, place: String, declared:
  *
  * Codex has no `${NAME}` expansion in its config file: it forwards the environment variables `env_vars` lists to a stdio server under their own names, and fills a header from an environment variable only as a whole value (`env_http_headers`) or as a bearer token (`bearer_token_env_var`). A secret is therefore accepted only in those places, so no tool ever needs its value in a file.
  *
- * A remote url must not carry a user or password, and must start with `https://` when a header is secret; the url is never repeated in a failure.
+ * The text a remote url starts with, up to its first variable, must be `http://` or `https://` followed by a host, with no backslash and no user or password; a url that starts with a variable passes, and the whole url is checked for the same once resolved - see [cz.cleanship.aitools.engine.tools.mcp.McpServerResolver.resolve]. When a header is secret, the url must start with `https://` as written. The url is never repeated in a failure.
  *
  * @throws InvalidMcpServerManifestException naming the server and the offending variable, environment variable or header
  */
@@ -116,11 +116,14 @@ private fun McpServer.requireHttp(transport: McpServerTransport.Http, names: Set
     transport.url.variableNames.firstOrNull { it in secrets }?.let {
         fail(id, "references the secret variable '$it' in 'url'. A secret may only be a header value; move it into 'headers'.")
     }
-    // Checked on the literal start of the url; a url whose scheme or host comes from a variable is checked again once resolved.
-    val written = (transport.url.parts.firstOrNull() as? McpTextPart.Literal)?.text.orEmpty()
+    // A url that starts with written text must write its scheme and host there, so 'https://${'$'}{HOST}/mcp' is refused here; only a url that starts with a variable is judged once resolved.
+    val written = (transport.url.parts.firstOrNull() as? McpTextPart.Literal)?.text
     val sendsSecret = transport.headers.values.any { it !is McpHeader.Text }
-    written.urlProblem()?.let { fail(id, "has a 'url' that $it.") }
-    if (sendsSecret && !written.isHttps()) fail(id, "sends a secret header, so its 'url' must start with 'https://' as written, never plain http or a variable.")
+    if (written != null && SCHEME_ONLY.matches(written) && transport.url.parts.getOrNull(1) is McpTextPart.Variable) {
+        fail(id, "has a 'url' that writes its scheme but takes its host from a variable. Write the host after 'http://' or 'https://', or start the url with the variable, which is then checked once resolved.")
+    }
+    written?.urlProblem()?.let { fail(id, "has a 'url' that ${it.description}.${it.remedy?.let { remedy -> " $remedy." }.orEmpty()}") }
+    if (sendsSecret && written?.isHttps() != true) fail(id, "sends a secret header, so its 'url' must start with 'https://' as written, never plain http or a variable.")
     for ((header, value) in transport.headers) {
         val secret = (value as? McpHeader.Text)?.text?.variableNames?.firstOrNull { it in secrets } ?: continue
         fail(
@@ -136,18 +139,32 @@ private fun McpServer.requireHttp(transport: McpServerTransport.Http, names: Set
 }
 
 /**
- * Returns why this url, or the start of one, may not be written, or `null` when it may: it must be `scheme://` followed by a host without a user or password, with no backslash anywhere. A start that holds no `:` yet, because a variable follows, is judged once resolved.
+ * Why a url may not be written into an MCP config file.
+ *
+ * @property description what is wrong with the url, as the end of a sentence about it that never repeats the url
+ * @property remedy what the author does about it when the url is written in the manifest, or `null` when the description says it
+ */
+internal enum class UrlProblem(val description: String, val remedy: String?) {
+    BACKSLASH("holds a backslash, which some tools read as a slash", null),
+    NOT_HTTP("does not start with 'http://' or 'https://' followed by a host", null),
+    CREDENTIALS("carries credentials, which every tool would write into its config file and send", "Pass them as a secret header instead"),
+}
+
+/**
+ * Returns why this url, or the written start of one, may not be written, or `null` when it may: it must start with `http://` or `https://`, in any case, followed by a host that is not empty and carries no user or password, with no backslash anywhere.
  */
 // A WHATWG parser, which Claude Code, VS Code and Cursor use, reads 'https:/user:pw@host' and backslashes as the two slashes, so anything but the plain form is refused rather than second-guessed.
-internal fun String.urlProblem(): String? = when {
-    '\\' in this -> "holds a backslash, which some tools read as a slash"
-    ':' !in this -> null
-    !URL_START.containsMatchIn(this) -> "is not a scheme followed by '://' and a host"
-    '@' in substringAfter("://").takeWhile { it !in "/?#" } -> "carries credentials, which every tool would write into its config file and send. Pass them as a secret header instead"
+internal fun String.urlProblem(): UrlProblem? = when {
+    '\\' in this -> UrlProblem.BACKSLASH
+    !URL_START.containsMatchIn(this) -> UrlProblem.NOT_HTTP
+    '@' in substringAfter("://").takeWhile { it !in "/?#" } -> UrlProblem.CREDENTIALS
     else -> null
 }
 
-private val URL_START = Regex("""^[A-Za-z][A-Za-z0-9+.-]*://[^/]""")
+// The host must start right after the two slashes: a path, query, fragment, port, user or space there means the host is empty or hidden.
+private val URL_START = Regex("""^https?://[^/?#:@\s\\]""", RegexOption.IGNORE_CASE)
+
+private val SCHEME_ONLY = Regex("""^https?://$""", RegexOption.IGNORE_CASE)
 
 /**
  * Returns whether this url, or the start of one, uses https.

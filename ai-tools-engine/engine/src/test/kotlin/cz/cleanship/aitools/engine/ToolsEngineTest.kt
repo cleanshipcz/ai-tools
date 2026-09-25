@@ -7,6 +7,7 @@ import ch.qos.logback.core.read.ListAppender
 import cz.cleanship.aitools.engine.env.EnvironmentSource
 import cz.cleanship.aitools.engine.env.UnresolvedVariableException
 import cz.cleanship.aitools.engine.env.VariableResolver
+import cz.cleanship.aitools.engine.io.ArtifactDeleteException
 import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.models.Locations
 import cz.cleanship.aitools.engine.models.ToolType
@@ -14,6 +15,9 @@ import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.DryRunArtifactSink
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
+import cz.cleanship.aitools.engine.services.SkillFileResolvingException
+import cz.cleanship.aitools.engine.tools.AgentContext
+import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.ToolFactory
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
@@ -23,6 +27,7 @@ import cz.cleanship.aitools.engine.utils.contentSnapshot
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assumptions.assumeFalse
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -31,8 +36,10 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 
 class ToolsEngineTest {
 
@@ -545,6 +552,67 @@ class ToolsEngineTest {
             assertThat((error as ExportFailedException).failures.map { it.manifest })
                 .containsExactlyInAnyOrder("skill 'standalone-skill'", "skill 'directory-skill'")
             assertThat(agentFile("good-agent")).exists()
+        }
+
+        /**
+         * A companion file that cannot be read fails its skill, naming the source rather than the target, in a dry run as in a deploy; the tool goes on with its other files, and the file an earlier deploy copied is kept.
+         */
+        @ParameterizedTest
+        @CsvSource("false", "true")
+        fun `should report a companion file that cannot be read as a failure of its skill naming the source`(
+            dryRun: Boolean,
+        ) {
+            // given
+            val manifest = writeDirectorySkill("directory-skill", "helper.md", companionFileExists = true)
+            val source = manifest.parentFile.resolve("helper.md")
+            writeAgent("good-agent", "base")
+            // - what an earlier deploy copied there
+            val deployed = destination.resolve(".claude/skills/directory-skill/helper.md")
+            deployed.parentFile.mkdirs()
+            deployed.writeText("Deployed before.\n")
+            Files.setPosixFilePermissions(source.toPath(), PosixFilePermissions.fromString("---------"))
+            val runEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ToolFactory.create(ToolType.CLAUDE, dryRun)), dryRun = dryRun)
+
+            // when
+            val error = try {
+                // - a user who may read anything, such as root, cannot be refused a read
+                assumeTrue(!Files.isReadable(source.toPath()))
+                runCatching { runEngine.process(locations()) }.exceptionOrNull()
+            } finally {
+                Files.setPosixFilePermissions(source.toPath(), PosixFilePermissions.fromString("rw-r--r--"))
+            }
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("Skill file '${source.absolutePath}' cannot be read.")
+                .hasMessageNotContaining("cannot be written")
+            assertThat((error as ExportFailedException).failures.map { it.manifest to it.cause::class.java })
+                .containsExactly("skill 'directory-skill'" to SkillFileResolvingException::class.java)
+            assertThat(deployed).content().isEqualTo("Deployed before.\n")
+            assertThat(agentFile("good-agent").exists()).isEqualTo(!dryRun)
+        }
+
+        @Test
+        fun `should stop the run rather than collect a failed delete raised while a project is exported`() {
+            // given
+            // - an adapter that deletes inside the export of an agent, as the user-scope adapters do for a skill
+            writeAgent("good-agent", "base")
+            val deleting = object : ToolAdapter by ClaudeAdapter() {
+                override fun export(projectDir: File, agentContext: AgentContext): Unit =
+                    throw ArtifactDeleteException("${projectDir.absolutePath}/.claude/agents/locked", IOException("locked"))
+            }
+            val deletingEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(deleting))
+
+            // when
+            val error = runCatching { deletingEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ReplaceFailedException::class.java)
+                .hasMessageContaining("project 'test-project'")
+                .hasMessageContaining("/.claude/agents/locked")
         }
 
         @Test
@@ -2379,6 +2447,118 @@ class ToolsEngineTest {
                 .hasMessageContaining(outside.canonicalPath)
             assertThat(outside).hasContent("""{"mcpServers":{}}""")
             assertThat(destination.resolve("CLAUDE.md")).exists()
+        }
+
+        /**
+         * A linked `.codex` that leads nowhere fails the Codex MCP file of that project only; the dry run reports exactly the failure the deploy reports, and every other tool and project of the run is still deployed.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - the link leads to a directory that no longer exists
+            "dangling",
+            // - the link leads to a second link that leads back to it
+            "looping",
+        )
+        fun `should fail only the tool and project whose tool directory is a link that cannot be followed, in a dry run as in a deploy`(
+            kind: String,
+        ) {
+            // given
+            writeAtlassianServer()
+            // - a second project of the same run, whose tool directories are plain
+            val laterDestination = tempDir.resolve("later-destination").toFile()
+            writeProject("later-project", "later-project", laterDestination.absolutePath, mcpFilter = listOf("atlassian"))
+            destination.mkdirs()
+            val codexDir = destination.resolve(".codex")
+            val leadsTo = when (kind) {
+                "dangling" -> tempDir.resolve("out/missing").toFile()
+                else -> destination.resolve("loop").also { Files.createSymbolicLink(it.toPath(), codexDir.toPath()) }
+            }
+            Files.createSymbolicLink(codexDir.toPath(), leadsTo.toPath())
+            val configFile = codexDir.resolve("config.toml")
+
+            // when
+            val dryRunError = runCatching { engineFor(ToolType.CODEX, ToolType.CLAUDE, dryRun = true).process(locations()) }.exceptionOrNull()
+            val writtenByDryRun = listOf(laterDestination, destination.resolve(".mcp.json")).filter { it.exists() }
+            val deployError = runCatching { engineFor(ToolType.CODEX, ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deployError)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${configFile.absolutePath}'")
+                .hasMessageContaining("'${leadsTo.absolutePath}'")
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(deployError?.message)
+            assertThat(writtenByDryRun).isEmpty()
+            listOf(dryRunError, deployError).forEach { error ->
+                assertThat((error as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                    .containsExactly(Triple("test-project", ToolType.CODEX, "MCP servers [atlassian]"))
+            }
+            // - the tool after Codex in the same project, and the other project, are deployed in full
+            assertThat(destination.resolve(".mcp.json")).content().contains("atlassian")
+            assertThat(laterDestination.resolve(".codex/config.toml")).content().contains("[mcp_servers.atlassian]")
+            assertThat(laterDestination.resolve(".mcp.json")).content().contains("atlassian")
+            assertThat(tempDir.resolve("out").toFile()).doesNotExist()
+        }
+
+        /**
+         * A tool directory a deploy cannot write through fails that tool of that project once, at the first file written into it, and every other tool and project is still written. A dry run writes no file, so it finds the directory only through the MCP config file in it, and passes for a project that selects no server.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - a dangling .codex in a project that deploys a Codex agent, which is written into .codex/skills before the MCP config file
+            "codex, true",
+            "codex, false",
+            // - a regular file at .cursor, where every deploy writes the rules of the project first
+            "cursor, true",
+            "cursor, false",
+        )
+        fun `should fail only the tool whose directory cannot be written and still write every other tool and project`(
+            tool: String,
+            selectsServers: Boolean,
+        ) {
+            // given
+            writeAtlassianServer()
+            writeAgent("basic", "base")
+            val mcpFilter = if (selectsServers) listOf("atlassian") else null
+            writeProject(mcpFilter = mcpFilter)
+            // - a second project of the same run, whose tool directories are plain
+            val laterDestination = tempDir.resolve("later-destination").toFile()
+            writeProject("later-project", "later-project", laterDestination.absolutePath, mcpFilter = mcpFilter)
+            val toolType = if (tool == "codex") ToolType.CODEX else ToolType.CURSOR
+            destination.mkdirs()
+            val brokenDir = destination.resolve(".$tool")
+            if (tool == "codex") Files.createSymbolicLink(brokenDir.toPath(), tempDir.resolve("out/missing")) else brokenDir.writeText("not a directory\n")
+
+            // when
+            val dryRunError = runCatching { engineFor(toolType, ToolType.CLAUDE, dryRun = true).process(locations()) }.exceptionOrNull()
+            val writtenByDryRun = listOf(laterDestination, destination.resolve("CLAUDE.md")).filter { it.exists() }
+            val deployError = runCatching { engineFor(toolType, ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deployError)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${brokenDir.absolutePath}/")
+                .hasMessageContaining("cannot be written")
+                .hasMessageContaining("no further ${toolType.serialName} files of project 'test-project'")
+            assertThat((deployError as ExportFailedException).failures.map { it.deploymentId to it.toolType }).containsExactly("test-project" to toolType)
+            // - the failure is named after the export that hit the directory first, and its cause is the stop of the tool
+            val firstWritten = if (tool == "codex") "agent 'basic'" else "project 'test-project'"
+            assertThat(deployError.failures.map { it.manifest to it.cause::class.java }).containsExactly(firstWritten to ToolExportStoppedException::class.java)
+            // - the dry run finds the same pair through the MCP config file, and nothing else it would have written fails it
+            if (selectsServers) {
+                assertThat((dryRunError as ExportFailedException).failures.map { it.deploymentId to it.toolType }).containsExactly("test-project" to toolType)
+            } else {
+                assertThat(dryRunError).isNull()
+            }
+            assertThat(writtenByDryRun).isEmpty()
+            // - the other tool of the project, and every tool of the later project, are written in full
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(destination.resolve(".claude/agents/basic.md")).exists()
+            val laterFiles = if (tool == "codex") listOf("AGENTS.md", ".codex/skills/agent-basic/SKILL.md") else listOf(".cursor/rules/project.mdc", ".cursor/rules/agent-basic.mdc")
+            (laterFiles + listOf("CLAUDE.md", ".claude/agents/basic.md")).forEach { assertThat(laterDestination.resolve(it)).exists() }
+            val mcpFiles = listOf(".mcp.json", if (tool == "codex") ".codex/config.toml" else ".cursor/mcp.json")
+            mcpFiles.forEach { assertThat(laterDestination.resolve(it).exists()).isEqualTo(selectsServers) }
+            assertThat(destination.resolve(".mcp.json").exists()).isEqualTo(selectsServers)
+            assertThat(tempDir.resolve("out").toFile()).doesNotExist()
         }
 
         @Test

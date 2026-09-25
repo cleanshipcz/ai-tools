@@ -9,7 +9,7 @@ import java.io.File
 /**
  * `.codex/config.toml` of Codex, holding one `[mcp_servers.<id>]` table per server and its `[mcp_servers.<id>.*]` sub-tables.
  *
- * The file is edited as text rather than parsed and written again, because no TOML writer keeps comments: the tables of owned servers are cut out and written again, and every other line of the file is kept byte for byte, its line ending and a missing final newline included. A comment directly above the next table is kept with that table. Before and after the edit, the file is parsed with tomlj, a conformant TOML 1.0 parser: the edit is refused unless the existing file is valid TOML, every owned server in it is defined as a table of its own, and the edited file is valid TOML whose foreign content is unchanged and whose owned servers are exactly the ones written.
+ * The file is edited as text rather than parsed and written again, because no TOML writer keeps comments: the tables of owned servers are cut out and written again, and every other line of the file is kept byte for byte, its line ending and a missing final newline included; the lines the engine adds end with the line ending most lines of the file use. A comment directly above the next table is kept with that table. Before and after the edit, the file is parsed with tomlj, a conformant TOML 1.0 parser: the edit is refused unless the existing file is valid TOML, every owned server in it is defined as a table of its own, and the edited file is valid TOML whose foreign content is unchanged and whose owned servers are exactly the ones written.
  *
  * Codex expands no `${NAME}` in this file, so a secret is written as the name of the environment variable Codex forwards: `env_vars` for a stdio server, `bearer_token_env_var` for a bearer token, and `env_http_headers` for any other header.
  */
@@ -17,11 +17,15 @@ object CodexTomlMcpConfigFormat : McpConfigFormat {
 
     override fun merge(existing: String?, servers: List<ResolvedMcpServer>, ownedMcpIds: Set<String>, file: File): String {
         val owned = ownedMcpIds + servers.map { it.id }
-        val text = existing.orEmpty()
-        val before = parse(text, file, "is not valid TOML")
+        val original = existing.orEmpty()
+        val before = parse(original, file, "is not valid TOML")
+        val lineEnding = dominantLineEnding(original)
+        // The last line of a file without a final newline is given one for the edit and loses it again at the end, so the lines the engine adds after it never end the file in a bare carriage return, which TOML refuses.
+        val unterminated = original.isNotEmpty() && !original.endsWith("\n")
+        val text = if (unterminated) original + lineEnding else original
         val sections = sectionsOf(text, owned, file)
         requireOwnTables(before, sections, owned, file)
-        val newline = if ("\r\n" in text) "\r" else ""
+        val newline = lineEnding.removeSuffix("\n")
         val block = servers.flatMapIndexed { index, server -> (if (index > 0) listOf("") else emptyList()) + render(server) }.map { it + newline }
         val out = Output(newline)
         var inserted = false
@@ -39,10 +43,20 @@ object CodexTomlMcpConfigFormat : McpConfigFormat {
         }
         if (!inserted) out.block(block)
         if (sections.lastOrNull()?.owned == true) out.trimTrailingBlankLines()
-        val merged = out.text(finalNewline = text.isEmpty() || text.endsWith("\n"))
+        val edited = out.text(finalNewline = true)
+        val merged = if (unterminated) edited.removeSuffix(if (edited.endsWith("\r\n")) "\r\n" else "\n") else edited
         // Verified as the bytes that will be written, so text UTF-8 cannot encode never changes on disk after passing the check.
         verify(before, String(merged.toByteArray(Charsets.UTF_8), Charsets.UTF_8), servers, owned, file)
         return merged
+    }
+
+    /**
+     * Returns the line ending most lines of [text] end with, `\r\n` or `\n`; `\n` for a tie and for text without any.
+     */
+    // Counts every raw line ending, those inside a multi-line string included; that is harmless, because the result only picks the ending of the lines the engine adds.
+    private fun dominantLineEnding(text: String): String {
+        val crlf = CRLF.findAll(text).count()
+        return if (crlf > text.count { it == '\n' } - crlf) "\r\n" else "\n"
     }
 
     override fun ownedEntriesIn(existing: String, ownedMcpIds: Set<String>, file: File): Set<String> =
@@ -159,7 +173,7 @@ object CodexTomlMcpConfigFormat : McpConfigFormat {
     /**
      * Collects the lines of the merged file, keeping one blank line between the written tables and what follows them.
      *
-     * @param carriageReturn `"\r"` when the file ends its lines with CRLF, so every line the engine adds ends the same way
+     * @param carriageReturn `"\r"` when most lines of the file end with CRLF, so every line the engine adds ends the way most lines do
      */
     private class Output(private val carriageReturn: String) {
         private val lines = mutableListOf<String>()
@@ -187,6 +201,7 @@ object CodexTomlMcpConfigFormat : McpConfigFormat {
 }
 
 private const val SERVERS_TABLE = "mcp_servers"
+private val CRLF = Regex("\r\n")
 private val BARE_KEY = Regex("[A-Za-z0-9_-]+")
 
 /**

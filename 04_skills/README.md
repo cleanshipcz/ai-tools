@@ -83,6 +83,8 @@ A relative `path` or `source` of a `files` entry resolves against the directory 
 These paths are taken as written: a `${NAME}` in them is not substituted, and a leading `~` is not expanded.
 A single-file skill has no directory of its own, so it can list only absolute paths.
 A file that is not listed is not copied.
+A listed file must exist, be a regular file, and be readable. Otherwise that skill fails in every deployment that selects it, in a dry run as in a deploy, and the message names the source.
+Each file is copied into a temporary file next to its target and then moved into place, so a copy that fails leaves the earlier copy at the target as it was.
 
 ### Pointer skill
 
@@ -199,9 +201,11 @@ Each failure below stops the run and names the manifest, as `Failed to load <man
 
 A path that overlaps a source folder is reported differently. The run fails before writing anything, `--dry-run` included, with `Refusing to deploy: N path(s) the run would write or delete overlap the source folder of a pointer skill; nothing was written:`, followed by one line per overlap. Each line names the pointer skill, its manifest, its source folder, the tool, the deployment, what the deployment would do (`write the skill '<id>' ... to '<path>'`, or `delete '<path>' ... to replace it`), and how the path overlaps the folder: directly, through `the link '<link>' in it`, where it lies `once the link '<link>' is removed` when the path is, or lies below, a replaced directory that is a link, or, for a replaced directory, through `the link '<link>' below the directory to be replaced` or, when the replaced directory is itself a link, through `'<path>' is itself a link to '<destination>'`. A replacing deploy never opens what either kind of link leads to, but it still refuses. Remove the link or folder that leads there, deselect the skill, move the source folder out of the replaced directory, move the directory the deployment deploys to out of the source folder, or turn off `replace` for that deployment, as the line advises.
 
-The failures below are reported late, only when a deployment selects the skill: the other artifacts are still written, and the run then ends with a failure.
+The failures below are reported late, only when a deployment selects the skill, in a dry run as in a deploy: the other artifacts are still written, and the run then ends with a failure.
 
 - `Skill file '...' does not exist.` A companion file listed under `files` is missing, or, for a pointer skill, was removed from its source folder while the run was going on.
+- `Skill file '<source>' is not a regular file. Declare a file, or remove it from 'files'.` The source of a companion file is a directory or another entry that is not a file.
+- `Skill file '<source>' cannot be read. Make it readable, or remove it from 'files'.` The source of a companion file exists but the user running the engine cannot read it. When reading fails during the copy, the message carries the class and the reason of the failure: `Skill file '<source>' cannot be read (<class>[: <reason>]). Make it readable, or remove it from 'files'.` The earlier copy at the target is kept.
 - `Skill '<id>' would copy a companion file to '...', which lies in the folder '...' it is copied from once links are resolved.` A companion file would land in the folder it is read from. Remove the link at the target.
 - `Skill '<id>' would copy a companion file to '...', which lies in the source folder '...' of a pointer skill once links are resolved.` A chain of links below the generated skill leads the companion file into the source folder of a pointer skill. Remove the link that leads there.
 - `Skill file target '...' would be written outside the skill directory '...'.` The `target` of a companion file resolves to the generated skill directory itself or outside it, for example through `..`. Declare a target inside the skill.

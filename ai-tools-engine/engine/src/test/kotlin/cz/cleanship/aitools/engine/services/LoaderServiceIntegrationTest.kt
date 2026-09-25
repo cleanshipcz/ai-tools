@@ -1323,6 +1323,47 @@ class LoaderServiceIntegrationTest {
         }
 
         @Test
+        fun `should fail naming the file and the name when the id and a key of the server json derive a variable the engine refuses`() {
+            // given
+            // - a pointer named git whose positional argument is identified by the hint ssh_command, which derives GIT_SSH_COMMAND
+            val serverJson = projectsFolder.resolve("git-server/server.json")
+            writeFile(
+                serverJson,
+                "{\"\$schema\": \"https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json\", \"name\": \"x\", \"description\": \"d\", \"version\": \"1\", " +
+                    "\"packages\": [{\"registryType\": \"pypi\", \"identifier\": \"git-server\", \"transport\": {\"type\": \"stdio\"}, \"packageArguments\": [{\"type\": \"positional\", \"valueHint\": \"ssh_command\"}]}]}",
+            )
+            val file =
+                writeFile(mcpDir.resolve("git.yml"), "id: git\nsource: \${PROJECTS_FOLDER}/git-server\nmetadata:\n  version: 1.0.0\n")
+
+            // when / then
+            assertThatThrownBy { mcpLoader.loadAll(mcpLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageStartingWith("Failed to load ${file.absolutePath}: ")
+                .hasMessageContaining(serverJson.absolutePath)
+                .hasMessageContaining("'GIT_SSH_COMMAND'")
+        }
+
+        @Test
+        fun `should fail naming the file and the server json when the server json provides no description`() {
+            // given
+            val serverJson = projectsFolder.resolve("quiet/server.json")
+            writeFile(
+                serverJson,
+                "{\"\$schema\": \"https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json\", \"name\": \"x\", \"description\": \"\", \"version\": \"1\", " +
+                    "\"remotes\": [{\"type\": \"streamable-http\", \"url\": \"https://example.com/mcp\"}]}",
+            )
+            val file =
+                writeFile(mcpDir.resolve("quiet.yml"), "id: quiet\nsource: \${PROJECTS_FOLDER}/quiet\nmetadata:\n  version: 1.0.0\n")
+
+            // when / then
+            assertThatThrownBy { mcpLoader.loadAll(mcpLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageStartingWith("Failed to load ${file.absolutePath}: ")
+                .hasMessageContaining(serverJson.absolutePath)
+                .hasMessageContaining("'description'")
+        }
+
+        @Test
         fun `should fail naming the id and both files when two manifests share an id`() {
             // given
             val firstFile = writeFile(mcpDir.resolve("first.yml"), inlineStdio("atlassian"))
