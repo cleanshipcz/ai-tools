@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine.tools.mcp
 
+import cz.cleanship.aitools.engine.models.McpToolRestriction
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Nested
@@ -70,6 +71,40 @@ class CodexTomlMcpConfigFormatTest {
 
                 """.trimIndent(),
             )
+        }
+
+        @Test
+        fun `should write the allowed and denied tools of a server as its enabled and disabled tools, before its sub-tables`() {
+            // given
+            val restricted = httpServer.copy(tools = McpToolRestriction(allow = listOf("get_me", "search_code"), deny = listOf("delete_repository")))
+
+            // when
+            val content = format.merge(null, listOf(restricted), setOf("github"), file)
+
+            // then
+            assertThat(content).startsWith(
+                """
+                [mcp_servers.github]
+                url = "https://api.githubcopilot.com/mcp/"
+                bearer_token_env_var = "GITHUB_TOKEN"
+                enabled_tools = ["get_me", "search_code"]
+                disabled_tools = ["delete_repository"]
+
+                [mcp_servers.github.http_headers]
+                """.trimIndent(),
+            )
+            val table = Toml.parse(content).getTable("mcp_servers.github")!!
+            assertThat(table.getArray("enabled_tools")!!.toList()).containsExactly("get_me", "search_code")
+            assertThat(table.getArray("disabled_tools")!!.toList()).containsExactly("delete_repository")
+        }
+
+        @Test
+        fun `should write neither list for a server without restrictions`() {
+            // when
+            val content = format.merge(null, listOf(stdioServer), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).doesNotContain("enabled_tools").doesNotContain("disabled_tools")
         }
 
         @Test
@@ -340,15 +375,55 @@ class CodexTomlMcpConfigFormatTest {
         }
 
         @Test
-        fun `should name the owned entries an existing file holds`() {
+        fun `should name every entry an existing file holds`() {
             // given
             val existing = "[mcp_servers.github]\nurl = \"x\"\n[mcp_servers.playwright]\ncommand = \"npx\"\n"
 
             // when
-            val owned = format.ownedEntriesIn(existing, setOf("github", "atlassian"), file)
+            val entries = format.entryFingerprints(existing, file).keys
 
             // then
-            assertThat(owned).containsExactly("github")
+            assertThat(entries).containsExactlyInAnyOrder("github", "playwright")
+        }
+
+        @Test
+        fun `should give an entry the same fingerprint however its table is written, since only its parsed content counts`() {
+            // given
+            val table = "[mcp_servers.a]\ncommand = \"x\"\nargs = [\"1\", \"2\"]\n\n[mcp_servers.a.env]\nA = \"1\"\n"
+            val rearranged = "# mine\nmodel = \"o3\"\n\n[mcp_servers.a]\nargs = [ \"1\",\n  \"2\" ]  # tail\ncommand = 'x'\nenv = { A = \"1\" }\n"
+
+            // when
+            val first = format.entryFingerprints(table, file)
+            val second = format.entryFingerprints(rearranged, file)
+
+            // then
+            assertThat(second).isEqualTo(first)
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - another value
+                "[mcp_servers.a]\\ncommand = \"y\"\\nargs = [\"1\", \"2\"]\\n",
+                // - the elements of an array in another order
+                "[mcp_servers.a]\\ncommand = \"x\"\\nargs = [\"2\", \"1\"]\\n",
+                // - one more key
+                "[mcp_servers.a]\\ncommand = \"x\"\\nargs = [\"1\", \"2\"]\\nenabled_tools = [\"get_me\"]\\n",
+                // - a number where a string was
+                "[mcp_servers.a]\\ncommand = \"x\"\\nargs = [1, 2]\\n",
+            ],
+        )
+        fun `should give an entry another fingerprint once its content changes`(changed: String) {
+            // given
+            val original = "[mcp_servers.a]\ncommand = \"x\"\nargs = [\"1\", \"2\"]\n"
+
+            // when
+            val before = format.entryFingerprints(original, file).getValue("a")
+            val after = format.entryFingerprints(changed.replace("\\n", "\n"), file).getValue("a")
+
+            // then
+            assertThat(after).isNotEqualTo(before)
         }
     }
 

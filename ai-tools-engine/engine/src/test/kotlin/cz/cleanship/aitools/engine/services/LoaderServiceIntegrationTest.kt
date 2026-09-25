@@ -1440,6 +1440,76 @@ class LoaderServiceIntegrationTest {
             assertThat(allManifests.mcps).containsKey("s")
         }
 
+        @Test
+        fun `should load an agent that names MCP servers the run declares`() {
+            // given
+            writeFile(mcpDir.resolve("atlassian.yml"), inlineStdio("atlassian"))
+            writeFile(agentDir.resolve("reviewer.yml"), agentUsing("atlassian"))
+
+            // when
+            val allManifests = mcpLoader.loadAll(mcpLocations())
+
+            // then
+            assertThat(allManifests.agents.getValue("reviewer").mcps).containsExactly("atlassian")
+        }
+
+        @Test
+        fun `should fail naming the agent manifest and the server when an agent names an MCP server no manifest declares`() {
+            // given
+            writeFile(mcpDir.resolve("atlassian.yml"), inlineStdio("atlassian"))
+            val agentFile = writeFile(agentDir.resolve("reviewer.yml"), agentUsing("atlassian", "github"))
+
+            // when / then
+            assertThatThrownBy { mcpLoader.loadAll(mcpLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageStartingWith("Failed to load ${agentFile.absolutePath}: ")
+                .hasMessageContaining("'reviewer'")
+                .hasMessageContaining("'github'")
+        }
+
+        @Test
+        fun `should list every agent that names an MCP server no manifest declares in one failure, naming each agent manifest and server`() {
+            // given
+            writeFile(mcpDir.resolve("atlassian.yml"), inlineStdio("atlassian"))
+            val reviewerFile = writeFile(agentDir.resolve("reviewer.yml"), agentUsing("atlassian", "github"))
+            val writer = agentUsing("jira").replace("id: reviewer", "id: writer")
+            val writerFile = writeFile(agentDir.resolve("writer.yml"), writer)
+
+            // when / then
+            assertThatThrownBy { mcpLoader.loadAll(mcpLocations()) }
+                .isInstanceOf(UnknownMcpServersException::class.java)
+                .hasMessageContaining("Failed to load ${reviewerFile.absolutePath}: Agent 'reviewer' uses the MCP server(s) 'github'")
+                .hasMessageContaining("Failed to load ${writerFile.absolutePath}: Agent 'writer' uses the MCP server(s) 'jira'")
+        }
+
+        /**
+         * The pin is the hash `sha256sum` prints for the bytes of the file, checked against a literal value rather than one the test computes the way the reader does.
+         */
+        @Test
+        fun `should load a pointer server whose server json has exactly the pinned hash, and fail naming the manifest once the file changes`() {
+            // given
+            writeGitHubServerJson()
+            val manifest = writeFile(
+                mcpDir.resolve("github.yml"),
+                githubPointer("remote: https://api.githubcopilot.com/mcp/") + "pin: sha256:38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c33372\n",
+            )
+            val loaded = mcpLoader.loadAll(mcpLocations())
+            val serverJson = projectsFolder.resolve("github-mcp-server/server.json")
+            serverJson.appendText(" ")
+
+            // when / then
+            assertThat(loaded.mcps).containsKey("github")
+            assertThatThrownBy { mcpLoader.loadAll(mcpLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageStartingWith("Failed to load ${manifest.absolutePath}: '${serverJson.absolutePath}' has the hash '")
+                .hasMessageContaining("but the manifest pins 'sha256:38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c33372'")
+        }
+
+        private val agentDir: File get() = tempDir.resolve("ai-tools/05_agents").toFile()
+
+        private fun agentUsing(vararg servers: String) =
+            "id: reviewer\ndescription: Reviews\npersona: A reviewer\nprompt: Review\nmcps: [${servers.joinToString()}]\nmetadata:\n  version: 1.0.0\n"
+
         private fun writeGitHubServerJson() {
             File(javaClass.getResource("/mcp/github-mcp-server/server.json")!!.toURI())
                 .copyTo(projectsFolder.resolve("github-mcp-server/server.json"))
@@ -1457,7 +1527,7 @@ class LoaderServiceIntegrationTest {
         }
 
         private fun mcpLocations() = Locations(
-            agents = emptyList(),
+            agents = listOf(agentDir),
             deployments = emptyList(),
             prompts = emptyList(),
             rulesets = emptyList(),

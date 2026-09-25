@@ -1,5 +1,10 @@
 package cz.cleanship.aitools.engine.tools.mcp
 
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.tomlj.Toml
 import org.tomlj.TomlArray
 import org.tomlj.TomlParseResult
@@ -11,7 +16,7 @@ import java.io.File
  *
  * The file is edited as text rather than parsed and written again, because no TOML writer keeps comments: the tables of owned servers are cut out and written again, and every other line of the file is kept byte for byte, its line ending and a missing final newline included; the lines the engine adds end with the line ending most lines of the file use. A comment directly above the next table is kept with that table. Before and after the edit, the file is parsed with tomlj, a conformant TOML 1.0 parser: the edit is refused unless the existing file is valid TOML, every owned server in it is defined as a table of its own, and the edited file is valid TOML whose foreign content is unchanged and whose owned servers are exactly the ones written.
  *
- * Codex expands no `${NAME}` in this file, so a secret is written as the name of the environment variable Codex forwards: `env_vars` for a stdio server, `bearer_token_env_var` for a bearer token, and `env_http_headers` for any other header.
+ * Codex expands no `${NAME}` in this file, so a secret is written as the name of the environment variable Codex forwards: `env_vars` for a stdio server, `bearer_token_env_var` for a bearer token, and `env_http_headers` for any other header. The tools a deployment allows and denies are written as `enabled_tools` and `disabled_tools` of the server.
  */
 object CodexTomlMcpConfigFormat : McpConfigFormat {
 
@@ -59,8 +64,8 @@ object CodexTomlMcpConfigFormat : McpConfigFormat {
         return if (crlf > text.count { it == '\n' } - crlf) "\r\n" else "\n"
     }
 
-    override fun ownedEntriesIn(existing: String, ownedMcpIds: Set<String>, file: File): Set<String> =
-        serversOf(parse(existing, file, "is not valid TOML")).keys.filterTo(mutableSetOf()) { it in ownedMcpIds }
+    override fun entryFingerprints(content: String, file: File): Map<String, String> =
+        serversOf(parse(content, file, "is not valid TOML")).mapValues { (_, entry) -> json(plain(entry)).fingerprint() }
 
     private fun render(server: ResolvedMcpServer): List<String> {
         val table = "$SERVERS_TABLE.${key(server.id)}"
@@ -75,6 +80,7 @@ object CodexTomlMcpConfigFormat : McpConfigFormat {
                     add("command = ${string(transport.command)}")
                     if (transport.args.isNotEmpty()) add("args = ${array(transport.args)}")
                     if (secrets.isNotEmpty()) add("env_vars = ${array(secrets)}")
+                    addAll(toolLists(server))
                     addAll(subTable("$table.env", plain))
                 }
             }
@@ -88,12 +94,25 @@ object CodexTomlMcpConfigFormat : McpConfigFormat {
                     add("[$table]")
                     add("url = ${string(transport.url)}")
                     bearer?.let { add("bearer_token_env_var = ${string(it.variable)}") }
+                    addAll(toolLists(server))
                     addAll(subTable("$table.http_headers", plain))
                     addAll(subTable("$table.env_http_headers", secret))
                 }
             }
         }
     }
+
+    /**
+     * Returns the keys that restrict the tools of [server]: `enabled_tools`, the only tools Codex shows, and `disabled_tools`, the tools it hides; none when the deployment restricts nothing.
+     */
+    private fun toolLists(server: ResolvedMcpServer): List<String> = listOfNotNull(
+        server.tools.allow
+            .takeIf { it.isNotEmpty() }
+            ?.let { "enabled_tools = ${array(it)}" },
+        server.tools.deny
+            .takeIf { it.isNotEmpty() }
+            ?.let { "disabled_tools = ${array(it)}" },
+    )
 
     /**
      * Fails when an owned server of [before] is defined other than through `[mcp_servers.<id>]` tables, such as an inline table, dotted keys or an array of tables, which the engine would otherwise define a second time.
@@ -227,6 +246,19 @@ private fun plain(value: Any?): Any? = when (value) {
 }
 
 private fun plain(table: TomlTable): Map<String, Any?> = table.keySet().associateWith { plain(table.get(listOf(it))) }
+
+/**
+ * Returns [value], a plain TOML value, as the JSON element it would be, so a TOML entry is fingerprinted the way a JSON one is; a date or a time, which JSON lacks, becomes a text naming its type.
+ */
+private fun json(value: Any?): JsonElement = when (value) {
+    null -> JsonNull
+    is Map<*, *> -> JsonObject(value.entries.associate { (key, inner) -> key.toString() to json(inner) })
+    is List<*> -> JsonArray(value.map(::json))
+    is String -> JsonPrimitive(value)
+    is Boolean -> JsonPrimitive(value)
+    is Number -> JsonPrimitive(value)
+    else -> JsonPrimitive("${value.javaClass.simpleName}:$value")
+}
 
 private fun subTable(table: String, entries: List<Pair<String, String>>): List<String> =
     if (entries.isEmpty()) emptyList() else listOf("", "[$table]") + entries.map { (key, value) -> "${key(key)} = ${string(value)}" }

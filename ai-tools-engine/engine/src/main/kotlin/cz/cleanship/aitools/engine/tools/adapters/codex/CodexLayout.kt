@@ -11,7 +11,8 @@ import java.io.File
  * from each other by the prefix of their directory.
  *
  * @param toolDir the `.codex` directory of this scope, whose generated directories a replacing project deploy
- * deletes and which a user deploy never touches beyond the artifacts it writes inside it
+ * deletes and which a user deploy never touches beyond the artifacts it writes inside it and the server tables it owns
+ * in [mcpConfigFile]
  * @param instructionsFile the instructions file Codex reads for this scope, which sits beside `.codex` in a project
  * and inside it in the user scope
  */

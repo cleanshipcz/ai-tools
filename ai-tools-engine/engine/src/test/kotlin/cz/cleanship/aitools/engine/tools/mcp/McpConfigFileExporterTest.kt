@@ -4,14 +4,19 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import cz.cleanship.aitools.engine.io.TargetRoot
+import cz.cleanship.aitools.engine.services.ArtifactSink
+import cz.cleanship.aitools.engine.services.ConfigFileState
 import cz.cleanship.aitools.engine.services.DryRunArtifactSink
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.services.FileSystemArtifactSink
+import cz.cleanship.aitools.engine.services.NewConfigFileMode
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.io.TempDir
@@ -111,14 +116,36 @@ class McpConfigFileExporterTest {
     fun `should remove an owned entry from the file when no server is selected`() {
         // given
         file.parentFile.mkdirs()
-        file.writeText("""{"mcpServers":{"atlassian":{"command":"old"},"playwright":{"command":"npx"}}}""")
+        val existing = """{"mcpServers":{"atlassian":{"command":"old"},"playwright":{"command":"npx"}}}"""
+        file.writeText(existing)
+        // - without a selection, an entry is the engine's only while the ledger records what it holds
+        val recorded = JsonMcpConfigFormat.CURSOR
+            .entryFingerprints(existing, file)
+            .filterKeys { it == "atlassian" }
+            .asRecorded()
         val exporter = McpConfigFileExporter(file, JsonMcpConfigFormat.CURSOR, ExportService(), projectDir)
 
         // when
-        exporter.export(McpContext(emptyList(), setOf("atlassian")))
+        exporter.export(McpContext(emptyList(), setOf("atlassian"), recorded))
 
         // then
         assertThat(file).content().doesNotContain("atlassian").contains("playwright")
+    }
+
+    @Test
+    fun `should leave an entry named after a manifest untouched when no server is selected and the ledger does not record it`() {
+        // given
+        file.parentFile.mkdirs()
+        val existing = """{"mcpServers":{"atlassian":{"command":"mine"},"playwright":{"command":"npx"}}}"""
+        file.writeText(existing)
+        val exporter = McpConfigFileExporter(file, JsonMcpConfigFormat.CURSOR, ExportService(), projectDir)
+
+        // when
+        val prepared = exporter.prepare(McpContext(emptyList(), setOf("atlassian")))
+
+        // then
+        assertThat(prepared).isNull()
+        assertThat(file).hasContent(existing)
     }
 
     @Test
@@ -155,6 +182,142 @@ class McpConfigFileExporterTest {
         assertThat(infos).singleElement().satisfies({
             assertThat(it).contains("MCP servers [atlassian]").contains("removing [retired]").contains(file.absolutePath)
         })
+    }
+
+    /**
+     * The MCP ledger names the entries the engine wrote with the fingerprint of what it wrote: only an entry that still holds exactly that is the engine's to remove.
+     */
+    @Nested
+    inner class RecordedEntries {
+
+        private val format = JsonMcpConfigFormat.CURSOR
+        private val retired = """{"mcpServers":{"retired":{"command":"old"},"playwright":{"command":"npx"}}}"""
+        private val ledgerLogger = LoggerFactory.getLogger(McpLedger::class.java) as Logger
+        private val warnings = ListAppender<ILoggingEvent>()
+
+        @BeforeEach
+        fun setUp() {
+            file.parentFile.mkdirs()
+            warnings.start()
+            ledgerLogger.addAppender(warnings)
+        }
+
+        @AfterEach
+        fun tearDown() {
+            ledgerLogger.detachAppender(warnings)
+            warnings.stop()
+        }
+
+        @Test
+        fun `should remove an entry the ledger records while it still holds what the engine wrote`() {
+            // given
+            file.writeText(retired)
+            val recorded = format.entryFingerprints(retired, file).filterKeys { it == "retired" }.asRecorded()
+            val exporter = McpConfigFileExporter(file, format, ExportService(), projectDir)
+
+            // when
+            exporter.export(McpContext(emptyList(), manifestIds = emptySet(), recorded = recorded))
+
+            // then
+            assertThat(file).content().doesNotContain("retired").contains("playwright")
+            assertThat(warnings.list).isEmpty()
+        }
+
+        /**
+         * A ledger written while an edit was pending records both what the file held and what the edit writes; the entry is the engine's whichever of the two it holds.
+         */
+        @Test
+        fun `should remove an entry the ledger records with several fingerprints while it holds one of them`() {
+            // given
+            file.writeText(retired)
+            val recorded =
+                mapOf("retired" to setOf("sha256:" + "0".repeat(64)) + format.entryFingerprints(retired, file).getValue("retired"))
+            val exporter = McpConfigFileExporter(file, format, ExportService(), projectDir)
+
+            // when
+            exporter.export(McpContext(emptyList(), manifestIds = emptySet(), recorded = recorded))
+
+            // then
+            assertThat(file).content().doesNotContain("retired").contains("playwright")
+            assertThat(warnings.list).isEmpty()
+        }
+
+        @Test
+        fun `should leave an entry the ledger records in place once it changed, warning with the file and the entry`() {
+            // given
+            val recorded = format.entryFingerprints(retired, file).filterKeys { it == "retired" }.asRecorded()
+            // - the entry was edited by hand after the engine wrote it
+            val edited = """{"mcpServers":{"retired":{"command":"mine"},"playwright":{"command":"npx"}}}"""
+            file.writeText(edited)
+            val exporter = McpConfigFileExporter(file, format, ExportService(), projectDir)
+
+            // when
+            val prepared = exporter.prepare(McpContext(emptyList(), manifestIds = emptySet(), recorded = recorded))
+
+            // then
+            assertThat(prepared).isNull()
+            assertThat(file).hasContent(edited)
+            assertThat(warnings.list.filter { it.level == Level.WARN }.map { it.formattedMessage }).singleElement().satisfies({
+                assertThat(it).contains(file.absolutePath).contains("'retired'").contains("changed since the engine wrote it")
+            })
+        }
+
+        @Test
+        fun `should remove nothing on the word of a ledger whose fingerprints the entries do not hold, as one the engine did not write`() {
+            // given
+            file.writeText(retired)
+            val planted =
+                mapOf("retired" to setOf("sha256:" + "0".repeat(64)), "playwright" to setOf("sha256:" + "1".repeat(64), "sha256:" + "2".repeat(64)))
+            val exporter = McpConfigFileExporter(file, format, ExportService(DryRunArtifactSink), projectDir)
+
+            // when
+            val prepared = exporter.prepare(McpContext(emptyList(), manifestIds = emptySet(), recorded = planted))
+
+            // then
+            assertThat(prepared).isNull()
+            assertThat(logAppender.list).isEmpty()
+        }
+
+        @Test
+        fun `should write nothing until the prepared edit is committed, and name what the file then holds of the engine by fingerprint`() {
+            // given
+            file.writeText(retired)
+            val exporter = McpConfigFileExporter(file, format, ExportService(), projectDir)
+
+            // when
+            val prepared =
+                requireNotNull(exporter.prepare(McpContext(listOf(server), manifestIds = setOf("atlassian", "retired"))))
+            val beforeCommit = file.readText()
+            prepared.commit()
+
+            // then
+            assertThat(beforeCommit).isEqualTo(retired)
+            assertThat(prepared.file).isEqualTo(file)
+            assertThat(prepared.entries).isEqualTo(format.entryFingerprints(file.readText(), file).filterKeys { it == "atlassian" })
+            assertThat(file)
+                .content()
+                .contains("atlassian")
+                .contains("playwright")
+                .doesNotContain("retired")
+        }
+
+        @Test
+        fun `should refuse to commit an edit whose file changed after it was prepared, leaving the file as it is`() {
+            // given
+            file.writeText(retired)
+            val exporter = McpConfigFileExporter(file, format, ExportService(), projectDir)
+            val prepared =
+                requireNotNull(exporter.prepare(McpContext(listOf(server), manifestIds = setOf("atlassian"))))
+            val changed = """{"mcpServers":{"playwright":{"command":"changed"}}}"""
+            file.writeText(changed)
+
+            // when / then
+            assertThatThrownBy { prepared.commit() }
+                .isInstanceOf(McpConfigFileException::class.java)
+                .hasMessageContaining(file.absolutePath)
+                .hasMessageContaining("changed while the engine merged it")
+            assertThat(file).hasContent(changed)
+        }
     }
 
     @Test
@@ -215,6 +378,92 @@ class McpConfigFileExporterTest {
             .isInstanceOf(McpConfigFileException::class.java)
             .hasMessageContaining(file.absolutePath)
         assertThat(file).hasContent("""{"mcpServers":{"written-by-a-tool":{}}}""")
+    }
+
+    @Test
+    fun `should leave the file as the tool wrote it and fail naming it when it changes after the merge was checked, right before it is replaced`() {
+        // given
+        file.parentFile.mkdirs()
+        file.writeText("""{"mcpServers":{}}""")
+        // - a tool rewrites the file after the engine checked it once more, while the sink writes the merged content
+        val racing = object : ArtifactSink by FileSystemArtifactSink {
+            override fun writeConfigFile(
+                targetFile: File,
+                content: String,
+                describedBy: String,
+                unchangedFrom: ConfigFileState,
+                createdAs: NewConfigFileMode,
+            ) {
+                targetFile.writeText("""{"mcpServers":{"written-by-a-tool":{}}}""")
+                FileSystemArtifactSink.writeConfigFile(targetFile, content, describedBy, unchangedFrom, createdAs)
+            }
+        }
+        val exporter = McpConfigFileExporter(file, JsonMcpConfigFormat.CURSOR, ExportService(racing), projectDir)
+
+        // when / then
+        assertThatThrownBy { exporter.export(McpContext(listOf(server), setOf("atlassian"))) }
+            .isInstanceOf(McpConfigFileException::class.java)
+            .hasMessageContaining(file.absolutePath)
+            .hasMessageContaining("changed while the engine merged it")
+        assertThat(file).hasContent("""{"mcpServers":{"written-by-a-tool":{}}}""")
+    }
+
+    @Test
+    fun `should refuse a file that is not valid UTF-8, which a rewrite could not give back byte for byte`() {
+        // given
+        file.parentFile.mkdirs()
+        val existing =
+            byteArrayOf('{'.code.toByte(), '"'.code.toByte(), 0xC3.toByte(), '"'.code.toByte(), ':'.code.toByte(), '1'.code.toByte(), '}'.code.toByte())
+        file.writeBytes(existing)
+        val exporter = McpConfigFileExporter(file, JsonMcpConfigFormat.CURSOR, ExportService(), projectDir)
+
+        // when / then
+        assertThatThrownBy { exporter.export(McpContext(listOf(server), setOf("atlassian"))) }
+            .isInstanceOf(McpConfigFileException::class.java)
+            .hasMessageContaining(file.absolutePath)
+            .hasMessageContaining("not valid UTF-8")
+        assertThat(file.readBytes()).isEqualTo(existing)
+    }
+
+    @Test
+    fun `should write through a tool directory and a config file of the home that link outside it, as a dotfile repository does`() {
+        // given
+        val home = tempDir.resolve("home")
+        val dotfiles = tempDir.resolve("dotfiles")
+        dotfiles.resolve("codex").mkdirs()
+        home.mkdirs()
+        Files.createSymbolicLink(home.resolve(".codex").toPath(), dotfiles.resolve("codex").toPath())
+        dotfiles.resolve("claude.json").writeText("{\"numStartups\": 1}\n")
+        Files.createSymbolicLink(home.resolve(".claude.json").toPath(), dotfiles.resolve("claude.json").toPath())
+        val codex =
+            McpConfigFileExporter(home.resolve(".codex/config.toml"), CodexTomlMcpConfigFormat, ExportService(), TargetRoot.UserHome(home))
+        val claude =
+            McpConfigFileExporter(home.resolve(".claude.json"), JsonMcpConfigFormat.CLAUDE_CODE_USER, ExportService(), TargetRoot.UserHome(home))
+
+        // when
+        codex.export(McpContext(listOf(server), setOf("atlassian")))
+        claude.export(McpContext(listOf(server), setOf("atlassian")))
+
+        // then
+        assertThat(dotfiles.resolve("codex/config.toml")).content().contains("[mcp_servers.atlassian]")
+        assertThat(dotfiles.resolve("claude.json")).content().startsWith("{\"numStartups\": 1,").contains("\"atlassian\"")
+        assertThat(Files.isSymbolicLink(home.resolve(".claude.json").toPath())).isTrue()
+    }
+
+    @Test
+    fun `should refuse a tool directory of the home that is a link leading nowhere, naming the file`() {
+        // given
+        val home = tempDir.resolve("home")
+        home.mkdirs()
+        Files.createSymbolicLink(home.resolve(".codex").toPath(), tempDir.resolve("dotfiles/missing").toPath())
+        val codex =
+            McpConfigFileExporter(home.resolve(".codex/config.toml"), CodexTomlMcpConfigFormat, ExportService(), TargetRoot.UserHome(home))
+
+        // when / then
+        assertThatThrownBy { codex.export(McpContext(listOf(server), setOf("atlassian"))) }
+            .isInstanceOf(McpConfigFileException::class.java)
+            .hasMessageContaining(home.resolve(".codex/config.toml").absolutePath)
+            .hasMessageContaining("cannot be followed")
     }
 
     @Test

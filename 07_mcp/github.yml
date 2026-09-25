@@ -5,10 +5,13 @@ id: github
 source: ${PROJECTS_FOLDER}/github-mcp-server
 select:
   remote: https://api.githubcopilot.com/mcp/
+# The SHA-256 hash of that server.json: loading fails when the checkout changes it, until the change is reviewed and the pin updated.
+pin: sha256:38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c33372
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: cleanshipcz
   created: 2026-09-24
+  updated: 2026-09-25
   tags:
     - ai-tools
     - github

@@ -3,7 +3,7 @@ package cz.cleanship.aitools.engine.tools.mcp
 import java.io.File
 
 /**
- * The file format of one tool's MCP config file, merged at the level of single server entries: the engine owns an entry only when its name is the id of an MCP server manifest of the run.
+ * The file format of one tool's MCP config file, merged at the level of single server entries: the engine owns an entry only when its name is one of the owned ids its caller passes - see [McpContext].
  */
 interface McpConfigFormat {
 
@@ -20,14 +20,14 @@ interface McpConfigFormat {
     fun merge(existing: String?, servers: List<ResolvedMcpServer>, ownedMcpIds: Set<String>, file: File): String
 
     /**
-     * Returns the names of [ownedMcpIds] that [existing] holds an entry for.
+     * Returns the fingerprint of every server entry [content] holds, by entry name, computed from the parsed entry, so it is the same whatever the layout of the file and the order of the keys of the entry, and another one once its content changes - see [fingerprint].
      *
-     * @throws McpConfigFileException naming [file], and never quoting its content, if [existing] cannot be read in this format
+     * @throws McpConfigFileException naming [file], and never quoting its content, if [content] cannot be read in this format
      */
-    fun ownedEntriesIn(existing: String, ownedMcpIds: Set<String>, file: File): Set<String>
+    fun entryFingerprints(content: String, file: File): Map<String, String>
 }
 
 /**
- * Thrown when an existing MCP config file cannot be read in the format of its tool without losing part of it, or changed while it was merged, so the engine leaves it untouched instead of rewriting it. It fails only the MCP config file of the deployment that writes it, and never quotes the content of the file.
+ * Thrown when a file the engine edits in place - an MCP config file, a permissions file or the MCP ledger - cannot be reached, read or merged without losing part of it, cannot be written, or changed while it was merged, so the engine leaves it untouched instead of rewriting it. Its message names the file and never quotes its content.
  */
 class McpConfigFileException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)

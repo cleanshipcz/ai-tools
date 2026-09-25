@@ -125,6 +125,8 @@ CLAUDE.md
 .vscode/mcp.json
 .cursor/mcp.json
 .codex/config.toml
+# The record of the MCP entries the engine wrote into those files, which a later deploy reads to remove the ones no longer selected.
+.ai-tools/
 
 # Local configuration
 config.local.yml

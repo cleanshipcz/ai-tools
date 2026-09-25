@@ -1,14 +1,18 @@
 package cz.cleanship.aitools.engine.tools.mcp
 
+import cz.cleanship.aitools.engine.models.McpToolRestriction
+
 /**
  * An MCP server as every MCP config file renders it: every plain value resolved, every secret one only named.
  *
  * @property id the name of the server entry, which is the id of its manifest
  * @property transport how a tool starts or reaches the server
+ * @property tools the tools of the server the deployment allows and denies, which a format renders when its tool reads them from the server entry, as Codex does
  */
 data class ResolvedMcpServer(
     val id: String,
     val transport: ResolvedMcpTransport,
+    val tools: McpToolRestriction = McpToolRestriction(),
 )
 
 /**

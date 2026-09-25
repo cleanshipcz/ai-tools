@@ -187,6 +187,20 @@ class ExportServiceTest {
         }
 
         @Test
+        fun `should name a config file it would delete without deleting it`() {
+            // given
+            targetFile.parentFile.mkdirs()
+            targetFile.writeText("{}\n")
+
+            // when
+            dryRunService.deleteConfigFile(targetFile, describedBy = "the MCP ledger", unchangedFrom = ConfigFileState.Exactly("{}\n"))
+
+            // then
+            assertThat(targetFile).hasContent("{}\n")
+            assertThat(infos()).anyMatch { it.contains("Would delete") && it.contains("the MCP ledger") && it.contains(targetFile.absolutePath) }
+        }
+
+        @Test
         fun `should name the absolute target path of the artifact it would write`() {
             // when
             dryRunService.export(ruleset, targetFile) { output -> output.appendLine("content") }

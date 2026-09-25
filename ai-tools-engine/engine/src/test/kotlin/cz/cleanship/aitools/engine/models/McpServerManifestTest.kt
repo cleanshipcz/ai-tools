@@ -179,6 +179,26 @@ class McpServerManifestTest {
     }
 
     @Test
+    fun `should decode the pin of a pointer server and leave it null when the manifest declares none`() {
+        // given
+        val input = """
+            |id: github
+            |source: ${'$'}{PROJECTS_FOLDER}/github-mcp-server
+            |pin: sha256:38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c33372
+            |metadata:
+            |    version: 1.0.0
+        """.trimMargin()
+
+        // when
+        val result = yaml.decodeFromString(McpServerManifest.serializer(), input)
+
+        // then
+        assertThat(result.pin).isEqualTo("sha256:38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c33372")
+        assertThat(result.copy(pin = null).pin).isNull()
+        assertThat(yaml.decodeFromString(McpServerManifest.serializer(), input.lines().filterNot { it.startsWith("pin:") }.joinToString("\n")).pin).isNull()
+    }
+
+    @Test
     fun `should reject a transport type the model does not declare`() {
         // given
         val input = """

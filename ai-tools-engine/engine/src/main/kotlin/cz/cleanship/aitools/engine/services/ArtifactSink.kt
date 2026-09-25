@@ -11,15 +11,19 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.CopyOption
 import java.nio.file.FileSystemException
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.PosixFilePermissions
 
 /**
  * Where the artifacts of a run end up: on disk in a deploy, nowhere in a dry run.
  *
- * It is the only thing that separates the two kinds of run. [ExportService] resolves and validates exactly the same way for both and hands the sink a target that is already known to be legitimate, so a dry run reports every failure a deploy would - a printer that cannot resolve a reference, a companion file that does not exist or cannot be read, an artifact directory outside its scope - and differs from a deploy in nothing but the writes. A write the file system refuses is therefore found only by a deploy: a dry run finds a tool directory that is a dangling or looping link, or not a directory, only through the MCP config file in it, which is checked before anything is written, and a read-only directory not at all.
+ * It is the only thing that separates the two kinds of run. [ExportService] resolves and validates exactly the same way for both and hands the sink a target that is already known to be legitimate, so a dry run reports every failure a deploy would - a printer that cannot resolve a reference, a companion file that does not exist or cannot be read, an artifact directory outside its scope - and differs from a deploy in nothing but the writes. A write the file system refuses is therefore found only by a deploy, such as one into a read-only directory; a tool directory that is a dangling or looping link, or not a directory, is found in both, because the engine checks every tool directory before it writes the files of that tool - see [cz.cleanship.aitools.engine.io.requireToolDirectory].
  */
 interface ArtifactSink {
 
@@ -45,9 +49,28 @@ interface ArtifactSink {
      * A config file is one the user owns alongside the engine: an existing one keeps its permission bits. [targetFile] is the file itself, never a symbolic link; the caller decides where a link at a config path may lead.
      *
      * @param describedBy what [content] holds, as the log line names it
+     * @param unchangedFrom what [targetFile] held when the caller read it; the file is replaced only while it still holds exactly that, checked once the new content is ready to be moved into place
+     * @param createdAs who may read and write [targetFile] when it does not exist yet; an existing file keeps its permission bits whatever this says
+     * @throws ConfigFileChangedException naming [targetFile] if it no longer holds what [unchangedFrom] says, which leaves it as it is; a sink that only says it would write never throws it
      * @throws java.io.IOException if [targetFile] or the directory holding it cannot be written, which leaves [targetFile] as it was; a sink that only says it would write never throws it
      */
-    fun writeConfigFile(targetFile: File, content: String, describedBy: String)
+    fun writeConfigFile(
+        targetFile: File,
+        content: String,
+        describedBy: String,
+        unchangedFrom: ConfigFileState = ConfigFileState.Unchecked,
+        createdAs: NewConfigFileMode = NewConfigFileMode.DEFAULT,
+    )
+
+    /**
+     * Deletes the config file [targetFile], or only says that it would.
+     *
+     * @param describedBy what [targetFile] holds, as the log line names it
+     * @param unchangedFrom what [targetFile] held when the caller read it; the file is deleted only while it still holds exactly that
+     * @throws ConfigFileChangedException naming [targetFile] if it no longer holds what [unchangedFrom] says, which leaves it as it is; a sink that only says it would delete never throws it
+     * @throws java.io.IOException if [targetFile] cannot be deleted; a sink that only says it would delete never throws it
+     */
+    fun deleteConfigFile(targetFile: File, describedBy: String, unchangedFrom: ConfigFileState)
 
     /**
      * Removes [artifactDir] and everything under it before it is written again, or only says that it would. Both refuse a directory that is not inside [owned] - see [cz.cleanship.aitools.engine.io.deleteArtifactDirectoryWithin].
@@ -80,10 +103,26 @@ object FileSystemArtifactSink : ArtifactSink {
     }
 
     /**
-     * Writes [content] to [targetFile] atomically, the way [export] writes an artifact. An existing file keeps its permission bits: the temporary file is created with them, before any content is written into it.
+     * Writes [content] to [targetFile] atomically, the way [export] writes an artifact. An existing file keeps its permission bits, and a new one gets those [createdAs] names: the temporary file is created with them, before any content is written into it.
      */
-    override fun writeConfigFile(targetFile: File, content: String, describedBy: String) {
-        val permissions = targetFile.takeIf { it.exists() }?.let { runCatching { Files.getPosixFilePermissions(it.toPath()) }.getOrNull() }
+    override fun writeConfigFile(
+        targetFile: File,
+        content: String,
+        describedBy: String,
+        unchangedFrom: ConfigFileState,
+        createdAs: NewConfigFileMode,
+    ) {
+        val permissions = if (targetFile.exists()) {
+            runCatching { Files.getPosixFilePermissions(targetFile.toPath()) }.getOrNull()
+        } else {
+            OWNER_ONLY.takeIf {
+                createdAs == NewConfigFileMode.OWNER_ONLY && targetFile
+                    .toPath()
+                    .fileSystem
+                    .supportedFileAttributeViews()
+                    .contains("posix")
+            }
+        }
         targetFile.parentFile.mkdirs()
         val temporaryFile = if (permissions == null) {
             File.createTempFile(temporaryPrefix(targetFile), ".tmp", targetFile.parentFile).toPath()
@@ -94,11 +133,29 @@ object FileSystemArtifactSink : ArtifactSink {
             // The attribute of createTempFile is narrowed by the umask, so the bits are set once more, still before the content is written.
             permissions?.let { Files.setPosixFilePermissions(temporaryFile, it) }
             Files.writeString(temporaryFile, content)
-            Files.move(temporaryFile, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            // Checked as late as the content allows: a tool rewriting the file, such as Claude Code with ~/.claude.json, would otherwise lose what it wrote since the caller read it. A write in the instant between this check and the move is not caught.
+            requireUnchanged(targetFile, unchangedFrom)
+            moveIntoPlace(temporaryFile, targetFile.toPath())
         } finally {
             Files.deleteIfExists(temporaryFile)
         }
         LOG.info("Wrote {} to {}", describedBy, targetFile.absolutePath)
+    }
+
+    override fun deleteConfigFile(targetFile: File, describedBy: String, unchangedFrom: ConfigFileState) {
+        requireUnchanged(targetFile, unchangedFrom)
+        Files.deleteIfExists(targetFile.toPath())
+        LOG.info("Deleted {} at {}", describedBy, targetFile.absolutePath)
+    }
+
+    private fun requireUnchanged(targetFile: File, unchangedFrom: ConfigFileState) {
+        val path = targetFile.toPath()
+        val unchanged = when (unchangedFrom) {
+            ConfigFileState.Unchecked -> true
+            ConfigFileState.Absent -> !Files.exists(path, LinkOption.NOFOLLOW_LINKS)
+            is ConfigFileState.Exactly -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) && Files.readAllBytes(path).contentEquals(unchangedFrom.content.toByteArray(Charsets.UTF_8))
+        }
+        if (!unchanged) throw ConfigFileChangedException(targetFile)
     }
 
     // File.createTempFile refuses a prefix of fewer than three characters, so a short name such as 'a' is padded; it keeps File.createTempFile, whose file takes the default permissions an artifact is written with, where Files.createTempFile would make it readable by its owner only.
@@ -110,7 +167,7 @@ object FileSystemArtifactSink : ArtifactSink {
         val temporaryFile = File.createTempFile(temporaryPrefix(targetFile), ".tmp", targetDir)
         try {
             write(temporaryFile)
-            Files.move(temporaryFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            moveIntoPlace(temporaryFile.toPath(), targetFile.toPath())
         } finally {
             // No-op once the move above succeeded, cleans up the partial write otherwise.
             temporaryFile.delete()
@@ -165,6 +222,8 @@ object FileSystemArtifactSink : ArtifactSink {
 
     private const val MIN_TEMPORARY_PREFIX = 3
 
+    private val OWNER_ONLY = PosixFilePermissions.fromString("rw-------")
+
     private val LOG = LoggerFactory.getLogger(FileSystemArtifactSink::class.java)
 }
 
@@ -186,8 +245,18 @@ object DryRunArtifactSink : ArtifactSink {
         LOG.info("Would copy skill file {} to {}", sourceFile.absolutePath, targetFile.absolutePath)
     }
 
-    override fun writeConfigFile(targetFile: File, content: String, describedBy: String) {
+    override fun writeConfigFile(
+        targetFile: File,
+        content: String,
+        describedBy: String,
+        unchangedFrom: ConfigFileState,
+        createdAs: NewConfigFileMode,
+    ) {
         LOG.info("Would write {} to {}", describedBy, targetFile.absolutePath)
+    }
+
+    override fun deleteConfigFile(targetFile: File, describedBy: String, unchangedFrom: ConfigFileState) {
+        LOG.info("Would delete {} at {}", describedBy, targetFile.absolutePath)
     }
 
     override fun replaceArtifactDirectory(artifactDir: File, owned: File, describedBy: String) {
@@ -197,6 +266,46 @@ object DryRunArtifactSink : ArtifactSink {
 
     private val LOG = LoggerFactory.getLogger(DryRunArtifactSink::class.java)
 }
+
+/**
+ * Who may read and write a config file the engine creates.
+ */
+enum class NewConfigFileMode {
+    /** The permission bits every artifact of the engine is created with. */
+    DEFAULT,
+
+    /** Readable and writable by its owner only, as a file of the home that a tool later adds session state or a key to must be. */
+    OWNER_ONLY,
+}
+
+/**
+ * What a config file held when the engine read it, which a sink compares with what it holds right before replacing or deleting it.
+ */
+sealed interface ConfigFileState {
+
+    /** The file is replaced whatever it holds. */
+    data object Unchecked : ConfigFileState
+
+    /** The file did not exist. */
+    data object Absent : ConfigFileState
+
+    /** The file held exactly [content], encoded as UTF-8. */
+    data class Exactly(val content: String) : ConfigFileState
+
+    companion object {
+        /** Returns the state of a file that held [content], or did not exist when it is `null`. */
+        fun of(content: String?): ConfigFileState = if (content == null) Absent else Exactly(content)
+    }
+}
+
+/**
+ * Thrown when a config file no longer holds what the engine read from it, because another program wrote it in the meantime, naming the file and never its content.
+ *
+ * @property targetFile the config file that changed
+ */
+class ConfigFileChangedException(
+    val targetFile: File,
+) : IOException("'${targetFile.absolutePath}' changed while the engine merged it")
 
 /**
  * Thrown when the artifact [targetFile] cannot be written, naming it, the class of the failure that stopped the write and the reason the operating system gave, never content.
@@ -223,3 +332,22 @@ private fun IOException.osReason(): String? = when {
 private val TRAILING_REASON = Regex("""\(([^()]+)\)$""")
 
 private val PLAIN_REASON = Regex("""[A-Za-z][A-Za-z ,-]*""")
+
+/**
+ * Moves [source] onto [target], replacing it: atomically, so a reader sees either the old or the new file, where the file system can, and as a plain replacing move where it cannot.
+ *
+ * @param move moves a file with the option it is given, as [Files.move] does
+ * @throws java.io.IOException if [source] cannot be moved onto [target]
+ */
+internal fun moveIntoPlace(
+    source: Path,
+    target: Path,
+    move: (Path, Path, CopyOption) -> Unit = { from, to, option -> Files.move(from, to, option) },
+) {
+    try {
+        // The JDK replaces an existing target in an atomic move on Linux, macOS and Windows alike, and ignores REPLACE_EXISTING beside ATOMIC_MOVE, so only the one is passed.
+        move(source, target, StandardCopyOption.ATOMIC_MOVE)
+    } catch (_: AtomicMoveNotSupportedException) {
+        move(source, target, StandardCopyOption.REPLACE_EXISTING)
+    }
+}

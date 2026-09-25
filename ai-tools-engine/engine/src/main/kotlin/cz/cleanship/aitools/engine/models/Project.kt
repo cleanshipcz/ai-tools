@@ -14,11 +14,11 @@ data class Project(
      */
     val pointerSourceDirs: List<java.io.File>,
     /**
-     * The MCP servers this project selects, in the order they are rendered; empty when it selects none, and then no MCP config file is read or written.
+     * The MCP servers this project selects, in the order they are rendered; empty when it selects none, and then an MCP config file is changed only to remove the entries the MCP ledger records for it.
      */
     val mcps: Map<String, McpServer> = emptyMap(),
     /**
-     * The id of every MCP server of the run, whether this project selects it or not: the entries the engine owns in the MCP config files of a project that selects any.
+     * The id of every MCP server manifest of the run, whether this project selects it or not - see [cz.cleanship.aitools.engine.tools.mcp.McpOwnership.ownedServerEntries] for the entries of an MCP config file the engine owns.
      */
     val ownedMcpIds: Set<String> = emptySet(),
 )

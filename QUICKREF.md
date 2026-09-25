@@ -9,17 +9,15 @@ Manifests are parsed in strict mode: **an unknown key fails the run**, so do not
 # First-run setup: checks prerequisites, builds the engine
 ./setup.sh
 
-# Validate every manifest without writing anything: parses, filters, resolves
-# every ruleset, fragment, and skill-file reference, and logs what a real run
-# would write where
+# Validate every manifest without writing anything: parses, filters, resolves every ruleset, fragment, and skill-file reference, and logs what a real run would write where
 ./deploy.sh --dry-run
 
-# Try a run first: user.yml manifests land in a scratch home instead of your own
-./deploy.sh --user-home /tmp/try
+# See what the user.yml manifests would write into a scratch home instead of your own; a run without --dry-run deploys every project for real
+./deploy.sh --dry-run --user-home /tmp/try
 
 # Generate and deploy configs for every deployment manifest
-# WARNING: with a user.yml in play, this rewrites ~/.claude/CLAUDE.md and
-# ~/.codex/AGENTS.md from the manifest, keeping no backup of what they held
+# WARNING: with a user.yml in play, this rewrites ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md from the manifest, keeping no backup of what they held
+# A user.yml with an mcps block also edits ~/.claude.json: close every Claude Code session first
 ./deploy.sh
 
 # What deploy.sh runs under the hood
@@ -36,7 +34,7 @@ The inner quotes in that snippet survive Gradle's own splitting of `--args`, whi
 
 The CLI has three options besides `--help`, and no subcommands:
 
-- `--dry-run` — load, filter, and render everything exactly as a deploy would, report every failure a deploy would report except a file a tool cannot write (see [Validation](#validation)), and write nothing. This is how manifests are validated.
+- `--dry-run` — load, filter, and render everything exactly as a deploy would, report every failure a deploy would report except a write the file system refuses (see [Validation](#validation)), and write nothing. This is how manifests are validated.
 - `--working-dir` — the directory holding `config.yml`. Defaults to `.`; `deploy.sh` sets it to the directory it was started from.
 - `--user-home` — the home a `user.yml` deploys under. Defaults to the home of the current user. A relative value resolves against `--working-dir`, a value that is `~` or starts with `~/` resolves against the home directory, an empty value is rejected, and a home that does not exist yet is created.
 
@@ -104,6 +102,8 @@ prompt: |
   1) ...
 constraints:
   - "Never do X."
+mcps:                  # optional: ids of MCP server manifests this agent uses
+  - github
 metadata:
   version: 1.0.0
   tags:
@@ -111,6 +111,7 @@ metadata:
 ```
 
 `persona` and `prompt` are both required and are plain strings.
+`mcps` names MCP servers by id; every deployment that deploys the agent must select each of them, or that deployment is not exported. Claude Code gets `mcpServers: [github]` in the agent frontmatter. GitHub Copilot, Codex, Cursor, Windsurf and Antigravity get nothing, with a warning; a Copilot agent file never carries `tools`, so it keeps its built-in tools. Unknown ids of several agents are reported in one failure. See [07_mcp/README.md](07_mcp/README.md#attaching-servers-to-an-agent).
 There is no `purpose`, no `capabilities`, and no `defaults` block — model and temperature are not configurable here.
 
 ## Creating a Prompt
@@ -245,6 +246,7 @@ The messages and their fixes are listed in [04_skills/README.md](04_skills/READM
 
 An MCP server manifest lives in `07_mcp/<id>.yml`; its model is `McpServerManifest.kt`.
 A project selects it with `deploy.mcps`, and every deploy merges it into `.mcp.json` (Claude Code), `.vscode/mcp.json` (GitHub Copilot), `.cursor/mcp.json` (Cursor), and `.codex/config.toml` (Codex) under its id.
+A user deployment selects it with a top-level `mcps` block, and every deploy merges it into `~/.claude.json` (Claude Code) and `~/.codex/config.toml` (Codex).
 Windsurf and Antigravity get no MCP config file; the run warns that the servers are not deployed for them.
 The full reference is [07_mcp/README.md](07_mcp/README.md).
 
@@ -288,10 +290,13 @@ id: github
 source: ${PROJECTS_FOLDER}/github-mcp-server   # the server.json, or the folder holding it
 select:                         # optional when server.json declares exactly one package or remote
   remote: https://api.githubcopilot.com/mcp/   # or: package: <identifier>
+pin: sha256:38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c33372   # optional: SHA-256 of the server.json bytes
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   tags: [ai-tools]
 ```
+
+`pin` is `sha256:` followed by 64 lowercase hexadecimal digits. A pointer without a pin loads with a warning that prints the value to add. When the `server.json` holds other bytes than the pin, loading fails naming the manifest, the file, and both hashes, and the whole run stops. A `pin` on an inline server fails loading. See [Pinning a pointer server](07_mcp/README.md#pinning-a-pointer-server).
 
 - `${NAME}` in `args`, `env`, `url`, and `headers` must name a declared variable. Any other `${` fails loading: an undeclared name, `${NAME:-default}`, `${env:NAME}`, `${input:id}`, or a nested reference.
 - `command` is a path. `${NAME}` in it is a variable of the run (`env_vars` or the environment of the run), never a declared variable. A bare `~` or a leading `~/` is the home of the user running the engine, whatever `--user-home` the run uses. A relative command, such as `uvx`, is written as it is, for the tool to find on its `PATH`.
@@ -299,8 +304,9 @@ metadata:
 - The engine never uses the value of a secret variable (`secret: true`); it only checks whether the environment of the run sets it. It is written as `${NAME}` for Claude Code (`${NAME:-}` when optional), `${env:NAME}` for VS Code and Cursor, and in `env_vars`, `bearer_token_env_var`, or `env_http_headers` for Codex.
 - The value of a secret must be in the environment of the tool process, such as the shell you start `claude` or `codex` from. `env_vars` of `config.local.yml` is not enough: the engine reads it only while deploying and never uses the value of a secret, so the value never reaches the tool. A deploy does not need the value; every run warns about each secret of a selected server that the environment of the run does not set.
 - Because Codex has no `${NAME}` expansion, a secret may appear only in the environment of a stdio server, or as a whole header value `${NAME}` or `Authorization: Bearer ${NAME}` of an http server. Anywhere else fails the run.
-- A plain variable (`secret: false`) is resolved at deploy time from `env_vars` of the config files only, never from the environment of the run, and written as its value. A required one `env_vars` does not declare fails the MCP config files of every project that selects the server. An optional one it does not declare is left out, unless it is used in `args` or `url`, which fails the same way.
-- MCP servers are opt-in: a project without a `deploy.mcps` block selects none, unlike every other kind, and a project that selects none never reads or writes any MCP config file. `mcps: {}` selects every MCP server manifest.
+- A plain variable (`secret: false`) is resolved at deploy time from `env_vars` of the config files only, never from the environment of the run, and written as its value. A required one `env_vars` does not declare fails the MCP config files of every deployment that selects the server. An optional one it does not declare is left out, unless it is used in `args` or `url`, which fails the same way.
+- MCP servers are opt-in: a project without a `deploy.mcps` block, or a `user.yml` without an `mcps` block, selects none, unlike every other kind. `mcps: {}` selects every MCP server manifest.
+- A deployment that selects no server writes no server entry, but still removes the entries its [ledger](07_mcp/README.md#the-ledger) records. Without a ledger, it reads and writes no MCP config file.
 - A pointer's `server.json` is data. The full rules are in [07_mcp/README.md](07_mcp/README.md#a-pointer-server):
   - Text holding `${` fails loading.
   - A variable is secret when it or any input around it is `isSecret`.
@@ -312,14 +318,40 @@ metadata:
   - Every run logs the names of the variables each pointer passes and sets, never a value.
 - The url of every http server must start with `http://` or `https://` followed by a host. A url that starts with written text is checked when loading. That text must include at least the start of the host, so `https://mcp.${DOMAIN}/mcp` passes and `https://${HOST}/mcp` fails. A url that starts with a variable, such as `${BASE}/mcp`, is checked once resolved. The url must not carry a user or password. When the server sends a secret header, the url must start with `https://` as written. See the [URL rules](07_mcp/README.md#url-rules).
 - Every `.yml` and `.yaml` file under a directory of `locations.mcps` (`07_mcp/` by default), at any depth, is loaded as an MCP server manifest.
-- In a project that selects servers, the engine owns the entries named after any MCP server manifest of the run. It keeps every other entry, removes an owned entry the project does not select, rewrites an owned entry in full, and never deletes an MCP config file, `replace: true` included.
-- Every edit is verified before it is written: the file must parse, foreign content must stay unchanged, and the owned entries must be exactly the selected servers. Otherwise the file is left untouched and the project fails for that tool.
-- A rewritten file keeps its permission bits.
-- An MCP config file is written only inside the project once links are resolved, a linked parent directory such as `.codex` included. A link at the file or above it that leads outside the project, nowhere, or in a loop fails that project and tool, in a dry run as in a deploy.
-- Anything at the path of an MCP config file that is not a regular file fails that project and tool without being opened. So does anything above it that is not a directory, in a dry run as in a deploy.
-- Any other file a tool cannot write in a project, such as one under a broken `.claude` or `.github`, or under a broken `.codex` of a project that selects no MCP server, is found only by a real deploy. There it fails that project and tool: no further files of that tool are written in that project, and every other tool and project is still deployed.
-- The four MCP config files hold plain values resolved on one machine. They are gitignored in this repository; add them to the `.gitignore` of every other project that selects servers. See [what a deploy lets a tool start](07_mcp/README.md#what-a-deploy-lets-a-tool-start) before you select a server.
-- User scope, per-agent attachment, Windsurf, tool allow and deny lists, and a secrets manager are not supported yet; see [PLANNED_FEATURES.md](PLANNED_FEATURES.md#mcps).
+- In a deployment that selects servers, the engine owns the entries named after any MCP server manifest of the run, whatever they hold, plus the entries its ledger records while they hold the recorded content. A hand-edited entry named after a manifest is replaced or removed without a warning. It keeps every other entry, removes an owned entry the deployment does not select, rewrites an owned entry in full, and never deletes an MCP config file, `replace: true` included.
+- The ledger is `.ai-tools/mcp-ledger.json` in a project and `~/.ai-tools/mcp-ledger.json` for the user scope. Version 2 lists, per file, each entry the engine wrote with a `sha256:` fingerprint of its content; a version 1 ledger is refused. A later deploy removes a recorded entry its deployment no longer selects: by name while the deployment selects servers, whatever the entry holds; otherwise, when the deployment selects no server or the entry's manifest no longer exists, only while the entry still holds a recorded fingerprint, and a changed entry is kept with a warning. A fingerprint is not a secret, so a planted ledger can still remove an entry whose content it knows; every removal is logged, and a dry run shows each one. Gitignore `.ai-tools/`. See [The ledger](07_mcp/README.md#the-ledger).
+- The whole run is planned before anything is exported. When two deployments of the run declare an `mcps` block and write the same MCP file, compared by real path, both fail for that file. A deployment without an `mcps` block never touches a file another deployment covers.
+- Every edit is verified before it is written: the file must parse, foreign content must stay unchanged, and the owned entries must be exactly the selected servers. A JSON file must hold no raw control character in a string and nest no deeper than 512 levels. Otherwise the file is left untouched and the deployment fails for that tool.
+- A rewritten file keeps its permission bits. A file created under the home gets the mode `0600`.
+- A name read from a file or a manifest is named in a message with control and format characters escaped as `\uXXXX`, and cut to 160 characters.
+- `~/.claude.json` and every `settings.json` are edited in place: every byte outside the owned entries is kept. A file that changes between the read and the write is refused, so deploy a user scope with MCP servers while no Claude Code session runs; see [The user scope](07_mcp/README.md#the-user-scope).
+- In a project, an MCP config file is written only inside the project once links are resolved, a linked parent directory included. A link at the file or above it that leads outside the project, nowhere, or in a loop fails that project and tool, in a dry run as in a deploy. In the user scope, a link may lead anywhere but must lead to something.
+- Anything at the path of an MCP config file that is not a regular file fails that deployment and tool without being opened. So does anything above it that is not a directory, in a dry run as in a deploy.
+- Every tool directory and the fixed subdirectories each tool writes into (such as `.claude/agents`, `.codex/skills`, `.github/prompts`, `.cursor/rules`, `.windsurf/workflows`, `.agent/rules`, `.vscode` when Copilot writes `.vscode/mcp.json`, and `~/.claude/agents` or `~/.codex/skills` in the user scope; the full list is in [Tool directories](07_mcp/README.md#tool-directories)) are checked before the tool writes anything, in a dry run as in a deploy. A directory a replacing deploy deletes, and every directory below it, is exempt. A link that leads nowhere or in a loop, something that is not a directory, or in a project a link leading outside it, fails that deployment and tool; see [Tool directories](07_mcp/README.md#tool-directories).
+- The four MCP config files hold plain values resolved on one machine. They are gitignored in this repository, as is `.ai-tools/`; add them to the `.gitignore` of every other project that selects servers. See [what a deploy lets a tool start](07_mcp/README.md#what-a-deploy-lets-a-tool-start) before you select a server.
+- Windsurf, Antigravity, the user scope of GitHub Copilot and Cursor, and a secrets manager are not supported yet; see [PLANNED_FEATURES.md](PLANNED_FEATURES.md#mcps).
+
+### Selecting MCP servers and restricting their tools
+
+```yaml
+# project.yml: under deploy; user.yml: at the top level
+mcps:
+  filter:
+    - type: whitelist
+      ids: [github]
+  tools:                        # optional: server id -> allowed and denied tool names
+    github:
+      allow: [get_me]           # optional, default []; Codex only
+      deny: [delete_repository] # optional, default []; Codex and Claude Code
+```
+
+- A tool name is 1 to 128 of `A-Z a-z 0-9 _ - .`, as the server exposes it. A restriction for a server the block does not select, a name with another character, or a server id or tool name holding `__`, leaves the deployment unexported.
+- Codex gets `enabled_tools` and `disabled_tools` in the server table: it offers only the allowed tools and hides the denied ones.
+- Claude Code gets only `deny`, as `permissions.deny` entries `mcp__<id>__<tool>` in `.claude/settings.json` (`~/.claude/settings.json` in the user scope): a denied tool is blocked, and every other tool still asks. `allow` is not applied for Claude Code, and the run warns about it; `permissions.allow` is never written or changed.
+- The engine owns exactly the deny entries it wrote, as its ledger records them. A deny entry you wrote is never taken over or removed. Every other byte of the file is kept. A `settings.json` left holding only empty permission lists is deleted, unless a symbolic link sits at the file, through which the emptied content is written instead.
+- GitHub Copilot and Cursor are warned about and get the servers unrestricted.
+- `replace: true` deletes `.claude` of a project as a whole, `settings.json` included; a dry run of such a project treats `settings.json` as missing.
+- See [Allowing and denying tools](07_mcp/README.md#allowing-and-denying-tools).
 
 ## Creating a Project
 
@@ -359,7 +391,7 @@ deploy:
         ids: [windsurf-defaults]
   fragments: {}
   skills: {}
-  mcps: {}                       # MCP servers are opt-in: {} selects every one, no block selects none
+  mcps: {}                       # MCP servers are opt-in: {} selects every one, no block selects none; see "Selecting MCP servers and restricting their tools"
   features: {}
 metadata:
   version: 1.0.0
@@ -368,6 +400,7 @@ metadata:
 ```
 
 `context.documentation` is required, though every field inside it is optional.
+The `mcps` block is described in [Selecting MCP servers and restricting their tools](#selecting-mcp-servers-and-restricting-their-tools).
 An omitted or empty filter — `fragments: {}` above — lets everything through.
 
 ### Filters are order-sensitive
@@ -435,6 +468,10 @@ agents:
 prompts: {}                   # an omitted or empty filter selects everything
 skills: {}
 fragments: {}
+# mcps:                       # optional; MCP servers are opt-in, no block selects none
+#   filter:
+#     - type: whitelist
+#       ids: [github]
 metadata:
   version: 1.0.0
 ```
@@ -450,8 +487,11 @@ Destinations, relative to `--user-home`:
 | agents | `~/.claude/agents/<id>.md` | `~/.codex/skills/agent-<id>/SKILL.md` |
 | prompts | `~/.claude/commands/<id>.md` | `~/.codex/skills/prompt-<id>/SKILL.md` |
 | skills | `~/.claude/skills/<id>/SKILL.md` | `~/.codex/skills/skill-<id>/SKILL.md` |
+| MCP servers (`mcps`) | `~/.claude.json` | `~/.codex/config.toml` |
+| MCP tool restrictions (`mcps.tools`) | `~/.claude/settings.json` | `~/.codex/config.toml` |
 
 A skill's companion `files` are copied next to the generated `SKILL.md`, exactly as in project scope.
+The MCP files are edited entry by entry, created with the mode `0600`, and the entries written are recorded with their fingerprints in `~/.ai-tools/mcp-ledger.json`. `~/.claude.json` is Claude Code's own file, so deploy while no Claude Code session runs; see [The user scope](07_mcp/README.md#the-user-scope).
 
 `windsurf`, `antigravity`, `github_copilot`, and `cursor` have no user-scope layout yet; a manifest naming one is deployed for the other tools, and the run logs the tool it skipped.
 
@@ -461,7 +501,8 @@ Hand edits are lost, including what Claude Code's `#`-remember shortcut appends.
 
 Limitations to know before you rely on it:
 
-- Removing an artifact from the manifest leaves its previously deployed copy in the home until you delete it by hand — there is no ledger of what was written.
+- Removing an artifact from the manifest leaves its previously deployed copy in the home until you delete it by hand — there is no ledger of the artifacts written. The MCP ledger covers MCP server entries and tool restrictions only.
+- Two user deployments with an `mcps` block that name the same tool both cover `~/.claude.json` or `~/.codex/config.toml`. Both fail for that file, and neither writes its MCP files for that tool.
 - `replace: true` deletes and rewrites the directory of each artifact this manifest deploys (Claude: skills; Codex: skills, agents, prompts) and overwrites single-file artifacts. Parent directories such as `~/.claude/skills/` and hand-made neighbours are never touched.
 - A directory to be replaced that is a symbolic link is removed as a link when it leads inside the skills folder of the tool or leads nowhere; one leading to an existing folder or file outside that folder, or to that folder itself, fails the run before anything is written.
 - Two user deployments selecting the same tool contend for its one instructions file. Neither writes it, the run fails naming both, and their other artifacts are still deployed. Give each tool a single deployment, or narrow the `tools` lists.
@@ -581,13 +622,20 @@ Use `fragments` for shared content; there is no include mechanism.
 1. Create `07_mcp/<id>.yml`, inline or as a pointer at a `server.json` — see [Creating an MCP Server](#creating-an-mcp-server)
 2. Mark every token, password, and key file `secret: true`; put machine-specific plain values under `env_vars` in `config.local.yml`
 3. Give it a tag the `mcps` filter of your project selects — `ai-tools` for this repository
-4. Validate with `./deploy.sh --dry-run`; it names each MCP config file it would write and warns about every secret the environment does not set
-5. Run `./deploy.sh`, and export the secret variables before starting the tool
+4. For a pointer server, review its `server.json` and add the `pin` the dry-run warning prints
+5. Validate with `./deploy.sh --dry-run`; it names each MCP config file it would write and warns about every secret the environment does not set
+6. Run `./deploy.sh`, and export the secret variables before starting the tool
+
+### Give an Agent an MCP Server
+
+1. Add the server id to `mcps` of the agent manifest
+2. Make sure every deployment that deploys the agent selects that server in its `mcps` block, or leaves the agent out
+3. Validate with `./deploy.sh --dry-run`; a deployment that deploys the agent without selecting the server is reported and not exported
 
 ### Add a Rule to Every Project You Work On
 
 1. Add the rule to a ruleset that the `rulesets` filter of your `user.yml` selects — for this repository, a ruleset tagged `global`
-2. Try it out first with `./deploy.sh --user-home /tmp/try`, and read `/tmp/try/.claude/CLAUDE.md`
+2. Try it out first with `./deploy.sh --dry-run --user-home /tmp/try`, and read the lines naming `/tmp/try/.claude/CLAUDE.md`. A run without `--dry-run` would write that file, but it also deploys every project for real
 3. Run `./deploy.sh` — `~/.claude/CLAUDE.md` and `~/.codex/AGENTS.md` are rewritten from the manifest, so never edit them directly
 
 ## Validation
@@ -596,11 +644,11 @@ Use `fragments` for shared content; there is no include mechanism.
 ./deploy.sh --dry-run
 ```
 
-A dry run does everything a deploy does except write: every manifest is decoded strictly (an unknown key, a missing required field, or a malformed version fails the run naming the file), every ruleset, fragment, and skill-file reference is resolved, every skill `source` folder and every MCP `server.json` is read, the plain variables of every MCP server a project selects are resolved, and the log names each artifact and MCP config file a real run would write and where. A secret MCP variable of a selected server that the environment of the run does not set is warned about, by name only, and does not fail the run.
-The exit status is the one a deploy would have had, with one exception: a file a tool cannot write.
-A dry run never writes, so it finds a broken tool directory only through the MCP config file in it: a `.codex`, `.vscode` or `.cursor` that is a link leading nowhere or in a loop, or that is not a directory, in a project that selects MCP servers.
-A broken `.claude`, `.github`, `.windsurf` or `.agent`, a broken `.codex` or `.cursor` in a project that selects no MCP server, and any write the file system refuses, such as into a read-only directory, are found only by a real deploy.
-In a real deploy, a file a tool cannot write fails only that project and tool. No further files of that tool are written in that project, every other tool and project is still deployed, and the run exits non-zero listing every failure.
+A dry run does everything a deploy does except write: every manifest is decoded strictly (an unknown key, a missing required field, or a malformed version fails the run naming the file), every ruleset, fragment, and skill-file reference is resolved, every skill `source` folder and every MCP `server.json` is read and compared with its `pin`, the plain variables of every MCP server a deployment selects are resolved, every MCP ledger is read, and the log names each artifact, MCP config file, permission change, and ledger change a real run would write and where. A secret MCP variable of a selected server that the environment of the run does not set is warned about, by name only, and does not fail the run.
+The whole run, every deployment and every MCP file claim, is planned before anything is exported, in a dry run as in a deploy.
+Every tool directory and its fixed subdirectories are checked in a dry run as in a deploy: a `.claude`, `.claude/agents`, `.codex`, `.codex/skills`, `.github`, `~/.claude`, `~/.codex` or any other directory listed in [Tool directories](07_mcp/README.md#tool-directories) that is a link leading nowhere or in a loop, that is not a directory, or that in a project leads outside it, fails that deployment and tool in both.
+The exit status is the one a deploy would have had, with one exception: a write the file system refuses, such as into a read-only directory or where a directory stands at the path of a file. A dry run never writes, so only a real deploy finds it.
+In a real deploy, such a file fails only that deployment and tool, in a project and in the user scope alike. No further files of that tool are written for that deployment, every other tool and deployment is still deployed, and the run exits non-zero listing every failure.
 
 A plain `./deploy.sh` validates the same way, but a successful run also deploys into every configured project and into your home. Do not use it just to validate.
 
@@ -639,21 +687,35 @@ Keep machine-local paths and settings in `config.local.yml`, which is gitignored
 
 **`Cannot replace the <tool> files of project '<id>' in '<directory>': deleting '<entry>' failed (<exception>)`** / **`Cannot replace the <tool> files of user deployment '<id>' under '<home>': deleting '<entry>' failed (<exception>)`**: a replacing deploy could not delete an entry, typically a file in a folder that is not writable. The message ends with `The run stopped here; make that path deletable and deploy again.` The run stops at that entry and leaves the directory partly deleted. Projects are exported before user deployments: when a user deployment fails, every project of the run, and the user-scope files exported before the failed one, are already written; when a project fails, the projects and tools exported before it are. `--dry-run` deletes nothing, so it does not report this.
 
-**`MCP server '<id>' needs the variable '<NAME>' ...`**: a required plain MCP variable is not declared under `env_vars:`. Declare it in `config.local.yml`, mark it `required: false`, or mark it `secret: true` to pass it from the environment of the tool; exporting it in the shell of the deploy does not help. The MCP config files of the projects selecting that server are not written, everything else is, and the run exits non-zero.
+**`MCP server '<id>' needs the variable '<NAME>' ...`**: a required plain MCP variable is not declared under `env_vars:`. Declare it in `config.local.yml`, mark it `required: false`, or mark it `secret: true` to pass it from the environment of the tool; exporting it in the shell of the deploy does not help. The MCP config files of the deployments selecting that server are not written, everything else is, and the run exits non-zero.
 
-**`MCP server '<id>' uses the optional variable '<NAME>' in ..., which 'env_vars:' of config.yml and config.local.yml do not declare, and ... cannot be left out. Declare it under 'env_vars:'.`**: an optional plain MCP variable is used in `args` or `url`, which cannot be left out. Declare it under `env_vars:` in `config.local.yml`. The MCP config files of the projects selecting that server are not written, everything else is, and the run exits non-zero.
+**`MCP server '<id>' uses the optional variable '<NAME>' in ..., which 'env_vars:' of config.yml and config.local.yml do not declare, and ... cannot be left out. Declare it under 'env_vars:'.`**: an optional plain MCP variable is used in `args` or `url`, which cannot be left out. Declare it under `env_vars:` in `config.local.yml`. The MCP config files of the deployments selecting that server are not written, everything else is, and the run exits non-zero.
 
 **`MCP server '<id>' references the secret variable '<NAME>' in ...`**: a secret is used where a tool would need its value in the file. See [Creating an MCP Server](#creating-an-mcp-server) for where a secret may appear. It comes from loading, prefixed with `Failed to load <file>:`, and stops the whole run before anything is written. The same refusal ending in `where it would have to be written as a value.` is a safeguard behind loading that a manifest cannot reach; if you see it, report it.
 
 **`... is not valid JSON at offset <n>, so the engine leaves it untouched`** / **`... is not valid TOML at line <n>`** / **`... declares the key '<key>' twice`** / **`... defines the MCP server '<id>' ... other than as a table`**: an existing MCP config file cannot be edited without losing part of it. Fix or remove it, and deploy again. The other artifacts of the run are still written, and the run exits non-zero. More messages are listed in [07_mcp/README.md](07_mcp/README.md#troubleshooting).
 
-**`'<file>' is reached through the symbolic link '<link>', which leads to '<target>' and cannot be followed (<exception>), so the engine leaves it untouched.`**: the MCP config file, or a directory above it such as `.codex`, `.vscode` or `.cursor`, is a link that leads nowhere or in a loop. Repair or remove the link. That project fails for that tool, and the rest of the run is still written. In a real deploy, a tool that writes other files into that directory first, such as Codex agents or the Cursor rules, fails there instead, with the `cannot be written` message below.
+**`'<file>' is reached through the symbolic link '<link>', which leads to '<target>' and cannot be followed (<exception>), so the engine leaves it untouched.`**: an MCP config file, a `settings.json` or the MCP ledger, or a directory above it such as `.ai-tools`, is a link that leads nowhere or in a loop. Repair or remove the link. That deployment fails for that tool, in a dry run as in a deploy, and the rest of the run is still written. A broken tool directory such as `.codex` is reported by the `tool directory` check below instead.
 
-**`'<file>' lies below '<path>', which is not a directory, so the engine leaves it untouched. Remove what is at that path, and deploy again.`**: something other than a directory, such as a regular file named `.codex`, sits where the directory of the MCP config file belongs. Remove or rename it. That project fails for that tool, and the rest of the run is still written. In a real deploy, a tool that writes other files into that directory first fails there instead, with the message below.
+**`'<file>' lies below '<path>', which is not a directory, so the engine leaves it untouched. Remove what is at that path, and deploy again.`**: something other than a directory, such as a regular file named `.ai-tools`, sits where the directory of an MCP config file, a `settings.json` or the MCP ledger belongs. Remove or rename it. That deployment fails for that tool, and the rest of the run is still written.
 
-**`[<project> | <TOOL> | <manifest>] '<path>' cannot be written (<class>[: <reason>]), so the engine writes no further <tool> files of project '<project>' in this run. Repair or remove what is at that path, and deploy again.`**: a real deploy could not write a file of that tool in that project, for example because `.claude`, `.codex`, `.cursor` or `.github` is a link that leads nowhere or in a loop, is a regular file, or is a read-only directory. The line is listed under `Export failed for N manifest(s)`, and `<manifest>` is the export that hit it, such as `agent 'basic'`. `<reason>` is the reason the operating system gave, such as `No such file or directory`, `Not a directory` or `Permission denied`, when it is known. A failure that did not come from writing a file reads `'<path>' cannot be accessed (<class>[: <reason>])`, or `A file cannot be accessed (<class>[: <reason>])` when no path is known. Repair or remove what is at that path, and deploy again. The files of that tool written before the failure stay in place; every other tool and project is still deployed. A dry run writes nothing, so it reports this only through the MCP config file in `.codex`, `.vscode` or `.cursor`, and only when the project selects MCP servers. In a user deployment, a file that cannot be written stops the run instead, and the CLI prints `'<path>' cannot be written (<class>[: <reason>])` as one line.
+**`'<dir>' is a symbolic link to '<target>' that cannot be followed (<exception>), so the engine writes no <tool> files of project '<id>' in this run. Repair or remove the link, and deploy again.`** / **`'<dir>' is not a directory, so the engine writes no <tool> files of project '<id>' in this run. Remove what is at that path, and deploy again.`** / **`'<dir>' leads to '<real>' once links are resolved, outside the project directory '<root>', so the engine writes no <tool> files of project '<id>' in this run. The engine writes only inside the project: replace the link with a directory, and deploy again.`**: a tool directory or one of its fixed subdirectories, such as `.claude`, `.claude/agents`, `.codex`, `.github`, `~/.claude` or `~/.codex`, cannot hold the files of its tool. For a user deployment, the messages say `user deployment '<id>'` instead of `project '<id>'`, and a link leading outside the home is followed. The failure is listed as `[<id> | <TOOL> | tool directory '<dir>']`. Nothing of that tool is written for that deployment, every other tool and deployment is, and the run exits non-zero. A dry run fails the same way. See [Tool directories](07_mcp/README.md#tool-directories).
+
+**`[<id> | <TOOL> | <manifest>] '<path>' cannot be written (<class>[: <reason>]), so the engine writes no further <tool> files of project '<id>' in this run. Repair or remove what is at that path, and deploy again.`**: a real deploy could not write a file of that tool for that deployment, for example because a directory the tool writes into is read-only, or a directory stands at the path of a file, such as `.claude/agents/<id>.md`. For a user deployment, the message says `user deployment '<id>'` instead of `project '<id>'`. The line is listed under `Export failed for N manifest(s)`, and `<manifest>` is the export that hit it, such as `agent 'basic'`. `<reason>` is the reason the operating system gave, such as `No such file or directory`, `Not a directory` or `Permission denied`, when it is known. A failure that did not come from writing a file reads `'<path>' cannot be accessed (<class>[: <reason>])`, or `A file cannot be accessed (<class>[: <reason>])` when no path is known. Repair or remove what is at that path, and deploy again. The files of that tool written before the failure stay in place; every other tool and deployment is still deployed, in a project and in the user scope alike. A dry run writes nothing, so it does not report this.
 
 **`<tool> has no MCP support in this engine`**: a project selects MCP servers and the run configures `windsurf` or `antigravity`. The servers are deployed for the other tools.
+
+**`... has the hash 'sha256:<actual>', but the manifest pins 'sha256:<pinned>'. ...`** / **`... declares a 'pin' that is not 'sha256:' followed by 64 lowercase hexadecimal digits, ...`** / **`... declares 'pin' but no 'source'. ...`**: the `pin` of an MCP server does not fit its `server.json`, has another form, or sits on an inline server. After reviewing a changed `server.json`, copy the actual hash from the message into `pin`. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written. See [Pinning a pointer server](07_mcp/README.md#pinning-a-pointer-server).
+
+**`Agent '<id>' uses the MCP server(s) '<server>', which no MCP server manifest of the run declares. ...`**: the `mcps` list of an agent names an unknown id. Fix the id, or add the manifest. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written. When several agents do this, one failure headed `Found <n> agent manifest(s) naming an MCP server no MCP server manifest declares:` lists them all.
+
+**`Skipped the deployment(s) whose MCP servers do not fit what they deploy, for <n> reason(s):`**: a deployment deploys an agent whose `mcps` names a server it does not select, restricts the tools of a server it does not select, names a tool that is not 1 to 128 of `A-Z a-z 0-9 _ - .`, or restricts a server id or names a tool holding `__`. Each reason below the headline names the deployment, and the agent or the server. That deployment is not exported at all; every other one is. See [07_mcp/README.md](07_mcp/README.md#troubleshooting).
+
+**`... changed while the engine merged it, so the engine leaves it untouched. Deploy again once the tool writing it is idle.`**: a program wrote an MCP config file, a `settings.json` or the MCP ledger while the engine merged it, usually a running Claude Code writing `~/.claude.json`. Close every Claude Code session, and deploy again.
+
+**`Not writing the MCP entries of '<file>': the deployments [<d1>, <d2>] each declare an 'mcps' block covering it. ...`** / **`'<file>' is covered by the 'mcps' block of more than one deployment of this run: ...`**: two deployments of the run declare an `mcps` block and write the same MCP file, such as two projects with one `deploy.directory`. Both fail for that file and write none of their MCP files for that tool. Keep the `mcps` block in only one of them. See [One mcps block per file](07_mcp/README.md#one-mcps-block-per-file).
+
+**`'<ledger>' is not an MCP ledger the engine can read: ...`**: the MCP ledger `.ai-tools/mcp-ledger.json` was edited or damaged, or is of version 1, which records no fingerprint. Every MCP export of that project or home fails. Remove the ledger, deploy again, and remove by hand the entries of servers the deployment no longer selects. See [The ledger](07_mcp/README.md#the-ledger).
 
 **`Export failed for N manifest(s)`**: N manifests could not be exported; the list below the headline names each one, together with every tool it failed for. The run still exports everything else before reporting, and exits non-zero.
 

@@ -18,6 +18,7 @@ import kotlinx.serialization.Serializable
  * @param replace whether a deploy may delete the artifact directories it generates before writing them again.
  * Only the paths of the artifacts this manifest deploys are ever removed - never the directories of the tool that
  * hold them, which the user shares with everything they installed by hand.
+ * @param mcps which MCP servers this deployment writes into `<home>/.claude.json` (Claude Code) and `<home>/.codex/config.toml` (Codex), and which of their tools it restricts, YAML key `mcps` with the shape of [ProjectDeploy.mcps] - see [ProjectMcps] - or `null` for none. The denied tools of Claude Code land in `<home>/.claude/settings.json`, and its allowed tools nowhere. Leaving it out selects no server: the deployment then reads the MCP ledger of the home, `<home>/.ai-tools/mcp-ledger.json`, and changes those files only to remove the entries the ledger records for them, each only while it still holds what the engine wrote - see [cz.cleanship.aitools.engine.tools.mcp.McpLedger]. It leaves alone every such file that the `mcps` block of another deployment of the run covers, even when its ledger records entries there. GitHub Copilot, Cursor, Windsurf and Antigravity have no user-scope MCP config file in this engine, and a deployment that selects servers reports them as skipped.
  */
 @Serializable
 data class UserDeploymentManifest(
@@ -30,5 +31,6 @@ data class UserDeploymentManifest(
     val rulesets: ProjectRulesets = ProjectRulesets(),
     val fragments: ProjectFragments = ProjectFragments(),
     val skills: ProjectSkills = ProjectSkills(),
+    val mcps: ProjectMcps? = null,
     override val metadata: ManifestMetadata,
 ) : VersionedManifest

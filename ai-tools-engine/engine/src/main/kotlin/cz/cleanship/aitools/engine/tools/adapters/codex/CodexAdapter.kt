@@ -1,5 +1,6 @@
 package cz.cleanship.aitools.engine.tools.adapters.codex
 
+import cz.cleanship.aitools.engine.io.TargetRoot
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.UserDeploymentManifest
@@ -8,6 +9,7 @@ import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
+import cz.cleanship.aitools.engine.tools.McpLimits
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
@@ -17,6 +19,7 @@ import cz.cleanship.aitools.engine.tools.UserScopeExporter
 import cz.cleanship.aitools.engine.tools.mcp.CodexTomlMcpConfigFormat
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpPermissionsExporter
 import cz.cleanship.aitools.engine.tools.replacing
 import java.io.File
 
@@ -71,10 +74,23 @@ class CodexAdapter(
         listOf(CodexLayout.ofProject(projectDir).skillDir(skillId))
 
     override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter =
-        CodexUserScopeExporter(CodexLayout.ofUser(userHome), deployment)
+        CodexUserScopeExporter(CodexLayout.ofUser(userHome), deployment, userHome)
 
     override fun mcpConfig(projectDir: File): McpConfigExporter =
         McpConfigFileExporter(CodexLayout.ofProject(projectDir).mcpConfigFile, CodexTomlMcpConfigFormat, exportService, projectDir)
+
+    // Codex reads the allowed and denied tools of a server from its table in config.toml, which the MCP config file already renders.
+    override fun mcpPermissions(projectDir: File): McpPermissionsExporter? = null
+
+    override fun toolDirectories(projectDir: File): List<File> =
+        CodexLayout.ofProject(projectDir).let { listOf(it.toolDir, it.skillsDir, it.featuresDir) }
+
+    override val mcpLimits = McpLimits(
+        agentServers = "Codex agents are rendered as skills, which name no MCP server; every server of the deployment is available to every agent",
+        allowedTools = null,
+        deniedTools = null,
+        userScope = null,
+    )
 
     private fun exportPrompt(layout: CodexLayout, promptContext: PromptContext) = exportService.export(
         promptContext.prompt,
@@ -136,9 +152,18 @@ class CodexAdapter(
     private inner class CodexUserScopeExporter(
         private val layout: CodexLayout,
         private val deployment: UserDeploymentManifest,
+        private val userHome: File,
     ) : UserScopeExporter {
 
         override val instructionsFile: File get() = layout.instructionsFile
+
+        // A user deploy writes no features, so the features directory is not one of them.
+        override val toolDirectories: List<File> get() = listOf(layout.toolDir, layout.skillsDir)
+
+        override fun mcpConfig(): McpConfigExporter =
+            McpConfigFileExporter(layout.mcpConfigFile, CodexTomlMcpConfigFormat, exportService, TargetRoot.UserHome(userHome))
+
+        override fun mcpPermissions(): McpPermissionsExporter? = null
 
         override fun export(instructionsContext: UserInstructionsContext) = exportService.export(
             instructionsContext.deployment,

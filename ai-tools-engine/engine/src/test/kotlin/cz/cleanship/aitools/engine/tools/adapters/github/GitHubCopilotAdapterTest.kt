@@ -232,6 +232,39 @@ class GitHubCopilotAdapterTest {
     }
 
     @Test
+    fun `should write no tools into the profile of an agent that uses MCP servers, so it keeps every built-in tool and every configured server`() {
+        // given
+        val agentContext = AgentContext(agent.copy(mcps = listOf("github", "atlassian")), rulesets)
+
+        // when
+        adapter.export(tempDir.toFile(), agentContext)
+
+        // then
+        val content = agentsDir.resolve("${agent.id}.agent.md").readText()
+        assertThat(content).startsWith(
+            """
+            |---
+            |name: test-agent
+            |description: "Multiline description"
+            |---
+            """.trimMargin(),
+        )
+        assertThat(content).doesNotContain("tools:")
+    }
+
+    @Test
+    fun `should name the github directory and the directories below it as its tool directories and write no MCP tool permissions`() {
+        // when
+        val directories = adapter.toolDirectories(tempDir.toFile())
+        val permissions = adapter.mcpPermissions(tempDir.toFile())
+
+        // then
+        val github = tempDir.toFile().resolve(".github")
+        assertThat(directories).containsExactly(github, github.resolve("agents"), github.resolve("prompts"), github.resolve("instructions"))
+        assertThat(permissions).isNull()
+    }
+
+    @Test
     fun `should quote an agent description that contains a colon so the frontmatter stays valid YAML`() {
         // given
         // - a description with `: ` inside, which an unquoted scalar turns into a nested mapping

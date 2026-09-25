@@ -20,6 +20,7 @@ import cz.cleanship.aitools.engine.services.ArtifactWriteException
 import cz.cleanship.aitools.engine.services.DryRunArtifactSink
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
+import cz.cleanship.aitools.engine.services.UnknownMcpServersException
 import cz.cleanship.aitools.engine.tools.RulesetResolvingException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -722,6 +723,31 @@ class AiToolsCliIntegrationTest {
             .isInstanceOf(CliktError::class.java)
             .hasMessageContaining("broken.yml")
             .hasMessageContaining("Invalid version format: 1.0")
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
+    fun `should fail with every agent manifest when several agents name an MCP server no manifest declares`() {
+        // given
+        val cli = AiToolsCli(
+            runner = { _, _, _ ->
+                throw UnknownMcpServersException(
+                    listOf(
+                        ManifestLoadingException(File("/manifests/reviewer.yml"), IllegalArgumentException("Agent 'reviewer' uses the MCP server(s) 'github'")),
+                        ManifestLoadingException(File("/manifests/writer.yml"), IllegalArgumentException("Agent 'writer' uses the MCP server(s) 'jira'")),
+                    ),
+                )
+            },
+        )
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessageContaining("reviewer.yml")
+            .hasMessageContaining("writer.yml")
         assertThat((error as CliktError).statusCode).isNotZero()
     }
 

@@ -5,14 +5,17 @@ import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpPermissionsExporter
 import java.io.File
 
+// One member per kind of artifact and per decision about it, each answered by every adapter on purpose; splitting the interface would only move that list.
+@Suppress("TooManyFunctions")
 interface ToolAdapter {
 
     val toolType: ToolType
 
     /**
-     * Returns every path [prepare] deletes in [projectDir] for [project]: the directories this tool generates when the project sets `deploy.replace`, otherwise an empty list. No path is, or holds, the file of [mcpConfig], whose entries the engine owns one by one.
+     * Returns every path [prepare] deletes in [projectDir] for [project]: the directories this tool generates when the project sets `deploy.replace`, otherwise an empty list. No path is, or holds, the file of [mcpConfig], whose entries the engine owns one by one. A path may hold the file of [mcpPermissions], such as `.claude/settings.json`, which is then deleted with it.
      */
     fun replacedPaths(projectDir: File, project: ProjectManifest): List<File>
 
@@ -44,7 +47,37 @@ interface ToolAdapter {
      * Every adapter answers this deliberately rather than inheriting an answer, like [userScope]. The engine reports a `null` as the MCP servers of the project skipped for this tool.
      */
     fun mcpConfig(projectDir: File): McpConfigExporter?
+
+    /**
+     * Returns how this tool writes the MCP tool restrictions of a project into a permissions file in [projectDir], or `null` when this tool reads them from its MCP config file or has no way to read them.
+     */
+    fun mcpPermissions(projectDir: File): McpPermissionsExporter?
+
+    /**
+     * Returns the directories of [projectDir] this tool writes its files into, such as `<project>/.codex` and `<project>/.codex/skills`, each after the directory holding it; a file of the tool at the top of [projectDir], such as `AGENTS.md`, lies in none of them.
+     *
+     * The engine checks each of them before it writes any file of this tool - see [cz.cleanship.aitools.engine.io.requireToolDirectory] - and writes nothing of this tool for the project when one cannot hold its files.
+     */
+    fun toolDirectories(projectDir: File): List<File>
+
+    /** What of the MCP support of the engine this tool lacks, each with the reason the engine reports. */
+    val mcpLimits: McpLimits
 }
+
+/**
+ * What of the MCP support of the engine a tool lacks, each part as the reason the engine logs when a deployment asks for it, or `null` when the tool has it.
+ *
+ * @property agentServers why the tool attaches no MCP server to an agent, or `null` when it lists them in the agent file
+ * @property allowedTools why the tool applies no `allow` list of a server, or `null` when it applies it or has no MCP config file at all, which the engine reports on its own
+ * @property deniedTools why the tool applies no `deny` list of a server, or `null` when it applies it or has no MCP config file at all
+ * @property userScope why the tool gets no MCP servers in the user scope, or `null` when it gets them
+ */
+data class McpLimits(
+    val agentServers: String?,
+    val allowedTools: String?,
+    val deniedTools: String?,
+    val userScope: String?,
+)
 
 /**
  * Deletes every path of [ToolAdapter.replacedPaths] for [project] in [projectDir], each together with everything under it.

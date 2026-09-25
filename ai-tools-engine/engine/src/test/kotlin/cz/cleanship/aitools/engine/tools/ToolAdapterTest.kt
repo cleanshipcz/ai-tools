@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.Version
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -151,6 +152,98 @@ class ToolAdapterTest {
 
         // then
         assertThat(exporter?.file).isEqualTo(projectDir.resolve(expected))
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = '|',
+        value = [
+            "CLAUDE | .claude .claude/agents .claude/commands .claude/skills .claude/workflows",
+            "CODEX | .codex .codex/skills .codex/features",
+            "GITHUB_COPILOT | .github .github/agents .github/prompts .github/instructions",
+            "CURSOR | .cursor .cursor/rules .cursor/commands .cursor/features",
+            "WINDSURF | .windsurf .windsurf/rules .windsurf/workflows",
+            "ANTIGRAVITY | .agent .agent/rules .agent/workflows",
+        ],
+    )
+    fun `should name every directory the files of a tool land in besides the files at the root of the project, each after the directory holding it`(
+        toolType: ToolType,
+        expected: String,
+    ) {
+        // given
+        val projectDir = tempDir.resolve("project")
+
+        // when
+        val directories = ToolFactory.create(toolType).toolDirectories(projectDir)
+
+        // then
+        assertThat(directories).containsExactlyElementsOf(expected.split(" ").map { projectDir.resolve(it) })
+    }
+
+    /**
+     * What of the MCP support of the engine each tool lacks is decided by its adapter, and reported with the reason it gives.
+     */
+    @ParameterizedTest
+    @CsvSource(
+        // - tool, attaches servers to agents, applies allowed tools, applies denied tools, has user-scope MCP
+        "CLAUDE, true, false, true, true",
+        "CODEX, false, true, true, true",
+        "GITHUB_COPILOT, false, false, false, false",
+        "CURSOR, false, false, false, false",
+        "WINDSURF, false, true, true, false",
+        "ANTIGRAVITY, false, true, true, false",
+    )
+    fun `should give a reason for every part of the MCP support a tool lacks`(
+        toolType: ToolType,
+        attachesServers: Boolean,
+        appliesAllowed: Boolean,
+        appliesDenied: Boolean,
+        hasUserScope: Boolean,
+    ) {
+        // when
+        val limits = ToolFactory.create(toolType).mcpLimits
+
+        // then
+        // - Windsurf and Antigravity get no MCP file at all, which is reported on its own, so they give no reason about restrictions
+        assertThat(limits.agentServers == null).isEqualTo(attachesServers)
+        assertThat(limits.allowedTools == null).isEqualTo(appliesAllowed)
+        assertThat(limits.deniedTools == null).isEqualTo(appliesDenied)
+        assertThat(limits.userScope == null).isEqualTo(hasUserScope)
+    }
+
+    @Test
+    fun `should give the reason Claude Code applies no allowed tools of a server`() {
+        // when
+        val reason = ToolFactory.create(ToolType.CLAUDE).mcpLimits.allowedTools
+
+        // then
+        assertThat(reason).isEqualTo("Claude Code has no list of the tools a server may offer; only 'deny' is rendered")
+    }
+
+    @Test
+    fun `should give the reason GitHub Copilot attaches no MCP server to an agent`() {
+        // when
+        val reason = ToolFactory.create(ToolType.GITHUB_COPILOT).mcpLimits.agentServers
+
+        // then
+        assertThat(reason).isEqualTo("a Copilot agent without 'tools' already gets every configured server, and a 'tools' list would remove its built-in tools")
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "WINDSURF, ~/.codeium/windsurf/mcp_config.json",
+        "WINDSURF, Devin Desktop",
+        "ANTIGRAVITY, environment variable",
+    )
+    fun `should name the facts that keep a tool out of the MCP servers of the user scope`(
+        toolType: ToolType,
+        fact: String,
+    ) {
+        // when
+        val reason = ToolFactory.create(toolType).mcpLimits.userScope
+
+        // then
+        assertThat(reason).contains(fact)
     }
 
     @ParameterizedTest

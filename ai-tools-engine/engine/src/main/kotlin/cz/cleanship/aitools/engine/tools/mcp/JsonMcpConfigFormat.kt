@@ -1,15 +1,11 @@
 package cz.cleanship.aitools.engine.tools.mcp
 
-import cz.cleanship.aitools.engine.services.MessageWithheldException
-import cz.cleanship.aitools.engine.services.jsonOffset
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -18,15 +14,17 @@ import java.io.File
 /**
  * An MCP config file in JSON, holding one object of server entries under [serversKey].
  *
- * The file is parsed strictly and written again as a whole, so every entry and every other key survives, in its order, while the layout of the file is normalized. A file holding comments, trailing commas or a duplicate key is refused rather than rewritten without them, and every result is parsed again and compared with the file before it is returned.
+ * The file is parsed strictly, so a file holding comments, trailing commas or a duplicate key is refused rather than rewritten without them, and every result is parsed again and compared with the file before it is returned. A format that keeps the layout edits the server entries in place and keeps every byte outside the owned entries; any other format writes the file again as a whole, so every entry and every other key survives, in its order, while the layout of the file is normalized.
  */
 class JsonMcpConfigFormat private constructor(
     private val serversKey: String,
     private val secretReference: (variable: String, required: Boolean) -> String,
     private val typesRemoteServers: Boolean,
+    private val keepsLayout: Boolean,
 ) : McpConfigFormat {
 
     override fun merge(existing: String?, servers: List<ResolvedMcpServer>, ownedMcpIds: Set<String>, file: File): String {
+        if (keepsLayout) return mergeInPlace(existing, servers, ownedMcpIds, file)
         val root = parse(existing, file)
         val owned = ownedMcpIds + servers.map { it.id }
         val rendered = servers.associate { it.id to render(it) }
@@ -47,8 +45,24 @@ class JsonMcpConfigFormat private constructor(
         return result
     }
 
-    override fun ownedEntriesIn(existing: String, ownedMcpIds: Set<String>, file: File): Set<String> =
-        serversOf(parse(existing, file), file).keys.filterTo(mutableSetOf()) { it in ownedMcpIds }
+    override fun entryFingerprints(content: String, file: File): Map<String, String> =
+        serversOf(parse(content, file), file).mapValues { (_, entry) -> entry.fingerprint() }
+
+    /**
+     * Returns [existing] with the owned entries under [serversKey] replaced, removed or added in place, and every other byte kept.
+     */
+    private fun mergeInPlace(
+        existing: String?,
+        servers: List<ResolvedMcpServer>,
+        ownedMcpIds: Set<String>,
+        file: File,
+    ): String {
+        val document = JsonDocument.parse(existing, file)
+        // Checked before the edit, so a servers value of another kind is reported the way a rewriting format reports it.
+        serversOf(document.content, file)
+        val owned = ownedMcpIds + servers.map { it.id }
+        return document.withMembers(listOf(serversKey), owned = { it in owned }, members = servers.associate { it.id to render(it) })
+    }
 
     /**
      * Fails unless [result] parses to [before] with every owned entry replaced by [rendered] and every other entry and key unchanged.
@@ -71,26 +85,8 @@ class JsonMcpConfigFormat private constructor(
         }
     }
 
-    private fun parse(existing: String?, file: File): JsonObject {
-        if (existing.isNullOrBlank()) return JsonObject(emptyMap())
-        val element = try {
-            STRICT.parseToJsonElement(existing)
-        } catch (ex: SerializationException) {
-            // The message of the parser quotes the file around the error, which may hold a token, so only the offset it names is repeated.
-            throw McpConfigFileException(
-                "'${file.absolutePath}' is not valid JSON${ex.jsonOffset()}, so the engine leaves it untouched rather than rewrite it. " +
-                    "A comment or a trailing comma counts as invalid too, because rewriting the file would drop it. Fix the file or remove it, and deploy again.",
-                MessageWithheldException(ex),
-            )
-        }
-        val duplicate = duplicateKey(existing)
-        val problem = when {
-            duplicate != null -> "declares the key '$duplicate' twice in one object, so the engine leaves it untouched rather than rewrite it without one of them. Remove one, and deploy again."
-            element !is JsonObject -> "is not a JSON object, so the engine leaves it untouched. Fix the file or remove it, and deploy again."
-            else -> return element
-        }
-        throw McpConfigFileException("'${file.absolutePath}' $problem")
-    }
+    private fun parse(existing: String?, file: File): JsonObject =
+        if (existing.isNullOrBlank()) JsonObject(emptyMap()) else JsonDocument.parseStrictly(existing, file)
 
     private fun serversOf(root: JsonObject, file: File): JsonObject = when (val servers = root[serversKey]) {
         null -> JsonObject(emptyMap())
@@ -126,6 +122,18 @@ class JsonMcpConfigFormat private constructor(
             serversKey = "mcpServers",
             secretReference = { variable, required -> if (required) "\${$variable}" else "\${$variable:-}" },
             typesRemoteServers = true,
+            keepsLayout = false,
+        )
+
+        /**
+         * `~/.claude.json` of Claude Code, rendered like [CLAUDE_CODE] under its top-level `mcpServers`, and edited in place with every byte outside the owned entries kept - see [JsonDocument].
+         */
+        val CLAUDE_CODE_USER = JsonMcpConfigFormat(
+            serversKey = "mcpServers",
+            secretReference = { variable, required -> if (required) "\${$variable}" else "\${$variable:-}" },
+            typesRemoteServers = true,
+            // Claude Code keeps its session state in this file and rewrites it while it runs, so no byte of it may be normalized.
+            keepsLayout = true,
         )
 
         /**
@@ -135,6 +143,7 @@ class JsonMcpConfigFormat private constructor(
             serversKey = "servers",
             secretReference = { variable, _ -> "\${env:$variable}" },
             typesRemoteServers = true,
+            keepsLayout = false,
         )
 
         /**
@@ -144,9 +153,8 @@ class JsonMcpConfigFormat private constructor(
             serversKey = "mcpServers",
             secretReference = { variable, _ -> "\${env:$variable}" },
             typesRemoteServers = false,
+            keepsLayout = false,
         )
-
-        private val STRICT = Json
 
         @OptIn(ExperimentalSerializationApi::class)
         private val PRETTY = Json {
@@ -154,47 +162,4 @@ class JsonMcpConfigFormat private constructor(
             prettyPrintIndent = "  "
         }
     }
-}
-
-/**
- * Returns the first key [json], which parses as JSON, declares twice in one object, or `null` when it declares none twice; the parser keeps only the last of them, silently.
- */
-private fun duplicateKey(json: String): String? {
-    // One set of keys per object being read, and null for an array, innermost last.
-    val open = ArrayDeque<MutableSet<String>?>()
-    var index = 0
-    while (index < json.length) {
-        when (json[index]) {
-            '{' -> open.addLast(mutableSetOf())
-            '[' -> open.addLast(null)
-            '}', ']' -> open.removeLast()
-            '"' -> {
-                val end = stringEnd(json, index)
-                if (isKey(json, end) && open.lastOrNull()?.add(keyText(json, index, end)) == false) return keyText(json, index, end)
-                index = end
-            }
-        }
-        index++
-    }
-    return null
-}
-
-/**
- * Returns whether the string closing at [end] is followed by a colon, which makes it a key.
- */
-private fun isKey(json: String, end: Int): Boolean {
-    var next = end + 1
-    while (next < json.length && json[next].isWhitespace()) next++
-    return next < json.length && json[next] == ':'
-}
-
-private fun keyText(json: String, start: Int, end: Int): String = Json.parseToJsonElement(json.substring(start, end + 1)).jsonPrimitive.content
-
-/**
- * Returns the index of the quote closing the string that opens at [start].
- */
-private fun stringEnd(json: String, start: Int): Int {
-    var index = start + 1
-    while (json[index] != '"') index += if (json[index] == '\\') 2 else 1
-    return index
 }

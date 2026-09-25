@@ -29,6 +29,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
+import java.security.MessageDigest
 
 class McpServerReaderTest {
 
@@ -1242,6 +1243,113 @@ class McpServerReaderTest {
                 .isInstanceOf(InvalidMcpServerSourceException::class.java)
                 .hasMessageContaining("'description', 'transport', 'variables'")
         }
+    }
+
+    @Nested
+    inner class Pinning {
+
+        private val logAppender = ListAppender<ILoggingEvent>()
+        private val readerLogger = LoggerFactory.getLogger(McpServerReader::class.java) as Logger
+        private lateinit var serverJson: File
+
+        @BeforeEach
+        fun setUp() {
+            // - a server json whose bytes end in a CRLF, so a hash of decoded and re-encoded text would differ from the hash of the file
+            serverJson = writeServerJson(
+                """{"${'$'}schema": "$SCHEMA", "name": "x", "description": "d", "version": "1", "remotes": [{"type": "streamable-http", "url": "https://example.com/mcp"}]}""" + "\r\n",
+            )
+            logAppender.start()
+            readerLogger.addAppender(logAppender)
+        }
+
+        @AfterEach
+        fun tearDown() {
+            readerLogger.detachAppender(logAppender)
+            logAppender.stop()
+        }
+
+        @Test
+        fun `should load a pointer whose pin is the SHA-256 hash of the bytes of its server json, without a warning`() {
+            // given
+            val pinned = pointer(select = null, source = "\${PROJECTS_FOLDER}/server").copy(pin = sha256(serverJson))
+
+            // when
+            val server = reader.read(pinned, manifestFile)
+
+            // then
+            assertThat(server.id).isEqualTo("github")
+            assertThat(warnings()).isEmpty()
+        }
+
+        @Test
+        fun `should fail naming the server json, the pinned and the actual hash when the file changed since it was pinned`() {
+            // given
+            val pinned = pointer(select = null, source = "\${PROJECTS_FOLDER}/server").copy(pin = sha256(serverJson))
+            // - one byte of the file changes after it was pinned
+            serverJson.writeText(serverJson.readText().replace("\"d\"", "\"e\""))
+
+            // when / then
+            assertThatThrownBy { reader.read(pinned, manifestFile) }
+                .isInstanceOf(InvalidMcpServerSourceException::class.java)
+                .hasMessageContaining(serverJson.absolutePath)
+                .hasMessageContaining("'${pinned.pin}'")
+                .hasMessageContaining("'${sha256(serverJson)}'")
+        }
+
+        @Test
+        fun `should warn once, printing the value to pin, when a pointer declares no pin`() {
+            // when
+            readServer()
+
+            // then
+            assertThat(warnings()).singleElement().satisfies({
+                assertThat(it).contains("'github'").contains(serverJson.absolutePath).contains("pin: ${sha256(serverJson)}")
+            })
+        }
+
+        @ParameterizedTest
+        @ValueSource(
+            strings = [
+                // - no algorithm
+                "38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c33372",
+                // - another algorithm
+                "sha512:38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c33372",
+                // - one digit short
+                "sha256:38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c3337",
+                // - upper case digits, which a hash tool never prints
+                "sha256:38D2395945342D544B57055E46D5FAAAE01F51CB4304BBD5182EC60489C33372",
+                // - blank
+                "",
+            ],
+        )
+        fun `should refuse a pin that is not sha256 followed by 64 lowercase hexadecimal digits`(pin: String) {
+            // given
+            val pinned = pointer(select = null, source = "\${PROJECTS_FOLDER}/server").copy(pin = pin)
+
+            // when / then
+            assertThatThrownBy { reader.read(pinned, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'github'")
+                .hasMessageContaining("'sha256:' followed by 64 lowercase hexadecimal digits")
+        }
+
+        @Test
+        fun `should refuse a pin on a server that declares no source`() {
+            // given
+            val manifest = inline(McpTransport.Stdio(command = "server")).copy(pin = sha256(serverJson))
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining("'pin'")
+                .hasMessageContaining("'source'")
+        }
+
+        private fun warnings() = logAppender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
+
+        private fun sha256(file: File): String =
+            "sha256:" + MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) }
     }
 
     private fun readServer(): McpServer = reader.read(pointer(select = null, source = "\${PROJECTS_FOLDER}/server"), manifestFile)

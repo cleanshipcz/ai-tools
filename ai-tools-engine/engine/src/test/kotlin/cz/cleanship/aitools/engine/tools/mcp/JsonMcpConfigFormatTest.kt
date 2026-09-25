@@ -281,15 +281,217 @@ class JsonMcpConfigFormatTest {
         }
 
         @Test
-        fun `should name the owned entries an existing file holds`() {
+        fun `should name every entry an existing file holds`() {
             // given
             val existing = """{ "mcpServers": { "github": {}, "playwright": {} } }"""
 
             // when
-            val owned = format.ownedEntriesIn(existing, setOf("github", "atlassian"), file)
+            val entries = format.entryFingerprints(existing, file).keys
 
             // then
-            assertThat(owned).containsExactly("github")
+            assertThat(entries).containsExactly("github", "playwright")
+        }
+
+        @Test
+        fun `should give an entry the same fingerprint whatever its layout and the order of its keys, since a tool may write the file again`() {
+            // given
+            val compact = """{"mcpServers":{"a":{"command":"x","args":["1","2"],"env":{"A":"1","B":"2"}}}}"""
+            val rearranged = "{\n  \"other\": 1,\n  \"mcpServers\": {\n    \"a\": {\n      \"env\": {\"B\": \"2\", \"A\": \"1\"},\n      \"args\": [ \"1\", \"2\" ],\n      \"command\": \"\\u0078\"\n    }\n  }\n}\n"
+
+            // when
+            val first = format.entryFingerprints(compact, file)
+            val second = format.entryFingerprints(rearranged, file)
+
+            // then
+            assertThat(second).isEqualTo(first)
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - another value
+                """{"mcpServers":{"a":{"command":"y","args":["1","2"]}}}""",
+                // - the elements of an array in another order
+                """{"mcpServers":{"a":{"command":"x","args":["2","1"]}}}""",
+                // - one more key
+                """{"mcpServers":{"a":{"command":"x","args":["1","2"],"type":"stdio"}}}""",
+                // - a number where a string was
+                """{"mcpServers":{"a":{"command":"x","args":[1,"2"]}}}""",
+            ],
+        )
+        fun `should give an entry another fingerprint once its content changes`(changed: String) {
+            // given
+            val original = """{"mcpServers":{"a":{"command":"x","args":["1","2"]}}}"""
+
+            // when
+            val before = format.entryFingerprints(original, file).getValue("a")
+            val after = format.entryFingerprints(changed, file).getValue("a")
+
+            // then
+            assertThat(after).isNotEqualTo(before)
+        }
+    }
+
+    /**
+     * `~/.claude.json`, which Claude Code rewrites while it runs and which holds its session state: every byte outside the owned entries is kept.
+     */
+    @Nested
+    inner class ClaudeCodeUser {
+
+        private val format = JsonMcpConfigFormat.CLAUDE_CODE_USER
+        private val userFile = File("/home/user/.claude.json")
+
+        @Test
+        fun `should only insert the owned entry into a large file of session state, change only that entry, and give the original bytes back once it is removed`() {
+            // given
+            val existing = claudeJson()
+            assertThat(existing.length).isGreaterThan(200_000)
+
+            // when
+            val added = format.merge(existing, listOf(httpServer), setOf("github", "atlassian"), userFile)
+            val changed = format.merge(added, listOf(httpServer.copy(transport = ResolvedMcpTransport.Http("https://changed/mcp", emptyMap()))), setOf("github", "atlassian"), userFile)
+            val removed = format.merge(changed, emptyList(), setOf("github", "atlassian"), userFile)
+
+            // then
+            assertThat(onlyInsertion(existing, added)).describedAs("the first deploy only inserts the owned entry").isTrue()
+            assertThat(servers(added, "mcpServers").keys).containsExactly("playwright", "github")
+            assertThat(servers(added, "mcpServers").getValue("github").toString()).contains("\${GITHUB_TOKEN}").contains("\"type\":\"http\"")
+            assertThat(onlyReplacement(added, changed, "github")).describedAs("a later deploy changes only the owned entry").isTrue()
+            assertThat(removed).describedAs("removing the owned entry restores the file byte for byte").isEqualTo(existing)
+        }
+
+        /**
+         * The large file in the other layouts a `~/.claude.json` is found in: each is only inserted into, changed only inside the owned entry, and given back byte for byte.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - lines ending in CRLF
+            "crlf",
+            // - no line break after the closing brace
+            "no-final-newline",
+            // - a string holding an escaped NUL character
+            "escaped-nul",
+            // - an empty servers object
+            "empty-servers",
+            // - the servers object as the first member
+            "first-servers",
+        )
+        fun `should only insert, change and remove the owned entry of a large file in every layout it is found in`(
+            layout: String,
+        ) {
+            // given
+            val existing = claudeJsonIn(layout)
+            assertThat(existing.length).isGreaterThan(200_000)
+
+            // when
+            val added = format.merge(existing, listOf(httpServer), setOf("github", "atlassian"), userFile)
+            val changed = format.merge(added, listOf(httpServer.copy(transport = ResolvedMcpTransport.Http("https://changed/mcp", emptyMap()))), setOf("github", "atlassian"), userFile)
+            val removed = format.merge(changed, emptyList(), setOf("github", "atlassian"), userFile)
+
+            // then
+            assertThat(onlyInsertion(existing, added)).describedAs("the first deploy only inserts the owned entry").isTrue()
+            assertThat(servers(added, "mcpServers").keys).contains("github")
+            assertThat(onlyReplacement(added, changed, "github")).describedAs("a later deploy changes only the owned entry").isTrue()
+            assertThat(removed).describedAs("removing the owned entry restores the file byte for byte").isEqualTo(existing)
+        }
+
+        @Test
+        fun `should keep the file byte for byte when it holds no owned entry and none is selected`() {
+            // given
+            val existing = claudeJson()
+
+            // when
+            val merged = format.merge(existing, emptyList(), setOf("github"), userFile)
+
+            // then
+            assertThat(merged).isEqualTo(existing)
+        }
+
+        @Test
+        fun `should create the servers object at the end of a file that has none`() {
+            // given
+            val existing = "{\n  \"numStartups\": 3\n}\n"
+
+            // when
+            val merged = format.merge(existing, listOf(stdioServer), setOf("atlassian"), userFile)
+
+            // then
+            assertThat(merged).startsWith("{\n  \"numStartups\": 3,\n  \"mcpServers\": {\n    \"atlassian\": {\n      \"type\": \"stdio\",").endsWith("\n  }\n}\n")
+        }
+
+        @Test
+        fun `should refuse a file whose servers are not an object, naming the file`() {
+            // when / then
+            assertThatThrownBy { format.merge("{\"mcpServers\": []}", listOf(stdioServer), setOf("atlassian"), userFile) }
+                .isInstanceOf(McpConfigFileException::class.java)
+                .hasMessageContaining(userFile.absolutePath)
+                .hasMessageContaining("'mcpServers'")
+        }
+
+        /**
+         * Returns whether [after] is [before] with one piece of text inserted and nothing else changed.
+         */
+        private fun onlyInsertion(before: String, after: String): Boolean {
+            val prefix = before.commonPrefixWith(after).length
+            val suffix = before.substring(prefix).commonSuffixWith(after.substring(prefix)).length
+            return after.length > before.length && prefix + suffix == before.length
+        }
+
+        /**
+         * Returns whether [after] differs from [before] only inside the server entry [id] of [before], which the fixture indents by four spaces.
+         */
+        private fun onlyReplacement(before: String, after: String, id: String): Boolean {
+            val prefix = before.commonPrefixWith(after).length
+            val suffix = before.substring(prefix).commonSuffixWith(after.substring(prefix)).length
+            val entryStart = before.indexOf("\n    \"$id\": {")
+            val entryEnd = before.indexOf("\n    }", entryStart) + "\n    }".length
+            return entryStart >= 0 && prefix > entryStart && before.length - suffix <= entryEnd
+        }
+
+        /**
+         * Returns the file of [claudeJson] in the layout [layout] names.
+         */
+        private fun claudeJsonIn(layout: String): String {
+            val servers = "  \"mcpServers\": {\n    \"playwright\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\n        \"@playwright/mcp@latest\"\n      ],\n      \"env\": {}\n    }\n  },\n"
+            val file = claudeJson()
+            return when (layout) {
+                "crlf" -> file.replace("\n", "\r\n")
+                "no-final-newline" -> file.removeSuffix("\n")
+                "escaped-nul" -> file.replaceFirst("{\n", "{\n  \"lastPaste\": \"a\\u0000b\",\n")
+                "empty-servers" -> file.replace(servers, "  \"mcpServers\": {},\n")
+                "first-servers" -> file.replace(servers, "").replaceFirst("{\n", "{\n$servers")
+                else -> error("Unknown layout $layout")
+            }.also { check(it != file) { "the layout $layout changed nothing" } }
+        }
+
+        /**
+         * Returns a `~/.claude.json` of more than 200 KB in the layout Claude Code writes: session state, numbers of every form, unicode as escapes and as text, a `projects` object of many entries, and a server added by hand.
+         */
+        private fun claudeJson(): String = buildString {
+            append("{\n")
+            append("  \"numStartups\": 412,\n")
+            append("  \"installMethod\": \"native\",\n")
+            append("  \"autoUpdates\": false,\n")
+            append("  \"tipsHistory\": {\n    \"new-user-warmup\": 7,\n    \"memory-command\": 1.5e3,\n    \"theme-command\": -0.25\n  },\n")
+            append("  \"oauthAccount\": {\n    \"accountUuid\": \"00000000-0000-0000-0000-000000000000\",\n    \"displayName\": \"Zo\\u00eb \\ud83d\\ude00 François\",\n    \"organizationRole\": null\n  },\n")
+            append("  \"cachedChangelog\": \"# Changelog\\n\\n- fixed \\\"quotes\\\" and \\/slashes\\/ \\t tabs\",\n")
+            append("  \"bigNumber\": 12345678901234567890,\n")
+            append("  \"projects\": {\n")
+            val projects = (0 until 400).map { index ->
+                "    \"/home/user/Documents/Projects/project-$index\": {\n" +
+                    "      \"allowedTools\": [],\n" +
+                    "      \"history\": [\n" +
+                    (0 until 3).joinToString(",\n") { entry -> "        {\n          \"display\": \"run the tests of module $entry \\u2014 then fix\",\n          \"pastedContents\": {}\n        }" } + "\n" +
+                    "      ],\n" +
+                    "      \"lastCost\": 0.${index}1,\n" +
+                    "      \"hasTrustDialogAccepted\": ${index % 2 == 0}\n" +
+                    "    }"
+            }
+            append(projects.joinToString(",\n")).append("\n  },\n")
+            append("  \"mcpServers\": {\n    \"playwright\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\n        \"@playwright/mcp@latest\"\n      ],\n      \"env\": {}\n    }\n  },\n")
+            append("  \"userID\": \"abcdef0123456789\"\n")
+            append("}\n")
         }
     }
 

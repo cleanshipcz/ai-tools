@@ -76,15 +76,17 @@ Validate the manifests first, without writing anything:
 ```
 
 A dry run loads, filters, and renders every manifest exactly as a deploy does, but it creates, deletes, and modifies nothing — not in the project directories, not in your home.
-It fails on what a deploy fails on, with one exception: a file a tool cannot write. A dry run finds a broken tool directory only through the MCP config file in it, so a broken `.claude` or `.github`, and any write the file system refuses, such as into a read-only directory, are found only by a real deploy; see [README.md](../README.md#common-workflow).
-In a real deploy, such a file fails only that project and tool, and every other tool and project is still deployed. In a user deployment, a file that cannot be written stops the run instead, and the CLI prints `'<path>' cannot be written (<class>[: <reason>])` as one line; the projects and the user-scope files exported before it are already written.
+It fails on what a deploy fails on, a broken tool directory such as `.claude`, `.claude/agents` or `~/.codex` included, with one exception: a write the file system refuses, such as into a read-only directory, is found only by a real deploy; see [README.md](../README.md#common-workflow) and [Tool directories](../07_mcp/README.md#tool-directories).
+In a real deploy, such a file fails only that deployment and tool, and every other tool and deployment is still deployed, in a project and in the user scope alike.
 It logs the absolute path of every artifact a deploy would write.
 
-To read the produced files, a user deployment can be pointed at a harmless home instead:
+A user deployment can be pointed at a harmless home instead:
 
 ```bash
-./deploy.sh --user-home /tmp/try
+./deploy.sh --dry-run --user-home /tmp/try
 ```
+
+The log names every file the user scope would write under `/tmp/try`. A run without `--dry-run` writes them there, and also deploys every project for real.
 
 Every argument given to `deploy.sh` is forwarded to the engine.
 A project deployment has no equivalent switch — point its `deploy.directory` at a scratch directory while experimenting, or stay with `--dry-run`.
@@ -251,11 +253,14 @@ metadata:
 Key points, all documented in full in [../QUICKREF.md](../QUICKREF.md#creating-a-project):
 
 - `deploy.directory` decides where the generated files land. A relative value resolves against `--working-dir`, so `.` means this repository's root; a value that is `~` or starts with `~/` resolves against the home directory.
-- `deploy.replace: true` wipes the output directories each tool owns inside `deploy.directory` before writing them again: `.claude`, `.windsurf`, and `.agent` as a whole; for Codex only `.codex/skills` and `.codex/features`, for Cursor only `.cursor/rules`, `.cursor/commands`, and `.cursor/features`, and for GitHub Copilot only `.github/prompts`, `.github/instructions`, and `.github/agents`. It never deletes an MCP config file (`.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`), whose server entries the engine owns one by one. There is no backup and no auto-commit; files are overwritten in place, each written atomically through a temporary file. The wipe removes a symbolic link inside those directories, or such a directory that is itself a link, as a link and never touches what it leads to, and a run whose wipe would reach the source folder of a pointer skill fails before anything is written; see [04_skills/README.md](../04_skills/README.md#pointer-skill).
+- `deploy.replace: true` wipes the output directories each tool owns inside `deploy.directory` before writing them again: `.claude`, `.windsurf`, and `.agent` as a whole; for Codex only `.codex/skills` and `.codex/features`, for Cursor only `.cursor/rules`, `.cursor/commands`, and `.cursor/features`, and for GitHub Copilot only `.github/prompts`, `.github/instructions`, and `.github/agents`. It never deletes an MCP config file (`.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`), whose server entries the engine owns one by one. It does delete `.claude/settings.json` with `.claude`, entries written by hand included. There is no backup and no auto-commit; files are overwritten in place, each written atomically through a temporary file. The wipe removes a symbolic link inside those directories, or such a directory that is itself a link, as a link and never touches what it leads to, and a run whose wipe would reach the source folder of a pointer skill fails before anything is written; see [04_skills/README.md](../04_skills/README.md#pointer-skill).
 - `deploy.tools` narrows the project to a subset of the tools configured for the run. Omitting it means all of them, `[]` means none, and naming a tool the run does not configure is a warning rather than an error.
 - Filters fold over a selection that **starts empty**: `tags` and `whitelist` add, `blacklist` subtracts, so `blacklist` must come last and an omitted or empty `filter` lets everything through.
 - A ruleset or fragment an agent references must itself survive the project's `rulesets` / `fragments` filter, otherwise that agent fails to export.
-- `deploy.mcps` selects the MCP servers of `07_mcp/` that are merged into the MCP config file of each tool. MCP servers are opt-in: omitting the block selects no server, unlike every other kind, and a project that selects none never reads or writes an MCP config file; `mcps: {}` selects every server. See [07_mcp/README.md](../07_mcp/README.md).
+- `deploy.mcps` selects the MCP servers of `07_mcp/` that are merged into the MCP config file of each tool. MCP servers are opt-in: omitting the block selects no server, unlike every other kind; `mcps: {}` selects every server. See [07_mcp/README.md](../07_mcp/README.md).
+- `deploy.mcps.tools` allows and denies single tools of a selected server: Codex gets both lists in its server table, Claude Code only `deny`, as `permissions.deny` entries in `.claude/settings.json`; `allow` is reported as skipped for Claude Code. See [Allowing and denying tools](../07_mcp/README.md#allowing-and-denying-tools).
+- The engine records the MCP entries it wrote, with a fingerprint of each, in `.ai-tools/mcp-ledger.json` of the project. A later deploy removes the recorded entries the project no longer selects: while the project selects servers, an entry named after a manifest whatever it holds; when it selects none, for example once its `mcps` block is gone, or when an entry's manifest no longer exists, only an entry that still holds what the engine wrote, and a changed one is kept with a warning. Two deployments of one run whose `mcps` blocks write the same MCP file both fail for that file. Without a ledger, a project that selects no server reads and writes no MCP config file. Add `.ai-tools/` to the `.gitignore` of the project. See [The ledger](../07_mcp/README.md#the-ledger).
+- Every agent a project deploys must use only MCP servers the project selects; otherwise the project is not exported. See [Attaching servers to an agent](../07_mcp/README.md#attaching-servers-to-an-agent).
 
 [`ai-tools/project.yml`](ai-tools/project.yml) is a worked example: it deploys onto this repository itself with `directory: "."`.
 
@@ -267,7 +272,7 @@ A user deployment is a directory holding a `user.yml`.
 It installs a filtered selection of rulesets, agents, prompts, and skills into the per-user configuration of each tool it names, instead of into a project directory.
 
 ```yaml
-# 09_deployments/globals/user.yml
+# 09_deployments/<name>/user.yml
 id: globals
 description: My global AI tool setup
 tools:                        # optional; omitted = every tool configured for the run
@@ -285,9 +290,15 @@ agents:
 prompts: {}                   # an omitted or empty filter selects everything
 skills: {}
 fragments: {}
+mcps:                         # optional; MCP servers are opt-in, no block selects none
+  filter:
+    - type: whitelist
+      ids: [github]
 metadata:
   version: 1.0.0
 ```
+
+This example selects the MCP server `github`; the real `09_deployments/globals/user.yml` has no `mcps` block.
 
 It carries none of the fields a user scope has no answer for:
 
@@ -307,12 +318,28 @@ Paths are relative to `--user-home`, which defaults to the home of whoever runs 
 | agents | `~/.claude/agents/<id>.md` | `~/.codex/skills/agent-<id>/SKILL.md` |
 | prompts | `~/.claude/commands/<id>.md` | `~/.codex/skills/prompt-<id>/SKILL.md` |
 | skills | `~/.claude/skills/<id>/SKILL.md` | `~/.codex/skills/skill-<id>/SKILL.md` |
+| MCP servers (`mcps`) | `~/.claude.json`, top-level `mcpServers` | `~/.codex/config.toml`, `[mcp_servers.<id>]` |
+| MCP tool restrictions (`mcps.tools`) | `~/.claude/settings.json` | `~/.codex/config.toml`, in the server table |
+| record of the MCP entries written | `~/.ai-tools/mcp-ledger.json` | `~/.ai-tools/mcp-ledger.json` |
 
 Codex has one shape for everything it can be asked to do, so its agents and prompts are skill-shaped there too, told apart by the prefix of their directory — the same layout it writes inside a project.
 A skill's companion `files` are copied next to the generated `SKILL.md`, exactly as in project scope.
 
 `windsurf`, `antigravity`, `github_copilot`, and `cursor` have no user-scope layout in this engine yet.
 A manifest naming one of them is not silently dropped: the run logs that the manifest is not deployed for that tool, and deploys it for the tools that do have a layout.
+
+### MCP servers in the home
+
+MCP servers are opt-in in the user scope as in a project: a `user.yml` without an `mcps` block selects none.
+In `~/.claude.json` and `~/.codex/config.toml`, the engine owns the entries named after an MCP server manifest while the deployment selects servers, whatever they hold, and otherwise only those its ledger records with their current content. In `~/.claude/settings.json`, it owns only the `permissions.deny` entries it wrote, as its ledger records them. Every other byte of those files is kept, and a file the engine creates there gets the mode `0600`.
+A `user.yml` without an `mcps` block still removes the entries its ledger records, but only those whose content matches a recorded fingerprint, and not in a file another deployment of the run covers with its `mcps` block.
+
+`~/.claude.json` is also where Claude Code keeps its sign-in session and project trust, and Claude Code rewrites it while it runs.
+The engine checks the file again right before it replaces it, and refuses the write when it changed, failing the deployment for `claude` with `... changed while the engine merged it ...`.
+Deploy a `user.yml` with an `mcps` block while no Claude Code session runs.
+
+GitHub Copilot, Cursor, Windsurf and Antigravity get no user-scope MCP servers; a `user.yml` that selects servers and names one of them logs the reason.
+See [The user scope](../07_mcp/README.md#the-user-scope) for the details and the messages.
 
 ### The engine owns the instructions file
 
@@ -338,15 +365,18 @@ A skill you wrote yourself, sitting beside the generated ones, survives every de
 
 Known limitations:
 
-- Removing an artifact from a `user.yml` leaves its previously deployed copy behind in the home until you delete it by hand. The engine keeps no ledger of what it wrote, so it cannot tell a stale artifact from one you installed yourself.
+- Removing an artifact from a `user.yml` leaves its previously deployed copy behind in the home until you delete it by hand. The engine keeps no ledger of the artifacts it wrote, so it cannot tell a stale artifact from one you installed yourself. The MCP ledger covers MCP server entries and tool restrictions only.
+- Two user deployments with an `mcps` block that name the same tool both cover `~/.claude.json` or `~/.codex/config.toml`. Both fail for that file, and neither writes its MCP files for that tool; see [One mcps block per file](../07_mcp/README.md#one-mcps-block-per-file).
 - `replace: true` reaches per-artifact paths only. Parent directories and hand-made neighbours are never touched.
 - A directory to be replaced that is a symbolic link is removed as a link when it leads inside the skills folder of the tool or leads nowhere; one leading to an existing folder or file outside that folder, or to that folder itself, fails the run before anything is written.
 
 ### Choosing the home
 
 ```bash
-./deploy.sh --user-home /tmp/try
+./deploy.sh --dry-run --user-home /tmp/try
 ```
+
+A run without `--dry-run` writes the user scope into that home, and also deploys every project for real.
 
 A relative `--user-home` resolves against `--working-dir`, the same base every other declared path of the run uses, rather than against the shell's current directory.
 An empty value is rejected instead of resolved.
@@ -432,12 +462,14 @@ How much a collision costs depends on the kind:
 
 1. **Name the directory after the deployment.** The filename says what kind it is; the directory is the only place the instance is named.
 2. **Keep machine-specific paths out of the versioned manifests.** Declare the base as an `env_vars` variable in `config.local.yml` and reference it as `${NAME}` from `deploy.directory`.
-3. **Try a user deployment against a scratch home first** with `--user-home`, and read the generated instructions file before deploying into your own.
+3. **Try a user deployment against a scratch home first** with `--dry-run --user-home`, and read what it would write before deploying into your own. Without `--dry-run`, that run deploys every project for real.
 4. **Never hand-edit `~/.claude/CLAUDE.md` or `~/.codex/AGENTS.md`** once a `user.yml` deploys them. Edit the rulesets and redeploy.
 5. **Prefer tag filters over whitelists**, so a new manifest is picked up without editing every deployment.
 6. **Put `blacklist` last**, or it trims a selection that is still empty and does nothing.
 7. **Bump `metadata.version`** when a manifest's behaviour changes, and keep `metadata.updated` current.
-8. **Remember that nothing is cleaned up for you** when you drop an artifact from a manifest: the previously deployed copy stays until it is deleted by hand.
+8. **Remember that nothing is cleaned up for you** when you drop an artifact from a manifest: the previously deployed copy stays until it is deleted by hand. MCP server entries are the exception: the MCP ledger removes the ones a deployment no longer selects.
+9. **Gitignore `.ai-tools/`** in every project that selects MCP servers, together with its MCP config files.
+10. **Close every Claude Code session** before deploying a `user.yml` with an `mcps` block.
 
 ---
 
@@ -457,7 +489,13 @@ How much a collision costs depends on the kind:
 
 **`Cannot replace the <tool> files of project '<id>' in '...': deleting '...' failed`** / **`Cannot replace the <tool> files of user deployment '<id>' under '...': deleting '...' failed`** — a replacing deploy could not delete an entry, typically a file in a folder that is not writable. The message names the deployment, the tool, and the entry, and ends with `The run stopped here; make that path deletable and deploy again.` The run stops at that point and leaves the directory partly deleted. Projects are exported before user deployments: when a user deployment fails, every project of the run, and the user-scope files exported before the failed one, are already written; when a project fails, the projects and tools exported before it are. `--dry-run` does not delete, so it does not report this.
 
-**`Export failed for N manifest(s)`** — the list below the headline names each manifest and every tool it failed for. Everything else was still exported, and the run exits non-zero.
+**`Export failed for N manifest(s)`** — the list below the headline names each manifest and every tool it failed for. Everything else was still exported, and the run exits non-zero. An entry named `tool directory '<dir>'` means that directory, such as `.claude`, `.claude/agents` or `~/.codex`, is a broken link, not a directory, or in a project a link leading outside it; see [Tool directories](../07_mcp/README.md#tool-directories).
+
+**`Skipped the deployment(s) whose MCP servers do not fit what they deploy, for <n> reason(s):`** — a deployment deploys an agent whose `mcps` names a server the deployment does not select, restricts the tools of a server it does not select, names an invalid tool, or uses `__` in a restricted server id or tool name. That deployment is not exported at all; every other one is. See [07_mcp/README.md](../07_mcp/README.md#troubleshooting).
+
+**`Not writing the MCP entries of '<file>': the deployments [<d1>, <d2>] each declare an 'mcps' block covering it. ...`** — two deployments of the run, such as two projects with the same `deploy.directory`, declare an `mcps` block and write the same MCP file. Both fail for that file, and their other artifacts are still written. Keep the `mcps` block in only one of them.
+
+**`... changed while the engine merged it ...`** — a running Claude Code wrote `~/.claude.json` during the deploy. Close every Claude Code session, and deploy again.
 
 **`No rulesets match pattern 'x'`** — the pattern matched nothing. The message says whether a match exists but was excluded by the deployment's `rulesets` filter.
 

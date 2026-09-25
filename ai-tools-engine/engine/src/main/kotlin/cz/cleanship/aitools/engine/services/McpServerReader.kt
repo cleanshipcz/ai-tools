@@ -19,6 +19,7 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 
 /**
  * Turns an [McpServerManifest] into the [McpServer] every later step of a run works with: an inline server from its own transport, a pointer server from the `server.json` its [McpServerManifest.source] names.
@@ -36,11 +37,11 @@ class McpServerReader(
      *
      * For an inline server, every `${NAME}` in `args`, `env`, `url` and `headers` must name a variable the manifest declares, and becomes a reference to it; any other `${` fails. The `command` is a path: it may reference only variables of the run, and after substitution a `~` or leading `~/` stands for the home directory of this reader; a relative command is kept as written, for the tool to look up.
      *
-     * A pointer server is derived from its `server.json`, and the names of the variables it passes and the environment variables it sets are logged, never their values. Its text is data: a `{name}` placeholder the file defines becomes a variable named after the manifest id and the placeholder, such as `GITHUB_TOKEN`; an environment variable of a package keeps its own name, and so does one whose value is a single placeholder; a header without a value becomes a variable named after the id and the header, such as `GITHUB_AUTHORIZATION`; a positional argument with only a `valueHint` becomes a variable named after the id and the hint. A variable is secret when its input or any input around it is marked `isSecret`. An `npm` package starts with `npx -y`, a `pypi` package with `uvx`, and an `oci` package with `docker run -i --rm`, naming every environment variable with `-e`.
+     * A pointer server is derived from its `server.json`, which is read once: when the manifest declares a `pin`, the SHA-256 hash of the bytes read must equal it, and when it declares none, a warning prints the value to pin. The names of the variables it passes and the environment variables it sets are logged, never their values. Its text is data: a `{name}` placeholder the file defines becomes a variable named after the manifest id and the placeholder, such as `GITHUB_TOKEN`; an environment variable of a package keeps its own name, and so does one whose value is a single placeholder; a header without a value becomes a variable named after the id and the header, such as `GITHUB_AUTHORIZATION`; a positional argument with only a `valueHint` becomes a variable named after the id and the hint. A variable is secret when its input or any input around it is marked `isSecret`. An `npm` package starts with `npx -y`, a `pypi` package with `uvx`, and an `oci` package with `docker run -i --rm`, naming every environment variable with `-e`.
      *
      * @param manifestFile the file [manifest] was read from, whose directory a relative `source` resolves against
-     * @throws InvalidMcpServerManifestException if an inline server lacks a transport or a description, declares a `select`, or references anything but a declared variable; if its `command` references a declared variable or a variable of the run nothing declares; or if the server, inline or derived, breaks a rule of [requireValid]
-     * @throws InvalidMcpServerSourceException if a pointer server also declares a `description`, `transport` or `variables`; if its `source` cannot be substituted or leads to no readable `server.json`; if that file is not valid JSON, is not of the schema [SUPPORTED_SCHEMA], has a blank `description`, or declares no package and no remote; if `select` names both, names one the file does not declare, or is missing while the file declares more than one; if the selected remote is not Streamable HTTP, or the selected package is not a stdio package of `npm`, `pypi` or `oci`; if its `runtimeHint` is not the runner of its registry; if its identifier or version does not follow the grammar of its registry - see [PackageRegistry]; if it has a runtime argument other than `-e NAME` of an `oci` package; if it sets or forwards an environment variable, derives a variable, or sends a header, of the names the engine refuses; if a named argument has no value or a positional one has neither a value nor a value hint; if its text holds `${`; or if it derives one variable both as secret and as not secret
+     * @throws InvalidMcpServerManifestException if a pointer server declares a `pin` not of the form [McpServerManifest.pin] describes; if an inline server lacks a transport or a description, declares a `select` or a `pin`, or references anything but a declared variable; if its `command` references a declared variable or a variable of the run nothing declares; or if the server, inline or derived, breaks a rule of [requireValid]
+     * @throws InvalidMcpServerSourceException if a pointer server also declares a `description`, `transport` or `variables`; if its `source` cannot be substituted or leads to no readable `server.json`; if the hash of that file is not its `pin`, naming the file, the pinned and the actual hash; if that file is not valid JSON, is not of the schema [SUPPORTED_SCHEMA], has a blank `description`, or declares no package and no remote; if `select` names both, names one the file does not declare, or is missing while the file declares more than one; if the selected remote is not Streamable HTTP, or the selected package is not a stdio package of `npm`, `pypi` or `oci`; if its `runtimeHint` is not the runner of its registry; if its identifier or version does not follow the grammar of its registry - see [PackageRegistry]; if it has a runtime argument other than `-e NAME` of an `oci` package; if it sets or forwards an environment variable, derives a variable, or sends a header, of the names the engine refuses; if a named argument has no value or a positional one has neither a value nor a value hint; if its text holds `${`; or if it derives one variable both as secret and as not secret
      */
     fun read(manifest: McpServerManifest, manifestFile: File): McpServer {
         val server = if (manifest.source == null) readInline(manifest) else readPointer(manifest, manifestFile)
@@ -94,8 +95,9 @@ class McpServerReader(
 
     private fun readPointer(manifest: McpServerManifest, manifestFile: File): McpServer {
         requireNoInlineContent(manifest)
+        manifest.pin?.let { requirePinForm(manifest.id, it) }
         val serverFile = resolveServerFile(manifest, requireNotNull(manifest.source), manifestFile)
-        val serverJson = read(serverFile)
+        val serverJson = read(serverFile, manifest)
         if (serverJson.description.isBlank()) {
             throw InvalidMcpServerSourceException("'${serverFile.absolutePath}' provides no 'description', and a pointer server takes its description from there. Point 'source' at a $SERVER_FILE that describes the server.")
         }
@@ -154,16 +156,44 @@ class McpServerReader(
         throw InvalidMcpServerSourceException(problem)
     }
 
-    private fun read(serverFile: File): ServerJson {
-        val serverJson = try {
-            JSON.decodeFromString<ServerJson>(serverFile.readText())
+    /**
+     * Reads [serverFile] once, so the hash compared with the pin of [manifest] and the content decoded are the same bytes.
+     */
+    private fun read(serverFile: File, manifest: McpServerManifest): ServerJson {
+        val bytes = try {
+            serverFile.readBytes()
         } catch (ex: IOException) {
             throw InvalidMcpServerSourceException("'${serverFile.absolutePath}' cannot be read (${ex.javaClass.simpleName}).", ex)
+        }
+        requirePinned(manifest, serverFile, sha256(bytes))
+        val serverJson = try {
+            JSON.decodeFromString<ServerJson>(bytes.decodeToString())
         } catch (ex: IllegalArgumentException) {
             // A SerializationException is one. Its message quotes the file, which may hold a token, so only the offset it names is repeated.
             throw InvalidMcpServerSourceException("'${serverFile.absolutePath}' is not a valid $SERVER_FILE${ex.jsonOffset()}.", MessageWithheldException(ex))
         }
         return serverJson.also { requireSupportedSchema(it, serverFile) }
+    }
+
+    /**
+     * Fails when [manifest] pins another hash than [actual], the hash of [serverFile]; warns printing [actual] when it pins none. A hash is not a secret, so both are named.
+     */
+    private fun requirePinned(manifest: McpServerManifest, serverFile: File, actual: String) {
+        val pin = manifest.pin
+        if (pin == null) {
+            LOG.warn(
+                "MCP server '{}' reads '{}' without a pin, so any change to that file changes what every tool starts. Review the file, then add 'pin: {}' to the manifest to refuse any other content.",
+                manifest.id,
+                serverFile.absolutePath,
+                actual,
+            )
+            return
+        }
+        if (pin != actual) {
+            throw InvalidMcpServerSourceException(
+                "'${serverFile.absolutePath}' has the hash '$actual', but the manifest pins '$pin'. The file changed since it was pinned: review the change, then set 'pin' to the new hash.",
+            )
+        }
     }
 
     private fun requireSupportedSchema(serverJson: ServerJson, serverFile: File) {
@@ -470,6 +500,27 @@ class McpServerReader(
         private val JSON = Json { ignoreUnknownKeys = true }
     }
 }
+
+/**
+ * Fails when [pin], the pin of the MCP server [serverId], is not of the form [McpServerManifest.pin] describes.
+ *
+ * @throws InvalidMcpServerManifestException naming [serverId], never repeating [pin]
+ */
+private fun requirePinForm(serverId: String, pin: String) {
+    if (!PIN.matches(pin)) {
+        throw InvalidMcpServerManifestException("MCP server '$serverId' declares a 'pin' that is not 'sha256:' followed by 64 lowercase hexadecimal digits, the form a pin is written in.")
+    }
+}
+
+/**
+ * Returns the pin of [bytes], the SHA-256 hash of them in the form [McpServerManifest.pin] describes.
+ */
+private fun sha256(bytes: ByteArray): String =
+    PIN_PREFIX + MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+private const val PIN_PREFIX = "sha256:"
+
+private val PIN = Regex("sha256:[0-9a-f]{64}")
 
 /**
  * Returns the problem of a `source` or `command` whose variables cannot be substituted, naming the server, the field and the variable, never the value that came out.

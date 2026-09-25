@@ -8,6 +8,7 @@ import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
+import cz.cleanship.aitools.engine.tools.McpLimits
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
@@ -16,6 +17,7 @@ import cz.cleanship.aitools.engine.tools.UserScopeExporter
 import cz.cleanship.aitools.engine.tools.mcp.JsonMcpConfigFormat
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpPermissionsExporter
 import cz.cleanship.aitools.engine.tools.replacing
 import java.io.File
 
@@ -32,6 +34,17 @@ class CursorAdapter(
 
     override fun mcpConfig(projectDir: File): McpConfigExporter =
         McpConfigFileExporter(cursorDir(projectDir).resolve("mcp.json"), JsonMcpConfigFormat.CURSOR, exportService, projectDir)
+
+    override fun mcpPermissions(projectDir: File): McpPermissionsExporter? = null
+
+    override fun toolDirectories(projectDir: File): List<File> = listOf(cursorDir(projectDir), rulesDir(projectDir), commandsDir(projectDir), featuresDir(projectDir))
+
+    override val mcpLimits = McpLimits(
+        agentServers = "Cursor agents are rendered as rules, and Cursor gives every subagent all servers it is configured with",
+        allowedTools = NO_TOOL_RESTRICTION,
+        deniedTools = NO_TOOL_RESTRICTION,
+        userScope = "this engine writes no user-scope files for Cursor, which reads the MCP servers of the user from ~/.cursor/mcp.json",
+    )
 
     /**
      * Returns no exporter: the per-user layout of Cursor is not implemented yet, so the engine reports a user deployment naming this tool as skipped for it instead of writing anything into the home.
@@ -127,3 +140,5 @@ private fun commandsDir(projectDir: File) = cursorDir(projectDir).resolve("comma
 private fun rulesDir(projectDir: File) = cursorDir(projectDir).resolve("rules")
 
 private fun featuresDir(projectDir: File) = cursorDir(projectDir).resolve("features")
+
+private const val NO_TOOL_RESTRICTION = "the engine knows no setting of .cursor/mcp.json that restricts the tools of a server"

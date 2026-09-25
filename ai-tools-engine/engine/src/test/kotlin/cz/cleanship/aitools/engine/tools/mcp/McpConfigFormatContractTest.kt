@@ -65,7 +65,7 @@ class McpConfigFormatContractTest {
         assertThat(entries.keys).containsExactlyInAnyOrder("playwright", "github", "atlassian")
         assertThat(entries.getValue("playwright")).isEqualTo(entriesOf(format, existing).getValue("playwright"))
         assertThat(entries.getValue("github").toString()).doesNotContain("https://old")
-        assertThat(format.ownedEntriesIn(merged, owned, file)).containsExactlyInAnyOrder("github", "atlassian")
+        assertThat(format.entryFingerprints(merged, file).keys.filter { it in owned }).containsExactlyInAnyOrder("github", "atlassian")
         assertThat(format.merge(merged, listOf(atlassian, github), owned, file)).isEqualTo(merged)
     }
 
@@ -79,6 +79,34 @@ class McpConfigFormatContractTest {
         // - the model carries no secret value at all, so a reference by name is the only thing that can be written
         assertThat(merged).describedAs("%s file", name).contains("JIRA_PAT").contains("GITHUB_TOKEN")
         assertThat(entriesOf(format, merged).getValue("atlassian").toString()).doesNotContain("s3cr3t")
+    }
+
+    /**
+     * The fingerprint of an entry is what the MCP ledger records, and an entry the ledger records is removed only while its fingerprint still matches: it must depend on the entry alone, never on the file around it.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("formats")
+    fun `should give an entry the same fingerprint in every file it is merged into, and another one once its content changes`(
+        name: String,
+        format: McpConfigFormat,
+    ) {
+        // given
+        val alone = format.merge(null, listOf(atlassian, github), owned, file)
+        val withForeign = format.merge(format.merge(null, listOf(foreign), setOf("playwright"), file), listOf(atlassian, github), owned, file)
+        val changed = format.merge(alone, listOf(github.copy(transport = ResolvedMcpTransport.Http("https://other", emptyMap()))), setOf("github"), file)
+
+        // when
+        val fingerprintsAlone = format.entryFingerprints(alone, file)
+        val fingerprintsWithForeign = format.entryFingerprints(withForeign, file)
+        val fingerprintsChanged = format.entryFingerprints(changed, file)
+
+        // then
+        assertThat(fingerprintsAlone.keys).describedAs(name).containsExactlyInAnyOrder("atlassian", "github")
+        assertThat(fingerprintsAlone.values).allSatisfy { assertThat(it).matches("sha256:[0-9a-f]{64}") }
+        assertThat(fingerprintsWithForeign.filterKeys { it != "playwright" }).describedAs(name).isEqualTo(fingerprintsAlone)
+        assertThat(fingerprintsChanged.getValue("atlassian")).describedAs(name).isEqualTo(fingerprintsAlone.getValue("atlassian"))
+        assertThat(fingerprintsChanged.getValue("github")).describedAs(name).isNotEqualTo(fingerprintsAlone.getValue("github"))
+        assertThat(fingerprintsAlone.getValue("atlassian")).describedAs(name).isNotEqualTo(fingerprintsAlone.getValue("github"))
     }
 
     @Test
@@ -175,6 +203,7 @@ class McpConfigFormatContractTest {
         @JvmStatic
         fun formats(): Stream<Arguments> = Stream.of(
             Arguments.of("Claude Code", JsonMcpConfigFormat.CLAUDE_CODE),
+            Arguments.of("Claude Code user", JsonMcpConfigFormat.CLAUDE_CODE_USER),
             Arguments.of("VS Code", JsonMcpConfigFormat.VS_CODE),
             Arguments.of("Cursor", JsonMcpConfigFormat.CURSOR),
             Arguments.of("Codex", CodexTomlMcpConfigFormat),

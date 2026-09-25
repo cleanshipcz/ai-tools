@@ -454,6 +454,23 @@ class CodexAdapterTest {
             return file
         }
 
+        @Test
+        fun `should name the config file of the home as the file of its MCP servers and write no separate tool permissions`() {
+            // given
+            val exporter = exporterFor(userDeployment)
+
+            // when
+            val mcpConfig = exporter.mcpConfig()
+            val permissions = exporter.mcpPermissions()
+
+            // then
+            // - Codex reads the allowed and denied tools of a server from its table in config.toml
+            assertThat(mcpConfig?.file).isEqualTo(codexDir.resolve("config.toml"))
+            assertThat(permissions).isNull()
+            assertThat(exporter.toolDirectories).containsExactly(codexDir, codexDir.resolve("skills"))
+            assertThat(userHome).doesNotExist()
+        }
+
         private fun exporterFor(deployment: UserDeploymentManifest) =
             requireNotNull(adapter.userScope(userHome, deployment)) { "Codex has a user scope" }
     }

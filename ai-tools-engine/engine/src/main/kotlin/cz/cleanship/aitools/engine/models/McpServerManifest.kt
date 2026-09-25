@@ -42,6 +42,12 @@ data class McpServerManifest(
      * The loader rejects it on a server without a [source].
      */
     val select: McpSourceSelection? = null,
+    /**
+     * The SHA-256 hash of the bytes of the `server.json` of [source], or `null` for a pointer that accepts whatever that file holds.
+     *
+     * YAML key `pin`; optional, and `null` by default. It is written `sha256:` followed by 64 lowercase hexadecimal digits, the form of the value the warning of an unpinned pointer prints. A value of another form, or a pin on a server without a [source], fails loading naming the manifest. When the file holds other bytes, loading fails naming the manifest, the `server.json`, the pinned and the actual hash. A pointer without a pin loads with a warning that prints the value to add.
+     */
+    val pin: String? = null,
 ) : VersionedManifest
 
 /**

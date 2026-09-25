@@ -78,6 +78,35 @@ class UserDeploymentManifestTest {
         assertThat(result.agents.filter).isEmpty()
         assertThat(result.prompts.filter).isEmpty()
         assertThat(result.fragments.filter).isEmpty()
+        // - MCP servers are opt-in in the user scope too: no block selects none of them and never touches an MCP config file
+        assertThat(result.mcps).isNull()
+    }
+
+    @Test
+    fun `should deserialize an mcps block with its filter and tool restrictions`() {
+        val input = """
+            |id: globals
+            |description: My global AI tool setup
+            |mcps:
+            |    filter:
+            |        - type: whitelist
+            |          ids: [github]
+            |    tools:
+            |        github:
+            |            allow: [get_me]
+            |            deny: [delete_repository]
+            |metadata:
+            |    version: 1.0.0
+        """.trimMargin()
+
+        val result = yaml.decodeFromString(UserDeploymentManifest.serializer(), input)
+
+        assertThat(result.mcps).isEqualTo(
+            ProjectMcps(
+                filter = listOf(ProjectFilter.ByWhitelistedIds(listOf("github"))),
+                tools = mapOf("github" to McpToolRestriction(allow = listOf("get_me"), deny = listOf("delete_repository"))),
+            ),
+        )
     }
 
     @Test

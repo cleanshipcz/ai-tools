@@ -34,13 +34,32 @@ class ExportService(
      * Writes [content] to the config file [targetFile] through the sink of this service - see [ArtifactSink.writeConfigFile].
      *
      * @param describedBy what [content] holds, as the log line names it
+     * @param unchangedFrom what [targetFile] held when the caller read it, which it must still hold to be replaced
+     * @param createdAs who may read and write [targetFile] when it does not exist yet
+     * @throws ConfigFileChangedException naming [targetFile] if it no longer holds what [unchangedFrom] says; never in a dry run
      * @throws java.io.IOException if [targetFile] or the directory holding it cannot be written, which leaves [targetFile] as it was; never in a dry run
      */
     fun writeConfigFile(
         targetFile: File,
         content: String,
         describedBy: String,
-    ) = sink.writeConfigFile(targetFile, content, describedBy)
+        unchangedFrom: ConfigFileState = ConfigFileState.Unchecked,
+        createdAs: NewConfigFileMode = NewConfigFileMode.DEFAULT,
+    ) = sink.writeConfigFile(targetFile, content, describedBy, unchangedFrom, createdAs)
+
+    /**
+     * Deletes the config file [targetFile] through the sink of this service - see [ArtifactSink.deleteConfigFile].
+     *
+     * @param describedBy what [targetFile] holds, as the log line names it
+     * @param unchangedFrom what [targetFile] held when the caller read it, which it must still hold to be deleted
+     * @throws ConfigFileChangedException naming [targetFile] if it no longer holds what [unchangedFrom] says; never in a dry run
+     * @throws java.io.IOException if [targetFile] cannot be deleted; never in a dry run
+     */
+    fun deleteConfigFile(
+        targetFile: File,
+        describedBy: String,
+        unchangedFrom: ConfigFileState,
+    ) = sink.deleteConfigFile(targetFile, describedBy, unchangedFrom)
 
     /**
      * Copies every companion file declared by a skill next to its generated manifest.

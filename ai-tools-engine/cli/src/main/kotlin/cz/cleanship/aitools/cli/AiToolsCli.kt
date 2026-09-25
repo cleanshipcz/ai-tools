@@ -20,6 +20,7 @@ import cz.cleanship.aitools.engine.services.ArtifactWriteException
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
 import cz.cleanship.aitools.engine.services.RetiredConfigKeyException
+import cz.cleanship.aitools.engine.services.UnknownMcpServersException
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.nio.file.Paths
@@ -49,7 +50,7 @@ class AiToolsCli(
         .check("--user-home must name a directory, not an empty path") { it.toString().isNotEmpty() }
 
     /**
-     * Validates the manifests without deploying them: the run loads, filters and renders everything a deploy does and fails on what a deploy fails on, but creates, deletes and modifies nothing on disk. The exception is a write the file system refuses: a dry run finds a tool directory that is a dangling or looping link, or not a directory, only through an MCP config file in it, and any other write failure, such as a read-only directory, only a deploy finds. It is the way to check a manifest set before letting a deploy rewrite the projects and the home it reaches.
+     * Validates the manifests without deploying them: the run loads, filters and renders everything a deploy does and fails on what a deploy fails on, but creates, deletes and modifies nothing on disk. The exception is a write the file system refuses, such as one into a read-only directory, which only a deploy finds; a tool directory that is a dangling or looping link, or not a directory, fails the dry run as it fails the deploy. It is the way to check a manifest set before letting a deploy rewrite the projects and the home it reaches.
      */
     private val dryRun by option(
         "--dry-run",
@@ -69,6 +70,8 @@ class AiToolsCli(
         } catch (ex: DuplicateManifestIdException) {
             throw failure(ex.message, ex)
         } catch (ex: ManifestLoadingException) {
+            throw failure(ex.message, ex)
+        } catch (ex: UnknownMcpServersException) {
             throw failure(ex.message, ex)
         } catch (ex: VariableSubstitutionException) {
             throw failure(ex.message, ex)
@@ -94,7 +97,7 @@ class AiToolsCli(
     /**
      * Returns what the command throws for the failed file operation [ex]: a [CliktError] for a missing config file and for a file the run cannot write, whose messages name the file, and [ex] itself for any other.
      */
-    // A file the user-scope export cannot write stops the run, and its message names the file and the reason, which is what the operator needs rather than a stack trace. Any other IOException keeps its stack trace, because its message alone is often only a path.
+    // The engine collects a file it cannot write as a failure of its deployment and tool, which reaches this command as an ExportFailedException; an ArtifactWriteException that still escapes it names the file and the reason, which is what the operator needs rather than a stack trace. Any other IOException keeps its stack trace, because its message alone is often only a path.
     private fun reported(ex: IOException): Exception = when (ex) {
         is FileNotFoundException -> failure(ex.message ?: "Missing config.yml in ${workingDir.toAbsolutePath()}", ex)
         is ArtifactWriteException -> failure(ex.message, ex)

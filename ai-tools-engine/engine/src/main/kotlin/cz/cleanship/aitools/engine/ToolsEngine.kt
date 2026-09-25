@@ -3,6 +3,9 @@ package cz.cleanship.aitools.engine
 import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.env.VariableSubstitutionException
 import cz.cleanship.aitools.engine.io.ArtifactDeleteException
+import cz.cleanship.aitools.engine.io.TargetRoot
+import cz.cleanship.aitools.engine.io.ToolDirectoryException
+import cz.cleanship.aitools.engine.io.requireToolDirectory
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
 import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
@@ -16,6 +19,9 @@ import cz.cleanship.aitools.engine.models.UserDeployment
 import cz.cleanship.aitools.engine.models.UserDeploymentManifest
 import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.ArtifactWriteException
+import cz.cleanship.aitools.engine.services.DryRunArtifactSink
+import cz.cleanship.aitools.engine.services.ExportService
+import cz.cleanship.aitools.engine.services.FileSystemArtifactSink
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.services.LoaderService
 import cz.cleanship.aitools.engine.services.McpServerReader
@@ -95,9 +101,9 @@ class ToolsEngine(
      *
      * Failure policy: COLLECT-ALL-THEN-FAIL. An unresolvable ruleset or fragment reference fails only the single manifest that carries it; every remaining manifest, adapter and project is still exported, and all failures are reported together in one [ExportFailedException] at the very end. A manifest author therefore sees every broken reference in a single run instead of rediscovering them one at a time. Because [ExportService] writes atomically, no half-written artifact is left behind by a manifest that failed.
      *
-     * A project whose own id or feature ids collide is not exported at all - see [LoaderService.loadAll] - and is reported through the same [ExportFailedException], so a single ambiguous id cannot stop the projects that have nothing to do with it.
+     * A project whose own id or feature ids collide is not exported at all - see [LoaderService.loadAll] - and is reported through the same [ExportFailedException], so a single ambiguous id cannot stop the projects that have nothing to do with it. A project or user deployment that deploys an agent using an MCP server it does not select, or restricts the tools of such a server or names a tool outside the grammar of MCP tool names, is not exported either - see [mcpProblems] - and is reported the same way.
      *
-     * @throws ExportFailedException if at least one manifest could not be exported or at least one project was left out because its ids collide
+     * @throws ExportFailedException if at least one manifest could not be exported, at least one project was left out because its ids collide, or at least one deployment was left out because its MCP servers do not fit what it deploys
      * @throws DeployDirectoryResolvingException if a `deploy.directory` references a variable that nothing declares, which stops the run before a single project is exported - see [resolveDeployDirectories]
      * @throws SkillSourceOverlapException if a path the run would write a skill to, or a directory it would delete to replace it, is, lies inside, or contains the source folder of a pointer skill, which stops the run before anything is written - see [SkillSourceOverlapCheck.requireApart]
      * @throws UnreadableReplacedFolderException if a directory the run would delete to replace it is, or holds, a folder the run cannot read, which stops the run before anything is written - see [SkillSourceOverlapCheck.requireApart]
@@ -143,48 +149,77 @@ class ToolsEngine(
             val destinations = resolveDeployDirectories(allData.projects.values)
             skillSourceOverlapCheck.requireApart(allData, destinations)
 
-            val failures = mutableListOf<ExportFailure>()
-            val mcpServers = McpConfigExportPlanner(mcpServerResolver)
-            for (projectManifest in allData.projects.values) {
-                // Selecting before the project is assembled keeps a project that exports through no tool out of the log entirely, rather than bracketing it in the lines that report a deploy which never happened.
-                val adapters =
-                    selectAdapters(projectManifest.id, projectManifest.deploy.tools, toolsField = "deploy.tools", subject = "project")
-                if (adapters.isEmpty()) continue
-                LOG.info("Processing project {}", projectManifest.id)
-                val project = assembleProject(projectManifest, allData)
-                val destination = destinations.getValue(projectManifest.id)
-                for (adapter in adapters) {
-                    failures += exportAdapter(project, adapter, destination, allData.rulesets, allData.fragments, mcpServers)
-                }
-                LOG.info("Processing project {} completed", projectManifest.id)
-            }
-
-            failures += exportUserDeployments(allData)
+            val invalidDeployments = mutableListOf<String>()
+            val mcpServers =
+                McpConfigExportPlanner(mcpServerResolver, ExportService(if (dryRun) DryRunArtifactSink else FileSystemArtifactSink))
+            // Every deployment is planned before any is exported, so the MCP files two deployments cover are known before either writes one.
+            val projects = planProjects(allData, destinations, invalidDeployments)
+            val userDeployments = planUserDeployments(allData, invalidDeployments)
+            mcpServers.claim(projects.flatMap { it.mcpClaims() } + userDeployments.planned.flatMap { it.mcpClaims() })
+            val failures = exportProjects(projects, allData, mcpServers).toMutableList()
+            failures += exportUserDeployments(userDeployments, allData, mcpServers)
 
             // Said before the failures are raised, so that a failing dry run is still recognisable as one: the error that follows reads the same as after a deploy, and this line is what says nothing was touched.
             if (dryRun) {
                 LOG.info("Dry run finished: nothing was written.")
             }
-            if (failures.isNotEmpty() || allData.duplicates.isNotEmpty()) {
-                throw ExportFailedException(failures, allData.duplicates)
+            if (failures.isNotEmpty() || allData.duplicates.isNotEmpty() || invalidDeployments.isNotEmpty()) {
+                throw ExportFailedException(failures, allData.duplicates, invalidDeployments)
             }
         }
     }
 
     /**
-     * Names a run that has nothing to deploy, for the same reason a run configuring no tools is named: a deploy that writes nothing and reports success reads exactly like one that worked.
-     *
-     * The likeliest cause is a `config.local.yml` left on the retired `locations.projects` key - which [cz.cleanship.aitools.engine.services.ConfigService] rejects outright when it can see it - or a location pointing at a directory that has since moved.
+     * Returns every project of [allData] that is exported, with the adapters it selects and its directory of [destinations]. A project whose agents or tool restrictions name an MCP server it does not select is not exported, and its problems are added to [invalidDeployments].
      */
-    private fun warnWhenNothingToDeploy(locations: Locations, allData: AllManifests) {
-        val foundNothing = allData.projects.isEmpty() && allData.userDeployments.isEmpty()
-        when {
-            locations.deployments.isEmpty() ->
-                LOG.warn("This run configures no deployment locations, so nothing is deployed. Declare the directories holding your project.yml and user.yml files under 'locations.deployments' in config.yml, or in config.local.yml, which replaces that list.")
-            // Manifests dropped for an ambiguous id are already absent from allData, and each collision was reported above. Explaining where manifests go to someone whose manifests were found and rejected would be misdirection, so that run is left with the error that actually describes it.
-            foundNothing && allData.duplicates.isEmpty() ->
-                LOG.warn("Found no deployment manifest under {}, so nothing is deployed. A project is a directory holding a project.yml, a user deployment one holding a user.yml.", locations.deployments.map { it.absolutePath })
+    private fun planProjects(
+        allData: AllManifests,
+        destinations: Map<String, File>,
+        invalidDeployments: MutableList<String>,
+    ): List<PlannedProject> = allData.projects.values.mapNotNull { projectManifest ->
+        // Selecting before the project is assembled keeps a project that exports through no tool out of the log entirely, rather than bracketing it in the lines that report a deploy which never happened.
+        val adapters =
+            selectAdapters(projectManifest.id, projectManifest.deploy.tools, toolsField = "deploy.tools", subject = "project")
+        if (adapters.isEmpty()) return@mapNotNull null
+        val project = assembleProject(projectManifest, allData)
+        val problems = mcpProblems(
+            "Project '${projectManifest.id}'",
+            "deploy.mcps",
+            project.agents.values,
+            project.mcps.keys,
+            projectManifest.deploy.mcps
+                ?.tools
+                .orEmpty(),
+        )
+        if (problems.isEmpty()) {
+            PlannedProject(project, adapters, destinations.getValue(projectManifest.id))
+        } else {
+            problems.forEach { LOG.error("Not exporting project {}: {}", projectManifest.id, it) }
+            invalidDeployments += problems
+            null
         }
+    }
+
+    /**
+     * Exports every project of [projects] into its directory, through the adapters it selects.
+     *
+     * @return the failures collected while exporting, which the caller reports together with those of the user deployments
+     */
+    private fun exportProjects(
+        projects: List<PlannedProject>,
+        allData: AllManifests,
+        mcpServers: McpConfigExportPlanner,
+    ): List<ExportFailure> {
+        val failures = mutableListOf<ExportFailure>()
+        for (planned in projects) {
+            val projectId = planned.project.manifest.id
+            LOG.info("Processing project {}", projectId)
+            for (adapter in planned.adapters) {
+                failures += exportAdapter(planned.project, adapter, planned.destination, allData.rulesets, allData.fragments, mcpServers)
+            }
+            LOG.info("Processing project {} completed", projectId)
+        }
+        return failures
     }
 
     /**
@@ -253,32 +288,61 @@ class ToolsEngine(
     }
 
     /**
-     * Exports every user deployment of [allData] into [userHome], through the adapters its `tools` list selects.
+     * Returns every user deployment of [allData] that is exported into [userHome], with the tools its `tools` list selects that have a user scope, and the instructions files more than one of them claims.
      *
-     * It mirrors the project loop above, minus the parts a user scope does not have: there is no directory to resolve - each adapter knows the per-user location of its own tool - and no features to deploy. A tool the engine has no user-scope layout for is reported rather than passed over, so a manifest naming it is never dropped without a word - see [ToolAdapter.userScope].
-     *
-     * @return the failures collected while exporting, which the caller reports together with those of the projects
+     * It mirrors the project planning above, minus the parts a user scope does not have: there is no directory to resolve - each adapter knows the per-user location of its own tool - and no features to deploy. A tool the engine has no user-scope layout for is reported rather than passed over, so a manifest naming it is never dropped without a word - see [ToolAdapter.userScope]; so is a tool that gets none of the MCP servers a deployment selects. A deployment whose agents or tool restrictions name a server it does not select is not exported, whether or not a tool it selects has a user scope, and its problems are added to [invalidDeployments].
      */
-    private fun exportUserDeployments(allData: AllManifests): List<ExportFailure> {
-        if (allData.userDeployments.isEmpty()) return emptyList()
+    private fun planUserDeployments(
+        allData: AllManifests,
+        invalidDeployments: MutableList<String>,
+    ): UserDeploymentPlan {
+        if (allData.userDeployments.isEmpty()) return UserDeploymentPlan(emptyList(), emptySet())
 
         // Selecting for every manifest first keeps `selectAdapters` - which warns - to one call per manifest, and is what lets the contention below be decided before anything has been written.
         val selections = allData.userDeployments.values
             .map { manifest ->
                 manifest to selectAdapters(manifest.id, manifest.tools, toolsField = "tools", subject = "user deployment")
             }.filter { (_, adapters) -> adapters.isNotEmpty() }
-        if (selections.isEmpty()) return emptyList()
+        if (selections.isEmpty()) return UserDeploymentPlan(emptyList(), emptySet())
 
         val targets = selections.flatMap { (manifest, adapters) ->
             adapters.mapNotNull { adapter -> userScopeTarget(manifest, adapter) }
         }
-        val contendedInstructions = reportContendedInstructionsFiles(targets)
+        val instructionsClaims = targets.map { it.instructionsFile to it.manifest.id }
+        val contendedInstructions = reportContendedInstructionsFiles(instructionsClaims)
 
         // A manifest every selected tool lacks a user scope for has no targets at all, and is left out here rather than bracketed by a pair of log lines reporting a deploy that never happened - the skip was reported per tool above. Assembling is pure filtering, so it can happen before the home is announced.
         val targetsByDeployment = targets.groupBy { it.manifest.id }
-        val planned = selections.mapNotNull { (manifest, _) ->
-            targetsByDeployment[manifest.id]?.let { PlannedUserDeployment(assembleUserDeployment(manifest, allData), it) }
+        val planned = selections.mapNotNull { (manifest, adapters) ->
+            val deployment = assembleUserDeployment(manifest, allData)
+            // Checked before anything is reported about the MCP servers of the deployment, since a deployment that is not exported skips nothing; and before its targets are looked at, since a manifest that fits no tool of this engine is still wrong.
+            val problems =
+                mcpProblems("User deployment '${manifest.id}'", "mcps", deployment.agents.values, deployment.mcps.keys, manifest.mcps?.tools.orEmpty())
+            if (problems.isNotEmpty()) {
+                problems.forEach { LOG.error("Not exporting user deployment {}: {}", manifest.id, it) }
+                invalidDeployments += problems
+                return@mapNotNull null
+            }
+            reportUserScopeMcpSkips(deployment, adapters)
+            val deploymentTargets = targetsByDeployment[manifest.id] ?: return@mapNotNull null
+            PlannedUserDeployment(deployment, deploymentTargets)
         }
+        return UserDeploymentPlan(planned, contendedInstructions)
+    }
+
+    /**
+     * Exports every user deployment of [plan] into [userHome], through the tools planned for it.
+     *
+     * @return the failures collected while exporting, which the caller reports together with those of the projects
+     */
+    private fun exportUserDeployments(
+        plan: UserDeploymentPlan,
+        allData: AllManifests,
+        mcpServers: McpConfigExportPlanner,
+    ): List<ExportFailure> {
+        val planned = plan.planned
+        val contendedInstructions = plan.contendedInstructions
+        if (planned.isEmpty()) return emptyList()
         announceHome(planned, contendedInstructions)
 
         val failures = mutableListOf<ExportFailure>()
@@ -292,6 +356,7 @@ class ToolsEngine(
                     ownsInstructionsFile = target.instructionsFile !in contendedInstructions,
                     allRulesets = allData.rulesets,
                     allFragments = allData.fragments,
+                    mcpServers = mcpServers,
                 )
             }
             LOG.info("Processing user deployment {} completed", deployment.manifest.id)
@@ -337,23 +402,6 @@ class ToolsEngine(
     }
 
     /**
-     * Returns the instructions files that more than one manifest claims, having reported each of them.
-     *
-     * A tool reads one instructions file per home, so two manifests deploying to the same tool both own `<home>/.claude/CLAUDE.md` and the one processed last would silently decide what every session on the machine reads. No winner is picked, mirroring what [LoaderService] does with a contested id: both are reported, the file neither may own is left alone, and the artifacts they do not contend for are still deployed.
-     */
-    private fun reportContendedInstructionsFiles(targets: List<UserScopeTarget>): Set<File> = targets
-        .groupBy { it.instructionsFile }
-        .filterValues { claimants -> claimants.distinctBy { it.manifest.id }.size > 1 }
-        .onEach { (instructionsFile, claimants) ->
-            val claimingIds = claimants.map { it.manifest.id }.distinct()
-            LOG.error(
-                "Not writing '{}': the user deployment(s) {} all deploy it. Give each tool a single deployment, or narrow their 'tools' lists.",
-                instructionsFile.absolutePath,
-                claimingIds,
-            )
-        }.keys
-
-    /**
      * Returns the export of the instructions file of one deployment, named the way every other export of the run is.
      *
      * The path is logged before it is written rather than left to be derived from the home: this is the one file the engine takes over from the user, and a replacement of something already there is worth a warning of its own. A manifest that does not own the file - because another one claims it too - keeps its place in the list and fails there, so the contention is reported against the manifest that caused it.
@@ -384,20 +432,37 @@ class ToolsEngine(
     /**
      * Exports every manifest of [deployment] into the user scope of [target], isolating each of them the way [exportAdapter] isolates the manifests of a project.
      *
+     * The directories of the tool in the home are checked first: when one cannot hold the files of the tool, nothing of the tool is written and that is the one failure. A file other than an MCP file that cannot be written ends the export of the tool with one failure naming that file, and the next tool is exported; a failed delete stops the run with [ReplaceFailedException].
+     *
      * @param ownsInstructionsFile whether this manifest may write the instructions file of the tool, which is false when another manifest claims the same file - see [reportContendedInstructionsFiles]. The contention is reported as a failure of this manifest, so the run cannot end successfully having written neither.
      * @return the failures collected while exporting, empty when everything was exported
      */
+    // One parameter per collaborator of the export, like exportAdapter; bundling them would only move the list.
+    @Suppress("LongParameterList")
     private fun exportUserAdapter(
         deployment: UserDeployment,
         target: UserScopeTarget,
         ownsInstructionsFile: Boolean,
         allRulesets: Map<String, RulesetManifest>,
         allFragments: Map<String, FragmentManifest>,
+        mcpServers: McpConfigExportPlanner,
     ): List<ExportFailure> {
         val manifest = deployment.manifest
         val exporter = target.exporter
         val toolType = target.adapter.toolType
+        val subject = "user deployment '${manifest.id}'"
         LOG.info("{}: {} into the user scope of {} under '{}'", manifest.id, deploying, toolType.serialName, userHome.absolutePath)
+        val root = TargetRoot.UserHome(userHome)
+        val mcpExports = mcpServers.exportsFor(
+            McpDeployment(manifest.id, root, deployment.mcps, deployment.ownedMcpIds, manifest.mcps?.tools.orEmpty(), declaresMcps = manifest.mcps != null),
+            toolType,
+            exporter.mcpConfig(),
+            exporter.mcpPermissions(),
+            target.adapter.mcpLimits,
+        )
+        val directories = exporter.toolDirectories + mcpExports.mapNotNull { it.directory }
+        toolDirectoryFailure(manifest.id, subject, root, toolType, directories)?.let { return listOf(it) }
+        reportAgentMcpSkip(manifest.id, deployment.agents.values, target.adapter)
         if (manifest.replace) {
             // Quoted for the same reason the project loop quotes its destination: a home can end in a character that reads as part of the sentence around it.
             LOG.warn("{}: {} the artifacts of this deployment under '{}'.", manifest.id, replacing, userHome.absolutePath)
@@ -436,16 +501,11 @@ class ToolsEngine(
                     },
                 )
             }
+            mcpExports.forEach { add(it.name to it.run) }
         }
 
-        return try {
-            exports.mapNotNull { (name, export) ->
-                exportOrCollectFailure(manifest.id, toolType, name, export)
-            }
-        } catch (ex: ArtifactDeleteException) {
-            // The user scope deletes inside the export of each artifact, so the failed delete surfaces here rather than from a step of its own like a project's.
-            throw ex.explained(toolType, "user deployment '${manifest.id}' under '${userHome.absolutePath}'")
-        }
+        // The user scope deletes inside the export of each artifact, so a failed delete surfaces here rather than from a step of its own like a project's.
+        return exportAll(manifest.id, subject, toolType, exports) { ex -> ex.explained(toolType, "$subject under '${userHome.absolutePath}'") }
     }
 
     /**
@@ -472,6 +532,12 @@ class ToolsEngine(
             skills = filteredSkills,
             skillSourceDirs = allData.skillSourceDirs.filterKeys { it in filteredSkills },
             pointerSourceDirs = allData.pointerSourceDirs,
+            // MCP servers are opt-in in the user scope too: a deployment that declares no mcps block selects none.
+            mcps = manifest.mcps
+                ?.let { filterService.filter(allData.mcps.values, it.filter) }
+                .orEmpty()
+                .associateBy { it.id },
+            ownedMcpIds = allData.mcps.keys,
         )
     }
 
@@ -504,7 +570,7 @@ class ToolsEngine(
     /**
      * Exports every manifest of [project] through [adapter], isolating each manifest so that one broken reference cannot skip the manifests behind it.
      *
-     * A file other than the MCP config file that cannot be written ends the export of [adapter] for [project] with one failure naming that file, and leaves the files written before it in place; a failed delete stops the run with [ReplaceFailedException]. A dry run writes no file, so it finds a tool directory that is a dangling or looping link, or not a directory, only through the MCP config file in it, and not at all for a project that selects no MCP server; any other write failure, such as a read-only directory, only a deploy finds.
+     * Every directory the files of the tool land in is checked first, in a dry run as in a deploy - see [requireToolDirectory]: when one is a link that leads nowhere, in a loop or outside the project, or is not a directory, nothing of the tool is written or deleted for the project and that is the one failure. A directory the project replaces, or one below it, is not checked, since the replace removes whatever stands there before anything is written. A file other than an MCP file that cannot be written ends the export of [adapter] for [project] with one failure naming that file, and leaves the files written before it in place; a failed delete stops the run with [ReplaceFailedException]. Any other write failure, such as a read-only directory, only a deploy finds.
      *
      * @return the failures collected while exporting, empty when everything was exported
      */
@@ -517,6 +583,32 @@ class ToolsEngine(
         mcpServers: McpConfigExportPlanner,
     ): List<ExportFailure> {
         LOG.info("{}: Exporting via adapter {}", project.manifest.id, adapter.toolType)
+        val projectId = project.manifest.id
+        val root = TargetRoot.Project(destination)
+        val replaced = adapter.replacedPaths(destination, project.manifest).map { it.absoluteFile.normalize() }
+        val mcpExports = mcpServers.exportsFor(
+            McpDeployment(
+                projectId,
+                root,
+                project.mcps,
+                project.ownedMcpIds,
+                project.manifest.deploy.mcps
+                    ?.tools
+                    .orEmpty(),
+                declaresMcps = project.manifest.deploy.mcps != null,
+            ),
+            adapter.toolType,
+            adapter.mcpConfig(destination),
+            adapter.mcpPermissions(destination),
+            adapter.mcpLimits,
+            // The deploy deletes these before any export runs; a dry run deletes nothing, so it plans the files below them as the deploy finds them.
+            deletedFirst = if (dryRun) replaced else emptyList(),
+        )
+        // A directory a replacing deploy deletes, and every directory below it, is removed as a link, or as whatever else stands there, before anything is written, so nothing is ever written through it; it is left out in a dry run too, which deletes nothing but must fail exactly where the deploy fails.
+        val directories = (adapter.toolDirectories(destination) + mcpExports.mapNotNull { it.directory })
+            .filterNot { directory -> replaced.any { directory.absoluteFile.normalize().startsWith(it) } }
+        toolDirectoryFailure(projectId, "project '$projectId'", root, adapter.toolType, directories)?.let { return listOf(it) }
+        reportAgentMcpSkip(projectId, project.agents.values, adapter)
         if (project.manifest.deploy.replace) {
             // The path is quoted because a resolved `deploy.directory` can legitimately end in `.`, which reads as `..` when a sentence-ending period follows it - misleading in a warning about deletion.
             LOG.warn("{}: {} existing agentic files in '{}'.", project.manifest.id, replacing, destination)
@@ -526,60 +618,27 @@ class ToolsEngine(
             adapter.prepareOrExplain(destination, project.manifest)
         }
 
-        val failures = mutableListOf<ExportFailure>()
-        for ((manifest, export) in adapter.projectExports(project, destination, allRulesets, allFragments, mcpServers)) {
-            try {
-                exportOrCollectFailure(project.manifest.id, adapter.toolType, manifest, export)?.let(failures::add)
-            } catch (ex: ArtifactDeleteException) {
-                // A failed delete leaves a directory partly deleted, which must stop the run wherever an adapter deletes, never become one more collected failure.
-                throw ex.explained(adapter.toolType, "project '${project.manifest.id}' in '${destination.absolutePath}'")
-            } catch (ex: IOException) {
-                // Most write failures come from the tool directory itself, such as a '.codex' that is a dangling link or a regular file, so the tool is stopped at the first one rather than failing once per file; the failure says that no further files of the tool are written.
-                val stopped = ToolExportStoppedException(project.manifest.id, adapter.toolType, ex)
-                LOG.error("{}: {} could not be exported for {}: {}", project.manifest.id, manifest, adapter.toolType, stopped.message)
-                LOG.debug("{}: the failure that stopped {}", project.manifest.id, adapter.toolType, ex)
-                failures += ExportFailure(project.manifest.id, adapter.toolType, manifest, stopped)
-                break
-            }
-        }
-        return failures
+        val exports = adapter.projectExports(project, destination, allRulesets, allFragments) + mcpExports.map { it.name to it.run }
+        // A failed delete leaves a directory partly deleted, which must stop the run wherever an adapter deletes, never become one more collected failure.
+        return exportAll(projectId, "project '$projectId'", adapter.toolType, exports) { ex -> ex.explained(adapter.toolType, "project '$projectId' in '${destination.absolutePath}'") }
     }
 
     /**
-     * Runs a single [export], turning an authoring error into a reportable [ExportFailure] instead of letting it abort the remaining exports.
-     *
-     * Only the deliberately named exceptions of one manifest or one file are collected: an unresolvable ruleset or fragment reference, a companion file a skill manifest declares but does not ship or that cannot be read, an MCP server whose variables cannot be resolved, every failure of an MCP config file (an [McpConfigFileException]), and an instructions file two user deployments claim. An [IOException] of any other artifact propagates to the caller: a project export collects it for the whole tool - see [exportAdapter] - except a failed delete, which stops the run like a user deployment stops it on any of them. Everything else - a programming fault or an out-of-memory error - is left to propagate and abort the run loudly instead of being reported as one more broken manifest.
-     *
-     * @return the failure that stopped this manifest, or `null` when it was exported successfully
+     * A project with its artifacts selected, the adapters it exports through and its directory known, before anything has been written.
      */
-    private fun exportOrCollectFailure(
-        deploymentId: String,
-        toolType: ToolType,
-        manifest: String,
-        export: () -> Unit,
-    ): ExportFailure? = try {
-        export()
-        null
-    } catch (ex: RulesetResolvingException) {
-        LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
-        ExportFailure(deploymentId, toolType, manifest, ex)
-    } catch (ex: FragmentResolvingException) {
-        LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
-        ExportFailure(deploymentId, toolType, manifest, ex)
-    } catch (ex: SkillFileResolvingException) {
-        LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
-        ExportFailure(deploymentId, toolType, manifest, ex)
-    } catch (ex: McpServerResolvingException) {
-        // Named after the server that failed rather than after the file, which holds every server of the project.
-        val server = "MCP server '${ex.serverId}'"
-        LOG.error("{}: {} could not be exported for {}: {}", deploymentId, server, toolType, ex.message)
-        ExportFailure(deploymentId, toolType, server, ex)
-    } catch (ex: McpConfigFileException) {
-        LOG.error("{}: {} could not be exported for {}: {}", deploymentId, manifest, toolType, ex.message)
-        ExportFailure(deploymentId, toolType, manifest, ex)
-    } catch (ex: ContendedInstructionsFileException) {
-        // Reported once for the file, above; collected here so the run of every claimant fails rather than succeeding having quietly written nothing.
-        ExportFailure(deploymentId, toolType, manifest, ex)
+    private data class PlannedProject(
+        val project: Project,
+        val adapters: List<ToolAdapter>,
+        val destination: File,
+    ) {
+        /** Returns every MCP file the adapters of this project write, when it declares an `mcps` block that covers them. */
+        fun mcpClaims(): List<McpFileClaim> = if (project.manifest.deploy.mcps == null) {
+            emptyList()
+        } else {
+            adapters
+                .flatMap { adapter -> listOfNotNull(adapter.mcpConfig(destination)?.file, adapter.mcpPermissions(destination)?.file) }
+                .map { McpFileClaim(it, "project '${project.manifest.id}'") }
+        }
     }
 
     /**
@@ -588,6 +647,23 @@ class ToolsEngine(
     private data class PlannedUserDeployment(
         val deployment: UserDeployment,
         val targets: List<UserScopeTarget>,
+    ) {
+        /** Returns every MCP file the tools of this deployment write in the home, when it declares an `mcps` block that covers them. */
+        fun mcpClaims(): List<McpFileClaim> = if (deployment.manifest.mcps == null) {
+            emptyList()
+        } else {
+            targets
+                .flatMap { target -> listOfNotNull(target.exporter.mcpConfig()?.file, target.exporter.mcpPermissions()?.file) }
+                .map { McpFileClaim(it, "user deployment '${deployment.manifest.id}'") }
+        }
+    }
+
+    /**
+     * The user deployments of a run that are exported, and the instructions files more than one of them claims - see [reportContendedInstructionsFiles].
+     */
+    private data class UserDeploymentPlan(
+        val planned: List<PlannedUserDeployment>,
+        val contendedInstructions: Set<File>,
     )
 
     /**
@@ -607,14 +683,151 @@ class ToolsEngine(
 }
 
 /**
- * Returns every export of [project] through this adapter into [destination], each named after the manifest it writes, in the order they run: the project, its agents, prompts, features and skills, and last its MCP config file when it selects servers.
+ * Returns the instructions files that more than one manifest of [claims], each an instructions file and the id of the user deployment writing it, claims, having reported each of them.
+ *
+ * A tool reads one instructions file per home, so two manifests deploying to the same tool both own `<home>/.claude/CLAUDE.md` and the one processed last would silently decide what every session on the machine reads. No winner is picked, mirroring what [LoaderService] does with a contested id: both are reported, the file neither may own is left alone, and the artifacts they do not contend for are still deployed.
+ */
+private fun reportContendedInstructionsFiles(claims: List<Pair<File, String>>): Set<File> = claims
+    .groupBy({ it.first }, { it.second })
+    .filterValues { claimants -> claimants.distinct().size > 1 }
+    .onEach { (instructionsFile, claimants) ->
+        val claimingIds = claimants.distinct()
+        ENGINE_LOG.error(
+            "Not writing '{}': the user deployment(s) {} all deploy it. Give each tool a single deployment, or narrow their 'tools' lists.",
+            instructionsFile.absolutePath,
+            claimingIds,
+        )
+    }.keys
+
+/**
+ * Names a run that has nothing to deploy, for the same reason a run configuring no tools is named: a deploy that writes nothing and reports success reads exactly like one that worked.
+ *
+ * The likeliest cause is a `config.local.yml` left on the retired `locations.projects` key - which [cz.cleanship.aitools.engine.services.ConfigService] rejects outright when it can see it - or a location pointing at a directory that has since moved.
+ */
+private fun warnWhenNothingToDeploy(locations: Locations, allData: AllManifests) {
+    val foundNothing = allData.projects.isEmpty() && allData.userDeployments.isEmpty()
+    when {
+        locations.deployments.isEmpty() ->
+            ENGINE_LOG.warn("This run configures no deployment locations, so nothing is deployed. Declare the directories holding your project.yml and user.yml files under 'locations.deployments' in config.yml, or in config.local.yml, which replaces that list.")
+        // Manifests dropped for an ambiguous id are already absent from allData, and each collision was reported above. Explaining where manifests go to someone whose manifests were found and rejected would be misdirection, so that run is left with the error that actually describes it.
+        foundNothing && allData.duplicates.isEmpty() ->
+            ENGINE_LOG.warn("Found no deployment manifest under {}, so nothing is deployed. A project is a directory holding a project.yml, a user deployment one holding a user.yml.", locations.deployments.map { it.absolutePath })
+    }
+}
+
+/**
+ * Runs every export of [exports] for the deployment [deploymentId], [subject] in a message, through [toolType], collecting each failure the way [exportOrCollectFailure] does.
+ *
+ * A write that fails with an [IOException] ends the exports of the tool with one failure naming the file; the failure says that no further files of the tool are written. A failed delete becomes what [explained] returns and stops the run: it leaves a directory partly deleted.
+ *
+ * @return the failures collected, empty when everything was exported
+ */
+// The exports of a tool stop at the first failed write because most write failures come from the tool directory itself, which every later file of the tool would fail on too.
+private fun exportAll(
+    deploymentId: String,
+    subject: String,
+    toolType: ToolType,
+    exports: List<Pair<String, () -> Unit>>,
+    explained: (ArtifactDeleteException) -> ReplaceFailedException,
+): List<ExportFailure> {
+    val failures = mutableListOf<ExportFailure>()
+    for ((manifest, export) in exports) {
+        try {
+            exportOrCollectFailure(deploymentId, toolType, manifest, export)?.let(failures::add)
+        } catch (ex: ArtifactDeleteException) {
+            throw explained(ex)
+        } catch (ex: IOException) {
+            val stopped = ToolExportStoppedException(subject, toolType, ex)
+            ENGINE_LOG.error("{}: {} could not be exported for {}: {}", deploymentId, manifest, toolType, stopped.message)
+            ENGINE_LOG.debug("{}: the failure that stopped {}", deploymentId, toolType, ex)
+            failures += ExportFailure(deploymentId, toolType, manifest, stopped)
+            break
+        }
+    }
+    return failures
+}
+
+/**
+ * Checks every directory of [directories] the files of [toolType] land in for the deployment [deploymentId] - see [requireToolDirectory] - and returns the failure of the first one that cannot hold them, logged, or `null` when all of them can.
+ *
+ * A directory is named relative to the directory of [root], as `tool directory '.codex'`, and the directory of [root] itself is not checked.
+ */
+private fun toolDirectoryFailure(
+    deploymentId: String,
+    subject: String,
+    root: TargetRoot,
+    toolType: ToolType,
+    directories: List<File>,
+): ExportFailure? {
+    val base = root.directory.absoluteFile
+    for (directory in directories.map { it.absoluteFile }.distinct().filter { it != base }) {
+        try {
+            root.requireToolDirectory(directory, "${toolType.serialName} files of $subject")
+        } catch (ex: ToolDirectoryException) {
+            val name = "tool directory '${directory.relativeTo(base).invariantSeparatorsPath}'"
+            ENGINE_LOG.error("{}: {} could not be exported for {}: {}", deploymentId, name, toolType, ex.message)
+            return ExportFailure(deploymentId, toolType, name, ex)
+        }
+    }
+    return null
+}
+
+/**
+ * Runs a single [export], turning an authoring error into a reportable [ExportFailure] instead of letting it abort the remaining exports.
+ *
+ * Only the deliberately named exceptions of one manifest or one file are collected: an unresolvable ruleset or fragment reference, a companion file a skill manifest declares but does not ship or that cannot be read, an MCP server whose variables cannot be resolved, every failure of an MCP config file, a permissions file or a ledger (an [McpConfigFileException]), a ledger that cannot be written (an [McpLedgerException], named `MCP ledger`), an instructions file two user deployments claim, and an MCP file the `mcps` blocks of two deployments cover. An [IOException] of any other artifact propagates to the caller, which collects it for the whole tool - see [exportAll] - except a failed delete, which stops the run. Everything else - a programming fault or an out-of-memory error - is left to propagate and abort the run loudly instead of being reported as one more broken manifest.
+ *
+ * @return the failure that stopped this manifest, or `null` when it was exported successfully
+ */
+private fun exportOrCollectFailure(
+    deploymentId: String,
+    toolType: ToolType,
+    manifest: String,
+    export: () -> Unit,
+): ExportFailure? = try {
+    export()
+    null
+} catch (ex: RulesetResolvingException) {
+    ENGINE_LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
+    ExportFailure(deploymentId, toolType, manifest, ex)
+} catch (ex: FragmentResolvingException) {
+    ENGINE_LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
+    ExportFailure(deploymentId, toolType, manifest, ex)
+} catch (ex: SkillFileResolvingException) {
+    ENGINE_LOG.error("{}: {} could not be exported for {}", deploymentId, manifest, toolType, ex)
+    ExportFailure(deploymentId, toolType, manifest, ex)
+} catch (ex: McpServerResolvingException) {
+    // Named after the server that failed rather than after the file, which holds every server of the project.
+    val server = "MCP server '${ex.serverId}'"
+    ENGINE_LOG.error("{}: {} could not be exported for {}: {}", deploymentId, server, toolType, ex.message)
+    ExportFailure(deploymentId, toolType, server, ex)
+} catch (ex: McpConfigFileException) {
+    ENGINE_LOG.error("{}: {} could not be exported for {}: {}", deploymentId, manifest, toolType, ex.message)
+    ExportFailure(deploymentId, toolType, manifest, ex)
+} catch (ex: McpLedgerException) {
+    // Named after the ledger rather than after the file whose export needed the record, which is left as it was.
+    val ledger = McpConfigExportPlanner.LEDGER
+    ENGINE_LOG.error("{}: {} could not be exported for {}: {}", deploymentId, ledger, toolType, ex.message)
+    ExportFailure(deploymentId, toolType, ledger, ex)
+} catch (ex: ContendedInstructionsFileException) {
+    // Reported once for the file, above; collected here so the run of every claimant fails rather than succeeding having quietly written nothing.
+    ExportFailure(deploymentId, toolType, manifest, ex)
+} catch (ex: ContendedMcpFileException) {
+    // Reported once for each file when the run was planned; collected here for the same reason as a contended instructions file.
+    ExportFailure(deploymentId, toolType, manifest, ex)
+}
+
+// The functions above run beside the engine and log under it, so one logger holds the whole transcript.
+private val ENGINE_LOG = LoggerFactory.getLogger(ToolsEngine::class.java)
+
+/**
+ * Returns every export of [project] through this adapter into [destination], each named after the manifest it writes, in the order they run: the project, its agents, prompts, features and skills. The MCP files follow them - see [McpConfigExportPlanner].
  */
 private fun ToolAdapter.projectExports(
     project: Project,
     destination: File,
     allRulesets: Map<String, RulesetManifest>,
     allFragments: Map<String, FragmentManifest>,
-    mcpServers: McpConfigExportPlanner,
 ): List<Pair<String, () -> Unit>> = buildList {
     add("project '${project.manifest.id}'" to { export(destination, GlobalContext(project.manifest)) })
     project.agents.values.forEach { agent ->
@@ -652,7 +865,6 @@ private fun ToolAdapter.projectExports(
             },
         )
     }
-    mcpServers.exportFor(project, this@projectExports, destination)?.let(::add)
 }
 
 /**
@@ -696,19 +908,24 @@ class DeployDirectoryResolvingException(
     )
 
 /**
- * Thrown for each user deployment that claims an instructions file another one claims too. A tool reads one such file per home, so there is nothing to merge and no winner to pick - see [ToolsEngine.reportContendedInstructionsFiles].
+ * Thrown for each user deployment that claims an instructions file another one claims too. A tool reads one such file per home, so there is nothing to merge and no winner to pick - see [reportContendedInstructionsFiles].
  */
 class ContendedInstructionsFileException(message: String) : RuntimeException(message)
 
 /**
- * The cause of the [ExportFailure] that records the [IOException] which stopped the export of [toolType] for the project [projectId], naming the file that could not be written or accessed and never its content.
+ * Thrown for each deployment and tool whose MCP files the `mcps` block of another deployment of the same run covers too - see [McpConfigExportPlanner.claim].
+ */
+class ContendedMcpFileException(message: String) : RuntimeException(message)
+
+/**
+ * The cause of the [ExportFailure] that records the [IOException] which stopped the export of [toolType] for the deployment [deployment], such as `project 'x'` or `user deployment 'x'`, naming the file that could not be written or accessed and never its content.
  */
 class ToolExportStoppedException(
-    val projectId: String,
+    val deployment: String,
     val toolType: ToolType,
     cause: IOException,
 ) : RuntimeException(
-        "${cause.describedWrite()}, so the engine writes no further ${toolType.serialName} files of project '$projectId' in this run. Repair or remove what is at that path, and deploy again.",
+        "${cause.describedWrite()}, so the engine writes no further ${toolType.serialName} files of $deployment in this run. Repair or remove what is at that path, and deploy again.",
         cause,
     )
 
@@ -734,11 +951,16 @@ data class ExportFailure(
 )
 
 /**
- * Thrown by [ToolsEngine.process] once every project has been processed, when at least one manifest failed to export or a project was left unexported because its ids collide. Carries the original resolver messages so the caller can report every broken reference and every collision at once.
+ * Thrown by [ToolsEngine.process] once every project and user deployment has been processed, when at least one manifest failed to export or a deployment was left unexported. Carries the original messages so the caller can report every broken reference, collision and misfit at once.
+ *
+ * @property failures every manifest or file that could not be exported, per deployment and tool
+ * @property duplicates every id collision that left a deployment unexported
+ * @property invalidDeployments every message of [mcpProblems] that left a deployment unexported
  */
 class ExportFailedException(
     val failures: List<ExportFailure>,
     val duplicates: List<DuplicateManifestId> = emptyList(),
+    val invalidDeployments: List<String> = emptyList(),
 ) : RuntimeException(
         buildString {
             if (failures.isNotEmpty()) {
@@ -753,6 +975,11 @@ class ExportFailedException(
                 if (isNotEmpty()) append("\n")
                 append("Skipped the deployment(s) affected by ${duplicates.size} duplicate manifest id(s):")
                 duplicates.forEach { duplicate -> append("\n  - ${duplicate.message}") }
+            }
+            if (invalidDeployments.isNotEmpty()) {
+                if (isNotEmpty()) append("\n")
+                append("Skipped the deployment(s) whose MCP servers do not fit what they deploy, for ${invalidDeployments.size} reason(s):")
+                invalidDeployments.forEach { problem -> append("\n  - $problem") }
             }
         },
     )

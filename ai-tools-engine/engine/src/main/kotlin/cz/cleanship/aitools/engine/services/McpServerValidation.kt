@@ -10,7 +10,7 @@ import cz.cleanship.aitools.engine.models.McpTextPart
 import cz.cleanship.aitools.engine.models.McpVariable
 
 /**
- * Fails when this MCP server, which declares no `source`, lacks what an inline server needs: a transport and a description, and no selection.
+ * Fails when this MCP server, which declares no `source`, lacks what an inline server needs: a transport and a description, and no `select` or `pin`.
  *
  * @throws InvalidMcpServerManifestException naming what is missing or misplaced
  */
@@ -18,6 +18,7 @@ internal fun McpServerManifest.requireInlineShape() {
     val problem = when {
         transport == null -> "declares neither 'source' nor 'transport'. Declare a 'transport', or a 'source' naming a server.json."
         select != null -> "declares 'select' but no 'source'. Only a server read from a server.json selects a package or remote; remove 'select'."
+        pin != null -> "declares 'pin' but no 'source'. Only the server.json of a pointer server is pinned; remove 'pin'."
         description.isBlank() -> "has a missing or empty 'description'. Declare one that is not blank, or declare a 'source' whose server.json provides it."
         else -> return
     }

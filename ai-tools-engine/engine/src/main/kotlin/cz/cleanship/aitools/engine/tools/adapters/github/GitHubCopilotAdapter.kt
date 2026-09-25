@@ -10,6 +10,7 @@ import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
+import cz.cleanship.aitools.engine.tools.McpLimits
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
@@ -18,6 +19,7 @@ import cz.cleanship.aitools.engine.tools.UserScopeExporter
 import cz.cleanship.aitools.engine.tools.mcp.JsonMcpConfigFormat
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpPermissionsExporter
 import cz.cleanship.aitools.engine.tools.replacing
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -43,6 +45,20 @@ class GitHubCopilotAdapter(
     // VS Code also reads a portable `.mcp.json`, but that is the file of Claude Code; `.vscode/mcp.json` is the one only Copilot reads, so the two tools never contend for an entry.
     override fun mcpConfig(projectDir: File): McpConfigExporter =
         McpConfigFileExporter(projectDir.resolve(".vscode").resolve("mcp.json"), JsonMcpConfigFormat.VS_CODE, exportService, projectDir)
+
+    override fun mcpPermissions(projectDir: File): McpPermissionsExporter? = null
+
+    // `.vscode` holds only the MCP config file, so the engine checks it only when it writes that file.
+    override fun toolDirectories(projectDir: File): List<File> =
+        listOf(githubDir(projectDir), agentsDir(projectDir), promptsDir(projectDir), instructionsDir(projectDir))
+
+    // VS Code gives an agent that declares no `tools` every tool it has, the servers of `.vscode/mcp.json` included, and one that declares them only those it lists: listing the servers of an agent would take away its editing, search and terminal tools.
+    override val mcpLimits = McpLimits(
+        agentServers = "a Copilot agent without 'tools' already gets every configured server, and a 'tools' list would remove its built-in tools",
+        allowedTools = NO_TOOL_RESTRICTION,
+        deniedTools = NO_TOOL_RESTRICTION,
+        userScope = "VS Code keeps the MCP servers of the user in the mcp.json of each user profile, and of each remote, which this engine does not write",
+    )
 
     override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
         globalContext.project,
@@ -107,14 +123,6 @@ class GitHubCopilotAdapter(
     override fun skillPaths(projectDir: File, skillId: String): List<File> =
         listOf(skillFile(promptsDir(projectDir), skillId), skillFilesDir(promptsDir(projectDir), skillId))
 
-    private fun githubDir(projectDir: File) = projectDir.resolve(".github")
-
-    private fun promptsDir(projectDir: File) = githubDir(projectDir).resolve("prompts")
-
-    private fun instructionsDir(projectDir: File) = githubDir(projectDir).resolve("instructions")
-
-    private fun agentsDir(projectDir: File) = githubDir(projectDir).resolve("agents")
-
     private fun frontmatter(name: String, description: String, argumentHint: String? = null) = buildString {
         appendLine("---")
         appendLine("name: $name")
@@ -151,3 +159,13 @@ private fun skillFilesDir(promptsDir: File, skillId: String) = promptsDir.resolv
 private fun argumentHint(variables: List<PromptVariable>) = variables
     .takeIf { it.isNotEmpty() }
     ?.joinToString(" ") { if (it.required) "<${it.name}>" else "[${it.name}]" }
+
+private fun githubDir(projectDir: File) = projectDir.resolve(".github")
+
+private fun promptsDir(projectDir: File) = githubDir(projectDir).resolve("prompts")
+
+private fun instructionsDir(projectDir: File) = githubDir(projectDir).resolve("instructions")
+
+private fun agentsDir(projectDir: File) = githubDir(projectDir).resolve("agents")
+
+private const val NO_TOOL_RESTRICTION = "the engine knows no setting of .vscode/mcp.json that restricts the tools of a server"
