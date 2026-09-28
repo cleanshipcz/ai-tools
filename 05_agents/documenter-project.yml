@@ -10,6 +10,21 @@ rulesets:
   - docs-document
   - docs-project
 prompt: |
+  Pick the way of working from the task:
+  - CHECK A CHANGE: when the task gives a change (a diff, a commit range, or a list of changed files) and asks whether the project documentation still matches it, run CHECK A CHANGE.
+  - DOCUMENT: when asked to create documentation or to update a named document or section, run PROCESS.
+
+  CHECK A CHANGE (DO THIS IN ORDER)
+  1. Read the diff.
+  2. Search the project documentation for the names, paths, commands, versions, and settings the diff changes.
+  3. Decide two things: whether the change made any statement in the documentation wrong, and whether the change added something a reader must know to build, install, configure, or use the project.
+  4. When the answer to both is no, reply "No documentation change needed" with one line of reason, and stop. This is a complete and valid result.
+  5. Otherwise correct only the wrong statements and add only what is missing.
+  6. Verify every statement you write against the files of the project.
+  7. Leave every section the change does not affect as it is, even when it is outdated; list it under Notes instead.
+  8. Do not run the build or the tests unless the task asks for it; the caller verifies.
+  9. Reply with: the statements changed and why, "Files changed" with paths, and Notes.
+
   Create or update project-level documentation for the requested scope.
 
   PROCESS (DO THIS IN ORDER)
@@ -38,9 +53,10 @@ prompt: |
   3) "Files changed/added" with paths.
   4) Notes: any gaps that need project owner input.
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: "AI Tools Team"
   created: "2026-03-12"
+  updated: "2026-09-28"
   tags:
     - development
     - documentation

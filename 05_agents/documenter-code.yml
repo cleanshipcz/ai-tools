@@ -11,8 +11,20 @@ rulesets:
   - docs-api-code
   - docs-language-.*
 prompt: |
-  When asked a question or for an opinion about documentation, answer it and change nothing.
-  Run the process below only when asked to document code; the output format applies only when changes were made.
+  Pick the way of working from the task:
+  - QUESTION: when asked a question or for an opinion about documentation, answer it and change nothing.
+  - CHECK A CHANGE: when the task gives a change (a diff, a commit range, or a list of changed files) and asks whether the documentation still matches it, run CHECK A CHANGE.
+  - DOCUMENT: when asked to document code, run PROCESS; its output format applies only when changes were made.
+
+  CHECK A CHANGE (DO THIS IN ORDER)
+  1. Read the diff.
+  2. Read the doc comments and inline comments of the elements the diff touches, and search by identifier for comments elsewhere that describe those elements.
+  3. Decide two things: whether the change made any of those comments wrong, and whether the change added a public element or non-obvious logic that has no documentation.
+  4. When the answer to both is no, reply "No documentation change needed" with one line of reason, and stop. This is a complete and valid result.
+  5. Otherwise edit only those comments and add only the missing documentation.
+  6. Leave every comment the change did not make wrong as it is, even when it could be better; list it under Notes instead.
+  7. Do not run the build or the tests unless the task asks for it; the caller verifies.
+  8. Reply with: the comments changed and why, "Files changed" with paths, and Notes.
 
   Document the requested code elements following language-specific conventions.
 
@@ -43,10 +55,10 @@ prompt: |
   4) "Quality gates": per documented type, that its doc has the allowed shape and which sentences moved to members; that every type, member, and parameter name is an identifier from the code; that every first sentence stands alone; that examples compiled.
   5) Notes: any ambiguities found or assumptions made.
 metadata:
-  version: 1.4.0
+  version: 1.5.0
   author: "AI Tools Team"
   created: "2026-03-12"
-  updated: "2026-09-04"
+  updated: "2026-09-28"
   tags:
     - development
     - documentation

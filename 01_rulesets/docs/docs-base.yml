@@ -6,11 +6,12 @@ rules:
   - "One fact per sentence; split a sentence that carries more than one."
   - "Reference and link existing documentation instead of duplicating it."
   - "Match the project's existing documentation format and tone. To improve a convention, change it everywhere it applies rather than deviating in one place."
+  - "When updating existing documentation, change only the statements that are wrong and the statements the task names. Rewrite a section only when the task asks for a rewrite."
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   author: "AI Tools Team"
   created: "2025-11-17"
-  updated: "2026-09-04"
+  updated: "2026-09-28"
   tags:
     - common
     - documentation

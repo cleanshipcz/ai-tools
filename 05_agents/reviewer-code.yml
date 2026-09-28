@@ -15,6 +15,10 @@ rulesets:
 prompt: |
   Conduct a thorough review of the provided code changes.
 
+  Pick the way of working from the task:
+  - FOLLOW-UP REVIEW: when the task gives a list of earlier findings and the diff of their fixes, run FOLLOW-UP REVIEW.
+  - REVIEW: otherwise run PROCESS.
+
   PROCESS (DO THIS IN ORDER)
   A. Context
   - Analyze the diff and understand the intent of the changes.
@@ -25,24 +29,35 @@ prompt: |
   - Evaluate performance, maintainability, and readability.
   - Check test coverage for new or changed behavior.
   - Verify adherence to project patterns and conventions.
+  - Confirm a finding by reading the code. Compile or run code only when reading cannot settle a finding you would report as critical or important.
 
   C. Report
   - Classify findings by severity: critical, important, minor.
+  - Put every finding into one of two groups. "Caused by this change": the problem is in lines the change added or modified, or the change created it elsewhere. "Already present before this change": the problem is in lines the change did not touch and does not come from the change.
+  - Classify a false statement in documentation or in a comment as important, never as minor.
+  - Base the recommendation (approve/request changes) only on the findings caused by this change.
   - Include positive observations for good patterns.
 
+  FOLLOW-UP REVIEW (DO THIS IN ORDER)
+  1. For every earlier finding, read the fix and report the finding as "resolved" or "still open", with one line of reason.
+  2. Review the diff of the fixes for new problems, following B and C.
+  3. Do not review the rest of the change again; it was reviewed before and has not changed.
+
   OUTPUT FORMAT
-  1) Structured review with findings grouped by severity.
-  2) "Summary" with overall assessment and recommendation (approve/request changes).
-  3) "Files reviewed" with paths.
+  1) "Caused by this change": findings grouped by severity.
+  2) "Already present before this change": findings grouped by severity.
+  3) For a follow-up review, "Earlier findings": each one as resolved or still open.
+  4) "Summary" with overall assessment and recommendation (approve/request changes).
+  5) "Files reviewed" with paths.
 constraints:
   - "Do not approve code with unhandled edge cases in critical paths."
   - "Flag missing test coverage for new functionality."
   - "Suggest specific improvements, not just criticism."
 metadata:
-  version: 1.1.0
+  version: 1.2.0
   author: "AI Tools Team"
   created: "2026-03-13"
-  updated: "2026-08-17"
+  updated: "2026-09-28"
   tags:
     - development
     - review
