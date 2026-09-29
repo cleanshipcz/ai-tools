@@ -13,3 +13,10 @@ dependencies {
 
     testImplementation(kotlin("test"))
 }
+
+// The MCP launcher is a shell script kept outside this Gradle project, in scripts/ of the repository. Its tests (McpLaunchScriptTest) find it through this system property, and declaring it as an input makes Gradle rerun them when only the script changes. inputs.files, unlike inputs.file, tolerates a missing file, so a missing launcher fails the tests rather than the build configuration.
+val mcpLaunchScript = rootProject.projectDir.parentFile.resolve("scripts/mcp-launch")
+tasks.named<Test>("test") {
+    inputs.files(mcpLaunchScript).withPropertyName("mcpLaunchScript").withPathSensitivity(PathSensitivity.NONE)
+    systemProperty("aitools.mcpLaunch", mcpLaunchScript.absolutePath)
+}

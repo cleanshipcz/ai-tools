@@ -94,8 +94,9 @@ sealed class McpTransport {
  *
  * @property name the name of the environment variable, matching `[A-Za-z_][A-Za-z0-9_]*`
  * @property description what the variable holds
- * @property secret whether the value is a secret: a secret variable is never read by the engine and is rendered as a reference each tool resolves from its own environment; any other variable is read from `env_vars` of the config files only, never from the environment of the run, and written as its value
+ * @property secret whether the value is a secret: the engine never reads the value of a secret variable, and an MCP config file holds only a reference to it, which a tool resolves when it starts the server from where [from] says; any other variable is read from `env_vars` of the config files only, never from the environment of the run, and written as its value
  * @property required whether a server cannot run without it: a required variable that is not secret and that `env_vars` does not declare fails the MCP config files of every deployment that selects the server, while an optional one is left out, unless it is used in `args` or `url`, which fails the same way. It defaults to `true`
+ * @property from where a stdio server reads this secret variable when a tool starts it, written `from` in YAML, or `null` when the manifest declares nothing, which means [SecretSource.MANAGER]. A variable that is not secret fails loading when it declares one, naming the manifest and the variable; a value other than `manager` or `environment` fails loading naming the file. A secret a pointer server derives from its `server.json` declares none. A stdio server that reads a secret through the secrets manager starts through the launcher, and fails loading, naming the manifest, when the launcher refuses the name of that secret, when the name of any of its variables, secret or not, `from: environment` or not, or of an `env` key is of class A - see [cz.cleanship.aitools.engine.launcher.RefusedNameClass.LAUNCHER] - or when the launcher refuses the id of the server - see [cz.cleanship.aitools.engine.launcher.McpLauncherContract]; this holds whatever secrets manager the machine uses. An http server reads every secret from the environment of the tool, whatever this says
  */
 @Serializable
 data class McpVariable(
@@ -103,7 +104,26 @@ data class McpVariable(
     val description: String,
     val secret: Boolean,
     val required: Boolean = true,
-)
+    val from: SecretSource? = null,
+) {
+    /** Where a stdio server reads this variable, when it is secret: [from], or [SecretSource.MANAGER] when that is `null`. */
+    val source: SecretSource get() = from ?: SecretSource.MANAGER
+}
+
+/**
+ * Where a stdio MCP server reads a secret variable when a tool starts it.
+ */
+@Serializable
+enum class SecretSource {
+
+    /** The secrets manager of the machine, named by `secrets_manager` of the config files, with the environment of the tool as the fallback; when the machine uses none, the environment of the tool only. YAML value `manager`. */
+    @SerialName("manager")
+    MANAGER,
+
+    /** The environment of the tool only, rendered as a reference each tool resolves, whatever secrets manager the machine uses. YAML value `environment`. */
+    @SerialName("environment")
+    ENVIRONMENT,
+}
 
 /**
  * The package or remote of a `server.json` a pointer MCP server uses; exactly one of the two is set.

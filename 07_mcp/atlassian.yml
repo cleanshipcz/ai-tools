@@ -5,7 +5,7 @@ transport:
   type: stdio
   command: ${PROJECTS_FOLDER}/jira-confluence-mcp-server/.venv/bin/jira-mcp-server
 # Every variable is optional: the server enables Jira and Confluence each only when its base URL is set.
-# The engine never uses the value of a secret variable; each tool passes it from its own environment by name.
+# Every secret variable but HTTPS_PROXY is read from the secrets manager of the machine when a tool starts the server: the entry starts the launcher scripts/mcp-launch of this repository, which looks each secret up in the libsecret keyring and falls back to the environment of the tool. On a machine whose config sets 'secrets_manager: environment', each tool passes every secret from its own environment by name. The engine never reads the value of a secret.
 # Plain variables are resolved at deploy time from env_vars of config.yml or config.local.yml only, and written as values; one declared nowhere is left out.
 variables:
   - name: JIRA_PAT
@@ -41,14 +41,16 @@ variables:
     secret: false
     required: false
   - name: HTTPS_PROXY
-    # Secret, because a proxy URL may carry credentials; the tool passes it from its own environment.
+    # Secret, because a proxy URL may carry credentials. Read from the environment of the tool only, which passes it to the server with or without the launcher. HTTPS_PROXY matches *_PROXY, a class B name of the launcher's list of refused names: it changes where the server connects, never how the launcher runs. So it cannot be a keyring secret, and without 'from: environment' loading would fail; an inline manifest may declare it 'from: environment'.
     description: HTTPS proxy the server connects through.
     secret: true
     required: false
+    from: environment
 metadata:
-  version: 1.0.0
+  version: 1.2.0
   author: cleanshipcz
   created: 2026-09-24
+  updated: 2026-09-29
   tags:
     - ai-tools
     - atlassian

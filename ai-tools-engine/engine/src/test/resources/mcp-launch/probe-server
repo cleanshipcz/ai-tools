@@ -1,0 +1,19 @@
+#!@INTERPRETER@
+# Test double of an MCP server: reports on standard output what the launcher handed over, as NUL-terminated records.
+# The test installs it with @TOOLS@ replaced by a directory holding cat and env, so that it never runs a program of the same name that a test planted on the PATH.
+# @INTERPRETER@ is the shell under test with the options of the launcher's #! line, so that an environment a test makes hostile to the shell reaches this probe under the same protection as the launcher.
+# Records: "pid=<process id>", one "arg=<argument>" per argument, then the mode's output.
+# PROBE_MODE selects the mode: "report" (default) writes a record "env" followed by the environment exactly as the kernel handed it to this process, NUL-separated (/proc/<pid>/environ), before this script's shell exported anything; "echo" copies standard input to standard output unchanged.
+printf 'pid=%s\0' "$$"
+for argument in "$@"; do
+    printf 'arg=%s\0' "$argument"
+done
+case ${PROBE_MODE:-report} in
+    echo)
+        exec '@TOOLS@/cat'
+        ;;
+    *)
+        printf 'env\0'
+        exec '@TOOLS@/cat' "/proc/$$/environ"
+        ;;
+esac

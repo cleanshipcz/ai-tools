@@ -4,7 +4,11 @@ An MCP server gives an AI coding assistant extra tools, such as reading Jira iss
 Each YAML file here is an MCP server manifest: it declares one MCP server once, and a deploy writes it into the MCP config file of every supported tool in each project that selects it.
 A user deployment can select servers too, for the MCP config files of Claude Code and Codex in the home directory; see [The user scope](#the-user-scope).
 An agent can name the servers it uses, and a deployment can allow and deny single tools of a server; see [Attaching servers to an agent](#attaching-servers-to-an-agent) and [Allowing and denying tools](#allowing-and-denying-tools).
-The engine never uses the value of a variable marked secret: each tool gets a reference by name.
+The engine never reads the value of a variable marked secret, and no MCP config file holds one.
+A stdio server reads each secret from the libsecret keyring at the moment a tool starts it.
+The launcher `scripts/mcp-launch` of this repository does the reading, with the environment of the tool as the fallback.
+To store a secret, follow [First steps: keep a token in the keyring](#first-steps-keep-a-token-in-the-keyring).
+A remote server reads each secret from the environment of the tool.
 A plain variable is written as its value, read from `env_vars` of the config files only.
 For a pointer server, which variables are secret comes from its `server.json`, so the engine refuses a `server.json` it cannot render safely; see [What a deploy lets a tool start](#what-a-deploy-lets-a-tool-start).
 
@@ -16,7 +20,7 @@ flowchart LR
     inline["inline server<br/>07_mcp/atlassian.yml"] --> loader
     pointer["pointer server<br/>07_mcp/github.yml"] --> json["server.json<br/>outside this repository,<br/>checked against its pin"] --> loader
     loader["load and validate<br/>every manifest"] --> filter["deploy.mcps of a project.yml<br/>mcps of a user.yml"]
-    filter --> resolve["resolve plain variables<br/>keep secrets as references"]
+    filter --> resolve["resolve plain variables,<br/>keep secrets as references,<br/>start a stdio server with keyring<br/>secrets through scripts/mcp-launch"]
     resolve --> project["project: .mcp.json, .vscode/mcp.json,<br/>.cursor/mcp.json, .codex/config.toml"]
     resolve --> home["user scope: ~/.claude.json,<br/>~/.codex/config.toml"]
     filter --> tools["mcps.tools: .claude/settings.json<br/>and Codex enabled_tools / disabled_tools"]
@@ -49,18 +53,22 @@ Every tool fills it from its environment, and Claude Code sends an empty header 
 The package passes its token as `-e GITHUB_PERSONAL_ACCESS_TOKEN={token}`, a runtime argument other than `-e NAME`, so loading refuses it.
 Its identifier also holds `${VERSION}`, which the oci grammar refuses, so allowing the argument alone would not make the package usable.
 Codex could not fill that argument from the environment either.
-Before starting a tool, export the header value, including the scheme:
+A remote server does not use the keyring, so the header value, including the scheme, must be in the environment of the tool when it starts.
+Either export it:
 
 ```bash
 export GITHUB_AUTHORIZATION="Bearer <your GitHub token>"
 ```
+
+or store it in the keyring and start the tool with it for that one command; see [Remote servers](#remote-servers).
 
 ## Adding a server
 
 1. Create `07_mcp/<id>.yml`, as an [inline server](#an-inline-server) or a [pointer server](#a-pointer-server).
 2. Tag it `ai-tools` to deploy it into this repository, or select it in the `deploy.mcps` block of another project or the `mcps` block of a `user.yml`; see [Where the servers land](#where-the-servers-land).
 3. For a pointer server, review its `server.json` and add the `pin` that the first dry run prints; see [Pinning a pointer server](#pinning-a-pointer-server).
-4. Run `./deploy.sh --dry-run` from the repository root. It loads and checks the manifest, names each MCP config file it would write, and warns about every secret the environment does not set.
+4. Store each secret of a stdio server in the keyring; see [First steps: keep a token in the keyring](#first-steps-keep-a-token-in-the-keyring).
+5. Run `./deploy.sh --dry-run` from the repository root. It loads and checks the manifest, names each MCP config file it would write, and reports where a tool will find each secret; see [What the check of secrets reports](#what-the-check-of-secrets-reports). To see only the lines about secrets, as plain text, run `LOG_FORMAT=TEXT ./deploy.sh --dry-run 2>&1 | grep secret`, as in step 2 of [First steps](#first-steps-keep-a-token-in-the-keyring).
 
 The full step list is in [QUICKREF.md](../QUICKREF.md#add-an-mcp-server).
 
@@ -82,6 +90,7 @@ variables:                     # optional
     description: Jira personal access token.
     secret: true               # required: true or false, there is no default
     required: false            # optional, default true
+    # from: environment        # optional, on a secret only: manager (default) or environment
   - name: JIRA_BASE_URL
     description: Base URL of Jira.
     secret: false
@@ -115,6 +124,7 @@ metadata:
 - `description` is required for an inline server and must not be blank.
 - Each variable has the required fields `name`, `description`, and `secret`.
 - The optional field `required` defaults to `true`.
+- The optional field `from` is allowed on a secret variable only. It says where a stdio server reads the secret: `manager` (the default) or `environment`; see [The `from` key](#the-from-key).
 - A `name` is an environment variable name: letters, digits, and underscores, not starting with a digit.
 - `${NAME}` in `args`, `env`, `url`, and `headers` must name a variable the manifest declares under `variables`.
 - Any other `${` fails loading, naming the file: an undeclared name, and tool syntax such as `${NAME:-default}`, `${env:NAME}`, `${input:id}` or a nested reference. Every tool would expand such text from its own environment.
@@ -183,27 +193,21 @@ A pointer server takes its description, transport, and variables from a `server.
   - pypi: the identifier is a PEP 508 project name, and the version a PEP 440 version.
   - oci: the identifier is an image reference as `distribution/reference` defines it, optionally with a tag or a digest, and the version is a tag or a digest. An identifier that carries a tag or a digest is used as written, and the version is then ignored.
 - No identifier or version the engine accepts starts with `-` or holds whitespace. So no identifier or version reaches a position where `npx`, `uvx` or `docker` reads its own options. Package arguments come after the identifier. They are checked for `${`, but not against a grammar.
-- A `server.json` fails loading when it sets, forwards or derives an environment variable whose name is on the [environment variable denylist](#environment-variable-denylist), compared without regard to case.
+- A `server.json` fails loading when it sets, forwards or derives an environment variable whose name is on the [environment variable denylist](#environment-variable-denylist), compared without regard to case. This holds for a stdio and an http server alike.
 - A derived name is one the engine builds from the manifest id and a key of the file, such as `GIT_SSH_COMMAND` from the id `git` and the `valueHint` `ssh_command`; see [how the variables are named](#how-the-variables-of-a-serverjson-are-named).
 - A header of a remote fails loading when its name is a hop-by-hop header or overrides the host, the client address, the method, or authentication other than `Authorization`: `Host`, `Connection`, `Keep-Alive`, `Proxy-*`, `TE`, `Trailer`, `Transfer-Encoding`, `Upgrade`, `Content-Length`, `Cookie`, `Forwarded`, `X-Forwarded-*`, `X-Real-IP`, `X-HTTP-Method-Override`, `X-Method-Override`, `X-Original-URL`, `X-Rewrite-URL`.
 - The grammar checks and the two denylists apply to what a `server.json` contributes. The [URL rules](#url-rules) apply to every server.
-- An inline server is exempt from the denylists. It is written by the owner of this repository, chooses its whole `command` anyway, and is reviewed like code.
+- An inline server is exempt from the header denylist and the grammar checks. It is written by the owner of this repository, chooses its whole `command` anyway, and is reviewed like code.
+- An inline server is checked against the list of refused names only when it is started through the launcher, and then by the class of each name; see [Names the launcher refuses](#names-the-launcher-refuses).
 - Every run, `--dry-run` included, logs for each pointer server the file it was read from, the name of every variable it passes to the server and every environment variable it sets, never a value. A `server.json` may still ask for any other variable of your environment, such as `AWS_SECRET_ACCESS_KEY`, by name; read that line before you deploy.
 
 ### Environment variable denylist
 
-Each of these names configures the runner, the loader or the connection of the process a tool starts:
-
-| Names | What they configure |
-| --- | --- |
-| `DOCKER_*`, `CONTAINER_*`, `CONTAINERS_*` | docker and podman |
-| `NPM_*` (so `npm_config_*` too), `NODE_*` | npm and Node.js |
-| `UV_*`, `PIP_*`, `PYTHON*` | uv, pip and Python |
-| `LD_*`, `DYLD_*`, `GCONV_PATH` | the dynamic loader and glibc |
-| `HOSTALIASES`, `LOCALDOMAIN`, `RES_OPTIONS` | name resolution of glibc |
-| `GIT_*` | git |
-| `SSL_*`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`, `*_PROXY` | TLS and proxies |
-| `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `SHELL`, `BASH_ENV`, `ENV`, `XDG_*` | the paths, shell and configuration directories a process runs with |
+The environment variable denylist of a `server.json` is the whole list of [names the launcher refuses](#names-the-launcher-refuses), class A and class B alike.
+It covers every name that configures a shell, the launcher and the programs it starts, the runner (`npx`, `uvx`, `docker`), the dynamic loader, an interpreter, the locale, or the connection of the process a tool starts, such as `PATH`, `LD_*`, `NODE_*`, `PYTHON*`, `DOCKER_*`, `GIT_*`, `LANG` and `*_PROXY`.
+It applies to every name the file contributes, secret or not, for a stdio and an http server alike.
+The reason is that the owner of this repository does not write the `server.json`.
+A class B name, such as `NODE_OPTIONS` or `HTTPS_PROXY`, does not change the launcher, but it still lets the file change what the runtime of the server loads or where it connects.
 
 ### How the variables of a `server.json` are named
 
@@ -255,29 +259,789 @@ A `pin` on an inline server, or a value of another form, fails loading naming th
 
 ## Secret and plain variables
 
-A secret variable (`secret: true`) is never written, logged or resolved by the engine. The engine only checks whether the environment of the run sets it, to warn when it does not.
-Each tool gets a reference to it and reads the value from its own environment when it starts or connects to the server:
+A variable is secret when its manifest marks it `secret: true`, such as a token, a password or the path of a key file.
+The engine never reads, writes or logs the value of a secret.
+An MCP config file holds only the name of a secret and a reference to it.
+
+Where a server finds the value of a secret when a tool starts it:
+
+- A stdio server is a program a tool starts on your machine. By default it reads each secret from the keyring, the password store of your desktop session, and from the environment of the tool when the keyring does not hold it.
+- A remote server is one a tool reaches over HTTP. It reads each secret from the environment of the tool; see [Remote servers](#remote-servers).
+
+The manifests and the config files call the place a secret is kept a secrets manager.
+A secret variable may declare `from: manager`, which means that it is read from the secrets manager, or `from: environment`; see [The `from` key](#the-from-key).
+The key `secrets_manager` of the config files names the secrets manager of the machine; see [The `secrets_manager` setting](#the-secrets_manager-setting).
+The only secrets manager this engine supports is the libsecret keyring, which this page calls the keyring.
+
+### First steps: keep a token in the keyring
+
+The keyring is the password store of your Linux desktop session.
+A token kept there is in no file of any project and not in your shell profile.
+You store each token once.
+A tool, here, is an AI coding assistant that starts MCP servers, such as Claude Code, Codex, GitHub Copilot or Cursor.
+The launcher `scripts/mcp-launch`, a script of this repository, reads the token from the keyring each time a tool starts the server.
+
+Before you start:
+
+- Install `secret-tool`, the command-line program of the keyring. On Ubuntu and Debian it is the package `libsecret-tools`.
+- Open a terminal of your desktop session, where the keyring runs. [Storing a secret in the keyring](#storing-a-secret-in-the-keyring) lists exactly what that terminal needs.
+- Look up the name of the secret: it is the `name` of a variable marked `secret: true` in the manifest of the server, such as `JIRA_PAT` in `07_mcp/atlassian.yml`.
+- Make sure that `./deploy.sh --dry-run` can run. It needs what [Requirements](../README.md#requirements) of `README.md` lists, among them a JDK and two checkouts of other repositories.
+
+**Step 1: store the secret.**
+Run this command, with the name of your secret in place of `JIRA_PAT` in both places:
+
+```bash
+secret-tool store --label='ai-tools MCP JIRA_PAT' service ai-tools-mcp variable JIRA_PAT
+```
+
+It prints this prompt and waits:
+
+```
+Password:
+```
+
+Paste or type the value, and press Enter.
+The prompt shows nothing of what you type.
+Paste only once the prompt is shown.
+Text that arrives earlier is thrown away.
+An empty value is then stored instead.
+When the command prints an error, the value is not stored; see [When `secret-tool` fails](#when-secret-tool-fails).
+
+**Step 2: check that it is stored.**
+From the root of this repository, run:
+
+```bash
+LOG_FORMAT=TEXT ./deploy.sh --dry-run 2>&1 | grep secret
+```
+
+- `./deploy.sh --dry-run` checks everything a deploy would do, and writes nothing. It prints several thousand lines.
+- `LOG_FORMAT=TEXT` makes it print them as plain text. Without it, each line is a JSON object.
+- `2>&1 | grep secret` keeps only the lines that contain the word `secret`.
+
+For each MCP server that a deploy would write, the dry run prints one line for each secret that the launcher reads from the keyring.
+Every other secret gets a line only when the environment of the run does not set it.
+Each line starts with the time of day.
+When the secret is stored, its line reads:
+
+```
+09:28:19.688 INFO  c.c.a.e.tools.mcp.McpServerResolver - MCP server 'atlassian' reads the optional secret variable 'JIRA_PAT' from the keyring, which holds it.
+```
+
+When it is not stored, but the variable is set in the environment of the run, for example by your shell profile, the line is an INFO line that ends with `the keyring does not hold it, and the environment of this run sets it.`.
+When it is found in neither, the line is a warning that ends with the command of step 1:
+
+```
+09:28:19.688 WARN  c.c.a.e.tools.mcp.McpServerResolver - MCP server 'atlassian' reads the optional secret variable 'JIRA_PAT' from the keyring or the environment of the tool that starts it, but the keyring does not hold it and the environment of this run does not set it. Store it with: secret-tool store --label='ai-tools MCP JIRA_PAT' service ai-tools-mcp variable JIRA_PAT
+```
+
+`optional` in a line means that the server can start without that secret.
+A `required` secret is one the server cannot start without.
+
+The other secrets of the same server that the keyring supplies keep their own lines until you store them too.
+In this repository, those of `atlassian` are `CONFLUENCE_PAT`, `JIRA_CLIENT_CERT` and `JIRA_CLIENT_KEY`.
+You need not store a secret you do not use: a warning about an optional secret you do not use needs no action.
+Two more lines end with `Export it before starting the tool.`.
+One is about `HTTPS_PROXY` of `atlassian`, which its manifest declares `from: environment`.
+The other is about `GITHUB_AUTHORIZATION` of `github`, which is a remote server; see [Remote servers](#remote-servers).
+The keyring never supplies these two secrets, so storing them does not remove their lines.
+Export such a secret instead, and only when you use it.
+
+Other lines this command can show:
+
+- A warning with `the engine cannot tell whether the keyring holds it` means that the check could not ask the keyring. [What the check of secrets reports](#what-the-check-of-secrets-reports) lists each reason and what to do.
+- An error that contains `MCP server '<id>' reads its secrets through the launcher` means that the engine does not trust the file `scripts/mcp-launch` or one of its directories. The usual cause is that their group may write them. When the cause is such a permission, the message names the command that fixes it after `Remove that permission with:`, such as `chmod go-w '<path>'`. Run that command, then run step 2 again; see [The launcher file](#the-launcher-file).
+- Every variant of that error but the one about a path that holds `${` ends with `or set 'secrets_manager: environment' in config.local.yml to read every secret from the environment of the tool.`. That setting turns the keyring off for every server; see [The `secrets_manager` setting](#the-secrets_manager-setting).
+- When the command prints nothing, the dry run stopped before it checked the secrets. Run `LOG_FORMAT=TEXT ./deploy.sh --dry-run` without the filter, and read its last lines.
+
+**Step 3: deploy, then restart the tool.**
+Run `./deploy.sh` from the root of this repository.
+It writes the MCP config files, whose entries then start the server through the launcher.
+It also writes into every other project the config lists, and into your home; see [README.md](../README.md#common-workflow).
+You need this deploy the first time.
+You need it again after you change [`from`](#the-from-key) or [`secrets_manager`](#the-secrets_manager-setting).
+Then quit the tool, such as Claude Code or Codex, and start it again, so that it starts the server anew.
+
+The launcher reads the keyring each time a tool starts the server.
+So a value you store, replace or remove later takes effect the next time the tool starts the server, without a deploy.
+A server that is already running keeps the value it started with.
+
+**Step 4: when the server does not start or gets no value.**
+When the launcher cannot use the keyring, or does not find a required secret, it writes a line starting with `mcp-launch:` to the standard error of the server.
+In Claude Code, `/mcp` shows a server that failed to start as failed.
+Where a tool shows the line of the launcher depends on the tool; [Seeing the messages of the launcher](#seeing-the-messages-of-the-launcher) lists what the documentation of each tool says.
+For a server that failed to start, the check in a terminal described there is the way that always works.
+[Secrets and the launcher](#secrets-and-the-launcher) lists each such line with its cause and what to do.
+An optional secret found nowhere gives no such line; run the dry run of step 2 to see it.
+
+**To replace a secret**, run the command of step 1 again.
+The keyring then updates the item stored under the same two attributes, `service` and `variable`, rather than add a second one.
+
+**To remove a secret**, run:
+
+```bash
+secret-tool clear service ai-tools-mcp variable JIRA_PAT
+```
+
+`secret-tool` 0.20.4 crashes when nothing matches.
+It then exits with code 139, and the shell may print `Segmentation fault`.
+So its exit code does not tell whether an item was removed; check with the dry run of step 2.
+
+After you replace or remove a secret, restart the tool, as at the end of step 3; no deploy is needed.
+
+### What the keyring protects and what it does not
+
+The keyring keeps a secret:
+
+- out of every file that this repository, the engine or a tool writes, the MCP config files of every project and home included;
+- out of your shell profile and your shell history, when you store it through the prompt;
+- out of the environment of the tool, which receives only the name of a secret the launcher reads.
+
+The keyring daemon stores the items of a keyring in one file of its own under your home directory, such as `~/.local/share/keyrings/Default_keyring.keyring` of `gnome-keyring-daemon`.
+That file is encrypted with the password of the keyring.
+When that password is empty, which is usual with automatic login, the items are stored without encryption.
+A secret in a keyring with an empty password is then protected by the permissions of that file, as a file readable only by you would be, and the gain is that it is in none of the files the engine writes, not in your shell profile and not in the environment of the tool.
+
+The keyring does not keep one server's secret from another program of yours:
+
+- While the keyring is unlocked, every program that runs as your user can ask it for any item, every `ai-tools-mcp` item included. Every MCP server runs as your user.
+- A stored item is not bound to a server. Every server that declares a variable of that name receives the value stored under that name, in every project and home deployed from this repository.
+- A running server holds its values in its environment. Your own processes and root can read that environment through `/proc/<pid>/environ`.
+
+A remote server does not use the keyring at all; see [Remote servers](#remote-servers).
+
+### How a stdio server gets its secrets
+
+The terms of this part:
+
+- A keyring daemon, such as `gnome-keyring-daemon`, is the program that keeps the stored items and answers requests for them. It encrypts them with the password of the keyring, and stores them without encryption when that password is empty; see [What the keyring protects and what it does not](#what-the-keyring-protects-and-what-it-does-not).
+- The D-Bus session bus is the message channel of your login session, over which programs reach the keyring daemon.
+- libsecret is the library programs use to reach the keyring, and `secret-tool` is its command-line program.
+- The launcher `scripts/mcp-launch` is a shell script kept in this repository that a tool starts in place of the server.
+- [`from`](#the-from-key) is an optional key of a secret variable that names where a stdio server reads it: `manager`, the default, or `environment`.
+- [`secrets_manager`](#the-secrets_manager-setting) is an optional key of `config.yml` or `config.local.yml` that names the secrets manager of the machine: `libsecret`, the default, or `environment`.
+
+Where a server finds a secret:
+
+| Server | Where the server finds a secret |
+| --- | --- |
+| stdio, and the secret declares no `from`, or `from: manager` | the keyring first, then the environment of the tool; the launcher reads both |
+| stdio, and the secret declares `from: environment` | the environment of the tool only |
+| http (remote) | the environment of the tool only, whatever `from` says; see [Remote servers](#remote-servers) |
+| any server, on a machine whose config sets `secrets_manager: environment` | the environment of the tool only |
+
+The engine writes an entry that starts the launcher instead of the server when all of these hold:
+
+- the server is a stdio server;
+- at least one of its secrets declares no `from`, or `from: manager`;
+- the `secrets_manager` of the machine is `libsecret`, the default.
+
+Every other server is written without the launcher: every secret is a reference the tool resolves from its own environment.
+
+A tool then starts the server in three steps:
+
+1. The tool starts the launcher with the server id, the name of each keyring secret after `--required` or `--optional`, then `--`, then the real command and its arguments unchanged.
+2. The launcher looks each name up in the keyring, and falls back to the environment it received from the tool; see [The order in which a secret is looked for](#the-order-in-which-a-secret-is-looked-for).
+3. The launcher puts every value it found into its own environment and replaces itself with the real server (`exec`).
+
+After step 3, the server has the process id of the launcher. It also keeps its standard input and output and its signals. So the tool talks to the server as it would without the launcher.
+
+What each party sees:
+
+- The MCP config file holds the absolute path of the launcher, the names of the secrets, the real command, and the references of the tool. It never holds a value.
+- The argument list of the launcher holds names only. `ps` shows that list, and Cursor writes it into its log.
+- No program the launcher starts receives the value of a secret as an argument. The helper `env` receives the values of `DBUS_SESSION_BUS_ADDRESS`, `XDG_RUNTIME_DIR` and `HOME` as arguments, none of them a secret; see [The programs the launcher starts](#the-programs-the-launcher-starts).
+- The launcher writes its own messages to standard error, one line each. None of them holds a value.
+- The launcher never writes to standard output, which carries the protocol of the server.
+- The shell that runs the launcher, and the dynamic loader that starts that shell, write a message of their own in a few cases, such as a command that is not found. No such message holds the value of a variable the manifest declares; see [Limits](#limits).
+- The environment of the running server holds the values, as it did when the tool passed them.
+
+The server receives every variable the launcher received from the tool, plus the secrets the launcher found, with these differences:
+
+- An optional secret found nowhere is removed.
+- A variable named like one of the launcher's own variables, which all start with `mcp_launch_`, is removed.
+- Under dash, an entry whose name is not a valid shell name is dropped by the shell.
+- A variable the shell sets itself reaches the server with the value of the shell, or not at all. dash sets `PWD` and `PPID`. bash as `/bin/sh` also sets or drops, among others, `OLDPWD`, `_`, `SHLVL`, `LINENO`, `OPTERR`, `POSIXLY_CORRECT`, `SHELLOPTS` and `BASHOPTS`; see [Limits](#limits) for the last two. Each of these names is of class A, so no manifest that loads declares one for a server started through the launcher.
+
+`env_vars` of `config.yml` or `config.local.yml` never reaches a secret.
+The engine reads `env_vars` only while it deploys, and it never uses the value of a secret.
+Do not rely on a server's own `.env` file for a declared variable either: a server that reads that file only for variables not already set may never use it.
+
+### Storing a secret in the keyring
+
+To store a secret, you need:
+
+- `secret-tool`. On Ubuntu and Debian it is the package `libsecret-tools`.
+- A keyring daemon on the session bus, such as `gnome-keyring-daemon`.
+- A shell in which `DBUS_SESSION_BUS_ADDRESS` is set, or in which `$XDG_RUNTIME_DIR/bus` is a socket. A terminal of your desktop session has one of them. Without either, and with `DISPLAY` set, `secret-tool` may start a second session bus and a second keyring daemon of its own.
+
+What the launcher needs when a tool starts the server is listed under [The programs the launcher starts](#the-programs-the-launcher-starts).
+
+Every secret is stored under two fixed attributes: `service` with the value `ai-tools-mcp`, and `variable` with the name of the variable.
+So one stored item serves every server of every project that declares that name.
+`--label` is the name that keyring programs such as Seahorse show. The launcher finds the item by its two attributes only.
+The dry run prints the store command for every keyring secret it finds nowhere; see [What the check of secrets reports](#what-the-check-of-secrets-reports).
+
+The prompt of `secret-tool store`:
+
+- Text that arrives before `Password:` is shown is thrown away.
+- An empty value is stored without a complaint. The launcher counts it as not set.
+- The prompt stores the value without the line break of the Enter key.
+
+Do not pass the value through a pipe, as in `echo <value> | secret-tool store ...`:
+
+- A value written on the command line lands in the history of your shell and on the screen.
+- A piped value keeps every byte, including the line break that `echo` adds.
+- The launcher removes exactly one trailing line break from a keyring value. So a value stored with one line break still works. A value stored with two reaches the server with one.
+
+#### When `secret-tool` fails
+
+When `secret-tool store` prints an error, the value is not stored.
+The usual cause is that the terminal cannot reach the keyring daemon.
+`secret-tool lookup` 0.20.4 was seen to print these errors in that case:
+
+- `secret-tool: Cannot autolaunch D-Bus without X11 $DISPLAY`: the shell knows no session bus, and `DISPLAY` is not set.
+- `secret-tool: Could not connect: No such file or directory`: `DBUS_SESSION_BUS_ADDRESS` names a bus that does not exist.
+
+Check the terminal, then run the command again:
+
+1. `echo "$DBUS_SESSION_BUS_ADDRESS"` prints an address, such as `unix:path=/run/user/1000/bus`. Or `ls -l "$XDG_RUNTIME_DIR/bus"` prints a line that starts with `s`, which marks a socket.
+2. A keyring daemon runs. For GNOME Keyring, `pgrep -a gnome-keyring` prints a line with `gnome-keyring-daemon`.
+
+When a check fails, open a terminal of your desktop session, and check again.
+A terminal without a session bus but with `DISPLAY` set may even start a second session bus and keyring daemon of its own; see the list above.
+
+### The programs the launcher starts
+
+The launcher needs:
+
+- a `/bin/sh` that accepts the option `-p` of its first line (`#!/bin/sh -p`), such as dash or bash; BusyBox does not accept it, see [Limits](#limits);
+- to use the keyring, three programs in an absolute directory of the `PATH` it receives from the tool: `secret-tool`, `env`, and a `timeout` that takes the options `-v` and `-k`, such as the one of GNU coreutils.
+
+The `PATH` it receives is the `PATH` in the environment the tool starts the server with. That is usually the `PATH` of the shell or desktop session the tool was started from.
+
+How the launcher finds and starts these programs:
+
+- When the tool passes no `PATH`, or an empty one, the launcher starts none of the three and does not use the keyring. It writes the line `... keyring not used, reading secrets from the environment: the PATH is not set or is empty`. dash and bash have a default search path of their own for that case, but the launcher never takes a helper from it.
+- Otherwise it searches only the absolute directories of that `PATH`. An empty entry, `.`, every other relative entry, and a directory whose name holds `=` are skipped. So a program of the same name in the project directory is never started.
+- A program counts as found when it is an executable regular file.
+- When one of the three is not found, the launcher does not use the keyring for this start, and writes one line saying which program is missing.
+- `env` starts with every exported variable of the tool removed, except `BASH_XTRACEFD`. Under bash, it also receives `SHELLOPTS` and `BASHOPTS` with the values of bash when the tool passed them, the `SHLVL` that bash exports itself, and the entries of the environment whose names are not valid shell names, which no shell can remove.
+- The arguments of `env` are `-i`, then `DBUS_SESSION_BUS_ADDRESS=<value>`, `XDG_RUNTIME_DIR=<value>` and `HOME=<value>`, each only when it is set and not empty, then the path of `timeout`, `-v -k 1 5`, the path of `secret-tool`, and `lookup service ai-tools-mcp variable <NAME>`. Until `env` replaces itself with `timeout`, `ps` shows these three values to every user of the machine. None of them is a secret.
+- `env` then starts `timeout`, and `timeout` starts `secret-tool`. Both receive only `DBUS_SESSION_BUS_ADDRESS`, `XDG_RUNTIME_DIR` and `HOME`, each only when it is set and not empty.
+- So no secret, no other variable of the tool, no `DISPLAY` and no `PATH` reaches `timeout` or `secret-tool`.
+- `HOME` is passed because a session bus reached over TCP authenticates with a cookie file in the home directory.
+- Their standard input is `/dev/null`.
+- The launcher reads the environment inside its shell, without starting a program.
+
+The time limit of one lookup:
+
+- `timeout` sends the lookup the stop signal SIGTERM after 5 seconds.
+- A lookup still running 1 second later is killed.
+- So one lookup takes at most 6 seconds.
+- After a lookup that did not end in time, or that failed, the launcher does not ask the keyring again during that start. So a keyring that does not answer delays a start by at most 6 seconds.
+- Codex gives a server 10 seconds to start by default.
+
+### The order in which a secret is looked for
+
+For each secret, in the order of its arguments, the launcher:
+
+1. Looks the name up in the keyring with `secret-tool lookup service ai-tools-mcp variable <NAME>`, waiting at most 6 seconds.
+2. Reads the environment variable of the same name, as the tool passed it. It does this when the keyring holds no item for the name, when the stored value counts as not set, or when the keyring is not used for this start.
+3. Marks the secret as found nowhere when neither source has a value that counts as set; see [Required and optional secrets](#required-and-optional-secrets).
+
+A value in the keyring wins over a value in the environment.
+
+```mermaid
+flowchart TD
+    start["the tool starts scripts/mcp-launch"] --> usable{"keyring usable for this start?<br/>a PATH that is set and not empty,<br/>secret-tool, timeout and env in an<br/>absolute directory of the PATH,<br/>a session bus known"}
+    usable -- no --> note["one line on standard error:<br/>keyring not used"]
+    usable -- yes --> lookup["secret-tool lookup<br/>service ai-tools-mcp variable NAME<br/>at most 6 seconds"]
+    lookup -- "a value that counts as set" --> found["NAME set for the server"]
+    lookup -- "no item, or a value that counts as not set" --> env{"the environment from the tool<br/>has a value that counts as set?"}
+    lookup -- "timed out, killed or failed" --> note
+    note --> env
+    env -- yes --> found
+    env -- no --> kind{"required?"}
+    kind -- yes --> missing["NAME is missing"]
+    kind -- no --> dropped["NAME left out of the<br/>environment of the server"]
+    found --> last{"after the last secret:<br/>a required one missing?"}
+    missing --> last
+    dropped --> last
+    last -- yes --> stop["not started: exit 1,<br/>one line naming every missing NAME"]
+    last -- no --> run["exec the real server"]
+```
+
+The keyring is not used for the rest of a start, and the launcher writes one line to standard error, when:
+
+- the tool passed no `PATH`, or an empty one;
+- `secret-tool` is in no absolute directory of the `PATH`;
+- `timeout` is in no absolute directory of the `PATH`, because a lookup without a time limit could wait for an unlock prompt forever;
+- `env` is in no absolute directory of the `PATH`, because without it the rest of the environment of the tool would reach `secret-tool`;
+- no session bus is known: `DBUS_SESSION_BUS_ADDRESS` is unset or empty, and `$XDG_RUNTIME_DIR/bus` is not a socket;
+- a lookup did not end within 5 seconds and ended on the stop signal;
+- a lookup did not end within 5 seconds and was killed 1 second later;
+- a lookup failed in any other way than "no such item".
+
+A value counts as not set, from either source, when it is:
+
+- empty;
+- exactly `${NAME}`, `${NAME:-}` or `${env:NAME}` for the same name, which is the text a tool leaves in place when it does not expand its reference.
+
+Any other value is used, even one that only looks similar, such as `${OTHER}` or a single space.
+A keyring value loses exactly one trailing line break, the one a piped `echo` stores. Every other byte is kept.
+An environment value is passed on unchanged.
+
+### Required and optional secrets
+
+- A required secret (`required: true`, the default) that is found nowhere stops the start. The launcher exits with code 1 and writes one line to standard error naming the server and every missing secret. The server is not started, so the tool cannot connect to it.
+- An optional secret (`required: false`) that is found nowhere is left out of the environment of the server: the variable is unset, not empty.
+- The launcher enforces `required` itself. So the Claude Code entry references a keyring secret as `${NAME:-}`, even a required one.
+- `${NAME}` would make Claude Code report a missing variable for each keyring secret you did not also export.
+
+### The `from` key
+
+A secret variable may declare where a stdio server reads it:
+
+```yaml
+variables:
+  - name: DEMO_TOKEN
+    description: API token of the demo service.
+    secret: true               # no 'from': the keyring first, then the environment of the tool
+  - name: DEMO_CI_TOKEN
+    description: A token that is only ever exported, never stored in the keyring.
+    secret: true
+    required: false
+    from: environment          # the environment of the tool only, without the launcher
+```
+
+- `from: manager` is the default. The secret is read from the secrets manager the machine names in [`secrets_manager`](#the-secrets_manager-setting). That is the keyring by default. The environment of the tool is the fallback.
+- `from: environment` reads the secret from the environment of the tool only. The entry references it exactly as without the keyring.
+- Use `from: environment` for a secret you always export, for example on a build machine.
+- Use it also for a secret whose name is of class B, such as `HTTPS_PROXY`. A secret whose name is of class A must be renamed, unless every secret of the server declares `from: environment`; see [Names the launcher refuses](#names-the-launcher-refuses).
+- `from` on a variable that is not secret fails loading, naming the manifest and the variable.
+- Any value other than `manager` or `environment` fails loading, naming the file; see [Troubleshooting](#secrets-and-the-launcher).
+- Every secret a pointer server takes from its `server.json` gets the default. A pointer manifest cannot declare `from`.
+- On an http server, `from` is accepted and has no effect: an http server always reads its secrets from the environment of the tool.
+
+### Names the launcher refuses
+
+Some environment variables have a meaning of their own for the shell that runs the launcher, for the programs it starts, or for the runtime of the server.
+A value under such a name could change how the launcher runs or what the server runs, or appear in a message on standard error.
+The block `mcp_launch_refused_names` of `scripts/mcp-launch` lists these names as patterns, and puts each pattern in one of two classes:
+
+- **Class A**: names that change how the launcher's shell or the programs it starts run, or that a shell sets or prints itself. Examples: `PATH`, `HOME`, `LANG`, `LC_*`, `LD_*`, `BASH*`, `OPTIND`, `SHLVL`.
+- **Class B**: every other refused name. Such a name changes only what the server, or a program the server starts, does: an interpreter, a package runner, name resolution, a proxy, temporary files. Examples: `NODE_*`, `PYTHON*`, `GIT_*`, `*_PROXY`, `TMPDIR`.
+
+A server is **started through the launcher** when it is a stdio server with at least one keyring secret, that is, a secret that declares no `from`, or `from: manager`.
+Loading treats such a server so on every machine, also on one whose config sets `secrets_manager: environment`, where the engine writes no launcher.
+So the rule does not depend on `secrets_manager`, and a manifest that loads on one machine loads on every other.
+
+Where a name is refused, by the class of the pattern it matches:
+
+| Server | Role of the name | Class A | Class B |
+| --- | --- | --- | --- |
+| inline, started through the launcher | keyring secret: a secret without `from`, or with `from: manager` | refused | refused |
+| inline, started through the launcher | environment-only secret: a secret with `from: environment` | refused | allowed |
+| inline, started through the launcher | plain variable (`secret: false`) | refused | allowed |
+| inline, started through the launcher | key under `env` | refused | allowed |
+| pointer, stdio or http | every name its `server.json` sets, forwards or derives, secret or not | refused | refused |
+| any other: an inline http server, or an inline stdio server without a keyring secret | every role | allowed | allowed |
+
+A refused name fails loading, naming the manifest, the name and the pattern it matches; see [While loading](#while-loading).
+
+Why the rule differs by class:
+
+- A tool puts the whole `env` of an entry into the environment of the launcher's shell: the reference of every secret, `from: environment` or not, and every plain value and `env` key.
+- The shell and the dynamic loader read some class A names before the first line of the launcher runs, and print the value of a few of them; see [Limits](#limits). So a class A name is refused in every role.
+- Neither the launcher's shell nor its helpers `env`, `timeout` and `secret-tool` read a class B name. bash reads `TMPDIR` only to write a here-document, which the launcher never uses.
+- The server reads a class B name. The tool gives that variable to the server with or without the launcher. So an inline manifest may use a class B name in every role but that of a keyring secret.
+- The launcher itself refuses a name of either class after `--required` or `--optional`, because it cannot tell an inline server from a pointer server. It does so with `mcp-launch: usage error: secret name <NAME> is refused: ...`.
+- A pointer's `server.json` is refused for both classes, because the owner of this repository does not write it; see [Environment variable denylist](#environment-variable-denylist).
+
+Examples:
+
+- Allowed: `07_mcp/atlassian.yml` declares `HTTPS_PROXY` with `secret: true` and `from: environment`, beside four keyring secrets. `HTTPS_PROXY` matches `*_PROXY`, which is of class B.
+- Allowed: an inline stdio server with a keyring secret sets `NODE_OPTIONS` under `env`. `NODE_OPTIONS` matches `NODE_*`, which is of class B.
+- Refused: the same server declares a secret `LC_ALL` with `from: environment`. `LC_ALL` matches `LC_*`, which is of class A, and bash as `/bin/sh` prints an invalid value of `LC_ALL` before the launcher runs.
+
+How names are matched:
+
+- Matching ignores case, so `https_proxy` and `Https_Proxy` are refused like `HTTPS_PROXY`.
+- A `*` in the list stands for any text, the empty text included. So `LD_*` refuses `LD_PRELOAD`, and `*_PROXY` refuses `HTTPS_PROXY`.
+- A name is refused only when it matches a pattern as a whole. So `GITHUB_TOKEN` and `MY_LD_PRELOAD` are accepted.
+- `NPM_TOKEN` and `GIT_TOKEN` match `NPM_*` and `GIT_*`, which are of class B. So neither can be a keyring secret, and an inline manifest may declare either `from: environment`.
+- A name that matches patterns of both classes is of class A. For example, `G_PROXY` matches `G_*` of class A and `*_PROXY` of class B.
+
+What to do with a refused name:
+
+- A class B name as a keyring secret: declare it `from: environment`, and export it before starting the tool. Or rename it, if the server accepts another name.
+- A class A name: rename or remove it. When it is a keyring secret and the only one of the server, declaring it `from: environment` is enough. Otherwise declare every secret of the server `from: environment`, so that the server is no longer started through the launcher, and export those secrets before starting the tool.
+
+The list, as the block of `scripts/mcp-launch` holds it; the engine's build fails when its own copy differs from the block, class included:
+
+| What gives the names a meaning | Class | Names |
+| --- | --- | --- |
+| the launcher, its programs and the session bus | A | `MCP_LAUNCH_*`, `PATH`, `IFS`, `HOME`, `DISPLAY`, `DBUS_*`, `XDG_*`, `G_*`, `GIO_*` |
+| the locale | A | `LANG`, `LANGUAGE`, `LC_*`, `NLSPATH`, `LOCPATH` |
+| the shell, dash or bash | A | `POSIXLY_CORRECT`, `_`, `BASH*`, `ENV`, `SHELL`, `SHELLOPTS`, `SHLVL`, `CDPATH`, `PPID`, `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, `OPTERR`, `PS0`, `PS1`, `PS2`, `PS3`, `PS4`, `LINENO`, `RANDOM`, `SRANDOM`, `SECONDS`, `UID`, `EUID`, `GROUPS`, `HOSTNAME`, `HOSTTYPE`, `MACHTYPE`, `OSTYPE`, `MAIL`, `MAILCHECK`, `MAILPATH`, `HISTCHARS`, `HISTCMD`, `HISTCONTROL`, `HISTFILE`, `HISTFILESIZE`, `HISTIGNORE`, `HISTSIZE`, `HISTTIMEFORMAT`, `FUNCNAME`, `FUNCNEST`, `GLOBIGNORE`, `GLOBSORT`, `EXECIGNORE`, `FIGNORE`, `TIMEFORMAT`, `TMOUT`, `PROMPT_COMMAND`, `PROMPT_DIRTRIM`, `PIPESTATUS`, `DIRSTACK`, `COMP_*`, `COMPREPLY`, `COPROC`, `COLUMNS`, `LINES`, `EMACS`, `INSIDE_EMACS`, `EPOCHREALTIME`, `EPOCHSECONDS`, `FCEDIT`, `HOSTFILE`, `IGNOREEOF`, `INPUTRC`, `MAPFILE`, `READLINE_*`, `REPLY`, `CHILD_MAX` |
+| the dynamic loader and the C library | A | `LD_*`, `DYLD_*`, `GLIBC_TUNABLES`, `GCONV_PATH`, `MALLOC_*` |
+| name resolution of the C library | B | `HOSTALIASES`, `LOCALDOMAIN`, `RES_OPTIONS` |
+| interpreters and package runners | B | `NODE_*`, `NPM_*` (so `npm_config_*` too), `PYTHON*`, `UV_*`, `PIP_*`, `PERL5LIB`, `PERL5OPT`, `PERL5DB`, `PERLLIB`, `RUBYOPT`, `RUBYLIB`, `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS`, `_JAVA_OPTIONS` |
+| docker and podman | B | `DOCKER_*`, `CONTAINER_*`, `CONTAINERS_*` |
+| git | B | `GIT_*` |
+| TLS and proxies | B | `SSL_*`, `*_PROXY`, `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE` |
+| temporary files | B | `TMPDIR`, `TMP`, `TEMP` |
+
+bash reads `TMPDIR` only to write a here-document, which the launcher never uses, so `TMPDIR` is of class B.
+
+The launcher also receives the id of the server as its first argument.
+So the id of a server started through the launcher, inline or pointer, must start with a letter or digit, and hold only letters, digits, `.`, `_` and `-`.
+Loading checks this whatever `secrets_manager` the machine uses.
+
+### The `secrets_manager` setting
+
+The top-level key `secrets_manager` of `config.yml` or `config.local.yml` names the secrets manager of the machine:
+
+```yaml
+# config.local.yml of a machine without libsecret
+secrets_manager: environment
+```
+
+| Value | Effect |
+| --- | --- |
+| `libsecret` | the default when neither file names one. Stdio servers read their secrets through the launcher from the keyring, with the environment of the tool as the fallback. |
+| `environment` | no server is started through the launcher. Every secret is written as a reference the tool resolves from its own environment, and the check reads no keyring. |
+
+- `config.local.yml` wins over `config.yml`.
+- Only the value of the file that decides is checked: `config.local.yml` when it names one, otherwise `config.yml`. A value in `config.yml` is not checked while `config.local.yml` names one.
+- A value other than `libsecret` or `environment` in the file that decides fails the run, naming the file and the accepted values, without repeating the value. The comparison is exact, so `Libsecret` fails too.
+- A key the engine does not know, such as the misspelled `secret_manager`, is ignored with a warning naming the file and the key. The default `libsecret` then applies.
+- The next deploy after a change rewrites the entries of the affected servers.
+- Use `environment` on a machine without a keyring, on a machine whose `/bin/sh` is BusyBox, and for tools on the Windows side; see [Limits](#limits).
+
+### The launcher file
+
+Every tool of every project and home deployed from this checkout starts the file `scripts/mcp-launch`.
+So the engine gives it to a tool only when the file is safe to start.
+The file must:
+
+- exist, and be a regular file once links are resolved;
+- be executable by the user who runs the engine;
+- lie inside this checkout once links are resolved;
+- have a real path without `${`, which a tool would expand;
+- be owned by the user who runs the engine;
+- be writable by that user only, not by its group or others;
+- lie in directories that are each owned by that user and writable by no one else, from its own directory `scripts/` up to the root of this checkout, once links are resolved.
+
+A person who may write one of these directories could put another file in place of the launcher without changing the launcher's own mode.
+The directories above the checkout are not checked: a person who may write there could replace the whole checkout.
+
+Otherwise the MCP config file of every deployment and tool that selects a server needing the launcher is not written, in a dry run as in a deploy.
+Everything else of the run is still exported, and the run exits non-zero.
+A run that selects no such server never looks at the file.
+Each message and its remedy is listed under [Secrets and the launcher](#secrets-and-the-launcher).
+
+The engine checks the file and its directories at every deploy and every dry run, and never in between.
+A change of the checkout after a deploy, such as a `git pull` or a changed mode, is checked only at the next run.
+
+Git checks the file out, and creates its directories, with the mode your umask allows.
+With the umask `002`, which some Linux systems set for their users, the file and its directories are writable by their group, and the engine refuses them.
+Remove that permission once, from the root of this checkout, with `chmod go-w scripts/mcp-launch scripts .`.
+
+### What each tool's entry looks like
+
+Take this made-up server:
+
+```yaml
+id: demo
+description: An example stdio server whose secrets come from the keyring.
+transport:
+  type: stdio
+  command: /opt/demo/bin/demo-mcp
+  args: [--read-only]
+variables:
+  - name: DEMO_TOKEN
+    description: API token of the demo service.
+    secret: true               # no 'from': the keyring first, then the environment of the tool
+  - name: DEMO_PROXY_TOKEN
+    description: Token of an optional proxy.
+    secret: true
+    required: false
+  - name: DEMO_CI_TOKEN
+    description: A token that is only ever exported, never stored in the keyring.
+    secret: true
+    required: false
+    from: environment          # the environment of the tool only, without the launcher
+  - name: DEMO_BASE_URL
+    description: Base URL of the demo service.
+    secret: false
+metadata:
+  version: 1.0.0
+  tags: [demo]
+```
+
+With `DEMO_BASE_URL: "https://demo.example.invalid"` under `env_vars`, a deploy writes this entry into `.mcp.json` (Claude Code).
+`/home/<you>/Documents/Projects/ai-tools` stands for the absolute path of your checkout:
+
+```json
+{
+  "mcpServers": {
+    "demo": {
+      "type": "stdio",
+      "command": "/home/<you>/Documents/Projects/ai-tools/scripts/mcp-launch",
+      "args": [
+        "demo",
+        "--required",
+        "DEMO_TOKEN",
+        "--optional",
+        "DEMO_PROXY_TOKEN",
+        "--",
+        "/opt/demo/bin/demo-mcp",
+        "--read-only"
+      ],
+      "env": {
+        "DEMO_TOKEN": "${DEMO_TOKEN:-}",
+        "DEMO_PROXY_TOKEN": "${DEMO_PROXY_TOKEN:-}",
+        "DEMO_CI_TOKEN": "${DEMO_CI_TOKEN:-}",
+        "DEMO_BASE_URL": "https://demo.example.invalid"
+      }
+    }
+  }
+}
+```
+
+This one into `.vscode/mcp.json` (GitHub Copilot).
+`.cursor/mcp.json` (Cursor) gets the same entry under `mcpServers` instead of `servers`:
+
+```json
+{
+  "servers": {
+    "demo": {
+      "type": "stdio",
+      "command": "/home/<you>/Documents/Projects/ai-tools/scripts/mcp-launch",
+      "args": [
+        "demo",
+        "--required",
+        "DEMO_TOKEN",
+        "--optional",
+        "DEMO_PROXY_TOKEN",
+        "--",
+        "/opt/demo/bin/demo-mcp",
+        "--read-only"
+      ],
+      "env": {
+        "DEMO_TOKEN": "${env:DEMO_TOKEN}",
+        "DEMO_PROXY_TOKEN": "${env:DEMO_PROXY_TOKEN}",
+        "DEMO_CI_TOKEN": "${env:DEMO_CI_TOKEN}",
+        "DEMO_BASE_URL": "https://demo.example.invalid"
+      }
+    }
+  }
+}
+```
+
+And this table into `.codex/config.toml` (Codex):
+
+```toml
+[mcp_servers.demo]
+command = "/home/<you>/Documents/Projects/ai-tools/scripts/mcp-launch"
+args = ["demo", "--required", "DEMO_TOKEN", "--optional", "DEMO_PROXY_TOKEN", "--", "/opt/demo/bin/demo-mcp", "--read-only"]
+env_vars = ["DEMO_TOKEN", "DEMO_PROXY_TOKEN", "DEMO_CI_TOKEN", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR"]
+
+[mcp_servers.demo.env]
+DEMO_BASE_URL = "https://demo.example.invalid"
+```
+
+- The launcher gets `--required` or `--optional` and the name of each keyring secret. `DEMO_CI_TOKEN` declares `from: environment`, so the launcher is not told about it, and the server receives it from the tool.
+- Every reference stays in the entry, so the launcher can fall back to a value the tool passes.
+- Codex clears the environment of a server. It passes only a short default list, plus each name of `env_vars` that its own environment sets.
+- So the Codex table of a server started through the launcher also names `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR`. The launcher needs them to reach the keyring.
+- Only the names are written, never a value.
+- The user scope gets the same entries: `~/.claude.json` like `.mcp.json`, and `~/.codex/config.toml` like `.codex/config.toml`.
+
+Each tool writes a reference in its own form:
 
 | Tool | MCP config file | A secret variable is written as |
 | --- | --- | --- |
-| Claude Code | `.mcp.json` | `${NAME}`, or `${NAME:-}` when `required: false` |
+| Claude Code | `.mcp.json` | `${NAME}`; `${NAME:-}` when `required: false`, or when the launcher reads the secret |
 | GitHub Copilot (VS Code) | `.vscode/mcp.json` | `${env:NAME}` |
 | Cursor | `.cursor/mcp.json` | `${env:NAME}` |
 | Codex | `.codex/config.toml` | its name in `env_vars` (stdio), `bearer_token_env_var` (`Authorization: Bearer ${NAME}`), or `env_http_headers` (a header whose whole value is `${NAME}`) |
+
+When a secret the tool reads from its environment is unset, Claude Code passes an optional one as an empty value and a required one as the literal text `${NAME}`.
+
+### Where a secret may appear
 
 Because Codex has no `${NAME}` expansion, a secret is accepted only where all four tools can pass it by name:
 
 - in a stdio server, only through its environment, never in `command`, `args`, or `env`;
 - in an http server, only as a whole header value, `${NAME}`, or as `Authorization: Bearer ${NAME}`, never in `url`.
 
-### Where a secret value comes from
+### What the check of secrets reports
 
-The value of a secret must be in the environment of the tool process when the tool starts: the shell you start `claude` or `codex` from, or the session that starts VS Code or Cursor.
+Every run, `--dry-run` included, checks where a tool will find each secret variable of each selected server.
+It logs a line naming the server and the variable, never a value.
+The log is JSON unless `LOG_FORMAT=TEXT` is set; step 2 of [First steps](#first-steps-keep-a-token-in-the-keyring) shows how to read only these lines, as plain text.
+A deploy logs the same lines as a dry run, and none of them fails the run.
+`<kind>` in the messages below is `required` or `optional`.
 
-- Export it, for example in your shell profile or with `export JIRA_PAT=...` before you start the tool.
-- `env_vars` of `config.yml` or `config.local.yml` is not enough. The engine reads `env_vars` only while it deploys, and it never uses the value of a secret, so a secret declared there never reaches a tool.
-- A deploy does not need the secret. Every run, `--dry-run` included, warns once about each secret variable of a selected server that the environment of the run does not set, naming the variable and never its value, and does not fail on it.
-- If a secret is unset when the tool starts, Claude Code passes an optional one as an empty value and leaves a required one as the literal text `${NAME}`. Do not rely on a server's own `.env` file for a declared variable: a server that reads that file only for variables not already set may never use it.
+Which secrets get a line:
+
+- A secret the launcher reads always gets one of four lines. That is a secret of a stdio server without `from: environment`, on a machine whose `secrets_manager` is `libsecret`.
+- Every other secret gets a line only when the environment of the run does not set it. That is a secret of a remote server, a secret declared `from: environment`, and every secret on a machine whose `secrets_manager` is `environment`.
+
+For a secret the launcher reads, the engine asks the keyring daemon whether an item with the two attributes exists, and never receives a value:
+
+- It asks through `busctl --user ... SearchItems`, a call of the freedesktop secret service that answers with item paths only. It never runs `secret-tool`.
+- It starts `busctl` only from an absolute directory of the `PATH` of the run.
+- It starts nothing while no session bus is known, and it never starts a keyring daemon that is not running.
+- It waits at most 5 seconds. Once it cannot tell for one secret, every later secret of the run gets the same answer without a second attempt.
+- It counts a locked item as stored.
+- It counts a value in the environment of the run as not set exactly when the launcher does: an empty value, or the unexpanded reference of the variable itself, such as `${NAME}`.
+
+The four lines:
+
+**Stored in the keyring.** Nothing to do.
+
+```
+MCP server '<id>' reads the <kind> secret variable '<NAME>' from the keyring, which holds it.
+```
+
+**Not in the keyring, but set in the environment of the run.** The server will get the value only if the tool, too, is started from an environment that sets it. Store it in the keyring to stop depending on that.
+
+```
+MCP server '<id>' reads the <kind> secret variable '<NAME>' from the environment of the tool that starts it: the keyring does not hold it, and the environment of this run sets it.
+```
+
+**Found nowhere.** A warning. Run the command the message ends with; see [First steps](#first-steps-keep-a-token-in-the-keyring). An optional secret you do not use can stay unset.
+
+```
+MCP server '<id>' reads the <kind> secret variable '<NAME>' from the keyring or the environment of the tool that starts it, but the keyring does not hold it and the environment of this run does not set it. Store it with: secret-tool store --label='ai-tools MCP <NAME>' service ai-tools-mcp variable <NAME>
+```
+
+When the environment of the run sets the variable to a value that counts as not set, the same warning reads `... and the environment of this run sets it empty or to its own unexpanded reference, which counts as not set. Store it with: ...`.
+
+**Cannot tell.** A warning. The launcher may still find the secret when the tool starts the server.
+
+```
+MCP server '<id>' reads the <kind> secret variable '<NAME>' from the keyring, and the engine cannot tell whether the keyring holds it: <reason>.
+```
+
+| `<reason>` | What to do |
+| --- | --- |
+| `no D-Bus session bus is known (DBUS_SESSION_BUS_ADDRESS is not set and XDG_RUNTIME_DIR/bus is not a socket)` | Run the deploy from a shell of your desktop session, where one of the two is set. |
+| `busctl is not on the PATH` | Install `busctl`, which is part of systemd, in an absolute directory of the `PATH`, or ignore the warning. |
+| `busctl could not be started (<exception class>)` | Check that the `busctl` found first on the `PATH` is executable. |
+| `busctl did not answer within 5 seconds` | The keyring daemon does not answer. Check that it runs, and run again. |
+| `busctl failed with exit code <N>` | The keyring daemon is usually not running. A daemon that starts only on demand is not started by the check, although the launcher starts it; see [Limits](#limits). |
+| `busctl answered in a form the engine does not read` | Report the `busctl` version. |
+
+A secret the launcher does not read gets this warning when the environment of the run does not set it. For such a secret, any value counts as set, the empty one included:
+
+```
+MCP server '<id>' reads the <kind> secret variable '<NAME>' from the environment of the tool that starts it, and the environment of this run does not set it. Export it before starting the tool.
+```
+
+Once per run, when a server needs the keyring and `secret-tool` is in no absolute directory of the `PATH` of the run:
+
+```
+The secrets manager of this machine is libsecret, but secret-tool is not on the PATH of this run. The launcher reads every secret from the environment of the tool unless the PATH of the tool holds secret-tool. Install secret-tool (package libsecret-tools), or set 'secrets_manager: environment' in config.local.yml.
+```
+
+The check looks at the `PATH` and the session bus of the run.
+A tool started from another environment, such as a desktop launcher, may have a different one.
+
+### Seeing the messages of the launcher
+
+The launcher writes each of its messages as one line to the standard error of the server, starting with `mcp-launch:`.
+Where a tool shows the standard error of a server:
+
+| Tool | Where |
+| --- | --- |
+| Claude Code | Its documentation says to start it with `claude --debug=mcp` and read the standard error of a server in the debug log `~/.claude/debug/<session-id>.txt`, for a server that started and lists no tools. It does not say so for a server that failed to start. `/mcp` shows such a server as failed. |
+| GitHub Copilot (VS Code) | Run **MCP: List Servers** from the Command Palette, select the server, and choose **Show Output**. Its documentation says that this shows the logs of the server. It does not say whether those logs hold the standard error. |
+| Cursor | Open the Output panel, and select **MCP Logs**. Its documentation says that these logs show the error messages of servers. It does not say whether they hold the standard error. |
+| Codex | Its documentation does not say where the standard error of a server is shown. |
+
+The check that works for every tool is to start the launcher by hand in a terminal:
+
+1. Open the MCP config file the tool reads, such as `.mcp.json` in the root of the project, and find the entry of the server, such as `"atlassian"`. For Codex, it is the table `[mcp_servers.atlassian]` of `.codex/config.toml`.
+2. Copy the value of `command`, which is the path of the launcher, and the items of `args` up to and including `--`. They hold names only, never the value of a secret.
+3. In a terminal of your desktop session, run them with `/bin/true` in place of the real command, each item in single quotes. For the `demo` entry of [What each tool's entry looks like](#what-each-tools-entry-looks-like), that is:
+
+```bash
+'/home/<you>/Documents/Projects/ai-tools/scripts/mcp-launch' 'demo' '--required' 'DEMO_TOKEN' '--optional' 'DEMO_PROXY_TOKEN' '--' /bin/true; echo "exit code $?"
+```
+
+`/bin/true` stands in for the server: the launcher reads the secrets as it would for the server, then starts `/bin/true`, which ends at once.
+What you then see:
+
+- Only `exit code 0`: the launcher used the keyring, found every required secret in the keyring or in the environment of the terminal, and would start the server. An optional secret found nowhere gives no line; the dry run of step 2 of [First steps](#first-steps-keep-a-token-in-the-keyring) shows it.
+- One or more lines that start with `mcp-launch:`, such as `mcp-launch: demo: not started: required secret not found in the keyring or the environment: DEMO_TOKEN`, followed by `exit code 1`. [Secrets and the launcher](#secrets-and-the-launcher) lists each line with its cause and what to do.
+- A line `mcp-launch: demo: keyring not used, reading secrets from the environment: <reason>`, followed by `exit code 0`: the launcher could not use the keyring, and found every required secret in the environment of the terminal. A tool that does not pass that secret to the server would not start it. Fix the cause the line names; [Secrets and the launcher](#secrets-and-the-launcher) lists each `<reason>`.
+- A line `mcp-launch: usage error: <problem>`, followed by `exit code 2`: the launcher started nothing, because the copied items are not complete or not exact. Copy them again from the entry.
+
+The launcher sees the environment of that terminal, not the `env` of the entry and not the environment the tool gives the server.
+A secret you exported in the terminal therefore counts as found, even when the tool would not pass it.
+Codex, for example, passes a server only a short list of variables; see [What each tool's entry looks like](#what-each-tools-entry-looks-like).
+
+### Remote servers
+
+A tool connects to a remote (http) server itself and sends the secret with each request, so no launcher can sit in between.
+Its entry keeps the reference, and the value must be in the environment of the tool when the tool starts.
+
+To keep the value out of your shell profile, store it in the keyring and start the tool with it for a single command.
+For `github.yml`, store the whole header value, `Bearer ` followed by the token, under its variable name:
+
+```bash
+secret-tool store --label='ai-tools MCP GITHUB_AUTHORIZATION' service ai-tools-mcp variable GITHUB_AUTHORIZATION
+```
+
+Then start the tool like this:
+
+```bash
+GITHUB_AUTHORIZATION="$(secret-tool lookup service ai-tools-mcp variable GITHUB_AUTHORIZATION)" claude
+```
+
+- `secret-tool lookup service ai-tools-mcp variable GITHUB_AUTHORIZATION` prints the stored value.
+- `$(...)` puts that output in place. The shell drops every trailing line break of the output.
+- The double quotes keep the value in one piece if you later change the command into a form where the shell splits words, such as `env GITHUB_AUTHORIZATION=$(...) claude`.
+- `GITHUB_AUTHORIZATION=... claude` sets the variable for that one command only. Your shell does not keep it, and neither the history nor a file holds the value.
+- Put `codex`, or the command of another tool, in place of `claude`.
+
+Keep in mind:
+
+- When nothing is stored, `secret-tool lookup` prints nothing. The variable is then set but empty, and the tool still starts.
+- When the keyring cannot be reached, `secret-tool` prints its error to the terminal, with the same result.
+- Claude Code sends an empty header when the variable is empty.
+- So a start without a message in the terminal, followed by requests the server refuses, points to nothing stored under that name. To check without showing the value, run `secret-tool lookup service ai-tools-mcp variable GITHUB_AUTHORIZATION >/dev/null && echo stored`.
+- The value is in the environment of the tool and of everything the tool starts, other servers and shell commands included, as it would be after an `export`.
+- The engine does not ask the keyring about a secret of a remote server. The dry run keeps reporting `Export it before starting the tool.` for it unless the environment of the run sets it.
+- Run the command from a shell with a session bus; see [Storing a secret in the keyring](#storing-a-secret-in-the-keyring).
+
+The engine writes no such start command for you.
+
+### Limits
+
+- **The checkout must stay in place.** Every entry that starts the launcher names it by the absolute path of this checkout, in every project and home deployed from it. Moving or renaming the checkout breaks those servers until you deploy again from the new place. A checkout whose path holds `${` fails those MCP config files, because a tool would expand it.
+- **The launcher must be started through its first line.** A tool starts it that way. Started as `sh scripts/mcp-launch ...`, it loses the option `-p` and with it the protection against an inherited `SHELLOPTS`, `BASHOPTS` or function under bash.
+- **No BusyBox as `/bin/sh`.** BusyBox refuses the option `-p` of the first line, so the launcher starts nothing and the shell exits with code 2. This is the case on Alpine Linux. On such a machine, set `secrets_manager: environment` in `config.local.yml`.
+- **Messages printed before the launcher runs, which no script can prevent.** Before the first line of the launcher runs, the dynamic loader that starts the shell, and the shell itself, read some variables of the environment. When the value is not one they accept, they print a message holding the value, or a number derived from it, on standard error, which a tool may keep in a log. With dash 0.5.10.2, bash 5.0.17 and glibc 2.31, these are:
+  - with dash as `/bin/sh`: `LD_AUDIT`, `LD_DEBUG`, `LD_PRELOAD`, `OPTIND`;
+  - with bash as `/bin/sh`: `BASH_COMPAT`, `BASH_XTRACEFD`, `LC_ALL`, `LD_AUDIT`, `LD_DEBUG`, `LD_PRELOAD`, `SHLVL`.
+
+  The three `LD_*` names are printed by the loader, the others by the shell. Other versions may print more. Each of these names is of class A, so no manifest that loads puts a value under such a name into the entry of a server started through the launcher. A variable that the tool sets from its own environment still can. With `LD_TRACE_LOADED_OBJECTS` or `LD_SHOW_AUXV` set, the loader writes the libraries or the auxiliary vector of the shell to standard output, without a value; with the first, the launcher does not run at all. The messages are listed under [Messages of the shell](#messages-of-the-shell).
+- **`SHELLOPTS` and `BASHOPTS` under bash.** bash holds both read-only, so no POSIX script can remove them or restore the values the launcher received. When the tool passes them, the server receives the values of bash instead, such as `SHELLOPTS=braceexpand:hashall:interactive-comments:noglob:nounset:posix:privileged`, and a server that is itself a bash script starts with those options. When the tool passes neither, the server receives neither. Under dash, the server receives the values the tool passed. Do not export `SHELLOPTS` or `BASHOPTS` in the environment of a tool.
+- **Tested versions.** The behaviour of the launcher was verified with dash 0.5.10.2, bash 5.0.17 and glibc 2.31. Other shells, such as mksh, zsh or macOS bash 3.2, newer bash versions, and musl are not tested. The tests of the launcher read the environment of each program from `/proc/<pid>/environ`, so they are skipped where `/proc` is missing, such as on macOS.
+- **Tools on the Windows side.** A tool that runs on Windows, rather than in WSL, cannot start a shell script by its Linux path. This is not tested. For such a tool, set `secrets_manager: environment` in `config.local.yml`.
+- **Claude Code with `CLAUDE_CODE_MCP_ALLOWLIST_ENV`.** With that variable set, Claude Code passes a server only a short list of variables, without `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR`. The code of Claude Code 2.1.283 does the same when `CLAUDE_CODE_ENTRYPOINT` is `local-agent`; this was read in its code, not tried. The launcher then writes `keyring not used` once and reads the environment. The `${NAME:-}` references of the entry still deliver the values you exported. Only the Codex entry forwards the two bus variables.
+- **A locked keyring is not tested.** A dismissed unlock prompt is expected to look like "no such item", so the launcher would read the environment without a message. The check counts a locked item as stored.
+- **Two items under the same attributes.** `secret-tool lookup` then returns the first unlocked match in the order the keyring daemon lists them, which you cannot choose. The store command above replaces rather than adds, so this happens only when another program stored an item with these attributes, possibly with more attributes besides. `clear` removes every unlocked match.
+- **A keyring daemon that starts on demand.** The check never starts a keyring daemon, so on such a machine it reports "cannot tell" with `busctl failed with exit code <N>`. The launcher lets the session bus start the daemon, and works.
+- **The check and the tool may see different environments**; see the end of [What the check of secrets reports](#what-the-check-of-secrets-reports).
+- **The first deploy with the keyring rewrites entries.** Every entry of a stdio server with a keyring secret changes, and so does its fingerprint in the [ledger](#the-ledger). The entries are owned by name, so nothing is lost.
+- **The launcher is checked at deploy and dry run only.** The engine checks the file and its directories, up to the root of the checkout, each time it runs. A tool starts the file at every start of a server, possibly long after. A later change of the checkout, such as a `git pull`, a `git checkout` of a branch without `scripts/mcp-launch`, or a changed mode, is not checked until the next run. The directories above the checkout are never checked.
 
 ### Plain variables
 
@@ -404,7 +1168,7 @@ It does delete `.claude/settings.json`, because Claude Code replaces `.claude` a
 ### Keep the files out of version control
 
 The four MCP config files are gitignored in this repository, and so is `.ai-tools/`, the directory of the [ledger](#the-ledger).
-The config files hold plain values resolved on one machine, such as base URLs and the absolute path of the Jira server, which differ between machines.
+The config files hold plain values resolved on one machine, such as base URLs, the absolute path of the Jira server, and the absolute path of the launcher, which differ between machines.
 The ledger records what the engine wrote on one machine.
 The engine does not edit the `.gitignore` of another project. In every project that selects servers, add `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, and `.ai-tools/` to its `.gitignore` yourself, or review each file before you commit it.
 `.claude/settings.json` is often committed. A deployment with `deny` restrictions changes only the permission entries it wrote there, so the diff shows exactly those entries.
@@ -455,7 +1219,7 @@ Paths are relative to `--user-home`, which defaults to your home directory:
 | GitHub Copilot, Cursor, Windsurf, Antigravity | none | the run warns that the tool gets none of the servers, with the reason | none |
 
 - The ledger of the user scope is `~/.ai-tools/mcp-ledger.json`.
-- Secrets are written as references, exactly as in a project: `${NAME}` or `${NAME:-}` for Claude Code, by name for Codex; see [Secret and plain variables](#secret-and-plain-variables). Claude Code expands `${NAME}` in the server entries of `~/.claude.json` ([Claude Code MCP documentation](https://code.claude.com/docs/en/mcp)).
+- Secrets are handled exactly as in a project: a stdio server with a keyring secret starts the launcher, and every secret is written as a reference, `${NAME}` or `${NAME:-}` for Claude Code and by name for Codex; see [Secret and plain variables](#secret-and-plain-variables). Claude Code expands `${NAME}` in the server entries of `~/.claude.json` ([Claude Code MCP documentation](https://code.claude.com/docs/en/mcp)).
 - Ownership, verification and the other rules of [What the engine owns in an MCP config file](#what-the-engine-owns-in-an-mcp-config-file) apply unchanged. So a server you added by hand under the id of a manifest, for example with `claude mcp add --scope user github ...`, is changed by the first deploy of a `user.yml` that selects servers. When the `user.yml` selects that id, the entry is replaced without a separate log line. Otherwise it is removed, which the dry run names under `removing [...]`.
 - A file the engine creates under the home gets the mode `0600`.
 - A link at `~/.claude`, `~/.codex`, or one of the files may lead anywhere, as the links of a dotfile repository do, but it must lead to something; see [Tool directories](#tool-directories).
@@ -647,7 +1411,7 @@ How a deploy uses it:
 - The fingerprint rule applies to a deployment without an `mcps` block: removing the block of a project removes, on its next deploy, the entries the ledger records that still hold the recorded content, and then the ledger itself.
 - The same rule applies to an entry the ledger records whose manifest was deleted from `07_mcp/`.
 - The records of a tool the run does not deploy, for example after narrowing `tools`, are kept until that tool deploys again.
-- Without a ledger file, a deployment that selects nothing reads and writes no MCP config file, as before the ledger existed.
+- Without a ledger file, a deployment that selects nothing reads and writes no MCP config file.
 - The first deploy that writes an entry creates the ledger. A ledger left with no file is deleted, together with `.ai-tools/` when that directory is then empty. When `.ai-tools/` cannot be removed, the run warns and goes on.
 
 A ledger that records a content no entry holds removes nothing, so a ledger the engine did not write cannot make the engine remove what you wrote, beyond the entries named after a manifest that a deployment selecting servers removes anyway.
@@ -727,7 +1491,7 @@ A real deploy reports it:
 
 ## Not supported yet
 
-These are planned and listed in [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcps):
+These are not supported. [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcps) says for each item it lists whether it is open or not scheduled:
 
 - Windsurf, in either scope. The installed Windsurf reads user servers only from `~/.codeium/windsurf/mcp_config.json`, while the documentation of Devin Desktop, as Windsurf is now named, names other paths. The engine writes none of them.
 - Antigravity, in either scope, because it expands no environment variable in its MCP config file, so a secret could reach a server only by being written into the file.
@@ -735,11 +1499,15 @@ These are planned and listed in [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcp
 - Attaching a server to an agent in GitHub Copilot, Codex, Cursor, Windsurf and Antigravity.
 - Allow and deny lists in GitHub Copilot and Cursor, and an `allow` list in Claude Code, which has no setting for it.
 - A ledger that nobody but the user running the engine can plant; see [The ledger](#the-ledger).
-- A secrets manager as the source of secret values. Today the only source is the environment of the tool.
+- Secrets managers other than libsecret, such as `pass` or 1Password.
+- Forwarding `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR` for Claude Code when `CLAUDE_CODE_MCP_ALLOWLIST_ENV` is set; open. See [Limits](#limits) for this case and a related one.
+- A launcher that runs where `/bin/sh` is BusyBox; not scheduled. See [Limits](#limits).
 
 ## Troubleshooting
 
-**`MCP server '<id>' needs the variable '<NAME>' ...`**: a required plain variable is not declared under `env_vars:`. Declare it in `config.local.yml`, mark it `required: false`, or mark it `secret: true` to pass it from the environment of the tool. Exporting it in the shell of the deploy does not help: plain variables are never read from there. The MCP config files of the deployments selecting that server are not written, everything else is, and the run exits non-zero.
+**`MCP server '<id>' needs the variable '<NAME>' ...`**: a required plain variable is not declared under `env_vars:`. Declare it in `config.local.yml`, mark it `required: false`, or mark it `secret: true`, so that it is read when the server starts; see [Secret and plain variables](#secret-and-plain-variables). The message ends with where a secret would come from. For a stdio server on a machine with the keyring, it ends `... or mark it 'secret: true' to have the tool start the server with it from the keyring, or from the environment of the tool when the keyring does not hold it.`. For a remote server, and on a machine with `secrets_manager: environment`, it ends `... or mark it 'secret: true' to pass it from the environment of the tool.`. Exporting it in the shell of the deploy does not help: plain variables are never read from there. The MCP config files of the deployments selecting that server are not written, everything else is, and the run exits non-zero.
+
+**`MCP server '<id>' needs the variable '<NAME>' for <place>, which 'env_vars:' of config.yml and config.local.yml do not declare. Plain variables are read from there only, never from the environment of the run. Declare it under 'env_vars:' of config.yml or config.local.yml, select another package or remote of its server.json with 'select:', if it declares one, or point 'source' at another server.json.`**: the same for a pointer server, whose `server.json` declares a required plain variable. A pointer manifest declares no variables, so it can neither mark the variable optional nor secret. Declare the variable under `env_vars:` of `config.local.yml`, or pick another package, remote or `server.json`. The consequences are those of the entry above.
 
 **`MCP server '<id>' uses the optional variable '<NAME>' in ..., which 'env_vars:' of config.yml and config.local.yml do not declare, and ... cannot be left out. Declare it under 'env_vars:'.`**: an optional plain variable is used in `args` or `url`, where leaving it out would change the command line or the address. Declare it under `env_vars:` in `config.local.yml`. Marking it `required: true` does not help: the run then fails with the `needs the variable` message above. The MCP config files of the deployments selecting that server are not written, everything else is, and the run exits non-zero.
 
@@ -750,6 +1518,8 @@ These are planned and listed in [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcp
 **`MCP server '<id>' has a 'url' that writes its scheme but takes its host from a variable. Write the host after 'http://' or 'https://', or start the url with the variable, which is then checked once resolved.`**: the url is written like `https://${HOST}/mcp`. Write the host, as in `https://mcp.example.com/${PATH_PART}`, or let the variable hold the scheme too, as in `${BASE}/mcp`. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written.
 
 **`MCP server '<id>' resolves its 'url' from '<NAME>' to one that ... Give '<NAME>' a value in 'env_vars:' that makes the url start with 'http://' or 'https://' followed by a host, without a backslash or credentials.`**: the url breaks a [URL rule](#url-rules) once its plain variables are resolved from `env_vars`. The `...` is one of `holds a backslash, which some tools read as a slash`, `does not start with 'http://' or 'https://' followed by a host`, or `carries credentials, which every tool would write into its config file and send`. When the url uses several variables, the message names them all, as in `from 'A', 'B'`, and ends `Give 'A', 'B' values in 'env_vars:' that make the url ...`. Fix the value in `config.yml` or `config.local.yml`. The message never repeats the url or a value. The MCP config files of the deployments selecting that server are not written, and the run exits non-zero.
+
+When the url uses no variable, the message reads `MCP server '<id>' resolves its 'url' to one that ... Write a 'url' that starts with 'http://' or 'https://' followed by a host, without a backslash or credentials.`, and for a pointer server it ends `... to one that .... Select another package or remote of its server.json with 'select:', if it declares one, or point 'source' at another server.json.`. Loading checks such a url already, so this is a safeguard you should not meet.
 
 **`MCP server '<id>' sends a secret header, but its 'url' resolves from '<NAME>' to one that is not https. Give '<NAME>' a value in 'env_vars:' that makes the url start with 'https://'.`**: the same, for a server that sends a secret header. With several variables the remedy reads `Give 'A', 'B' values in 'env_vars:' that make the url start with 'https://'.` Loading already requires `https://` as written for such a server, so this is a safeguard you should not meet.
 
@@ -776,6 +1546,18 @@ These are planned and listed in [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcp
 
 **`MCP server '<id>' sets '<NAME>' under 'env' and declares it as a variable. A stdio server already receives every declared variable under its own name; remove one of them.`** / **`MCP server '<id>' declares the variable '<NAME>', which neither 'url' nor 'headers' references. An http server receives only the variables it references; reference it or remove it.`**: remove the duplicate `env` entry or the unused variable. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written.
 
+**`MCP server '<id>' ... Select another package or remote of its server.json with 'select:', if it declares one, or point 'source' at another server.json.`**: a pointer server breaks a rule that the messages above, and others, state for an inline server, such as a secret in its `url`. A pointer manifest declares no transport and no variables, so each such message states the problem and then offers only another package, remote or `server.json`, never an edit of the transport or the variables. It has this ending in place of the inline remedy after:
+
+- `declares the variable '<NAME>', which is not an environment variable name`
+- `sets '<NAME>' under 'env' and declares it as a variable. A stdio server already receives every declared variable under its own name`
+- `references the secret variable '<NAME>' in <place>. A stdio server receives a secret only in its environment under its own name, the one way every tool - Codex included - passes it without writing its value`
+- `references the secret variable '<NAME>' in 'url'. A secret may only be a header value`
+- `has a 'url' that writes its scheme but takes its host from a variable`
+- `has a 'url' that <problem>`, where `<problem>` is one of the three url problems above
+- `declares the variable '<NAME>', which neither 'url' nor 'headers' references. An http server receives only the variables it references`
+
+Select another package or remote with `select`, point `source` at another `server.json`, or leave the server out. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written.
+
 **`MCP server '<id>' references '<NAME>' in ..., which it does not declare`** / **`... holds a '${' ... that is not a reference in the form '${NAME}'`**: declare the variable under `variables`, or remove the tool syntax. The message names the field, never its text.
 
 **`'...server.json': ... holds '${' in ...`**, **`... declares the runtime argument ...`**, **`... names the runtime ...`**, **`... derives the variable ... twice`**: the `server.json` of a pointer server asks for something the engine does not render. Select another package or remote, or leave the server out.
@@ -784,7 +1566,7 @@ These are planned and listed in [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcp
 
 **`'...server.json': The identifier of the <registry> package is not a ..., or starts with '-', so the engine refuses to put it on the command line of '<runner>'.`** / **`'...server.json': The version of the <registry> package '<identifier>' does not follow the ..., so the engine refuses to put it on the command line of '<runner>'.`**: the identifier or version breaks the grammar of its registry, or holds `${`. Select another package or a remote, or leave the server out. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written.
 
-**`'...server.json': It sets, forwards or derives the environment variable '<NAME>', which configures the runner, the loader or the connection of the process a tool starts, so the engine refuses it.`**: the name is on the [denylist](#environment-variable-denylist). When `<NAME>` starts with the manifest id in upper case, the engine derived it from the id and a key of the file. If the id is what puts the name on the list, as the id `git` does for `GIT_SSH_COMMAND`, give the manifest another id. Otherwise select another package or remote, or leave the server out.
+**`'...server.json': It sets, forwards or derives the environment variable '<NAME>', which matches '<PATTERN>' of the names the engine refuses in a server.json without regard to case: a shell, the launcher, a program it starts, a loader or an interpreter gives that variable a meaning of its own. Select another package or remote of that file with 'select:', if it declares one, or point 'source' at another server.json.`**: a name the `server.json` contributes is on the [denylist](#environment-variable-denylist). `<PATTERN>` is the pattern of the list the name matched, of either class, such as `*_PROXY`. When the engine derived the name from the manifest id and a key of the file, the message ends `... point 'source' at another server.json, or rename the manifest id, which the name is derived from.`. If the id is what puts the name on the list, as the id `git` does for `GIT_SSH_COMMAND`, give the manifest another id. Otherwise select another package or remote, or leave the server out. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written.
 
 **`'<dir>' is a symbolic link to '<target>' that cannot be followed (<exception>), so the engine writes no <tool> files of project '<id>' in this run. Repair or remove the link, and deploy again.`**: a [tool directory](#tool-directories), such as `.claude` or `.codex`, is a link that leads nowhere or in a loop. In the user scope, the message ends `... no <tool> files of user deployment '<id>' in this run. ...`. When the link cannot be read, `to '<target>'` is missing. The failure is listed as `[<id> | <TOOL> | tool directory '<dir>']`. Nothing of that tool is written for that deployment, every other tool and deployment is, and the run exits non-zero. A dry run fails the same way.
 
@@ -876,6 +1658,145 @@ A ledger that is not valid JSON gets the JSON messages above instead. Every MCP 
 
 **A deploy removed a server entry the deployment no longer selects**: that is the [ledger](#the-ledger) at work, also for a deployment without an `mcps` block. An entry is removed only while it holds what the ledger records, or, in a deployment that selects servers, when it is named after a manifest. The dry run shows each removal as `Would write MCP servers [...], removing [<ids>] to <file>`, and each removed deny entry by its full text. To keep an entry of your own, give it a name that is not the id of an MCP server manifest.
 
-**A server does not start in Codex**: check that the project is trusted in Codex, and that every secret variable is exported in the shell that starts Codex.
+**A server does not start in Codex**: check that the project is trusted in Codex, and that every required secret is stored in the keyring or exported in the shell that starts Codex. Codex forwards `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR` to the launcher only when its own environment sets them; without them, the launcher reads the environment only. A remote server reads its secrets from the environment of Codex only; see [Remote servers](#remote-servers).
 
 **A project got no MCP config file**: MCP servers are opt-in; add an `mcps` block to its `project.yml`.
+
+### Secrets and the launcher
+
+The engine logs the messages of this part while it loads or deploys, except those that start with `mcp-launch:` and the messages of the shell at the end.
+The launcher writes those to its standard error when a tool starts the server; see [Seeing the messages of the launcher](#seeing-the-messages-of-the-launcher) for where to find them.
+`<reason>` in the messages below stands for `a shell, the launcher, a program it starts, a loader or an interpreter gives that variable a meaning of its own`.
+`<launcher reason>` stands for `the launcher's shell, the loader and C library of that shell, or a program the launcher starts reads a variable of that name, or the shell sets it itself, so its value could change what the launcher does or appear in a message before the server starts`.
+`<PATTERN>` is the pattern of the [list of refused names](#names-the-launcher-refuses) that the name matched, such as `*_PROXY` or `LANG`, without its class.
+
+#### While loading
+
+Each message of this group names the manifest, and the whole run stops before anything is written, `--dry-run` included.
+
+**`Failed to load <manifest>: MCP server '<id>' declares 'from' on the variable '<NAME>', which is not secret. Only a secret variable is read from the secrets manager or the environment of the tool; remove 'from', or mark the variable 'secret: true'.`**: a plain variable declares `from`. Remove `from`, or mark the variable secret.
+
+**`Exception in thread "main" YamlException at variables[<n>].from on line <l>, column <c>: Failed to load <manifest>`**, followed by **`Caused by: InvalidPropertyValueException at variables[<n>].from on line <l>, column <c>: Value for 'from' is invalid: Value '<value>' is not a valid option, permitted choices are: environment, manager`** and a stack trace: `from` holds a value other than `manager` or `environment`. Correct it. A one-line message instead of the stack trace is listed as not scheduled in [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcps).
+
+**`Failed to load <manifest>: MCP server '<id>' declares the secret variable '<NAME>' without 'from: environment', so on a machine with a secrets manager the launcher reads it, and the launcher refuses every secret name matching '<PATTERN>' without regard to case: <reason>. This is checked on every machine, whatever secrets manager it uses. Rename the variable, or declare it 'from: environment'.`**: a keyring secret of an inline stdio server has a name of either class. For a class B name, such as `HTTPS_PROXY`, declare it `from: environment` and export it before starting the tool, as `07_mcp/atlassian.yml` does, or rename it, if the server accepts another name. For a class A name that is the only keyring secret of the server, the same two remedies work. See [Names the launcher refuses](#names-the-launcher-refuses).
+
+**`Failed to load <manifest>: MCP server '<id>' declares the secret variable '<NAME>' without 'from: environment', ... Rename the variable, or declare every secret variable 'from: environment'.`**: the same message, for a keyring secret whose name is of class A while the server has another keyring secret. Declaring only that secret `from: environment` would leave a class A name in the entry of a server still started through the launcher, which the next message refuses. Rename the variable. Or declare every secret of the server `from: environment`, so that no launcher is used, and export those secrets before starting the tool.
+
+**`Failed to load <manifest>: MCP server '<id>' declares a secret variable without 'from: environment', so on a machine with a secrets manager a tool starts it through the launcher, which receives the environment of its entry, and it sets '<KEY>' under 'env', which matches '<PATTERN>' without regard to case: <launcher reason>. This is checked on every machine, whatever secrets manager it uses. Rename or remove it, or declare every secret variable 'from: environment'.`**: a server started through the launcher uses a class A name in its entry, here as a key under `env`. The same message names the other roles:
+
+- `... and it declares the plain variable '<NAME>', which matches ...` for a plain variable;
+- `... and it declares the secret variable '<NAME>' 'from: environment', which matches ...` for an environment-only secret.
+
+A tool puts every name of the entry into the environment of the launcher's shell, and the shell or the loader could act on a class A name, or print its value, before the server starts. Rename or remove the key or the variable. Or declare every secret of the server `from: environment`, so that no launcher is used; then export those secrets before starting the tool. A class B name in these roles loads; see [Names the launcher refuses](#names-the-launcher-refuses).
+
+**`Failed to load <manifest>: MCP server '<id>' declares a secret variable without 'from: environment', so on a machine with a secrets manager the launcher is given the id of the server, and it accepts only an id that starts with a letter or digit and holds only letters, digits, '.', '_' and '-'. This is checked on every machine, whatever secrets manager it uses. Rename the manifest id, or declare every secret variable 'from: environment'.`**: rename the manifest id, or declare every secret of the server `from: environment`.
+
+**`Failed to load <manifest>: MCP server '<id>' takes a secret variable from its server.json, so on a machine with a secrets manager the launcher is given the id of the server, and it accepts only an id that starts with a letter or digit and holds only letters, digits, '.', '_' and '-'. This is checked on every machine, whatever secrets manager it uses. Rename the manifest id.`**: the same for a pointer server, whose manifest cannot declare `from`. Rename the manifest id.
+
+A name that a `server.json` contributes is refused earlier, with the message [`'...server.json': It sets, forwards or derives the environment variable ...`](#troubleshooting). The loader also has pointer variants of the name messages above. They start `MCP server '<id>' takes the secret variable '<NAME>' from its server.json, so on a machine with a secrets manager the launcher reads it` and `MCP server '<id>' takes a secret variable from its server.json, so on a machine with a secrets manager a tool starts it through the launcher`, and end with `Select another package or remote of its server.json with 'select:', if it declares one, or point 'source' at another server.json.`. The `server.json` check refuses every such name first, so you should not meet them; report one if you do.
+
+#### While reading the config files
+
+**`'secrets_manager' of <config.yml|config.local.yml> names a secrets manager this engine does not know. Accepted values: 'libsecret', 'environment'.`**: the named file sets `secrets_manager` to another value, or writes one of the two in another letter case. Correct it; see [The `secrets_manager` setting](#the-secrets_manager-setting). The run stops before anything is loaded or written.
+
+**`<config.yml|config.local.yml> declares the key '<key>', which this engine does not know, so it is ignored. Check its spelling; a key of a newer engine is ignored the same way.`**: a warning, once per run for each such key. A key below a known key is named with a dot, such as `locations.mcp`. The keys under `env_vars` and the entries of `tools` are not checked. Correct the spelling, such as `secret_manager` for `secrets_manager`, or remove the key. The run goes on as if the key were not there, so a misspelled `secrets_manager` leaves the default `libsecret` in force.
+
+#### While exporting: the launcher file
+
+Each message of this group starts with `MCP server '<id>' reads its secrets through the launcher`, and each remedy ends with `or set 'secrets_manager: environment' in config.local.yml to read every secret from the environment of the tool.`, except the `${` message.
+The run logs such a failure as `<deployment>: MCP server '<id>' could not be exported for <TOOL>: ...`.
+It lists it under `Export failed for <n> manifest(s):` as `[<deployment> | <TOOL> | MCP server '<id>'] ...`.
+The line names one of the servers that need the launcher; every other server of that file needs it too.
+The MCP config file of each deployment and tool that selects such a server is not written, in a dry run as in a deploy. Everything else is written, and the run exits non-zero.
+The rules the file must meet are listed in [The launcher file](#the-launcher-file).
+
+**`MCP server '<id>' reads its secrets through the launcher '<path>', which does not exist. Restore it in the ai-tools repository, or set 'secrets_manager: environment' in config.local.yml to read every secret from the environment of the tool.`**: `scripts/mcp-launch` is missing from the checkout the run starts from. Restore it, for example with `git checkout -- scripts/mcp-launch`. A symbolic link at the path that leads nowhere counts as missing.
+
+**`... '<path>', which is not a regular file. Restore it in the ai-tools repository, ...`**: a directory or another entry that is not a file stands at that path. Remove it, and restore the file.
+
+**`... '<path>', which is not executable. Restore it in the ai-tools repository, ...`**: the file lost its executable mode. Restore it with `chmod +x scripts/mcp-launch`.
+
+**`... '<path>', whose real path cannot be read (<exception class>). Restore it in the ai-tools repository, ...`**: the file system refuses to resolve the path of the launcher. Check the permissions of the directories above it.
+
+**`... '<real path>', whose path holds '${', which a tool would expand. Move the ai-tools repository to a path without it, or set 'secrets_manager: environment' in config.local.yml.`**: the real path of the checkout holds `${`, which every tool would read as a reference. Move the checkout.
+
+**`... '<path>', but the real path of the ai-tools repository '<repository>' cannot be read (<exception class>). Make the repository readable, ...`**: the engine cannot resolve the path of the checkout, so it cannot tell whether the launcher lies inside it. Make the checkout and the directories above it readable.
+
+**`... '<path>', which resolves to '<real path>', outside the ai-tools repository '<repository>'. Restore scripts/mcp-launch of the repository, ...`**: `scripts/mcp-launch` is a symbolic link, or lies below one, that leads out of the checkout. Replace it with the file of the repository, for example with `rm scripts/mcp-launch && git checkout -- scripts/mcp-launch`.
+
+**`... '<real path>', which is owned by '<owner>', not by '<user>', who runs the engine. Make '<user>' its owner, ...`**: another user owns the file. Run the engine as the owner of the checkout, or make yourself the owner, for example with `sudo chown <user> scripts/mcp-launch`.
+
+**`... '<real path>', which its group can write, so the file every tool starts could be changed by someone else. Remove that permission with: chmod go-w '<real path>', ...`**: the group of the file may write it. The message says `which others can write` or `which its group and others can write` for the other two cases. Run the `chmod go-w` command of the message. A checkout made with the umask `002` gets this mode; see [The launcher file](#the-launcher-file).
+
+**`... '<real path>', whose directory '<dir>' its group can write, so the file every tool starts could be replaced by someone else. Remove that permission with: chmod go-w '<dir>', ...`**: a directory between the launcher and the root of this checkout, such as `scripts/` or the checkout itself, may be written by its group. Whoever may write it could put another file in place of the launcher. The message says `whose directory '<dir>' others can write` or `whose directory '<dir>' its group and others can write` for the other two cases, and names the first such directory from the launcher upwards. Run the `chmod go-w` command of the message, and run again, since the next directory up may need the same. A checkout made with the umask `002` gets this mode; `chmod go-w scripts/mcp-launch scripts .` from the root of the checkout fixes the file and both directories at once. See [The launcher file](#the-launcher-file).
+
+**`... '<real path>', whose directory '<dir>' is owned by '<owner>', not by '<user>', who runs the engine. Make '<user>' its owner, ...`**: another user owns a directory between the launcher and the root of this checkout. Run the engine as the owner of the checkout, or make yourself the owner of that directory, for example with `sudo chown <user> '<dir>'`.
+
+**`... '<real path>', but the engine cannot tell who owns its directory '<dir>' and who may write it (<exception class>), so it does not give it to any tool. Keep the ai-tools repository on a file system with POSIX owners and permissions, ...`**: the file system reports no owner or mode for that directory. The causes and remedies are those of the next entry.
+
+**`... '<real path>', but the engine cannot tell who owns it and who may write it (<exception class>), so it does not give it to any tool. Keep the ai-tools repository on a file system with POSIX owners and permissions, ...`**: the file system reports no owner and mode, such as the default file system on Windows (`UnsupportedOperationException`), or the user running the engine has no entry in the user database (`UserPrincipalNotFoundException`). Move the checkout to a Linux file system, or set `secrets_manager: environment`. A checkout under `/mnt/c` of WSL may instead report every file as writable by everyone, and then gets the message above.
+
+**`MCP server '<id>' cannot be started through the launcher, which accepts only an id that starts with a letter or digit and holds only letters, digits, '.', '_' and '-'.`** / **`MCP server '<id>' cannot pass the secret variable '<NAME>' to the launcher, which refuses every secret name matching '<PATTERN>' without regard to case: <reason>.`**: safeguards behind loading, which refuses both earlier. You meet them only after an engine fault; report it.
+
+#### While checking where each secret is found
+
+**`MCP server '<id>' reads the <kind> secret variable '<NAME>' from the keyring or the environment of the tool that starts it, but the keyring does not hold it and the environment of this run does not set it. Store it with: ...`**: a warning; the secret is neither stored nor exported. Store it with the command the message ends with; see [First steps](#first-steps-keep-a-token-in-the-keyring).
+
+**`... but the keyring does not hold it and the environment of this run sets it empty or to its own unexpanded reference, which counts as not set. Store it with: ...`**: a warning; the variable is exported, but empty or as its own reference, such as `${NAME}`, which the launcher counts as not set. Store the value in the keyring, or export the real value.
+
+**`MCP server '<id>' reads the <kind> secret variable '<NAME>' from the keyring, and the engine cannot tell whether the keyring holds it: <reason>.`**: a warning; the check could not ask the keyring. Each `<reason>` and what to do is listed under [What the check of secrets reports](#what-the-check-of-secrets-reports).
+
+**`MCP server '<id>' reads the <kind> secret variable '<NAME>' from the environment of the tool that starts it, and the environment of this run does not set it. Export it before starting the tool.`**: a warning for a secret the launcher does not read. Export it in the shell that starts the tool, or ignore the warning for an optional secret you do not use.
+
+**`The secrets manager of this machine is libsecret, but secret-tool is not on the PATH of this run. ...`**: a warning, once per run. No absolute directory of the `PATH` of the run holds `secret-tool`. Install `secret-tool` (package `libsecret-tools`), or set `secrets_manager: environment` in `config.local.yml`. Until then, the launcher reads every secret from the environment of the tool, unless the `PATH` of the tool holds `secret-tool`.
+
+#### When a tool starts the server
+
+**`mcp-launch: <id>: keyring not used, reading secrets from the environment: <reason>`**: the launcher did not use the keyring for this start, and read every secret from the environment the tool passed. The server still starts when every required secret is found there. Here `<reason>` is one of:
+
+- `the PATH is not set or is empty`: the tool passed the launcher no `PATH`, or an empty one, so the launcher starts no helper. It does not fall back to the default search path of the shell. Start the tool from a shell whose `PATH` holds the directory of `secret-tool`, such as `/usr/bin`, or check the settings of the tool that choose the environment of a server.
+- `secret-tool is not in any absolute directory of the PATH`: install `secret-tool` (package `libsecret-tools`) in a directory such as `/usr/bin`. A `secret-tool` found only through an empty or relative entry of the `PATH`, such as `.`, does not count.
+- `timeout is not in any absolute directory of the PATH`: install GNU coreutils. Without a time limit, the launcher does not ask the keyring.
+- `env is not in any absolute directory of the PATH`: install GNU coreutils. Without `env`, the launcher does not ask the keyring, because the rest of the environment of the tool would reach `secret-tool`.
+- `no D-Bus session bus is known (DBUS_SESSION_BUS_ADDRESS is not set and XDG_RUNTIME_DIR/bus is not a socket)`: the tool passed neither variable. Start the tool from a shell of your desktop session. For Claude Code, check whether `CLAUDE_CODE_MCP_ALLOWLIST_ENV` is set; see [Limits](#limits).
+- `secret-tool lookup timed out after 5 seconds`: the keyring daemon did not answer, possibly because it waits for an unlock prompt. Unlock the keyring, and restart the server.
+- `secret-tool lookup did not end within 5 seconds and was killed 1 second later`: the same, but the lookup also ignored the stop signal. Check that the keyring daemon is not stuck, for example by restarting your desktop session, and restart the server.
+- `secret-tool lookup failed with exit code <N>`: `secret-tool` reported an error other than "no such item", for example because the keyring daemon cannot be reached. A `timeout` without the options `-v` and `-k`, such as the one of BusyBox, makes every lookup fail this way. Run `./deploy.sh --dry-run` from the same kind of shell: its check of secrets names the reason when it cannot reach the keyring either.
+
+**`mcp-launch: <id>: not started: required secret not found in the keyring or the environment: <NAME>[ <NAME>...]`**: every listed required secret is neither in the keyring nor set in the environment the tool passed, or is set to a value that counts as not set, such as an empty one; see [The order in which a secret is looked for](#the-order-in-which-a-secret-is-looked-for). Store each one, or export it in the shell that starts the tool, and restart the server. The launcher exits with code 1.
+
+**`mcp-launch: usage error: <problem>`**: the entry that starts the launcher is malformed. The engine never writes such an entry, so an entry edited by hand, or an engine fault, is the cause. Deploy again to rewrite the entry. The launcher exits with code 2 and starts nothing. `<problem>` is one of:
+
+- `missing server name`
+- `the server name must start with a letter or digit and hold only letters, digits, '.', '_' and '-'`
+- `missing -- before the command`
+- `missing command after --`
+- `--required at argument <N> is not followed by a secret name`, or the same with `--optional`
+- `argument <N> is not a valid environment variable name`
+- `argument <N> must be --required, --optional or --`
+- `secret <NAME> is listed more than once`
+- `secret name <NAME> is refused: a shell, the launcher, a program it starts, a loader or an interpreter gives that variable a meaning of its own`
+
+`<N>` counts the arguments of the launcher from 1, the server id being argument 1. A name that is not valid is never repeated, only its position, because it may be a value passed by mistake.
+
+#### Messages of the shell
+
+The shell that runs the launcher writes these itself, so their text differs between shells. The forms below are those of dash 0.5.10.2, bash 5.0.17 and BusyBox. `<shell>` is the path the shell was started by, such as `/bin/sh`.
+
+**`<launcher path>: <line>: exec: <command>: not found`**: the real command of the server does not exist, and the launcher exits with code 127. Fix `command` in the manifest, or install the server.
+
+**`<launcher path>: <line>: exec: <command>: Permission denied`**: the real command is not executable, and the launcher exits with code 126. Make it executable, or fix `command`.
+
+**`... exec: <command>: Argument list too long`** (dash, exit code 2) / **`... <command>: Argument list too long`** (bash, exit code 126, followed by a line `... <command>: Success`): the environment of the server is too large for the kernel, for example because a keyring value is larger than 128 KiB. Store a smaller value.
+
+**`sh: 0: Illegal number: <value>`**: dash found an inherited `OPTIND` that is not a number, and stopped with exit code 2 before the launcher ran. Find where `OPTIND` is exported in the environment of the tool, and remove it.
+
+**`<shell>: BASH_XTRACEFD: <value>: invalid value for trace file descriptor`** / **`<shell>: BASH_COMPAT: <value>: compatibility value out of range`** / **`<shell>: warning: setlocale: LC_ALL: cannot change locale (<value>)`**: bash, as `/bin/sh`, found an invalid inherited variable. It warns and goes on. Correct or remove the variable in the environment of the tool.
+
+**`<shell>: warning: shell level (<N>) too high, resetting to 1`**: bash, as `/bin/sh`, found an inherited `SHLVL` of 999 or more; `<N>` is that value plus one. It goes on. Find where `SHLVL` is exported with such a value in the environment of the tool, and remove it.
+
+**`ERROR: ld.so: object '<value>' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.`** / **`ERROR: ld.so: object '<value>' cannot be loaded as audit interface: cannot open shared object file; ignored.`** / **``warning: debug option `<value>' unknown; try LD_DEBUG=help``**: the dynamic loader of glibc, starting the shell under dash or bash, found an `LD_PRELOAD`, `LD_AUDIT` or `LD_DEBUG` that names no file or option it knows. It goes on. Remove the variable from the environment of the tool.
+
+Each of these names is of class A, so no manifest that loads puts one into the entry of a server started through the launcher; see [Limits](#limits). The value comes from the environment of the tool itself.
+
+**`<shell>: illegal option -p`**: `/bin/sh` is BusyBox, which refuses the option of the first line of the launcher. Nothing is started, and the exit code is 2. Set `secrets_manager: environment` in `config.local.yml`, and deploy again; see [Limits](#limits).

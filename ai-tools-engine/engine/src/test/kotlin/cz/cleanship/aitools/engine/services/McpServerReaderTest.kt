@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import cz.cleanship.aitools.engine.env.VariableResolver
+import cz.cleanship.aitools.engine.launcher.McpLauncherContract
 import cz.cleanship.aitools.engine.models.ManifestMetadata
 import cz.cleanship.aitools.engine.models.McpHeader
 import cz.cleanship.aitools.engine.models.McpServer
@@ -15,6 +16,7 @@ import cz.cleanship.aitools.engine.models.McpText
 import cz.cleanship.aitools.engine.models.McpTextPart
 import cz.cleanship.aitools.engine.models.McpTransport
 import cz.cleanship.aitools.engine.models.McpVariable
+import cz.cleanship.aitools.engine.models.SecretSource
 import cz.cleanship.aitools.engine.models.Version
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -634,6 +636,39 @@ class McpServerReaderTest {
         }
 
         @Test
+        fun `should tell a pointer whose server json puts a secret into a longer value only what its manifest can change`() {
+            // given
+            writePackageEnvironment("""{"name": "API", "isSecret": true, "value": "key={key}", "variables": {"key": {"isRequired": true}}}""")
+
+            // when / then
+            assertThatThrownBy { readServer() }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageStartingWith("MCP server 'github' references the secret variable 'GITHUB_KEY' in 'env.API'.")
+                .hasMessageEndingWith(POINTER_REMEDY)
+                .hasMessageNotContaining("remove the reference")
+        }
+
+        @Test
+        fun `should tell a pointer whose server json names the same variable twice only what its manifest can change`() {
+            // given
+            // - API is a fixed environment variable of the package and a variable forwarded into the container
+            writeServerJson(
+                """
+                {"${'$'}schema": "$SCHEMA", "name": "x", "description": "d", "version": "1",
+                 "packages": [{"registryType": "oci", "identifier": "ghcr.io/acme/x:1", "transport": {"type": "stdio"}, "environmentVariables": [{"name": "API", "value": "fixed"}],
+                   "runtimeArguments": [{"type": "named", "name": "-e", "value": "API"}]}]}
+                """.trimIndent(),
+            )
+
+            // when / then
+            assertThatThrownBy { readServer() }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'API'")
+                .hasMessageEndingWith(POINTER_REMEDY)
+                .hasMessageNotContaining("remove one of them")
+        }
+
+        @Test
         fun `should refuse an environment variable name a shell could not export`() {
             // given
             writePackageEnvironment("""{"name": "NODE-OPTIONS", "value": "x"}""")
@@ -929,6 +964,20 @@ class McpServerReaderTest {
                 .hasMessageContaining("'github'")
                 .hasMessageNotContaining("tok-USERINFO")
                 .hasMessageNotContaining("a.example")
+        }
+
+        @Test
+        fun `should tell a pointer whose remote url carries userinfo only what its manifest can change`() {
+            // given
+            writeServerJson(
+                """{"${'$'}schema": "$SCHEMA", "name": "x", "description": "d", "version": "1",
+                 "remotes": [{"type": "streamable-http", "url": "https://user:tok-USERINFO@a.example/mcp"}]}""",
+            )
+
+            // when / then
+            assertThatThrownBy { readServer() }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessage("MCP server 'github' has a 'url' that carries credentials, which every tool would write into its config file and send. $POINTER_REMEDY")
         }
 
         @ParameterizedTest
@@ -1352,6 +1401,471 @@ class McpServerReaderTest {
             "sha256:" + MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) }
     }
 
+    /**
+     * Where a secret variable is read from when a tool starts its server, and the names the launcher of the secrets manager needs for itself.
+     */
+    @Nested
+    inner class SecretSources {
+
+        @Test
+        fun `should refuse where a variable is read from on a variable that is not secret, naming the server and the variable`() {
+            // given
+            val manifest = inline(
+                McpTransport.Stdio(command = "jira-mcp-server"),
+                McpVariable("JIRA_BASE_URL", "Base URL", secret = false, from = SecretSource.ENVIRONMENT),
+            )
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining("'JIRA_BASE_URL'")
+                .hasMessageContaining("'from'")
+        }
+
+        @Test
+        fun `should give every secret a pointer derives from its server json the secrets manager`() {
+            // given
+            writePackageEnvironment("""{"name": "API_TOKEN", "isSecret": true}""")
+
+            // when
+            val server = readServer()
+
+            // then
+            assertThat(server.variables.single { it.name == "API_TOKEN" }).satisfies({
+                assertThat(it.from).isNull()
+                assertThat(it.source).isEqualTo(SecretSource.MANAGER)
+            })
+        }
+
+        @ParameterizedTest
+        @CsvSource("PATH", "IFS", "DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "mcp_launch_value")
+        fun `should refuse a secret of a stdio server read through the secrets manager under a name the launcher needs for itself`(
+            name: String,
+        ) {
+            // given
+            val manifest =
+                inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable(name, "Token", secret = true))
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining("'$name'")
+                .hasMessageContaining("launcher")
+                .hasMessageContaining("from: environment")
+        }
+
+        @ParameterizedTest
+        @CsvSource("DISPLAY", "mcp_launch_value", "PATH_TOKEN", "XDISPLAY")
+        fun `should accept a name the launcher needs when the secret is read from the environment, or a name that only resembles one`(
+            name: String,
+        ) {
+            // given
+            // - the launcher compares names without regard to case, so only a name that resembles one of its own is read through the secrets manager
+            val source = if (name == "DISPLAY" || name == "mcp_launch_value") SecretSource.ENVIRONMENT else null
+            val manifest =
+                inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable(name, "Token", secret = true, from = source))
+
+            // when
+            val server = reader.read(manifest, manifestFile)
+
+            // then
+            assertThat(server.variables.map { it.name }).containsExactly(name)
+        }
+
+        @Test
+        fun `should refuse a secret a pointer derives under a name the launcher needs for itself`() {
+            // given
+            writePackageEnvironment("""{"name": "DISPLAY", "isSecret": true}""")
+
+            // when / then
+            // - the names the launcher refuses belong to the names a server.json may not use at all, so the file is named, and the loader wraps it naming the manifest
+            assertThatThrownBy { readServer() }
+                .isInstanceOf(InvalidMcpServerSourceException::class.java)
+                .hasMessageContaining(serverFile().absolutePath)
+                .hasMessageContaining("'DISPLAY'")
+        }
+
+        @ParameterizedTest
+        @CsvSource("SHELLOPTS", "PS4", "BASH_FUNC_printf", "ENV", "LC_ALL", "LANG", "HTTPS_PROXY", "Path", "OPTIND", "_")
+        fun `should refuse a secret of an inline server read through the secrets manager under any name the launcher refuses, naming the pattern it matches`(
+            name: String,
+        ) {
+            // given
+            val manifest =
+                inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable(name, "Token", secret = true))
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining("'$name'")
+                .hasMessageContaining("'${McpLauncherContract.refusedPatternOf(name)}'")
+                .hasMessageContaining(McpLauncherContract.REFUSAL_REASON)
+                .hasMessageContaining("from: environment")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - a variable the file declares, secret or not, and a fixed value it sets
+                "secret   | SHELLOPTS",
+                "plain    | PS4",
+                "fixed    | BASH_FUNC_printf",
+                "secret   | ENV",
+                "fixed    | DBUS_SESSION_BUS_ADDRESS",
+                "plain    | XDG_RUNTIME_DIR",
+                "secret   | G_MESSAGES_DEBUG",
+                "fixed    | GIO_EXTRA_MODULES",
+                "plain    | LC_ALL",
+                "fixed    | LANG",
+                "secret   | DISPLAY",
+                "fixed    | IFS",
+                "plain    | MCP_LAUNCH_VALUE",
+            ],
+        )
+        fun `should refuse any name the launcher refuses in a server json, as a variable or as a fixed environment variable`(
+            kind: String,
+            name: String,
+        ) {
+            // given
+            writePackageEnvironment(
+                when (kind) {
+                    "secret" -> """{"name": "$name", "isSecret": true}"""
+                    "plain" -> """{"name": "$name"}"""
+                    else -> """{"name": "$name", "value": "fixed-value"}"""
+                },
+            )
+
+            // when / then
+            assertThatThrownBy { readServer() }
+                .isInstanceOf(InvalidMcpServerSourceException::class.java)
+                .hasMessageContaining(serverFile().absolutePath)
+                .hasMessageContaining("'$name'")
+                .hasMessageContaining("'${McpLauncherContract.refusedPatternOf(name)}'")
+                .hasMessageEndingWith("Select another package or remote of that file with 'select:', if it declares one, or point 'source' at another server.json.")
+                .hasMessageNotContaining("from: environment")
+        }
+
+        @Test
+        fun `should refuse a name the launcher refuses that a pointer derives from its id, telling to rename the id`() {
+            // given
+            // - a header without a value becomes a variable named after the id and the header: LC_ALL
+            writeRemote("""{"name": "All", "description": "All"}""")
+            val manifest = pointer(select = null, source = "\${PROJECTS_FOLDER}/server").copy(id = "lc")
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerSourceException::class.java)
+                .hasMessageContaining("'LC_ALL'")
+                .hasMessageContaining("'LC_*'")
+                .hasMessageEndingWith("Select another package or remote of that file with 'select:', if it declares one, point 'source' at another server.json, or rename the manifest id, which the name is derived from.")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - a server that reads no secret through the secrets manager is never started through the launcher, so every name only reaches the server
+                "environment-secret | LD_PRELOAD",
+                "plain              | SHELLOPTS",
+                "fixed              | PS4",
+                // - a name of class B that the launcher's shell and helpers never read, beside a secret read through the secrets manager
+                "environment-secret-beside-a-managed-one | HTTPS_PROXY",
+            ],
+        )
+        fun `should accept in an inline manifest a name the launcher refuses where the launcher never receives it from the entry`(
+            kind: String,
+            name: String,
+        ) {
+            // given
+            val managed = McpVariable("JIRA_PAT", "Token", secret = true)
+            val manifest = when (kind) {
+                "environment-secret" -> inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable(name, "Value", secret = true, from = SecretSource.ENVIRONMENT))
+                "plain" -> inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable(name, "Value", secret = false))
+                "fixed" -> inline(McpTransport.Stdio(command = "jira-mcp-server", env = mapOf(name to "x")))
+                else -> inline(McpTransport.Stdio(command = "jira-mcp-server"), managed, McpVariable(name, "Value", secret = true, from = SecretSource.ENVIRONMENT))
+            }
+
+            // when
+            val server = reader.read(manifest, manifestFile)
+
+            // then
+            assertThat(server.id).isEqualTo("atlassian")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                "plain | SHELLOPTS",
+                "plain | LC_ALL",
+                "plain | path",
+                "fixed | OPTIND",
+                "fixed | DBUS_SESSION_BUS_ADDRESS",
+                "fixed | PATH",
+            ],
+        )
+        fun `should refuse in an inline manifest a plain variable or a fixed environment variable the launcher refuses when the server starts through the launcher`(
+            kind: String,
+            name: String,
+        ) {
+            // given
+            // - the tool puts the environment of the entry into the environment of the launcher, whose shell and helpers read it before the server starts
+            val managed = McpVariable("JIRA_PAT", "Token", secret = true)
+            val manifest = if (kind == "plain") {
+                inline(McpTransport.Stdio(command = "jira-mcp-server"), managed, McpVariable(name, "Value", secret = false))
+            } else {
+                inline(McpTransport.Stdio(command = "jira-mcp-server", env = mapOf(name to "x")), managed)
+            }
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining("'$name'")
+                .hasMessageContaining("'${McpLauncherContract.refusedPatternOf(name)}'")
+                .hasMessageContaining("launcher")
+                .hasMessageContaining("from: environment")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - the role of the name in a server that reads a secret through the secrets manager, and a name of class B
+                "environment-secret | HTTPS_PROXY",
+                "environment-secret | NODE_OPTIONS",
+                "plain              | HTTPS_PROXY",
+                "plain              | TMPDIR",
+                "fixed              | NODE_OPTIONS",
+                "fixed              | GIT_SSH_COMMAND",
+                "fixed              | python_path",
+            ],
+        )
+        fun `should accept in an inline manifest a name of class B as an environment-only secret, a plain variable or a fixed environment variable of a server started through the launcher`(
+            role: String,
+            name: String,
+        ) {
+            // given
+            // - such a manifest loaded before the launcher existed: the launcher's shell and helpers never read these names, the server does
+            val manifest = inlineStartedThroughTheLauncher(role, name)
+
+            // when
+            val server = reader.read(manifest, manifestFile)
+
+            // then
+            assertThat(server.id).isEqualTo("atlassian")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - names the shell prints at start, a name the loader prints, and names the launcher and its shell depend on
+                "environment-secret | OPTIND",
+                "environment-secret | LC_ALL",
+                "environment-secret | SHLVL",
+                "environment-secret | BASH_COMPAT",
+                "environment-secret | bash_xtracefd",
+                "environment-secret | LD_PRELOAD",
+                "environment-secret | MALLOC_CHECK_",
+                "plain              | SHLVL",
+                "plain              | MALLOC_PERTURB_",
+                "fixed              | LD_DEBUG",
+                "fixed              | GCONV_PATH",
+            ],
+        )
+        fun `should refuse in an inline manifest a name of class A in every role of a server started through the launcher, naming the server, the variable and the pattern`(
+            role: String,
+            name: String,
+        ) {
+            // given
+            val manifest = inlineStartedThroughTheLauncher(role, name)
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("MCP server 'atlassian'")
+                .hasMessageContaining("'$name'")
+                .hasMessageContaining("'${McpLauncherContract.refusedPatternOf(name)}'")
+                .hasMessageContaining("launcher")
+                .hasMessageEndingWith("Rename or remove it, or declare every secret variable 'from: environment'.")
+        }
+
+        @Test
+        fun `should name the declaration of an environment-only secret of class A and why the launcher receives it`() {
+            // given
+            val manifest = inlineStartedThroughTheLauncher("environment-secret", "OPTIND")
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessage(
+                    "MCP server 'atlassian' declares a secret variable without 'from: environment', so on a machine with a secrets manager a tool starts it through the launcher, which receives the environment of its entry, " +
+                        "and it declares the secret variable 'OPTIND' 'from: environment', which matches 'OPTIND' without regard to case: ${McpLauncherContract.LAUNCHER_ENVIRONMENT_REASON}. " +
+                        "This is checked on every machine, whatever secrets manager it uses. Rename or remove it, or declare every secret variable 'from: environment'.",
+                )
+        }
+
+        @ParameterizedTest
+        @CsvSource("SHELLOPTS", "HTTPS_PROXY")
+        fun `should tell to declare every secret from the environment when a secret read through the secrets manager has a refused name beside another such secret`(
+            name: String,
+        ) {
+            // given
+            // - declaring only this secret 'from: environment' leaves the server started through the launcher, which still refuses a name of class A in that role
+            val manifest =
+                inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable("JIRA_PAT", "Token", secret = true), McpVariable(name, "Token", secret = true))
+            val remedy = if (name == "SHELLOPTS") "Rename the variable, or declare every secret variable 'from: environment'." else "Rename the variable, or declare it 'from: environment'."
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'$name'")
+                .hasMessageEndingWith(remedy)
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - a server that reads no secret through the secrets manager is never started through the launcher, whatever the class of the name
+                "environment-secret | OPTIND",
+                "plain              | LD_PRELOAD",
+                "fixed              | LC_ALL",
+            ],
+        )
+        fun `should accept a name of class A in every role of an inline server that reads no secret through the secrets manager`(
+            role: String,
+            name: String,
+        ) {
+            // given
+            val manifest = when (role) {
+                "environment-secret" -> inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable(name, "Value", secret = true, from = SecretSource.ENVIRONMENT))
+                "plain" -> inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable(name, "Value", secret = false))
+                else -> inline(McpTransport.Stdio(command = "jira-mcp-server", env = mapOf(name to "x")))
+            }
+
+            // when
+            val server = reader.read(manifest, manifestFile)
+
+            // then
+            assertThat(server.id).isEqualTo("atlassian")
+        }
+
+        @Test
+        fun `should tell a pointer whose id the launcher does not accept only to rename the id, which is all its manifest can change`() {
+            // given
+            writePackageEnvironment("""{"name": "API_TOKEN", "isSecret": true}""")
+            val manifest = pointer(select = null, source = "\${PROJECTS_FOLDER}/server").copy(id = "jira server")
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'jira server'")
+                .hasMessageContaining("Rename the manifest id.")
+                .hasMessageNotContaining("from: environment")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                "secret | MCP server 'atlassian' declares the secret variable 'SHELLOPTS' without 'from: environment', so on a machine with a secrets manager the launcher reads it, and the launcher refuses every secret name matching 'SHELLOPTS' without regard to case: a shell, the launcher, a program it starts, a loader or an interpreter gives that variable a meaning of its own. This is checked on every machine, whatever secrets manager it uses. Rename the variable, or declare it 'from: environment'.",
+                "entry  | MCP server 'atlassian' declares a secret variable without 'from: environment', so on a machine with a secrets manager a tool starts it through the launcher, which receives the environment of its entry, and it sets 'SHELLOPTS' under 'env', which matches 'SHELLOPTS' without regard to case: the launcher's shell, the loader and C library of that shell, or a program the launcher starts reads a variable of that name, or the shell sets it itself, so its value could change what the launcher does or appear in a message before the server starts. This is checked on every machine, whatever secrets manager it uses. Rename or remove it, or declare every secret variable 'from: environment'.",
+                "id     | MCP server 'jira server' declares a secret variable without 'from: environment', so on a machine with a secrets manager the launcher is given the id of the server, and it accepts only an id that starts with a letter or digit and holds only letters, digits, '.', '_' and '-'. This is checked on every machine, whatever secrets manager it uses. Rename the manifest id, or declare every secret variable 'from: environment'.",
+            ],
+        )
+        fun `should state the rules of the launcher as they hold on every machine, also one without a secrets manager`(
+            case: String,
+            message: String,
+        ) {
+            // given
+            val manifest = when (case) {
+                "secret" -> inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable("SHELLOPTS", "Token", secret = true))
+                "entry" -> inline(McpTransport.Stdio(command = "jira-mcp-server", env = mapOf("SHELLOPTS" to "x")), McpVariable("JIRA_PAT", "Token", secret = true))
+                else -> inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable("JIRA_PAT", "Token", secret = true)).copy(id = "jira server")
+            }
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessage(message)
+        }
+
+        @Test
+        fun `should state the id rule of the launcher for a pointer as it holds on every machine`() {
+            // given
+            writePackageEnvironment("""{"name": "API_TOKEN", "isSecret": true}""")
+            val manifest = pointer(select = null, source = "\${PROJECTS_FOLDER}/server").copy(id = "jira server")
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessage(
+                    "MCP server 'jira server' takes a secret variable from its server.json, so on a machine with a secrets manager the launcher is given the id of the server, " +
+                        "and it accepts only an id that starts with a letter or digit and holds only letters, digits, '.', '_' and '-'. This is checked on every machine, whatever secrets manager it uses. Rename the manifest id.",
+                )
+        }
+
+        @Test
+        fun `should tell an inline server whose id the launcher does not accept to rename the id or read every secret from the environment`() {
+            // given
+            val manifest = inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable("JIRA_PAT", "Token", secret = true)).copy(id = "jira server")
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("Rename the manifest id, or declare every secret variable 'from: environment'.")
+        }
+
+        @ParameterizedTest
+        @CsvSource("'jira server'", "-jira", ".jira", "jira/x", "jira\$x")
+        fun `should refuse a stdio server reading a secret through the secrets manager whose id the launcher does not accept`(
+            id: String,
+        ) {
+            // given
+            val manifest = inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable("JIRA_PAT", "Token", secret = true)).copy(id = id)
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'$id'")
+                .hasMessageContaining("launcher")
+        }
+
+        @Test
+        fun `should accept any id for a server that reads no secret through the secrets manager`() {
+            // given
+            // - a plain variable, a secret read from the environment, and no launcher to name the server to
+            val manifest = inline(
+                McpTransport.Stdio(command = "jira-mcp-server"),
+                McpVariable("JIRA_PAT", "Token", secret = true, from = SecretSource.ENVIRONMENT),
+            ).copy(id = "jira server")
+
+            // when
+            val server = reader.read(manifest, manifestFile)
+
+            // then
+            assertThat(server.id).isEqualTo("jira server")
+        }
+
+        @Test
+        fun `should accept an id of letters, digits, dots, underscores and dashes for a server that reads a secret through the secrets manager`() {
+            // given
+            val manifest = inline(McpTransport.Stdio(command = "jira-mcp-server"), McpVariable("JIRA_PAT", "Token", secret = true)).copy(id = "0jira.mcp_server-2")
+
+            // when
+            val server = reader.read(manifest, manifestFile)
+
+            // then
+            assertThat(server.variables.single().source).isEqualTo(SecretSource.MANAGER)
+        }
+    }
+
     private fun readServer(): McpServer = reader.read(pointer(select = null, source = "\${PROJECTS_FOLDER}/server"), manifestFile)
 
     private fun serverFile(): File = projectsFolder.resolve("server/server.json")
@@ -1383,6 +1897,16 @@ class McpServerReaderTest {
         variables = variables.toList(),
     )
 
+    // An inline stdio server with the secret JIRA_PAT read through the secrets manager, so a tool starts it through the launcher, and [name] in [role]: an environment-only secret, a plain variable, or a fixed environment variable.
+    private fun inlineStartedThroughTheLauncher(role: String, name: String): McpServerManifest {
+        val managed = McpVariable("JIRA_PAT", "Token", secret = true)
+        return when (role) {
+            "environment-secret" -> inline(McpTransport.Stdio(command = "jira-mcp-server"), managed, McpVariable(name, "Value", secret = true, from = SecretSource.ENVIRONMENT))
+            "plain" -> inline(McpTransport.Stdio(command = "jira-mcp-server"), managed, McpVariable(name, "Value", secret = false))
+            else -> inline(McpTransport.Stdio(command = "jira-mcp-server", env = mapOf(name to "x")), managed)
+        }
+    }
+
     private fun pointer(select: McpSourceSelection?, source: String = "\${PROJECTS_FOLDER}/github-mcp-server") = McpServerManifest(
         id = "github",
         metadata = ManifestMetadata(version = Version("1.0.0")),
@@ -1392,5 +1916,6 @@ class McpServerReaderTest {
 
     companion object {
         private const val SCHEMA = "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
+        private const val POINTER_REMEDY = "Select another package or remote of its server.json with 'select:', if it declares one, or point 'source' at another server.json."
     }
 }

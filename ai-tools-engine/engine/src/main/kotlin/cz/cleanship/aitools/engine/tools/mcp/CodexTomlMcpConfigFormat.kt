@@ -16,7 +16,7 @@ import java.io.File
  *
  * The file is edited as text rather than parsed and written again, because no TOML writer keeps comments: the tables of owned servers are cut out and written again, and every other line of the file is kept byte for byte, its line ending and a missing final newline included; the lines the engine adds end with the line ending most lines of the file use. A comment directly above the next table is kept with that table. Before and after the edit, the file is parsed with tomlj, a conformant TOML 1.0 parser: the edit is refused unless the existing file is valid TOML, every owned server in it is defined as a table of its own, and the edited file is valid TOML whose foreign content is unchanged and whose owned servers are exactly the ones written.
  *
- * Codex expands no `${NAME}` in this file, so a secret is written as the name of the environment variable Codex forwards: `env_vars` for a stdio server, `bearer_token_env_var` for a bearer token, and `env_http_headers` for any other header. The tools a deployment allows and denies are written as `enabled_tools` and `disabled_tools` of the server.
+ * Codex expands no `${NAME}` in this file, so a secret is written as the name of the environment variable Codex forwards: `env_vars` for a stdio server, `bearer_token_env_var` for a bearer token, and `env_http_headers` for any other header. The [ResolvedMcpTransport.Stdio.forwarded] names of a stdio server follow its secrets in `env_vars`, each named once. The tools a deployment allows and denies are written as `enabled_tools` and `disabled_tools` of the server.
  */
 object CodexTomlMcpConfigFormat : McpConfigFormat {
 
@@ -71,15 +71,18 @@ object CodexTomlMcpConfigFormat : McpConfigFormat {
         val table = "$SERVERS_TABLE.${key(server.id)}"
         return when (val transport = server.transport) {
             is ResolvedMcpTransport.Stdio -> {
-                val secrets = transport.env.values
+                // Codex clears the environment of a server, so a variable it reads from the environment of Codex reaches it only when named here.
+                val forwarded = transport.env.values
                     .filterIsInstance<McpValue.Secret>()
                     .map { it.variable }
+                    .plus(transport.forwarded)
+                    .distinct()
                 val plain = transport.env.mapNotNull { (key, value) -> (value as? McpValue.Plain)?.let { key to it.value } }
                 buildList {
                     add("[$table]")
                     add("command = ${string(transport.command)}")
                     if (transport.args.isNotEmpty()) add("args = ${array(transport.args)}")
-                    if (secrets.isNotEmpty()) add("env_vars = ${array(secrets)}")
+                    if (forwarded.isNotEmpty()) add("env_vars = ${array(forwarded)}")
                     addAll(toolLists(server))
                     addAll(subTable("$table.env", plain))
                 }

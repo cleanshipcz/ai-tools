@@ -80,6 +80,16 @@ It fails on what a deploy fails on, a broken tool directory such as `.claude`, `
 In a real deploy, such a file fails only that deployment and tool, and every other tool and deployment is still deployed, in a project and in the user scope alike.
 It logs the absolute path of every artifact a deploy would write.
 
+For the secret variables of each MCP server a deployment selects, a dry run and a deploy log the same lines, naming the server and the variable and never a value.
+The log is JSON unless `LOG_FORMAT=TEXT` is set, so `LOG_FORMAT=TEXT ./deploy.sh --dry-run 2>&1 | grep secret` shows only these lines, as plain text:
+
+- A secret a stdio server reads through the keyring is always reported: as stored in the keyring, as not stored but set in the environment of the run, as found nowhere with the `secret-tool store` command to run, or as "cannot tell" with the reason. The engine asks the keyring daemon whether an item exists without ever receiving its value.
+- Every other secret is reported only when the environment of the run does not set it, with `Export it before starting the tool.` That is a secret of a remote server, one declared `from: environment`, and every secret on a machine with `secrets_manager: environment`.
+- None of these lines fails the run. The check sees the `PATH` and the session bus of the run, which may differ from those of the tool that later starts the server.
+- A `scripts/mcp-launch` that is missing, not executable, outside the checkout, owned by another user, or writable by its group or others, or that lies in a directory of the checkout owned by another user or writable by its group or others, fails the MCP config files of every deployment that needs it, in a dry run as in a deploy; see [The launcher file](../07_mcp/README.md#the-launcher-file).
+
+See [What the check of secrets reports](../07_mcp/README.md#what-the-check-of-secrets-reports) for every message and what to do.
+
 A user deployment can be pointed at a harmless home instead:
 
 ```bash
@@ -258,6 +268,7 @@ Key points, all documented in full in [../QUICKREF.md](../QUICKREF.md#creating-a
 - Filters fold over a selection that **starts empty**: `tags` and `whitelist` add, `blacklist` subtracts, so `blacklist` must come last and an omitted or empty `filter` lets everything through.
 - A ruleset or fragment an agent references must itself survive the project's `rulesets` / `fragments` filter, otherwise that agent fails to export.
 - `deploy.mcps` selects the MCP servers of `07_mcp/` that are merged into the MCP config file of each tool. MCP servers are opt-in: omitting the block selects no server, unlike every other kind; `mcps: {}` selects every server. See [07_mcp/README.md](../07_mcp/README.md).
+- A selected stdio server with a secret not declared `from: environment` is, on a machine whose `secrets_manager` is `libsecret`, written to start `scripts/mcp-launch` by the absolute path of the ai-tools checkout the run starts from, so every project deployed with it depends on that checkout staying in place. See [How a stdio server gets its secrets](../07_mcp/README.md#how-a-stdio-server-gets-its-secrets).
 - `deploy.mcps.tools` allows and denies single tools of a selected server: Codex gets both lists in its server table, Claude Code only `deny`, as `permissions.deny` entries in `.claude/settings.json`; `allow` is reported as skipped for Claude Code. See [Allowing and denying tools](../07_mcp/README.md#allowing-and-denying-tools).
 - The engine records the MCP entries it wrote, with a fingerprint of each, in `.ai-tools/mcp-ledger.json` of the project. A later deploy removes the recorded entries the project no longer selects: while the project selects servers, an entry named after a manifest whatever it holds; when it selects none, for example once its `mcps` block is gone, or when an entry's manifest no longer exists, only an entry that still holds what the engine wrote, and a changed one is kept with a warning. Two deployments of one run whose `mcps` blocks write the same MCP file both fail for that file. Without a ledger, a project that selects no server reads and writes no MCP config file. Add `.ai-tools/` to the `.gitignore` of the project. See [The ledger](../07_mcp/README.md#the-ledger).
 - Every agent a project deploys must use only MCP servers the project selects; otherwise the project is not exported. See [Attaching servers to an agent](../07_mcp/README.md#attaching-servers-to-an-agent).

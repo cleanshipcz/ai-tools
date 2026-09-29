@@ -7,6 +7,7 @@ package cz.cleanship.aitools.engine.models
  *
  * @property transport how a tool starts or reaches the server
  * @property variables the variables the server needs, in the order they are rendered; a stdio server receives every one of them in its environment under its own name
+ * @property pointer whether the server is derived from the `server.json` of a pointer manifest, whose author can change only which package or remote `select` picks, which file `source` names, and the `env_vars` of the config files
  */
 data class McpServer(
     override val id: String,
@@ -14,6 +15,7 @@ data class McpServer(
     override val metadata: ManifestMetadata,
     val transport: McpServerTransport,
     val variables: List<McpVariable>,
+    val pointer: Boolean = false,
 ) : VersionedManifest
 
 /**

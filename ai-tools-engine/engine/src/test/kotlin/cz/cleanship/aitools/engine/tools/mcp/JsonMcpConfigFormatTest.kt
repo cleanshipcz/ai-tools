@@ -84,6 +84,18 @@ class JsonMcpConfigFormatTest {
         }
 
         @Test
+        fun `should write nothing for the variables a server reads from the environment of the tool, which Claude Code passes on`() {
+            // given
+            val forwarding = stdioServer.copy(transport = (stdioServer.transport as ResolvedMcpTransport.Stdio).copy(forwarded = listOf("DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR")))
+
+            // when
+            val content = format.merge(null, listOf(forwarding), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).isEqualTo(format.merge(null, listOf(stdioServer), setOf("atlassian"), file)).doesNotContain("DBUS_SESSION_BUS_ADDRESS")
+        }
+
+        @Test
         fun `should leave out arguments and environment a server does not have`() {
             // given
             val bare =

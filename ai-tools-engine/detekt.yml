@@ -24,6 +24,17 @@ style:
     active: false
   UseCheckOrError: # does not work properly with ?: operator
     active: false
+  # tools (rendering for a tool) depends on services (loading and validating manifests); an import the other way, or from a package both depend on, would close a package cycle. Rules both sides apply live in launcher, env or models.
+  ForbiddenImport:
+    active: true
+    includes:
+      - '**/main/kotlin/cz/cleanship/aitools/engine/services/**'
+      - '**/main/kotlin/cz/cleanship/aitools/engine/models/**'
+      - '**/main/kotlin/cz/cleanship/aitools/engine/env/**'
+      - '**/main/kotlin/cz/cleanship/aitools/engine/io/**'
+      - '**/main/kotlin/cz/cleanship/aitools/engine/launcher/**'
+      - '**/main/kotlin/cz/cleanship/aitools/engine/process/**'
+    forbiddenPatterns: 'cz\.cleanship\.aitools\.engine\.tools(\..*)?'
 
 complexity:
   TooManyFunctions:

@@ -45,6 +45,8 @@ import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
 import cz.cleanship.aitools.engine.tools.adapters.github.GitHubCopilotAdapter
 import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileException
+import cz.cleanship.aitools.engine.tools.mcp.McpSecretDelivery
+import cz.cleanship.aitools.engine.tools.mcp.McpSecretsManager
 import cz.cleanship.aitools.engine.tools.mcp.McpServerResolver
 import cz.cleanship.aitools.engine.tools.mcp.McpServerResolvingException
 import cz.cleanship.aitools.engine.tools.narrowedTo
@@ -64,6 +66,7 @@ import java.nio.file.FileSystemException
  * @param loaderService reads the manifests of the run. The default one substitutes the `source` of a skill and of an MCP server with [variables].
  * @param userHome the home directory a [UserDeploymentManifest] is deployed under, from which each adapter derives the per-user location of its own tool - `<home>/.claude`, `<home>/.codex`. A leading `~` of a declared path - a `source`, the command of a stdio MCP server - stands for the real home of the user running the engine instead, whatever this is. It defaults to the home of the user running the engine, which is the only home a deploy is ever meant to reach; a test overrides it so that it writes into a directory of its own instead.
  * @param dryRun whether this run validates without deploying: everything is loaded, filtered and rendered as in a deploy and every failure is reported the same way, but nothing on disk is created, deleted or modified. The flag covers what the engine itself decides - the deletions of a replacing deploy, and how the run is announced - while the writes of the adapters are covered by the sink they were built with, so the [tools] of a dry run have to be built for one too - see [cz.cleanship.aitools.engine.tools.ToolFactory.create].
+ * @param secretsManager the secrets manager of the machine, which supplies the secrets of a stdio MCP server that its manifest does not declare `from: environment` - see [McpSecretDelivery] - or `null` to read every secret from the environment of the tool. The default is `null`, which is what an engine built without a config sees; a run started from the config files uses the one they name - see [cz.cleanship.aitools.engine.tools.mcp.managerFor].
  */
 // Every parameter is either a collaborator or a setting of the run with a default, and the engine is composed in one place; folding the settings into an object of their own would trade one count for an indirection on every construction site.
 @Suppress("LongParameterList")
@@ -83,13 +86,14 @@ class ToolsEngine(
         CursorAdapter(),
     ),
     private val dryRun: Boolean = false,
+    private val secretsManager: McpSecretsManager? = null,
 ) {
 
     private val telemetry = Telemetry.create(TelemetryConfig.fromEnvironment())
 
     private val skillSourceOverlapCheck = SkillSourceOverlapCheck(filterService, tools, userHome)
 
-    private val mcpServerResolver = McpServerResolver(variables)
+    private val mcpServerResolver = McpServerResolver(variables, McpSecretDelivery(secretsManager, variables))
 
     // The lines announcing a write before it happens are the ones a dry run would turn into a lie, so their verbs are chosen once here: a dry run then reads as the plan it is, not as a report of writes that never took place.
     private val replacing = if (dryRun) "Would replace" else "Replacing"

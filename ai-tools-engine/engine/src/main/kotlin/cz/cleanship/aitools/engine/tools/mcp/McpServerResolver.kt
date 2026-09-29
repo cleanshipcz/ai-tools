@@ -7,45 +7,37 @@ import cz.cleanship.aitools.engine.models.McpServerTransport
 import cz.cleanship.aitools.engine.models.McpText
 import cz.cleanship.aitools.engine.models.McpTextPart
 import cz.cleanship.aitools.engine.models.McpVariable
+import cz.cleanship.aitools.engine.services.POINTER_CHOICES
+import cz.cleanship.aitools.engine.services.POINTER_REMEDY
 import cz.cleanship.aitools.engine.services.isHttps
 import cz.cleanship.aitools.engine.services.urlProblem
-import org.slf4j.LoggerFactory
 
 /**
  * Turns a loaded [McpServer] into the [ResolvedMcpServer] every MCP config file renders.
  *
  * @param variables where the value of a plain variable is read - the `env_vars` of the config files of the run, and never its environment - and where a secret one is checked for without being read
+ * @param delivery how the secrets of a resolved server reach it when a tool starts it, and where each is reported found; the default uses no secrets manager, so every secret is read from the environment of the tool
  */
 class McpServerResolver(
     private val variables: VariableResolver,
+    private val delivery: McpSecretDelivery = McpSecretDelivery(manager = null, variables = variables),
 ) {
 
     /**
-     * Returns [server] with every reference to a plain variable replaced by its value from the `env_vars` of the config files, and every secret variable kept as [McpValue.Secret] or [McpValue.BearerSecret], never read.
+     * Returns [server] with every reference to a plain variable replaced by its value from the `env_vars` of the config files, and every secret variable kept as [McpValue.Secret] or [McpValue.BearerSecret], never read, then handed to [delivery] - see [McpSecretDelivery.deliver].
      *
-     * A stdio server receives every declared variable in its environment after its fixed `env` entries. An optional plain variable the config does not declare is left out, and so is an `env` entry or header that references it. A secret variable the environment of the run does not carry is logged as a warning naming it, never its value. No message names a value.
+     * A stdio server receives every declared variable in its environment after its fixed `env` entries. An optional plain variable the config does not declare is left out, and so is an `env` entry or header that references it. Where each secret variable is found is logged first - see [McpSecretDelivery.report]. No message names a value.
      *
-     * @throws McpServerResolvingException naming the server and the variable if a required plain variable is not declared by the config; if an optional one that is not is part of an argument or the url, which cannot be left out; if a plain value holds `${`, which a tool would expand; if the resolved `url` does not start with `http://` or `https://` and a host, holds a backslash, carries credentials, or is not https while a header is secret; or if a secret variable is referenced anywhere a tool would need its value written, which a server returned by [cz.cleanship.aitools.engine.services.LoaderService.loadMcpServer] never does
+     * @throws McpServerResolvingException naming the server and the variable if a required plain variable is not declared by the config; if an optional one that is not is part of an argument or the url, which cannot be left out; if a plain value holds `${`, which a tool would expand; if the resolved `url` does not start with `http://` or `https://` and a host, holds a backslash, carries credentials, or is not https while a header is secret; if a secret variable is referenced anywhere a tool would need its value written, which a server returned by [cz.cleanship.aitools.engine.services.LoaderService.loadMcpServer] never does; or naming the server when the secrets manager of [delivery] cannot start it on this machine
      */
     fun resolve(server: McpServer): ResolvedMcpServer {
-        warnAboutUnsetSecrets(server)
+        delivery.report(server)
         val substitution = Substitution(server)
         val resolved = when (val transport = server.transport) {
             is McpServerTransport.Stdio -> substitution.stdio(transport)
             is McpServerTransport.Http -> substitution.http(transport)
         }
-        return ResolvedMcpServer(server.id, resolved)
-    }
-
-    private fun warnAboutUnsetSecrets(server: McpServer) {
-        server.variables.filter { it.secret && !variables.isSetInEnvironment(it.name) }.forEach {
-            LOG.warn(
-                "MCP server '{}' reads the {} secret variable '{}' from the environment of the tool that starts it, and the environment of this run does not set it. Export it before starting the tool.",
-                server.id,
-                if (it.required) "required" else "optional",
-                it.name,
-            )
-        }
+        return delivery.deliver(server, ResolvedMcpServer(server.id, resolved))
     }
 
     /**
@@ -86,10 +78,10 @@ class McpServerResolver(
         }
 
         /**
-         * Returns the one remedy of a refused url: a value in `env_vars` for each of [urlVariables], or the url written in the manifest when it references none, starting with [form].
+         * Returns the one remedy of a refused url: a value in `env_vars` for each of [urlVariables], or, when it references none, the url written in the manifest starting with [form], or another package, remote or file for a pointer server.
          */
         private fun urlRemedy(urlVariables: List<String>, form: String): String = when (urlVariables.size) {
-            0 -> "Write a 'url' that starts with $form."
+            0 -> if (server.pointer) POINTER_REMEDY else "Write a 'url' that starts with $form."
             1 -> "Give '${urlVariables.single()}' a value in 'env_vars:' that makes the url start with $form."
             else -> "Give ${urlVariables.joinToString { "'$it'" }} values in 'env_vars:' that make the url start with $form."
         }
@@ -132,6 +124,16 @@ class McpServerResolver(
             throw McpServerResolvingException(server.id, problem)
         }
 
+        // A pointer manifest declares no variables, so it can neither mark one 'required: false' nor 'secret: true'.
+        private fun requiredRemedy(): String = if (server.pointer) {
+            "Declare it under 'env_vars:' of config.yml or config.local.yml, select $POINTER_CHOICES."
+        } else {
+            "Declare it, mark it 'required: false', or mark it 'secret: true' to ${secretRemedy()}."
+        }
+
+        private fun secretRemedy(): String = delivery.defaultManagerLabel(server)?.let { "have the tool start the server with it from $it, or from the environment of the tool when $it does not hold it" }
+            ?: "pass it from the environment of the tool"
+
         /**
          * Returns the value the config declares for the plain [variable] used in [place], or `null` when it declares none, the variable is optional and [omissible] allows leaving it out.
          */
@@ -143,7 +145,7 @@ class McpServerResolver(
                 value != null -> return value
                 variable.required ->
                     "MCP server '${server.id}' needs the variable '${variable.name}' for $place, which 'env_vars:' of config.yml and config.local.yml do not declare. " +
-                        "Plain variables are read from there only, never from the environment of the run. Declare it, mark it 'required: false', or mark it 'secret: true' to pass it from the environment of the tool."
+                        "Plain variables are read from there only, never from the environment of the run. " + requiredRemedy()
                 omissible -> return null
                 else ->
                     "MCP server '${server.id}' uses the optional variable '${variable.name}' in $place, which 'env_vars:' of config.yml and config.local.yml do not declare, and $place cannot be left out. " +
@@ -151,10 +153,6 @@ class McpServerResolver(
             }
             throw McpServerResolvingException(server.id, problem)
         }
-    }
-
-    companion object {
-        private val LOG = LoggerFactory.getLogger(McpServerResolver::class.java)
     }
 }
 

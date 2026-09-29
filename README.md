@@ -22,6 +22,7 @@ See [Not Yet Implemented](#not-yet-implemented) before looking for them.
 - Node/npm only if you want to build the optional `:server` module, whose frontend is built with Vite
 - A checkout of the `jira-confluence-mcp-server` repository, by default at `~/Documents/Projects/jira-confluence-mcp-server`. The pointer skills `jira-ticket`, `confluence-doc`, and `confluence-search` are read from its `skills/` folder, found through `${PROJECTS_FOLDER}/jira-confluence-mcp-server/skills/<id>`, and every run loads every skill manifest. Without the checkout, every run fails, `./deploy.sh --dry-run` included. If your checkout sits elsewhere, link it into `${PROJECTS_FOLDER}`, for example `ln -s <your checkout> ~/Documents/Projects/jira-confluence-mcp-server`. You can instead set `PROJECTS_FOLDER` under `env_vars` in `config.local.yml` to the folder that holds it, but every `deploy.directory` that uses `${PROJECTS_FOLDER}` then moves with it, and a deployment with `replace: true` deletes its tool folders at the new location; do that only when your projects live in that folder too. See [Path variables](#path-variables) and [04_skills/README.md](04_skills/README.md#pointer-skill).
 - A checkout of the `github/github-mcp-server` repository at `~/Documents/Projects/github-mcp-server`, found through `${PROJECTS_FOLDER}/github-mcp-server`. The MCP server manifest `07_mcp/github.yml` reads its `server.json`, and every run loads every MCP server manifest, so without the checkout every run fails, `./deploy.sh --dry-run` included. See [07_mcp/README.md](07_mcp/README.md).
+- For the secrets of stdio MCP servers: `secret-tool` (Ubuntu and Debian package `libsecret-tools`), a keyring daemon such as `gnome-keyring-daemon`, GNU coreutils for `timeout` and `env`, and a `/bin/sh` that is dash or bash, not BusyBox. Without `secret-tool` or a keyring daemon, a run still succeeds with warnings, and the servers read their secrets from the environment of the tool. `busctl` of systemd is needed only for the check a run makes; without it, the check reports that it cannot tell whether a secret is stored. `secrets_manager: environment` in `config.local.yml` turns the keyring off and stops the keyring warnings; a secret the environment of the run does not set is still warned about. See [First steps: keep a token in the keyring](07_mcp/README.md#first-steps-keep-a-token-in-the-keyring).
 
 ## Repository Layout
 - `01_rulesets/` – reusable rule sets, referenced by regex on their `id`
@@ -31,6 +32,7 @@ See [Not Yet Implemented](#not-yet-implemented) before looking for them.
 - `05_agents/` – agent manifests
 - `07_mcp/` – MCP server manifests, declared inline or as a pointer with `source` at a `server.json` outside this repository (see [07_mcp/README.md](07_mcp/README.md))
 - `09_deployments/` – deployment manifests, each a directory containing a `project.yml` (deploys into a project directory) or a `user.yml` (deploys into the user scope of a tool), plus an optional `features/`
+- `scripts/mcp-launch` – the launcher that starts a stdio MCP server with its secrets read from the keyring; hand-written and executable, and deployed MCP config files reference it by its absolute path, so it must stay where it is (see [07_mcp/README.md](07_mcp/README.md#how-a-stdio-server-gets-its-secrets))
 - `ai-tools-engine/` – the Kotlin build engine (Gradle multi-module: `:engine`, `:cli`, `:server`, `:telemetry`)
 - `90_docs/` – reference documentation
 - `91_examples/` – worked examples
@@ -140,7 +142,8 @@ A replacing deploy never deletes an MCP config file; the engine owns only the se
 Claude clears `.claude/` as a whole, so a replacing deploy does delete `.claude/settings.json`, entries written by hand included.
 
 MCP servers are opt-in: a project selects them with a `deploy.mcps` block, and a project without one gets none.
-The selected servers land in `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, and `.codex/config.toml`, with every secret written as a reference the tool resolves from its own environment.
+The selected servers land in `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, and `.codex/config.toml`, and none of these files holds the value of a secret.
+A stdio server with a secret not declared `from: environment` is started through the launcher `scripts/mcp-launch`, on a machine whose `secrets_manager` is `libsecret`, the default. The launcher reads the secret from the libsecret keyring and falls back to the environment of the tool. A remote server reads its secrets from the environment of the tool. See [How a stdio server gets its secrets](07_mcp/README.md#how-a-stdio-server-gets-its-secrets).
 The engine records the entries it wrote, with a fingerprint of each, in `.ai-tools/mcp-ledger.json` of the project, so a later deploy removes the ones the project no longer selects. While the project selects servers, an entry named after a manifest is removed whatever it holds. When it selects none, for example after its `mcps` block was removed, or when the manifest of an entry no longer exists, an entry is removed only while it holds what the engine wrote, and is otherwise kept with a warning. Add `.ai-tools/` to the `.gitignore` of the project.
 Two deployments of one run whose `mcps` blocks write the same MCP file both fail for that file.
 The block can also restrict single tools of a server (Codex applies `allow` and `deny`, Claude Code only `deny`), and an agent can name the servers it uses — see [07_mcp/README.md](07_mcp/README.md).
@@ -311,6 +314,7 @@ The engine reads `config.yml` from the directory given by `--working-dir` — th
 Merging happens per individual key: each of the seven entries under `locations`, and the `tools` list, is replaced wholesale when present in `config.local.yml`.
 Lists are never appended to, so a local `deployments:` list must repeat any default entry you still want.
 The `env_vars` map is the exception — it merges per variable, so a local declaration overrides that one variable and leaves the rest of the shared map in place.
+The optional top-level `secrets_manager` names where stdio MCP servers read their secrets: `libsecret`, the default, or `environment`; `config.local.yml` wins over `config.yml`. See [The `secrets_manager` setting](07_mcp/README.md#the-secrets_manager-setting).
 
 ```yaml
 locations:
@@ -385,7 +389,7 @@ The CLI accepts no subcommands, so there is no command to run for any of them:
 - `diff` and `clean` utilities
 - MCP server configuration for `windsurf` and `antigravity`, and in the user scope of `github_copilot` and `cursor`
 - Attaching MCP servers to an agent in `github_copilot`, `codex`, `cursor`, `windsurf`, and `antigravity`, allow and deny lists for the tools of a server in `github_copilot` and `cursor`, and an `allow` list in `claude`
-- A secrets manager as the source of secret MCP variables — today a secret comes only from the environment of the tool
+- Secrets managers other than libsecret for secret MCP variables, and reading the secrets of a remote MCP server from the keyring — a remote server reads its secrets from the environment of the tool
 - User-scope deployment for `windsurf`, `antigravity`, `github_copilot`, and `cursor` — a `user.yml` deploys through `claude` and `codex` only, and names the tools it skipped
 - A ledger of the artifacts a deploy wrote, and with it the removal of artifacts a manifest no longer selects — see [User-Scope Deployments](#user-scope-deployments). The MCP ledger covers MCP server entries and the `deny` entries of tool restrictions only
 - Deploy backups and auto-commit

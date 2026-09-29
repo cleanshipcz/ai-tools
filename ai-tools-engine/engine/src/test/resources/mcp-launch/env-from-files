@@ -1,0 +1,23 @@
+#!/bin/sh
+# Test helper: replaces itself with a program whose environment is given, byte for byte, by the files of a directory, and by nothing else.
+# Usage: env-from-files <directory> <program> [<argument>...]
+# Each file name is a variable name and the file content is its value. The JVM would encode environment strings with its platform charset, which this avoids.
+# The test installs it with @TOOLS@ replaced by a directory holding cat and env.
+# env builds the environment, not this shell: a shell cannot export a name it treats as read-only (SHELLOPTS under bash) or a name that is not a shell name (BASH_FUNC_printf%%), and tests need both.
+set -eu
+directory=$1
+shift
+count=$#
+for file in "$directory"/*; do
+    [ -f "$file" ] || continue
+    # The trailing "/" keeps trailing newlines of the value, which command substitution would remove.
+    value=$('@TOOLS@/cat' "$file"; printf /)
+    set -- "$@" "${file##*/}=${value%/}"
+done
+# Moves the program and its arguments behind the assignments: env -i NAME=value... <program> [<argument>...]
+while [ "$count" -gt 0 ]; do
+    set -- "$@" "$1"
+    shift
+    count=$((count - 1))
+done
+exec '@TOOLS@/env' -i "$@"

@@ -17,9 +17,9 @@ import cz.cleanship.aitools.engine.env.VariableSubstitutionException
 import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
 import cz.cleanship.aitools.engine.services.ArtifactWriteException
+import cz.cleanship.aitools.engine.services.ConfigFileException
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
-import cz.cleanship.aitools.engine.services.RetiredConfigKeyException
 import cz.cleanship.aitools.engine.services.UnknownMcpServersException
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -81,7 +81,7 @@ class AiToolsCli(
             throw failure(ex.message, ex)
         } catch (ex: ArtifactPathException) {
             throw failure(ex.message, ex)
-        } catch (ex: RetiredConfigKeyException) {
+        } catch (ex: ConfigFileException) {
             throw failure(ex.message, ex)
         } catch (ex: UnreadableReplacedFolderException) {
             throw failure(ex.message, ex)

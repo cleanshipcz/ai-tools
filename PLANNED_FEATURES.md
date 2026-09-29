@@ -45,6 +45,8 @@
   - **Tool allow and deny lists** per server under `mcps.tools`: Codex `enabled_tools` / `disabled_tools`, Claude Code `permissions.deny` only. Deny entries written by hand are never taken over. GitHub Copilot and Cursor are reported as skipped, and so is `allow` for Claude Code.
   - **Every tool directory and its fixed subdirectories are checked** in a dry run as in a deploy: a link leading nowhere or in a loop, something that is not a directory, or in a project a link leading outside it, fails only that deployment and tool. A user-scope write failure fails only that deployment and tool.
   - **Hostile files.** Raw control characters in JSON strings and nesting deeper than 512 levels are refused, and names read from files or manifests are escaped and cut to 160 characters in messages. Control characters, line and paragraph separators, and Unicode format characters (category `Cf`, such as the bidirectional override U+202E) are escaped as `\uXXXX`, and refused in ledger paths and entry names.
+- **DONE** Run 3: see [07_mcp/README.md](07_mcp/README.md#secret-and-plain-variables).
+  - **The libsecret keyring as the default source of secret values**, with the environment of the tool as the fallback. A secret variable declares `from: manager`, the default, or `from: environment`; `secrets_manager: libsecret | environment` in `config.yml` or `config.local.yml` names the manager of the machine. A stdio server with a keyring secret is started through the launcher `scripts/mcp-launch`, which reads each secret when the server starts and then replaces itself with the server, so no MCP config file or argument list holds the value of a secret, and no message of the launcher holds a value. The launcher starts its helper programs only from absolute directories of the `PATH`, gives `timeout` and `secret-tool` only the bus variables and `HOME`, gives no helper the value of a secret, and gives one lookup at most 6 seconds. The names the launcher refuses are in two classes. A class A name, one that changes how the launcher's shell or its helpers run or that a shell sets or prints itself, fails loading in every role of a server started through the launcher. A class B name fails loading as a keyring secret and as any name of a `server.json`. The engine gives a tool the launcher only while it is a regular, executable file inside the checkout, owned by the user running the engine and writable by no one else, in directories up to the root of the checkout that meet the same two conditions. The Codex entry forwards `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR` by name. Every run reports each secret the launcher reads as stored, set only in the environment, found nowhere, or not known with the reason, without receiving a value. An unknown key of `config.yml` or `config.local.yml` is reported as a warning. Remote servers keep reading the environment of the tool.
 
 ### Open items of run 2
 
@@ -56,7 +58,7 @@
 - **A version 1 ledger is refused** until it is removed by hand. After that, the entries it recorded count as foreign, so a `permissions.allow` entry written by an earlier version of the engine stays in `settings.json` until it is removed by hand. No such ledger exists in this repository.
 - **A `mcpServers` key the engine added** stays as `{}` once its last entry is removed; the engine cannot tell that it created the key.
 
-### Run 3
+### Open after run 3
 
 - **A ledger nobody else can plant.** A ledger written into a project or home by anyone other than the user running the engine cannot make a deploy remove any entry. Today a fingerprint is not a secret, so such a ledger can claim an entry whose exact content it knows; every removal is logged.
 - **A bounded ledger entry.** A ledger entry never records more than the content before and after one edit.
@@ -65,10 +67,20 @@
 - **No stale ledger records.** A ledger never keeps, or logs, a record of a file that no tool of its target writes.
 - **Hand-made servers kept.** A server added by hand under the id of a manifest, such as one added with `claude mcp add --scope user github`, is reported instead of replaced or removed.
 - **Engine structure.** Ownership, ledger and claim rules behave the same for projects and user deployments, every MCP decision is made before anything is written, and every MCP failure is reported under one scheme, naming its deployment.
-- **A secrets manager as the default source of secret values**, with the shell environment as the fallback. Candidates are `pass`/gopass, 1Password `op`, Bitwarden `bws`, and libsecret. A manifest declares how each secret variable is obtained. A stdio server is launched through the manager, so no tool sees the value in a file. For a remote server, the tool itself is launched through the manager, and OAuth is preferred where the server supports it.
+- **Every class A name refused a second time.** A server that the loader did not build, and that is rendered to start through the launcher, is refused when it has a class A name in any role: a secret read from the environment, a plain variable or an `env` key, as a server loaded from a manifest is.
+- **Launcher tests without `/proc`.** The tests of the launcher run, and check the exact environment of each program it starts, on a machine without `/proc`, such as macOS, instead of being skipped.
+- **Further secrets managers.** `pass` and 1Password can be named in `secrets_manager`, and a stdio server reads its secrets from them as it does from the keyring, without any change to the manifests.
+- **The keyring under Claude Code with a reduced environment.** A stdio server started by Claude Code with `CLAUDE_CODE_MCP_ALLOWLIST_ENV` set reads its secrets from the keyring, as it does in every other case.
 
 ### Not scheduled
 
+- **A start script for tools, for remote servers.** A tool is started with the secrets of its remote servers read from the keyring, so no value has to be exported; OAuth is used instead where the server supports it.
+- **A one-line error for a manifest that fails strict decoding.** An unknown key or an unknown value, such as `from: vault`, ends the run with one line naming the file and the field, not with a stack trace.
+- **A launcher that does not depend on one secrets manager.** The launcher reads a secret from whichever secrets manager the machine names, so a new manager needs no launcher of its own.
+- **One owner of what the check remembers.** Within one run, every part of the engine gets the same answer about a secret from one place, rather than from memories kept by several parts.
+- **No `${` formed by joining text.** A resolved argument, environment value, header or url whose joined text holds `${` fails, naming the server and the place, never the value.
+- **A decision on a launcher writable by a private group.** It is settled whether the engine accepts a launcher that its group may write when that group holds only the user running the engine, as after a checkout with the umask `002`.
+- **BusyBox as `/bin/sh`.** The launcher starts where `/bin/sh` is BusyBox, as on Alpine Linux, with the same protection against the inherited environment that it has under dash and bash.
 - **Tool allow and deny lists for Cursor and GitHub Copilot.** Cursor has `mcpAllowlist` in `permissions.json`, which controls auto-run rather than access; no file-level mechanism of VS Code is confirmed.
 - **Per-agent MCP servers for Codex**, through a custom agent TOML with `mcp_servers` instead of the skill the engine renders today.
 - **A `/manifests-create-mcp` prompt** that scaffolds an MCP server manifest from `McpServerManifest.kt`.

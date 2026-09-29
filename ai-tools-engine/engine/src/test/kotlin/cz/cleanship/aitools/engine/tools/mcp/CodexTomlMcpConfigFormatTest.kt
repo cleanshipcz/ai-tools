@@ -74,6 +74,35 @@ class CodexTomlMcpConfigFormatTest {
         }
 
         @Test
+        fun `should forward the variables a server reads from the environment of the tool by name after its secrets, never with a value`() {
+            // given
+            // - Codex clears the environment of a server, so every such variable must be listed; one named twice is listed once
+            val forwarding = stdioServer.copy(
+                transport = (stdioServer.transport as ResolvedMcpTransport.Stdio).copy(forwarded = listOf("DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "JIRA_PAT")),
+            )
+
+            // when
+            val content = format.merge(null, listOf(forwarding), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).contains("env_vars = [\"JIRA_PAT\", \"CONFLUENCE_PAT\", \"DBUS_SESSION_BUS_ADDRESS\", \"XDG_RUNTIME_DIR\"]\n")
+            assertThat(Toml.parse(content).getTable("mcp_servers.atlassian.env")?.keySet()).containsExactly("JIRA_BASE_URL")
+        }
+
+        @Test
+        fun `should forward the variables a server reads from the environment of the tool even when it has no secret`() {
+            // given
+            val forwarding =
+                ResolvedMcpServer("bare", ResolvedMcpTransport.Stdio(command = "server", args = emptyList(), env = emptyMap(), forwarded = listOf("XDG_RUNTIME_DIR")))
+
+            // when
+            val content = format.merge(null, listOf(forwarding), setOf("bare"), file)
+
+            // then
+            assertThat(content).isEqualTo("[mcp_servers.bare]\ncommand = \"server\"\nenv_vars = [\"XDG_RUNTIME_DIR\"]\n")
+        }
+
+        @Test
         fun `should write the allowed and denied tools of a server as its enabled and disabled tools, before its sub-tables`() {
             // given
             val restricted = httpServer.copy(tools = McpToolRestriction(allow = listOf("get_me", "search_code"), deny = listOf("delete_repository")))

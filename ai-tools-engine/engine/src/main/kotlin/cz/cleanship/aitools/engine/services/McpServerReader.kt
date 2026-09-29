@@ -1,11 +1,13 @@
 package cz.cleanship.aitools.engine.services
 
+import cz.cleanship.aitools.engine.env.ENVIRONMENT_VARIABLE_NAME
 import cz.cleanship.aitools.engine.env.UnexpandedReferenceException
 import cz.cleanship.aitools.engine.env.UnresolvedVariableException
 import cz.cleanship.aitools.engine.env.VARIABLE_REFERENCE
 import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.env.VariableSubstitutionException
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
+import cz.cleanship.aitools.engine.launcher.McpLauncherContract
 import cz.cleanship.aitools.engine.models.McpHeader
 import cz.cleanship.aitools.engine.models.McpServer
 import cz.cleanship.aitools.engine.models.McpServerManifest
@@ -107,7 +109,7 @@ class McpServerReader(
             is Candidate.Remote -> derivation.http(candidate.value, candidate.label)
         }
         val server =
-            McpServer(manifest.id, serverJson.description, manifest.metadata, transport, derivation.variables.values.toList())
+            McpServer(manifest.id, serverJson.description, manifest.metadata, transport, derivation.variables.values.toList(), pointer = true)
         logForwardedNames(server, serverFile)
         return server
     }
@@ -286,11 +288,11 @@ class McpServerReader(
         }
 
         private fun runtimeArgument(pkg: PackageJson, argument: ArgumentJson): List<McpText> {
-            val forwarded = argument.value?.takeIf { pkg.registryType == PackageRegistry.OCI.registryType && argument.type == NAMED && argument.name == "-e" && ENVIRONMENT_NAME.matches(it) }
+            val forwarded = argument.value?.takeIf { pkg.registryType == PackageRegistry.OCI.registryType && argument.type == NAMED && argument.name == "-e" && ENVIRONMENT_VARIABLE_NAME.matches(it) }
                 ?: fail(
                     "The package '${pkg.identifier}' declares the runtime argument '${argument.name ?: argument.valueHint ?: argument.type}'. The engine accepts runtime arguments only for an oci package, and only '-e NAME', which forwards one environment variable into the container.",
                 )
-            requireAllowedName(forwarded)
+            requireAllowedName(forwarded, derivedFromId = false)
             add(McpVariable(forwarded, argument.description.orEmpty(), argument.isSecret, argument.isRequired))
             return listOf(McpText.literal("-e"), McpText.literal(forwarded))
         }
@@ -319,7 +321,7 @@ class McpServerReader(
         }
 
         private fun environmentVariable(input: KeyValueInputJson, env: MutableMap<String, McpText>) {
-            requireAllowedName(input.name)
+            requireAllowedName(input.name, derivedFromId = false)
             val single = input.value
                 ?.let { PLACEHOLDER.matchEntire(it) }
                 ?.groupValues
@@ -390,12 +392,21 @@ class McpServerReader(
         }
 
         /**
-         * Refuses an environment variable name that configures the runner, the loader or the connection of the process a tool starts - see [DENIED_ENVIRONMENT].
+         * Refuses an environment variable name the launcher refuses as a secret name, of either class - see [McpLauncherContract.refusedNameOf] - which covers every name that configures a shell, the launcher and its helpers, the runner, the loader, an interpreter or the connection of the process a tool starts.
+         *
+         * @param derivedFromId whether [name] was built from the manifest id, which renaming the id changes
          */
-        private fun requireAllowedName(name: String) {
-            if (DENIED_ENVIRONMENT.any { it.matches(name) }) {
-                fail("It sets, forwards or derives the environment variable '$name', which configures the runner, the loader or the connection of the process a tool starts, so the engine refuses it.")
-            }
+        // Both classes, for every name a server.json contributes, secret or not: the file is not written by the owner of the repository, and a name of class B still lets it change what the runtime of the server loads or where it connects, such as NODE_OPTIONS or HTTPS_PROXY.
+        private fun requireAllowedName(name: String, derivedFromId: Boolean) {
+            val pattern = McpLauncherContract.refusedPatternOf(name) ?: return
+            fail(
+                "It sets, forwards or derives the environment variable '$name', which matches '$pattern' of the names the engine refuses in a $SERVER_FILE without regard to case: ${McpLauncherContract.REFUSAL_REASON}. " +
+                    if (derivedFromId) {
+                        "Select another package or remote of that file with 'select:', if it declares one, point 'source' at another $SERVER_FILE, or rename the manifest id, which the name is derived from."
+                    } else {
+                        "Select another package or remote of that file with 'select:', if it declares one, or point 'source' at another $SERVER_FILE."
+                    },
+            )
         }
 
         /**
@@ -404,7 +415,7 @@ class McpServerReader(
         private fun prefixed(key: String): String {
             val name = "${serverId}_$key".uppercase().replace(NOT_IN_NAME, "_")
             // The id alone is the repository's, but together with a key of the file it can spell a name such as GIT_SSH_COMMAND, and every variable of a stdio server reaches its environment.
-            return (if (name.first().isDigit()) "_$name" else name).also(::requireAllowedName)
+            return (if (name.first().isDigit()) "_$name" else name).also { requireAllowedName(it, derivedFromId = true) }
         }
 
         private fun fail(problem: String): Nothing = throw InvalidMcpServerSourceException("'${serverFile.absolutePath}': $problem")
@@ -435,40 +446,6 @@ class McpServerReader(
         private const val POSITIONAL = "positional"
 
         /**
-         * Environment variable names a `server.json` may not set, forward or derive, matched without regard to case: they configure docker or podman, npm, Node.js, uv, pip, Python, the dynamic loader, glibc, git, TLS or proxies, or the paths and configuration directories a process runs with.
-         */
-        private val DENIED_ENVIRONMENT = listOf(
-            "DOCKER_.*",
-            "NPM_.*",
-            "NODE_.*",
-            "UV_.*",
-            "PIP_.*",
-            "PYTHON.*",
-            "LD_.*",
-            "DYLD_.*",
-            "GIT_.*",
-            "SSL_.*",
-            ".*_PROXY",
-            "PATH",
-            "HOME",
-            "TMPDIR",
-            "TMP",
-            "TEMP",
-            "SHELL",
-            "BASH_ENV",
-            "ENV",
-            "REQUESTS_CA_BUNDLE",
-            "CURL_CA_BUNDLE",
-            "XDG_.*",
-            "CONTAINER_.*",
-            "CONTAINERS_.*",
-            "GCONV_PATH",
-            "HOSTALIASES",
-            "LOCALDOMAIN",
-            "RES_OPTIONS",
-        ).map { Regex(it, RegexOption.IGNORE_CASE) }
-
-        /**
          * Header names a `server.json` may not send, matched without regard to case: hop-by-hop headers, and headers that override the host, the client address, the method or authentication other than `Authorization`.
          */
         private val DENIED_HEADERS = listOf(
@@ -492,7 +469,6 @@ class McpServerReader(
         ).map { Regex(it, RegexOption.IGNORE_CASE) }
         private val PLACEHOLDER = Regex("""\{([^{}]+)}""")
         private val NOT_IN_NAME = Regex("[^A-Z0-9_]")
-        private val ENVIRONMENT_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
         private val LOG = LoggerFactory.getLogger(McpServerReader::class.java)
 

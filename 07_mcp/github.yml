@@ -1,17 +1,19 @@
 id: github
 # A pointer: description, transport, and variables come from the server.json of the github/github-mcp-server checkout.
 # The remote Streamable HTTP endpoint is selected rather than the OCI package. The remote's only variable is the Authorization header, which every tool can fill from the environment. The package passes its token as the runtime argument -e GITHUB_PERSONAL_ACCESS_TOKEN={token}, which loading refuses because only -e NAME is accepted.
-# The header becomes the secret variable GITHUB_AUTHORIZATION; export it as "Bearer <token>" before starting a tool.
+# The header becomes the secret variable GITHUB_AUTHORIZATION.
+# This manifest selects the remote variant. A tool connects to a remote server itself, so neither the launcher scripts/mcp-launch nor the keyring is used, and every entry keeps the environment reference.
+# So the value "Bearer <token>" must be in the environment of the tool when it starts. 07_mcp/README.md, "Remote servers", shows how to take it from the keyring for a single start of the tool.
 source: ${PROJECTS_FOLDER}/github-mcp-server
 select:
   remote: https://api.githubcopilot.com/mcp/
 # The SHA-256 hash of that server.json: loading fails when the checkout changes it, until the change is reviewed and the pin updated.
 pin: sha256:38d2395945342d544b57055e46d5faaae01f51cb4304bbd5182ec60489c33372
 metadata:
-  version: 1.1.0
+  version: 1.1.1
   author: cleanshipcz
   created: 2026-09-24
-  updated: 2026-09-25
+  updated: 2026-09-29
   tags:
     - ai-tools
     - github

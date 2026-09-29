@@ -14,6 +14,8 @@ import java.io.File
 /**
  * An MCP config file in JSON, holding one object of server entries under [serversKey].
  *
+ * Nothing is written for the [ResolvedMcpTransport.Stdio.forwarded] names of a server.
+ *
  * The file is parsed strictly, so a file holding comments, trailing commas or a duplicate key is refused rather than rewritten without them, and every result is parsed again and compared with the file before it is returned. A format that keeps the layout edits the server entries in place and keeps every byte outside the owned entries; any other format writes the file again as a whole, so every entry and every other key survives, in its order, while the layout of the file is normalized.
  */
 class JsonMcpConfigFormat private constructor(
@@ -94,6 +96,7 @@ class JsonMcpConfigFormat private constructor(
         else -> throw McpConfigFileException("'${file.absolutePath}' holds a '$serversKey' that is not a JSON object, so the engine leaves it untouched. Fix the file or remove it, and deploy again.")
     }
 
+    // The forwarded names of a stdio server are left out: Claude Code, VS Code and Cursor pass their own environment to it (Claude Code a reduced one when CLAUDE_CODE_MCP_ALLOWLIST_ENV is set), and none of them can forward a variable by name without holding a reference to it.
     private fun render(server: ResolvedMcpServer): JsonObject = when (val transport = server.transport) {
         is ResolvedMcpTransport.Stdio -> buildJsonObject {
             put("type", "stdio")

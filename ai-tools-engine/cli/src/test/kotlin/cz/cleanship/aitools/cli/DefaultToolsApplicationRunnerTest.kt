@@ -3,6 +3,7 @@ package cz.cleanship.aitools.cli
 import cz.cleanship.aitools.engine.env.VariableResolver
 import cz.cleanship.aitools.engine.models.EngineConfig
 import cz.cleanship.aitools.engine.models.Locations
+import cz.cleanship.aitools.engine.models.SecretsManagerKind
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.services.ConfigService
 import cz.cleanship.aitools.engine.tools.ToolAdapter
@@ -68,7 +69,7 @@ class DefaultToolsApplicationRunnerTest {
             every { toolAdapterFactory.create(ToolType.CLAUDE, dryRun = false) } returns claudeAdapter
             every { toolAdapterFactory.create(ToolType.CODEX, dryRun = false) } returns codexAdapter
             every {
-                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome, dryRun = false)
+                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome, dryRun = false, secretsManager = SecretsManagerKind.LIBSECRET)
             } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
@@ -81,7 +82,7 @@ class DefaultToolsApplicationRunnerTest {
             verify(exactly = 1) { toolAdapterFactory.create(ToolType.CODEX, dryRun = false) }
             // - the home of the run reaches the engine, which is what the adapters derive their user scope from
             verify(exactly = 1) {
-                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome, dryRun = false)
+                engineFactory.create(listOf(claudeAdapter, codexAdapter), workingDirectory, variables, userHome, dryRun = false, secretsManager = SecretsManagerKind.LIBSECRET)
             }
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
@@ -106,7 +107,7 @@ class DefaultToolsApplicationRunnerTest {
 
             every { configService.loadConfig(workingDirectory) } returns config
             every { toolAdapterFactory.create(ToolType.CLAUDE, dryRun = true) } returns dryRunAdapter
-            every { engineFactory.create(listOf(dryRunAdapter), workingDirectory, variables, userHome, dryRun = true) } returns engineProcessor
+            every { engineFactory.create(listOf(dryRunAdapter), workingDirectory, variables, userHome, dryRun = true, secretsManager = SecretsManagerKind.LIBSECRET) } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
@@ -119,6 +120,37 @@ class DefaultToolsApplicationRunnerTest {
 
     @Nested
     inner class EdgeCases {
+
+        @Test
+        fun `should hand the engine the secrets manager the config names`() {
+            // given
+            // - a machine whose config.local.yml says it has no secrets manager
+            val workingDirectory = File("workspace")
+            val userHome = File("home")
+            val locations = Locations(
+                agents = emptyList(),
+                deployments = emptyList(),
+                prompts = emptyList(),
+                rulesets = emptyList(),
+                fragments = emptyList(),
+                skills = emptyList(),
+            )
+            val variables = VariableResolver()
+            val config =
+                EngineConfig(locations = locations, tools = emptyList(), variables = variables, secretsManager = SecretsManagerKind.ENVIRONMENT)
+
+            every { configService.loadConfig(workingDirectory) } returns config
+            every {
+                engineFactory.create(emptyList(), workingDirectory, variables, userHome, dryRun = false, secretsManager = SecretsManagerKind.ENVIRONMENT)
+            } returns engineProcessor
+            every { engineProcessor.process(locations) } returns Unit
+
+            // when
+            runner.run(workingDirectory, userHome, dryRun = false)
+
+            // then
+            verify(exactly = 1) { engineProcessor.process(locations) }
+        }
 
         @Test
         fun `should process locations when config contains no tools`() {
@@ -142,7 +174,7 @@ class DefaultToolsApplicationRunnerTest {
             val userHome = File("home")
 
             every { configService.loadConfig(workingDirectory) } returns config
-            every { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome, dryRun = false) } returns engineProcessor
+            every { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome, dryRun = false, secretsManager = SecretsManagerKind.LIBSECRET) } returns engineProcessor
             every { engineProcessor.process(locations) } returns Unit
 
             // when
@@ -150,7 +182,7 @@ class DefaultToolsApplicationRunnerTest {
 
             // then
             verify(exactly = 1) { configService.loadConfig(workingDirectory) }
-            verify(exactly = 1) { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome, dryRun = false) }
+            verify(exactly = 1) { engineFactory.create(emptyAdapters, workingDirectory, variables, userHome, dryRun = false, secretsManager = SecretsManagerKind.LIBSECRET) }
             verify(exactly = 1) { engineProcessor.process(locations) }
         }
     }

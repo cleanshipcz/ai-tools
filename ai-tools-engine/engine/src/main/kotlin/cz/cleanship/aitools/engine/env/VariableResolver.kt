@@ -44,10 +44,12 @@ fun interface EnvironmentSource {
  * fails with [UnexpandedReferenceException] rather than being expanded further, which is what keeps the alternative -
  * a path quietly holding a literal `${...}` - from ever being deployed to. One pass also cannot loop, not even when a
  * variable refers to itself.
+ *
+ * @property environment the environment of the run, which every other reader of that environment in the run is given too
  */
 class VariableResolver(
     variables: Map<String, String> = emptyMap(),
-    private val environment: EnvironmentSource = EnvironmentSource.PROCESS,
+    val environment: EnvironmentSource = EnvironmentSource.PROCESS,
 ) {
 
     /**
@@ -90,6 +92,14 @@ class VariableResolver(
      * Returns whether the environment of the run carries the variable [name]; a variable only the config files declare does not count.
      */
     fun isSetInEnvironment(name: String): Boolean = environment.read(name) != null
+
+    /**
+     * Returns whether the environment of the run carries the variable [name] with a value [accepts] accepts; the value is handed to [accepts] only, never returned.
+     */
+    fun environmentHolds(
+        name: String,
+        accepts: (String) -> Boolean,
+    ): Boolean = environment.read(name)?.let(accepts) == true
 
     /**
      * Two resolvers are equal when they were built from the same variables and read the same environment - that is,
@@ -153,6 +163,11 @@ class UnexpandedReferenceException(
 private fun String?.readFrom() = this?.let { ", read from $it" } ?: ""
 
 /**
- * A `${NAME}` reference, where NAME matches `[A-Za-z_][A-Za-z0-9_]*`; group 1 is the name. Every place that expands or checks such a reference reads it from here, so they agree on what a reference is.
+ * An environment variable name the engine accepts, `[A-Za-z_][A-Za-z0-9_]*`: the name of a variable of the run, of a variable of an MCP server, and of a secret the launcher reads.
  */
-internal val VARIABLE_REFERENCE = Regex("""\$\{([A-Za-z_][A-Za-z0-9_]*)}""")
+internal val ENVIRONMENT_VARIABLE_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
+
+/**
+ * A `${NAME}` reference, where NAME matches [ENVIRONMENT_VARIABLE_NAME]; group 1 is the name. Every place that expands or checks such a reference reads it from here, so they agree on what a reference is.
+ */
+internal val VARIABLE_REFERENCE = Regex("""\$\{(${ENVIRONMENT_VARIABLE_NAME.pattern})}""")

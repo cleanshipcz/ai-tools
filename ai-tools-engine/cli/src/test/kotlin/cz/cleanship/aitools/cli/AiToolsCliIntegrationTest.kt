@@ -200,6 +200,22 @@ class AiToolsCliIntegrationTest {
     }
 
     @Test
+    fun `should fail naming the file and the accepted values when a config names a secrets manager the engine does not know`() {
+        // given
+        File(tempDir, "config.yml").writeText("secrets_manager: keychain\n")
+        val cli = AiToolsCli()
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessage("'secrets_manager' of config.yml names a secrets manager this engine does not know. Accepted values: 'libsecret', 'environment'.")
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
     fun `should deploy a user deployment into the home the option names`() {
         // given
         // - the home base is always the one the run was given; the real home of this machine is never involved

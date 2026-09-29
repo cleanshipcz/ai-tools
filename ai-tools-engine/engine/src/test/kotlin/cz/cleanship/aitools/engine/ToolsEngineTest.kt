@@ -29,10 +29,18 @@ import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
 import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
+import cz.cleanship.aitools.engine.tools.mcp.FakePrograms
+import cz.cleanship.aitools.engine.tools.mcp.FakeSecretService
+import cz.cleanship.aitools.engine.tools.mcp.LibsecretSecretsManager
 import cz.cleanship.aitools.engine.tools.mcp.McpLedger
+import cz.cleanship.aitools.engine.tools.mcp.McpSecretsManager
+import cz.cleanship.aitools.engine.tools.mcp.McpServerResolver
+import cz.cleanship.aitools.engine.tools.mcp.SecretServiceProbe
+import cz.cleanship.aitools.engine.tools.mcp.missingProgramsReason
 import cz.cleanship.aitools.engine.utils.contentSnapshot
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.assertj.core.api.Assertions.assertThat
@@ -47,12 +55,14 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 import org.slf4j.LoggerFactory
+import org.tomlj.Toml
 import java.io.File
 import java.io.IOException
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
+import java.time.Duration
 
 class ToolsEngineTest {
 
@@ -2737,6 +2747,281 @@ class ToolsEngineTest {
                 "  - name: JIRA_BASE_URL\n    description: Base URL\n    secret: false\n" +
                 extraVariable,
         )
+    }
+
+    /**
+     * A stdio server whose secrets the libsecret keyring supplies: rendered as a start of the launcher in every MCP config file of a project and of the home, and checked for in the keyring by the fake `busctl` of [FakeSecretService]. No test here reaches a real keyring, bus or display.
+     */
+    @Nested
+    inner class McpSecretsManagers {
+
+        private lateinit var programs: FakePrograms
+        private lateinit var secretService: FakeSecretService
+        private lateinit var launcher: File
+
+        // - the config of the run declares the base URL, the environment of the run carries the secret; no file may hold it
+        private val secretVariables = VariableResolver(
+            variables = mapOf("JIRA_BASE_URL" to "https://jira.example.com"),
+            environment = { name -> mapOf("JIRA_PAT" to SECRET_VALUE)[name] },
+        )
+
+        @BeforeEach
+        fun setUpKeyring() {
+            assumeTrue(missingProgramsReason() == null) { missingProgramsReason() }
+            programs = FakePrograms(tempDir.resolve("programs"))
+            secretService = FakeSecretService(tempDir.resolve("programs"), programs)
+            launcher = FakePrograms.executable(workspace.toPath().resolve("scripts/mcp-launch"), "#!/bin/sh\nexec \"\$@\"\n").toFile()
+        }
+
+        @Test
+        fun `should start every selected stdio server with a keyring secret through the launcher in all six MCP config files`() {
+            // given
+            writeStdioServer("atlassian", command = "jira-mcp-server", secret = "JIRA_PAT")
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR).process(locations())
+
+            // then
+            val launcherPath = launcher.toPath().toRealPath().toString()
+            val arguments = listOf("atlassian", "--required", "JIRA_PAT", "--", "jira-mcp-server")
+            mapOf(
+                destination.resolve(".mcp.json") to "mcpServers",
+                destination.resolve(".vscode/mcp.json") to "servers",
+                destination.resolve(".cursor/mcp.json") to "mcpServers",
+                userHome.resolve(".claude.json") to "mcpServers",
+            ).forEach { (file, key) ->
+                val entry = Json
+                    .parseToJsonElement(file.readText())
+                    .jsonObject
+                    .getValue(key)
+                    .jsonObject
+                    .getValue("atlassian")
+                    .jsonObject
+                assertThat(entry.getValue("command").jsonPrimitive.content).describedAs(file.path).isEqualTo(launcherPath)
+                assertThat(entry.getValue("args").jsonArray.map { it.jsonPrimitive.content }).describedAs(file.path).containsExactlyElementsOf(arguments)
+                assertThat(entry.getValue("env").jsonObject.keys).describedAs(file.path).containsExactly("JIRA_PAT")
+            }
+            listOf(destination.resolve(".codex/config.toml"), userHome.resolve(".codex/config.toml")).forEach { file ->
+                val table = Toml.parse(file.readText())
+                assertThat(table.getString("mcp_servers.atlassian.command")).describedAs(file.path).isEqualTo(launcherPath)
+                assertThat(table.getArray("mcp_servers.atlassian.args")?.toList()).describedAs(file.path).containsExactlyElementsOf(arguments)
+                assertThat(table.getArray("mcp_servers.atlassian.env_vars")?.toList()).describedAs(file.path).containsExactly("JIRA_PAT", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR")
+            }
+            assertThat((destination.walkTopDown() + userHome.walkTopDown()).filter { it.isFile }.map { it.readText() }.toList()).noneMatch { it.contains(SECRET_VALUE) }
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - the machine uses no secrets manager
+            "no-manager",
+            // - the manifest reads the secret from the environment only
+            "environment-only",
+        )
+        fun `should render a server without a keyring secret as without a secrets manager and ask the keyring nothing`(
+            case: String,
+        ) {
+            // given
+            writeYaml(
+                "mcps/atlassian.yml",
+                "id: atlassian\ndescription: Jira\ntransport:\n  type: stdio\n  command: jira-mcp-server\n" +
+                    "variables:\n  - name: JIRA_PAT\n    description: Token\n    secret: true\n" + (if (case == "environment-only") "    from: environment\n" else ""),
+            )
+            writeProject(mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.CODEX, manager = if (case == "no-manager") null else manager()).process(locations())
+
+            // then
+            assertThat(destination.resolve(".mcp.json"))
+                .content()
+                .contains("\"command\": \"jira-mcp-server\"")
+                .contains("\"JIRA_PAT\": \"\${JIRA_PAT}\"")
+                .doesNotContain("--required")
+            assertThat(destination.resolve(".codex/config.toml")).content().contains("env_vars = [\"JIRA_PAT\"]\n").doesNotContain("mcp-launch")
+            assertThat(secretService.calls()).isEmpty()
+        }
+
+        @Test
+        fun `should fail the MCP config files of only the deployments that need a missing launcher, naming it, with the same message in a dry run and a deploy`() {
+            // given
+            // - one project selects a server with a keyring secret, another one a server without any secret
+            val otherDestination = tempDir.resolve("other-destination").toFile()
+            writeStdioServer("atlassian", command = "jira-mcp-server", secret = "JIRA_PAT")
+            writeStdioServer("plain")
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeProject(directoryName = "other", id = "other", deployDirectory = otherDestination.absolutePath, mcpFilter = listOf("plain"))
+            val missing = workspace.resolve("moved/scripts/mcp-launch")
+
+            // when
+            val dryRun = runCatching { engineWith(ToolType.CLAUDE, dryRun = true, manager = manager(workspace.resolve("moved"))).process(locations()) }.exceptionOrNull()
+            val deploy = runCatching { engineWith(ToolType.CLAUDE, manager = manager(workspace.resolve("moved"))).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deploy).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'${missing.absolutePath}', which does not exist")
+            assertThat(dryRun).isInstanceOf(ExportFailedException::class.java).hasMessage(deploy?.message)
+            assertThat((deploy as ExportFailedException).failures.map { it.deploymentId to it.manifest }).containsExactly("test-project" to "MCP server 'atlassian'")
+            assertThat(destination.resolve(".mcp.json")).doesNotExist()
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(otherDestination.resolve(".mcp.json")).content().contains("\"command\": \"plain-server\"").doesNotContain("mcp-launch")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - a launcher its group can write, one that is a link to a file outside the repository, and one in a directory others can write
+            "group-writable, which its group can write",
+            "outside, outside the ai-tools repository",
+            "directory-writable, whose directory",
+        )
+        fun `should fail the MCP config files of only the deployments that need a launcher no tool may be given, naming it and the reason, with the same message in a dry run and a deploy`(
+            case: String,
+            reason: String,
+        ) {
+            // given
+            val otherDestination = tempDir.resolve("other-destination").toFile()
+            writeStdioServer("atlassian", command = "jira-mcp-server", secret = "JIRA_PAT")
+            writeStdioServer("plain")
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeProject(directoryName = "other", id = "other", deployDirectory = otherDestination.absolutePath, mcpFilter = listOf("plain"))
+            when (case) {
+                "group-writable" -> Files.setPosixFilePermissions(launcher.toPath(), PosixFilePermissions.fromString("rwxrwxr-x"))
+                "directory-writable" -> Files.setPosixFilePermissions(launcher.toPath().parent, PosixFilePermissions.fromString("rwxr-xrwx"))
+                else -> {
+                    val outside = FakePrograms.executable(tempDir.resolve("outside/mcp-launch"), "#!/bin/sh\n")
+                    Files.delete(launcher.toPath())
+                    Files.createSymbolicLink(launcher.toPath(), outside)
+                }
+            }
+
+            // when
+            val dryRun = runCatching { engineWith(ToolType.CLAUDE, dryRun = true).process(locations()) }.exceptionOrNull()
+            val deploy = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deploy).isInstanceOf(ExportFailedException::class.java).hasMessageContaining(reason).hasMessageContaining("mcp-launch")
+            assertThat(dryRun).isInstanceOf(ExportFailedException::class.java).hasMessage(deploy?.message)
+            assertThat((deploy as ExportFailedException).failures.map { it.deploymentId to it.manifest }).containsExactly("test-project" to "MCP server 'atlassian'")
+            assertThat(destination.resolve(".mcp.json")).doesNotExist()
+            assertThat(otherDestination.resolve(".mcp.json")).content().contains("\"command\": \"plain-server\"").doesNotContain("mcp-launch")
+        }
+
+        @Test
+        fun `should report where each secret is found once per name, in a dry run as in a deploy, with the same text`() {
+            // given
+            // - two servers read JIRA_PAT, which the keyring holds; a third reads CONFLUENCE_PAT, which is found nowhere
+            secretService.store("JIRA_PAT")
+            writeStdioServer("atlassian", secret = "JIRA_PAT")
+            writeStdioServer("jira", secret = "JIRA_PAT")
+            writeStdioServer("confluence", secret = "CONFLUENCE_PAT")
+            writeProject(mcpFilter = listOf("atlassian", "jira", "confluence"))
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"))
+
+            // when
+            val dryRun = reportsOf { engineWith(ToolType.CLAUDE, ToolType.CODEX, dryRun = true).process(locations()) }
+            val dryRunCalls = secretService.calls().size
+            val deploy = reportsOf { engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations()) }
+
+            // then
+            assertThat(dryRun).isEqualTo(deploy).containsExactlyInAnyOrder(
+                "INFO MCP server 'atlassian' reads the required secret variable 'JIRA_PAT' from the keyring, which holds it.",
+                "INFO MCP server 'jira' reads the required secret variable 'JIRA_PAT' from the keyring, which holds it.",
+                "WARN MCP server 'confluence' reads the required secret variable 'CONFLUENCE_PAT' from the keyring or the environment of the tool that starts it, " +
+                    "but the keyring does not hold it and the environment of this run does not set it. Store it with: secret-tool store --label='ai-tools MCP CONFLUENCE_PAT' service ai-tools-mcp variable CONFLUENCE_PAT",
+            )
+            assertThat(dryRunCalls).isEqualTo(2)
+            assertThat(secretService.calls().map { it.arguments.last() }).containsExactly("JIRA_PAT", "CONFLUENCE_PAT", "JIRA_PAT", "CONFLUENCE_PAT")
+        }
+
+        /**
+         * The launcher rendering and the keyring check extend the leak scenarios of [McpServers]: a secret the environment of the run carries appears in no file, log line, error or argument list, whatever the keyring answers.
+         */
+        @ParameterizedTest
+        @CsvSource("stored", "environment-fallback", "keyring-hangs", "launcher-missing")
+        fun `should never write, log or report a value of the environment when a keyring secret is rendered and checked`(
+            scenario: String,
+        ) {
+            // given
+            val rootAppender = ListAppender<ILoggingEvent>()
+            val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) as Logger
+            rootAppender.start()
+            rootLogger.addAppender(rootAppender)
+            val variables =
+                VariableResolver(emptyMap(), environment = { name -> if (name == "JIRA_PAT") LEAKED_VALUE else null })
+            when (scenario) {
+                "stored" -> secretService.store("JIRA_PAT")
+                "keyring-hangs" -> secretService.behaves("hang")
+            }
+            writeStdioServer("atlassian", command = "jira-mcp-server", secret = "JIRA_PAT")
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"))
+            // - a keyring that never answers is given a short limit, since the test waits for all of it; every other call answers at once
+            val manager = when (scenario) {
+                "launcher-missing" -> manager(workspace.resolve("moved"))
+                "keyring-hangs" -> manager(timeLimit = Duration.ofSeconds(1))
+                else -> manager()
+            }
+
+            // when
+            val error = try {
+                runCatching { engineWith(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR, manager = manager, variables = variables).process(locations()) }.exceptionOrNull()
+            } finally {
+                rootLogger.detachAppender(rootAppender)
+                rootAppender.stop()
+            }
+
+            // then
+            val written = (destination.walkTopDown() + userHome.walkTopDown()).filter { it.isFile }.map { it.readText() }.toList()
+            val logged = rootAppender.list.flatMap { event -> listOfNotNull(event.formattedMessage) + generateSequence(event.throwableProxy) { it.cause }.mapNotNull { it.message } }
+            val reported = generateSequence(error) { it.cause }.mapNotNull { it.message }.toList()
+            assertThat(written + logged + reported + secretService.recordedText()).noneMatch { it.contains(LEAKED_VALUE) }
+            // - and each scenario ends the way it is meant to, so an unrelated failure cannot pass for safety
+            if (scenario == "launcher-missing") {
+                assertThat(error).isInstanceOf(ExportFailedException::class.java)
+                assertThat(destination.resolve(".mcp.json")).doesNotExist()
+            } else {
+                assertThat(error).isNull()
+                assertThat(listOf(destination.resolve(".mcp.json"), userHome.resolve(".claude.json"))).allSatisfy { assertThat(it).content().contains("mcp-launch").contains("\${JIRA_PAT:-}") }
+            }
+        }
+
+        private fun manager(checkout: File = workspace, timeLimit: Duration = Duration.ofSeconds(30)): McpSecretsManager {
+            val environment =
+                mapOf("PATH" to programs.path, "DBUS_SESSION_BUS_ADDRESS" to "unix:path=/nonexistent/aitools-test-bus")
+            val source = EnvironmentSource { environment[it] }
+            return LibsecretSecretsManager(checkout, source, probe = SecretServiceProbe(source, timeLimit))
+        }
+
+        private fun engineWith(
+            vararg toolTypes: ToolType,
+            dryRun: Boolean = false,
+            manager: McpSecretsManager? = manager(),
+            variables: VariableResolver = secretVariables,
+        ) = ToolsEngine(
+            workspace,
+            variables = variables,
+            userHome = userHome,
+            tools = toolTypes.map { ToolFactory.create(it, dryRun) },
+            dryRun = dryRun,
+            secretsManager = manager,
+        )
+
+        /**
+         * Runs [block] with a list appender on the logger the reports about secrets are written under, returning each report as its level and text.
+         */
+        private fun reportsOf(block: () -> Unit): List<String> {
+            val appender = ListAppender<ILoggingEvent>()
+            val logger = LoggerFactory.getLogger(McpServerResolver::class.java) as Logger
+            appender.start()
+            logger.addAppender(appender)
+            try {
+                block()
+            } finally {
+                logger.detachAppender(appender)
+                appender.stop()
+            }
+            return appender.list.map { "${it.level} ${it.formattedMessage}" }
+        }
     }
 
     /**

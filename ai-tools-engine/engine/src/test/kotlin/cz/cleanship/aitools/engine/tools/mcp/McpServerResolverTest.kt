@@ -13,6 +13,8 @@ import cz.cleanship.aitools.engine.models.McpText
 import cz.cleanship.aitools.engine.models.McpTextPart
 import cz.cleanship.aitools.engine.models.McpVariable
 import cz.cleanship.aitools.engine.models.Version
+import io.mockk.every
+import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -187,6 +189,89 @@ class McpServerResolverTest {
         }
 
         @Test
+        fun `should hand the resolved server to the secrets manager of its delivery, and report its secrets there`() {
+            // given
+            // - JIRA_PAT is set in the environment of the run and stored nowhere else; the manager renders the launcher
+            val manager = mockk<McpSecretsManager>()
+            val server =
+                stdio(McpVariable("JIRA_PAT", "Token", secret = true), McpVariable("JIRA_BASE_URL", "Base URL", secret = false))
+            val resolvedTransport = ResolvedMcpTransport.Stdio(
+                command = "/work/jira-mcp-server",
+                args = listOf("--url=https://jira.example.com"),
+                env = linkedMapOf(
+                    "LOG_LEVEL" to McpValue.Plain("info"),
+                    "JIRA_PAT" to McpValue.Secret("JIRA_PAT", required = true),
+                    "JIRA_BASE_URL" to McpValue.Plain("https://jira.example.com"),
+                ),
+            )
+            val launched = resolvedTransport.copy(command = "/repo/scripts/mcp-launch")
+            every { manager.label } returns "the keyring"
+            every { manager.presenceOf("JIRA_PAT") } returns SecretPresence.Absent
+            every { manager.countsAsSet("JIRA_PAT", SECRET_VALUE) } returns true
+            every { manager.launch("atlassian", resolvedTransport, listOf(McpValue.Secret("JIRA_PAT", required = true))) } returns launched
+
+            // when
+            val resolved = McpServerResolver(variables, McpSecretDelivery(manager, variables)).resolve(server)
+
+            // then
+            assertThat(resolved).isEqualTo(ResolvedMcpServer("atlassian", launched))
+            assertThat(logAppender.list.map { it.formattedMessage }).singleElement().satisfies({
+                assertThat(it).contains("'JIRA_PAT'").contains("the environment of this run sets it").doesNotContain(SECRET_VALUE)
+            })
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - a stdio server whose secrets the keyring of the machine supplies
+                "stdio | manager | or mark it 'secret: true' to have the tool start the server with it from the keyring, or from the environment of the tool when the keyring does not hold it.",
+                // - a stdio server on a machine that uses no secrets manager, and an http server, whose secrets the tool always sends from its environment
+                "stdio | none    | or mark it 'secret: true' to pass it from the environment of the tool.",
+                "http  | manager | or mark it 'secret: true' to pass it from the environment of the tool.",
+            ],
+        )
+        fun `should tell where a required plain variable declared nowhere would be read from once it is marked secret`(
+            kind: String,
+            machine: String,
+            remedy: String,
+        ) {
+            // given
+            val manager = mockk<McpSecretsManager>()
+            every { manager.label } returns "the keyring"
+            val server = if (kind == "stdio") {
+                stdio(McpVariable("JIRA_BASE_URL", "Base URL", secret = false), McpVariable("JIRA_VERIFY_SSL", "Verify", secret = false))
+            } else {
+                server(McpServerTransport.Http(McpText(listOf(McpTextPart.Variable("MCP_URL"))), emptyMap()), McpVariable("MCP_URL", "Url", secret = false))
+            }
+            val resolver =
+                McpServerResolver(variables, McpSecretDelivery(manager.takeIf { machine == "manager" }, variables))
+
+            // when / then
+            assertThatThrownBy { resolver.resolve(server) }
+                .isInstanceOf(McpServerResolvingException::class.java)
+                .hasMessageEndingWith("Declare it, mark it 'required: false', $remedy")
+        }
+
+        @Test
+        fun `should tell a pointer server missing a required plain variable only what the config files and its manifest can change`() {
+            // given
+            // - a pointer manifest declares no variable, so it can mark none 'required: false' or 'secret: true'
+            val server = stdio(McpVariable("JIRA_BASE_URL", "Base URL", secret = false), McpVariable("API_BASE", "Base", secret = false)).copy(pointer = true)
+            val manager = mockk<McpSecretsManager>()
+            every { manager.label } returns "the keyring"
+
+            // when / then
+            assertThatThrownBy { McpServerResolver(variables, McpSecretDelivery(manager, variables)).resolve(server) }
+                .isInstanceOf(McpServerResolvingException::class.java)
+                .hasMessage(
+                    "MCP server 'atlassian' needs the variable 'API_BASE' for its environment, which 'env_vars:' of config.yml and config.local.yml do not declare. " +
+                        "Plain variables are read from there only, never from the environment of the run. Declare it under 'env_vars:' of config.yml or config.local.yml, " +
+                        "select another package or remote of its server.json with 'select:', if it declares one, or point 'source' at another server.json.",
+                )
+        }
+
+        @Test
         fun `should not warn when a secret is set in the environment of the run`() {
             // given
             val server =
@@ -310,6 +395,20 @@ class McpServerResolverTest {
                 .hasMessageStartingWith("MCP server 'remote' resolves its 'url' to one that carries credentials, which every tool would write into its config file and send.")
                 .hasMessageEndingWith(" Write a 'url' that starts with 'http://' or 'https://' followed by a host, without a backslash or credentials.")
                 .hasMessageNotContaining("Pass them")
+                .hasMessageNotContaining("host.example")
+        }
+
+        @Test
+        fun `should tell a pointer server whose url references no variable to select another remote or file, not to write a url`() {
+            // given
+            val server = server(McpServerTransport.Http(url = McpText.literal("https://user:pw@host.example/mcp"), headers = emptyMap())).copy(pointer = true)
+
+            // when / then
+            assertThatThrownBy { resolver.resolve(server) }
+                .isInstanceOf(McpServerResolvingException::class.java)
+                .hasMessageStartingWith("MCP server 'remote' resolves its 'url' to one that carries credentials, which every tool would write into its config file and send.")
+                .hasMessageEndingWith(" Select another package or remote of its server.json with 'select:', if it declares one, or point 'source' at another server.json.")
+                .hasMessageNotContaining("Write a 'url'")
                 .hasMessageNotContaining("host.example")
         }
 

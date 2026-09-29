@@ -1231,6 +1231,37 @@ class LoaderServiceIntegrationTest {
         }
 
         @Test
+        fun `should fail naming the file when a secret variable declares a source the model does not declare`() {
+            // given
+            val file = writeFile(
+                mcpDir.resolve("atlassian.yml"),
+                "id: atlassian\ndescription: d\ntransport:\n  type: stdio\n  command: c\nvariables:\n  - name: JIRA_PAT\n    description: t\n    secret: true\n    from: vault\nmetadata:\n  version: 1.0.0\n",
+            )
+
+            // when / then
+            assertThatThrownBy { mcpLoader.loadAll(mcpLocations()) }
+                .hasMessageContaining(file.absolutePath)
+                .hasStackTraceContaining("vault")
+        }
+
+        @Test
+        fun `should fail naming the file and the variable when a variable that is not secret declares where it is read from`() {
+            // given
+            val file = writeFile(
+                mcpDir.resolve("atlassian.yml"),
+                "id: atlassian\ndescription: d\ntransport:\n  type: stdio\n  command: c\nvariables:\n  - name: JIRA_BASE_URL\n    description: u\n    secret: false\n    from: environment\nmetadata:\n  version: 1.0.0\n",
+            )
+
+            // when / then
+            assertThatThrownBy { mcpLoader.loadAll(mcpLocations()) }
+                .isInstanceOf(ManifestLoadingException::class.java)
+                .hasMessageStartingWith("Failed to load ${file.absolutePath}: ")
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining("'JIRA_BASE_URL'")
+                .hasMessageContaining("'from'")
+        }
+
+        @Test
         fun `should fail naming the file and the reference when a transport references a variable the manifest does not declare`() {
             // given
             val file = writeFile(

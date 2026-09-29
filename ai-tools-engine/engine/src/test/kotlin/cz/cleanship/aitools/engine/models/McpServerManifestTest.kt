@@ -198,6 +198,68 @@ class McpServerManifestTest {
         assertThat(yaml.decodeFromString(McpServerManifest.serializer(), input.lines().filterNot { it.startsWith("pin:") }.joinToString("\n")).pin).isNull()
     }
 
+    @ParameterizedTest
+    @CsvSource(
+        // - nothing declared: the secrets manager of the machine, with the environment of the tool as the fallback
+        "'', , MANAGER",
+        "'      from: manager', MANAGER, MANAGER",
+        "'      from: environment', ENVIRONMENT, ENVIRONMENT",
+    )
+    fun `should decode where a secret variable is read from, defaulting to the secrets manager`(
+        declaration: String,
+        declared: SecretSource?,
+        effective: SecretSource,
+    ) {
+        // given
+        val input = """
+            |id: atlassian
+            |description: Jira
+            |transport:
+            |    type: stdio
+            |    command: jira-mcp-server
+            |variables:
+            |    - name: JIRA_PAT
+            |      description: Token
+            |      secret: true
+            |$declaration
+            |metadata:
+            |    version: 1.0.0
+        """.trimMargin()
+
+        // when
+        val variable = yaml.decodeFromString(McpServerManifest.serializer(), input).variables.single()
+
+        // then
+        assertThat(variable.from).isEqualTo(declared)
+        assertThat(variable.source).isEqualTo(effective)
+    }
+
+    @Test
+    fun `should reject a source of a secret the model does not declare`() {
+        // given
+        val input = """
+            |id: atlassian
+            |description: Jira
+            |transport:
+            |    type: stdio
+            |    command: jira-mcp-server
+            |variables:
+            |    - name: JIRA_PAT
+            |      description: Token
+            |      secret: true
+            |      from: vault
+            |metadata:
+            |    version: 1.0.0
+        """.trimMargin()
+
+        // when / then
+        assertThatThrownBy { yaml.decodeFromString(McpServerManifest.serializer(), input) }
+            .isInstanceOf(YamlException::class.java)
+            .hasMessageContaining("vault")
+            .hasMessageContaining("manager")
+            .hasMessageContaining("environment")
+    }
+
     @Test
     fun `should reject a transport type the model does not declare`() {
         // given

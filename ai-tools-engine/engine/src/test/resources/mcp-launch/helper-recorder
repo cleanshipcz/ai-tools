@@ -1,0 +1,11 @@
+#!@INTERPRETER@
+# Test double that stands in for a helper of the launcher (env or timeout): it records its name, its arguments and its environment exactly as it received them, and then replaces itself with the real program.
+# The test installs it with @NAME@, @REAL@, @STATE@ and @TOOLS@ replaced; the launcher may start it with no environment at all.
+# /proc/<pid>/environ holds the environment the kernel handed this process, before its own shell exported anything; its entries are NUL-separated, as the arguments are written.
+# env and timeout run in one process one after the other (env replaces itself with timeout), so each record is keyed by the process id and the name.
+printf 'helper %s %s\n' '@NAME@' "$$" >>'@STATE@/helpers.log'
+'@TOOLS@/cat' "/proc/$$/environ" >"@STATE@/environ/$$-@NAME@"
+for argument in "$@"; do
+    printf '%s\0' "$argument"
+done >"@STATE@/arguments/$$-@NAME@"
+exec '@REAL@' "$@"

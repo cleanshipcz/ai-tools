@@ -26,11 +26,13 @@ sealed interface ResolvedMcpTransport {
      * @property command the executable
      * @property args the arguments passed to [command]
      * @property env the environment of the server by variable name, in the order it is rendered; a [McpValue.Secret] entry is always keyed by the name of its own variable
+     * @property forwarded the names of variables the process reads from the environment of the tool besides [env], none of them a secret: a format whose tool starts a server with a cleared environment forwards each by name, and a format whose tool passes its own environment writes nothing for them. No value of them is ever written
      */
     data class Stdio(
         val command: String,
         val args: List<String>,
         val env: Map<String, McpValue>,
+        val forwarded: List<String> = emptyList(),
     ) : ResolvedMcpTransport
 
     /**
@@ -56,7 +58,7 @@ sealed interface McpValue {
     /**
      * The whole value of a secret variable, rendered as a reference to [variable] and never as its value.
      *
-     * @property required whether the server cannot run without it; a tool that can fall back to an empty value is told to for an optional one
+     * @property required whether the tool must find it in its own environment to start the server; a tool that can fall back to an empty value is told to for an optional one. A secret passed to the launcher is always optional here, and the launcher refuses to start the server without a required one - see [LibsecretSecretsManager.launch]
      */
     data class Secret(val variable: String, val required: Boolean) : McpValue
 
