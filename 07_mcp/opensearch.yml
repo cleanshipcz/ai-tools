@@ -1,0 +1,33 @@
+id: opensearch
+description: Read-only queries against an OpenSearch cluster through the OpenSearch Dashboards console proxy, with the session cookie of the browser - list indices and aliases, read mappings, search, count, SQL and PPL.
+# The server runs from its own checkout, built there with 'npm run build'; ${PROJECTS_FOLDER} comes from env_vars of config.yml or config.local.yml. dist/index.js starts with '#!/usr/bin/env node', so it must stay executable and 'node' must be on the PATH of the tool that starts it.
+transport:
+  type: stdio
+  command: ${PROJECTS_FOLDER}/mcp-opensearch/dist/index.js
+# No variable is a secret, so the server does not start through the launcher scripts/mcp-launch. The session cookie lives in the file OSD_COOKIE_FILE names, which the cookie bridge of the browser writes; this manifest holds only the path of that file.
+# Plain variables are resolved at deploy time from env_vars of config.yml or config.local.yml only, and written as values; an optional one declared nowhere is left out.
+variables:
+  - name: OSD_BASE_URL
+    description: Origin of the OpenSearch Dashboards instance, optionally with a base path.
+    secret: false
+  - name: OSD_COOKIE_FILE
+    description: Absolute path of the file holding the session cookie; a leading ~ is not expanded.
+    secret: false
+  - name: OSD_LOGIN_URL
+    description: Page to open in the browser when the session has expired; it must be on the site of OSD_BASE_URL.
+    secret: false
+    required: false
+  - name: OSD_DATA_SOURCE_ID
+    description: Dashboards data source id, when several clusters are configured.
+    secret: false
+    required: false
+  - name: OSD_INDEX_ALLOWLIST
+    description: Comma-separated index glob patterns; when set, every index a tool touches must match one.
+    secret: false
+    required: false
+metadata:
+  version: 1.0.0
+  author: cleanshipcz
+  created: 2026-09-30
+  tags:
+    - opensearch

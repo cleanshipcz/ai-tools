@@ -37,9 +37,16 @@ fragments:
         - confluence-search
         - docx-export
         - jira-ticket
+# MCP servers are opt-in: only the ids listed here are written, into ~/.claude.json and ~/.codex/config.toml. While this block selects a server, the engine owns every entry of those two files that is named after a manifest of 07_mcp/, and removes the ones not listed here, hand-written ones included.
+mcps:
+  filter:
+    - type: whitelist
+      ids:
+        - opensearch
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: cleanshipcz
   created: "2026-08-10"
+  updated: "2026-09-30"
   tags:
     - global
