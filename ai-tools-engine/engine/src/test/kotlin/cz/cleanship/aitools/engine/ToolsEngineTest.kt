@@ -39,6 +39,7 @@ import cz.cleanship.aitools.engine.tools.mcp.SecretServiceProbe
 import cz.cleanship.aitools.engine.tools.mcp.missingProgramsReason
 import cz.cleanship.aitools.engine.utils.contentSnapshot
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -2338,13 +2339,15 @@ class ToolsEngineTest {
             // then
             val claude = destination.resolve(".mcp.json").readText()
             val vsCode = destination.resolve(".vscode/mcp.json").readText()
+            val copilotCli = destination.resolve(".github/mcp.json").readText()
             val cursor = destination.resolve(".cursor/mcp.json").readText()
             val codex = destination.resolve(".codex/config.toml").readText()
             assertThat(claude).contains("\"JIRA_PAT\": \"\${JIRA_PAT}\"")
             assertThat(vsCode).contains("\"JIRA_PAT\": \"\${env:JIRA_PAT}\"")
+            assertThat(copilotCli).contains("\"JIRA_PAT\": \"\${JIRA_PAT}\"").doesNotContain("\${env:")
             assertThat(cursor).contains("\"JIRA_PAT\": \"\${env:JIRA_PAT}\"")
             assertThat(codex).contains("env_vars = [\"JIRA_PAT\"]")
-            assertThat(listOf(claude, vsCode, cursor, codex)).allSatisfy {
+            assertThat(listOf(claude, vsCode, copilotCli, cursor, codex)).allSatisfy {
                 assertThat(it).doesNotContain(SECRET_VALUE).contains("https://jira.example.com")
             }
         }
@@ -2385,6 +2388,7 @@ class ToolsEngineTest {
             // then
             assertThat(mcpFile).hasContent(existing)
             assertThat(destination.resolve(".vscode/mcp.json")).doesNotExist()
+            assertThat(destination.resolve(".github/mcp.json")).doesNotExist()
             assertThat(destination.resolve(".cursor/mcp.json")).doesNotExist()
             assertThat(destination.resolve(".codex/config.toml")).doesNotExist()
             assertThat(warnings()).noneMatch { it.contains("MCP") }
@@ -2423,13 +2427,17 @@ class ToolsEngineTest {
             val cursorConfig = destination.resolve(".cursor/mcp.json")
             cursorConfig.parentFile.mkdirs()
             cursorConfig.writeText("""{ "mcpServers": { "playwright": { "command": "npx" } } }""")
+            val copilotCliConfig = destination.resolve(".github/mcp.json")
+            copilotCliConfig.parentFile.mkdirs()
+            copilotCliConfig.writeText("""{ "mcpServers": { "playwright": { "command": "npx" } } }""")
 
             // when
-            engineFor(ToolType.CODEX, ToolType.CURSOR).process(locations())
+            engineFor(ToolType.CODEX, ToolType.CURSOR, ToolType.GITHUB_COPILOT).process(locations())
 
             // then
             assertThat(codexConfig).content().startsWith("# mine\n[mcp_servers.playwright]\ncommand = \"npx\"\n").contains("[mcp_servers.atlassian]")
             assertThat(cursorConfig).content().contains("playwright").contains("atlassian")
+            assertThat(copilotCliConfig).content().contains("playwright").contains("atlassian")
         }
 
         @Test
@@ -2613,7 +2621,7 @@ class ToolsEngineTest {
 
             // then
             val sinkInfos = sinkAppender.list.map { it.formattedMessage }
-            listOf(".mcp.json", ".vscode/mcp.json", ".cursor/mcp.json", ".codex/config.toml").forEach { path ->
+            listOf(".mcp.json", ".vscode/mcp.json", ".github/mcp.json", ".cursor/mcp.json", ".codex/config.toml").forEach { path ->
                 assertThat(sinkInfos).anyMatch { it.contains("MCP servers [atlassian]") && it.contains(destination.resolve(path).absolutePath) }
                 assertThat(destination.resolve(path)).doesNotExist()
             }
@@ -2774,11 +2782,11 @@ class ToolsEngineTest {
         }
 
         @Test
-        fun `should start every selected stdio server with a keyring secret through the launcher in all six MCP config files`() {
+        fun `should start every selected stdio server with a keyring secret through the launcher in every MCP config file of a project and of the home`() {
             // given
             writeStdioServer("atlassian", command = "jira-mcp-server", secret = "JIRA_PAT")
             writeProject(mcpFilter = listOf("atlassian"))
-            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"))
+            writeUserDeployment(tools = listOf("claude", "codex", "github_copilot"), mcpFilter = listOf("atlassian"))
 
             // when
             engineWith(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR).process(locations())
@@ -2789,8 +2797,10 @@ class ToolsEngineTest {
             mapOf(
                 destination.resolve(".mcp.json") to "mcpServers",
                 destination.resolve(".vscode/mcp.json") to "servers",
+                destination.resolve(".github/mcp.json") to "mcpServers",
                 destination.resolve(".cursor/mcp.json") to "mcpServers",
                 userHome.resolve(".claude.json") to "mcpServers",
+                userHome.resolve(".copilot/mcp-config.json") to "mcpServers",
             ).forEach { (file, key) ->
                 val entry = Json
                     .parseToJsonElement(file.readText())
@@ -3102,7 +3112,7 @@ class ToolsEngineTest {
         }
 
         @Test
-        fun `should name only the MCP files of Claude Code and Codex in the home in a dry run, and write nothing`() {
+        fun `should name only the MCP files of Claude Code, Codex and Copilot CLI in the home in a dry run, and write nothing`() {
             // given
             writeUserDeployment(tools = null, mcpFilter = listOf("atlassian"))
 
@@ -3114,6 +3124,7 @@ class ToolsEngineTest {
             assertThat(infos.filter { it.contains("MCP servers") }).containsExactlyInAnyOrder(
                 "Would write MCP servers [atlassian] to ${claudeJson.absolutePath}",
                 "Would write MCP servers [atlassian] to ${codexConfig.absolutePath}",
+                "Would write MCP servers [atlassian] to ${userHome.resolve(".copilot/mcp-config.json").absolutePath}",
             )
             assertThat(userHome).doesNotExist()
         }
@@ -3146,13 +3157,14 @@ class ToolsEngineTest {
             engineWith(*ToolType.entries.toTypedArray()).process(locations())
 
             // then
-            listOf("github_copilot", "cursor", "windsurf", "antigravity").forEach { tool ->
+            listOf("cursor", "windsurf", "antigravity").forEach { tool ->
                 assertThat(warnings().filter { it.contains("globals: $tool ") && it.contains("MCP") })
                     .describedAs(tool)
                     .singleElement()
                     .satisfies({ assertThat(it).contains("[atlassian]").contains("user scope") })
             }
             assertThat(warnings()).noneMatch { (it.contains("globals: claude ") || it.contains("globals: codex ")) && it.contains("MCP") }
+            assertThat(warnings()).noneMatch { it.contains("globals: github_copilot ") && it.contains("gets none") }
         }
 
         @Test
@@ -3184,10 +3196,396 @@ class ToolsEngineTest {
     /**
      * The ledger of a project: the entries the engine wrote into each MCP file, so a later deploy removes what its deployment no longer selects.
      */
+
+    /**
+     * GitHub Copilot CLI: `.github/mcp.json` of a project beside `.vscode/mcp.json` of Copilot in VS Code, and `~/.copilot/mcp-config.json`, the only file `github_copilot` gets in the user scope.
+     */
+    @Nested
+    inner class CopilotCliMcpServers {
+
+        private val projectFile get() = destination.resolve(".github/mcp.json")
+        private val userFile get() = userHome.resolve(".copilot/mcp-config.json")
+
+        // - the environment of the run carries the secret; no file may ever hold it
+        private val secretVariables =
+            VariableResolver(emptyMap(), environment = { name -> mapOf("JIRA_PAT" to SECRET_VALUE)[name] })
+
+        private val expectedEntry = Json.parseToJsonElement("""{"tools": ["*"], "type": "stdio", "command": "atlassian-server", "args": [], "env": {"JIRA_PAT": "${'$'}{JIRA_PAT}"}}""")
+
+        @BeforeEach
+        fun writeServers() {
+            writeStdioServer("atlassian", secret = "JIRA_PAT")
+            writeStdioServer("other")
+        }
+
+        @Test
+        fun `should write the selected servers into the file of Copilot CLI of a project beside the file of VS Code, and record both in the ledger`() {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT, variables = secretVariables).process(locations())
+
+            // then
+            assertThat(entriesOf(projectFile)).isEqualTo(mapOf("atlassian" to expectedEntry))
+            assertThat(projectFile).content().doesNotContain(SECRET_VALUE).doesNotContain("\${env:")
+            assertThat(destination.resolve(".vscode/mcp.json")).content().contains("\"JIRA_PAT\": \"\${env:JIRA_PAT}\"").doesNotContain(SECRET_VALUE)
+            assertThat(recordedEntries(destination.resolve(".ai-tools/mcp-ledger.json")))
+                .isEqualTo(mapOf(".vscode/mcp.json" to listOf("atlassian"), ".github/mcp.json" to listOf("atlassian")))
+        }
+
+        @Test
+        fun `should keep the entries and keys of the file of Copilot CLI it does not own, and replace the one it owns`() {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            projectFile.parentFile.mkdirs()
+            projectFile.writeText("""{"${'$'}schema": "mine", "mcpServers": {"playwright": {"command": "npx", "tools": ["browser_click"]}, "atlassian": {"command": "old"}}}""")
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            val root = Json.parseToJsonElement(projectFile.readText()).jsonObject
+            assertThat(root.keys).containsExactly("\$schema", "mcpServers")
+            assertThat(entriesOf(projectFile)).isEqualTo(
+                mapOf("playwright" to Json.parseToJsonElement("""{"command": "npx", "tools": ["browser_click"]}"""), "atlassian" to expectedEntry),
+            )
+        }
+
+        @Test
+        fun `should leave a file of Copilot CLI it cannot parse strictly untouched and fail only that file, in a dry run as in a deploy`() {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            projectFile.parentFile.mkdirs()
+            val existing = "{\n  // mine\n  \"mcpServers\": {}\n}\n"
+            projectFile.writeText(existing)
+
+            // when
+            val dryRunError = runCatching { engineWith(ToolType.GITHUB_COPILOT, dryRun = true).process(locations()) }.exceptionOrNull()
+            val error = runCatching { engineWith(ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining(projectFile.absolutePath)
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(error?.message)
+            assertThat((error as ExportFailedException).failures.map { it.toolType to it.manifest }).containsExactly(ToolType.GITHUB_COPILOT to "MCP servers [atlassian]")
+            assertThat(projectFile).hasContent(existing)
+            assertThat(destination.resolve(".vscode/mcp.json")).content().contains("\"atlassian\"")
+            assertThat(recordedEntries(destination.resolve(".ai-tools/mcp-ledger.json"))).isEqualTo(mapOf(".vscode/mcp.json" to listOf("atlassian")))
+        }
+
+        @ParameterizedTest
+        @CsvSource("true", "false")
+        fun `should warn once, naming both files, when a portable MCP file the deployment does not write hides the file of Copilot CLI, and write it anyway`(
+            dryRun: Boolean,
+        ) {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            destination.mkdirs()
+            val portable = destination.resolve(".mcp.json")
+            portable.writeText("{\"mcpServers\": {}}")
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT, dryRun = dryRun).process(locations())
+
+            // then
+            assertThat(warnings().filter { it.contains(portable.absolutePath) }).singleElement().satisfies({
+                assertThat(it)
+                    .startsWith("test-project: '${projectFile.absolutePath}' gets the MCP servers [atlassian] for github_copilot")
+                    .contains("Copilot CLI reads only .mcp.json in that directory")
+            })
+            assertThat(projectFile.exists()).isEqualTo(!dryRun)
+        }
+
+        @Test
+        fun `should not warn about the portable MCP file when the same deployment writes it through Claude Code`() {
+            // given
+            writeProject(tools = listOf("claude", "github_copilot"), mcpFilter = listOf("atlassian"))
+            engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT).process(locations())
+            logAppender.list.clear()
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(destination.resolve(".mcp.json")).exists()
+            assertThat(entriesOf(projectFile)).containsOnlyKeys("atlassian")
+            assertThat(warnings()).noneMatch { it.contains("Copilot CLI") }
+        }
+
+        @Test
+        fun `should fail every project whose mcps block covers the file of Copilot CLI another project covers too, and write none of it`() {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            writeProject("second-project", "second-project", destination.absolutePath, tools = listOf("github_copilot"), mcpFilter = emptyList())
+
+            // when
+            val error = runCatching { engineWith(ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'${projectFile.absolutePath}'")
+            assertThat((error as ExportFailedException).failures.map { it.deploymentId to it.cause::class.java }).containsExactlyInAnyOrder(
+                "test-project" to ContendedMcpFileException::class.java,
+                "second-project" to ContendedMcpFileException::class.java,
+            )
+            assertThat(projectFile).doesNotExist()
+        }
+
+        @Test
+        fun `should write the selected servers into the file of Copilot CLI of the home, readable by its owner only, record them in the ledger of the home and write nothing else`() {
+            // given
+            assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+            writeAgent("basic", "base")
+            writePrompt("review", "base")
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT, variables = secretVariables).process(locations())
+
+            // then
+            assertThat(entriesOf(userFile)).isEqualTo(mapOf("atlassian" to expectedEntry))
+            assertThat(userFile).content().doesNotContain(SECRET_VALUE)
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(userFile.toPath()))).isEqualTo("rw-------")
+            assertThat(recordedEntries(userHome.resolve(".ai-tools/mcp-ledger.json"))).isEqualTo(mapOf(".copilot/mcp-config.json" to listOf("atlassian")))
+            // - no instructions, agent, prompt or skill file of GitHub Copilot lands in the home
+            assertThat(
+                userHome
+                    .walkTopDown()
+                    .filter { it.isFile }
+                    .map { it.relativeTo(userHome).invariantSeparatorsPath }
+                    .toList(),
+            ).containsExactlyInAnyOrder(".copilot/mcp-config.json", ".ai-tools/mcp-ledger.json")
+            // - a deployment that does exactly what it declares is told so, without a warning
+            assertThat(infos()).contains("globals: only the MCP servers are deployed for github_copilot in the user scope; its instructions, agents, prompts and skills are not.")
+            assertThat(warnings().filter { it.contains("globals: ") && it.contains("github_copilot") }).isEmpty()
+        }
+
+        @Test
+        fun `should keep the permission bits and the entries written by hand of an existing file of Copilot CLI of the home`() {
+            // given
+            assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            userFile.parentFile.mkdirs()
+            val mine = """{"tools": ["*"], "type": "http", "url": "https://mine.example.com/mcp", "headers": {"Authorization": "Bearer written-by-hand"}}"""
+            userFile.writeText("""{"mcpServers": {"mine": $mine}, "zz-trailing-key": 1}""")
+            Files.setPosixFilePermissions(userFile.toPath(), PosixFilePermissions.fromString("rw-r-----"))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(userFile.toPath()))).isEqualTo("rw-r-----")
+            assertThat(entriesOf(userFile)).isEqualTo(mapOf("mine" to Json.parseToJsonElement(mine), "atlassian" to expectedEntry))
+            assertThat(Json.parseToJsonElement(userFile.readText()).jsonObject.keys).containsExactly("mcpServers", "zz-trailing-key")
+        }
+
+        @Test
+        fun `should remove the servers it wrote into the file of Copilot CLI of the home once the user deployment selects none, keeping the entries written by hand`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian", "other"))
+            userFile.parentFile.mkdirs()
+            userFile.writeText("""{"mcpServers": {"mine": {"command": "npx"}}}""")
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+            writeUserDeployment(tools = listOf("github_copilot"))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(entriesOf(userFile)).containsOnlyKeys("mine")
+            assertThat(userHome.resolve(".ai-tools")).doesNotExist()
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - no mcps block at all
+            "false",
+            // - an mcps block selecting nothing
+            "true",
+        )
+        fun `should report a user deployment that selects no server as not deployed for GitHub Copilot, and write nothing into the home`(
+            emptyWhitelist: Boolean,
+        ) {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = if (emptyWhitelist) emptyList() else null)
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(warnings().filter { it.startsWith("globals: ") }).containsExactly(
+                "globals: github_copilot gets only MCP servers in the user scope, and the manifest selects none, so nothing is deployed for it.",
+            )
+            assertThat(userHome).doesNotExist()
+        }
+
+        @Test
+        fun `should report a user deployment that selects no server for GitHub Copilot as deploying into the home while it removes the servers it wrote there`() {
+            // given
+            // - a first deploy wrote a server, which the ledger records
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+            writeUserDeployment(tools = listOf("github_copilot"))
+            logAppender.list.clear()
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(warnings()).noneMatch { (it.contains("github_copilot") && it.contains("not deployed")) || it.contains("nothing is deployed") }
+            assertThat(infos()).contains("globals: Deploying into the user scope of github_copilot under '${userHome.absolutePath}'")
+            assertThat(entriesOf(userFile)).isEmpty()
+        }
+
+        @Test
+        fun `should never delete the file of Copilot CLI of the home in a replacing user deployment`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("claude", "github_copilot"), replace = true, mcpFilter = listOf("atlassian"))
+            userFile.parentFile.mkdirs()
+            userFile.writeText("""{"mcpServers": {"mine": {"command": "npx"}}}""")
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(entriesOf(userFile)).containsOnlyKeys("mine", "atlassian")
+        }
+
+        @Test
+        fun `should fail every user deployment whose mcps block covers the file of Copilot CLI of the home another one covers too`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            writeUserDeployment("second", tools = listOf("github_copilot"), mcpFilter = emptyList())
+
+            // when
+            val error = runCatching { engineWith(ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${userFile.absolutePath}'")
+                .hasMessageContaining("user deployment 'globals', user deployment 'second'")
+            assertThat((error as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.cause::class.java) }).containsExactlyInAnyOrder(
+                Triple("globals", ToolType.GITHUB_COPILOT, ContendedMcpFileException::class.java),
+                Triple("second", ToolType.GITHUB_COPILOT, ContendedMcpFileException::class.java),
+            )
+            assertThat(userFile).doesNotExist()
+        }
+
+        @ParameterizedTest
+        @CsvSource("dangling", "looping", "file")
+        fun `should fail only GitHub Copilot of the user scope when its directory of the home cannot hold its file, and deploy Claude Code, with the same message in a dry run as in a deploy`(
+            kind: String,
+        ) {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("claude", "github_copilot"), mcpFilter = listOf("atlassian"))
+            userHome.mkdirs()
+            val copilotDir = userHome.resolve(".copilot")
+            when (kind) {
+                "dangling" -> Files.createSymbolicLink(copilotDir.toPath(), tempDir.resolve("out/missing"))
+                "looping" -> userHome.resolve(".copilot-loop").also { Files.createSymbolicLink(it.toPath(), copilotDir.toPath()) }.let { Files.createSymbolicLink(copilotDir.toPath(), it.toPath()) }
+                else -> copilotDir.writeText("not a directory\n")
+            }
+
+            // when
+            val dryRunError = runCatching { engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT, dryRun = true).process(locations()) }.exceptionOrNull()
+            val error = runCatching { engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'${copilotDir.absolutePath}'")
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(error?.message)
+            assertThat((error as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                .containsExactly(Triple("globals", ToolType.GITHUB_COPILOT, "tool directory '.copilot'"))
+            assertThat(userHome.resolve(".claude.json")).content().contains("\"atlassian\"")
+        }
+
+        @Test
+        fun `should report the tool restrictions of the user scope as not applied for GitHub Copilot, with its reason`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"), mcpTools = mapOf("atlassian" to McpToolRestriction(allow = listOf("search"), deny = listOf("delete"))))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(warnings().filter { it.contains("restrict") }).singleElement().satisfies({
+                assertThat(it).startsWith("globals: github_copilot does not restrict the tools of the MCP server(s) [atlassian]: ").contains("~/.copilot/mcp-config.json")
+            })
+            assertThat(entriesOf(userFile).getValue("atlassian").jsonObject.getValue("tools")).isEqualTo(Json.parseToJsonElement("[\"*\"]"))
+        }
+
+        /**
+         * Copilot CLI expands `$NAME` as well as `${NAME}` from its own environment in both of its files, so no literal `$` may reach either of them.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - a header value of a server json
+            "pointer-header, refused-at-load",
+            // - a package argument of a server json
+            "package-argument, refused-at-load",
+            // - a fixed environment variable of an inline manifest
+            "inline-env, refused-at-load",
+            // - a plain value of the config
+            "config-value, refused-at-export",
+        )
+        fun `should write neither file of Copilot CLI when literal text holds a dollar sign, in a dry run as in a deploy`(
+            scenario: String,
+            outcome: String,
+        ) {
+            // given
+            val bare = "${'$'}PROBE_SECRET"
+            val schema = "\"\$schema\": \"https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json\", \"name\": \"x\", \"description\": \"d\", \"version\": \"1\""
+            val serverJson = tempDir.resolve("servers/probe/server.json").toFile().apply { parentFile.mkdirs() }
+            when (scenario) {
+                "pointer-header" -> serverJson.writeText("{$schema, \"remotes\": [{\"type\": \"streamable-http\", \"url\": \"https://x/mcp\", \"headers\": [{\"name\": \"X-Client\", \"value\": \"$bare\"}]}]}")
+                "package-argument" -> serverJson.writeText(
+                    "{$schema, \"packages\": [{\"registryType\": \"npm\", \"identifier\": \"x\", \"transport\": {\"type\": \"stdio\"}, \"packageArguments\": [{\"type\": \"named\", \"name\": \"--trace\", \"value\": \"--trace=$bare\"}]}]}",
+                )
+                "inline-env" -> writeYaml("mcps/probe.yml", "id: probe\ndescription: d\ntransport:\n  type: stdio\n  command: server\n  env:\n    LOG_FILE: '$bare/x.log'\n")
+                else -> writeYaml("mcps/probe.yml", "id: probe\ndescription: d\ntransport:\n  type: stdio\n  command: server\nvariables:\n  - name: PROXY\n    description: p\n    secret: false\n")
+            }
+            if (serverJson.exists()) writeYaml("mcps/probe.yml", "id: probe\nsource: \"${serverJson.parentFile.absolutePath}\"\n")
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("probe"))
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("probe"))
+            val variables = VariableResolver(mapOf("PROXY" to "http://proxy/$bare"), emptyEnvironment)
+
+            // when
+            val errors = listOf(true, false).map { dryRun ->
+                runCatching { engineWith(ToolType.GITHUB_COPILOT, dryRun = dryRun, variables = variables).process(locations()) }.exceptionOrNull()
+            }
+
+            // then
+            assertThat(errors).allSatisfy { error ->
+                if (outcome == "refused-at-load") {
+                    assertThat(error).isInstanceOf(ManifestLoadingException::class.java).hasMessageContaining("'$'").hasMessageNotContaining("PROBE_SECRET")
+                } else {
+                    assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'PROXY'").hasMessageNotContaining("PROBE_SECRET")
+                }
+            }
+            assertThat(listOf(projectFile, userFile)).allSatisfy { assertThat(it).doesNotExist() }
+            assertThat((destination.walkTopDown() + userHome.walkTopDown()).filter { it.isFile }.toList()).noneMatch { it.readText().contains("PROBE_SECRET") }
+        }
+
+        private fun entriesOf(file: File): Map<String, JsonElement> = Json
+            .parseToJsonElement(file.readText())
+            .jsonObject
+            .getValue("mcpServers")
+            .jsonObject
+    }
+
     @Nested
     inner class McpLedgers {
 
-        private val mcpFiles = listOf(".mcp.json", ".vscode/mcp.json", ".cursor/mcp.json", ".codex/config.toml")
+        private val mcpFiles =
+            listOf(".mcp.json", ".vscode/mcp.json", ".github/mcp.json", ".cursor/mcp.json", ".codex/config.toml")
         private val tools = arrayOf(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR)
         private val ledger get() = destination.resolve(".ai-tools/mcp-ledger.json")
 
@@ -3197,10 +3595,12 @@ class ToolsEngineTest {
             writeStdioServer("other")
             // - a server added by hand to every MCP file, which no deploy may remove
             destination.resolve(".vscode").mkdirs()
+            destination.resolve(".github").mkdirs()
             destination.resolve(".cursor").mkdirs()
             destination.resolve(".codex").mkdirs()
             destination.resolve(".mcp.json").writeText("{\"mcpServers\": {\"mine\": {\"command\": \"npx\"}}}")
             destination.resolve(".vscode/mcp.json").writeText("{\"servers\": {\"mine\": {\"command\": \"npx\"}}}")
+            destination.resolve(".github/mcp.json").writeText("{\"mcpServers\": {\"mine\": {\"command\": \"npx\"}}}")
             destination.resolve(".cursor/mcp.json").writeText("{\"mcpServers\": {\"mine\": {\"command\": \"npx\"}}}")
             destination.resolve(".codex/config.toml").writeText("[mcp_servers.mine]\ncommand = \"npx\"\n")
         }
@@ -3857,11 +4257,11 @@ class ToolsEngineTest {
             // given
             writeStdioServer("other")
             writeProject(tools = emptyList())
-            // - GitHub Copilot gets no MCP server in the user scope, which a deployment that is exported reports as skipped
-            writeUserDeployment(tools = listOf("claude", "github_copilot"), mcpFilter = listOf("other"))
+            // - Cursor gets no MCP server in the user scope, which a deployment that is exported reports as skipped
+            writeUserDeployment(tools = listOf("claude", "cursor"), mcpFilter = listOf("other"))
 
             // when
-            val error = runCatching { engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+            val error = runCatching { engineWith(ToolType.CLAUDE, ToolType.CURSOR).process(locations()) }.exceptionOrNull()
 
             // then
             assertThat(error)
@@ -3930,7 +4330,7 @@ class ToolsEngineTest {
             engineWith(toolType).process(locations())
 
             // then
-            val projectDirectories = adapter.toolDirectories(destination) + listOfNotNull(adapter.mcpConfig(destination)?.file?.parentFile, adapter.mcpPermissions(destination)?.file?.parentFile)
+            val projectDirectories = adapter.toolDirectories(destination) + adapter.mcpConfigs(destination).map { it.file.parentFile } + listOfNotNull(adapter.mcpPermissions(destination)?.file?.parentFile)
             assertWrittenWithin(destination, projectDirectories)
             userScope?.let { exporter ->
                 assertWrittenWithin(userHome, exporter.toolDirectories + listOfNotNull(exporter.mcpConfig()?.file?.parentFile, exporter.mcpPermissions()?.file?.parentFile))

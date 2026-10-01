@@ -65,8 +65,8 @@ class ClaudeAdapter(
         ClaudeUserScopeExporter(ClaudeLayout.ofUser(userHome), deployment, userHome)
 
     // `.mcp.json` sits beside `.claude`, so the replaced `.claude` never holds it.
-    override fun mcpConfig(projectDir: File): McpConfigExporter =
-        McpConfigFileExporter(ClaudeLayout.ofProject(projectDir).mcpConfigFile, JsonMcpConfigFormat.CLAUDE_CODE, exportService, projectDir)
+    override fun mcpConfigs(projectDir: File): List<McpConfigExporter> =
+        listOf(McpConfigFileExporter(ClaudeLayout.ofProject(projectDir).mcpConfigFile, JsonMcpConfigFormat.CLAUDE_CODE, exportService, projectDir))
 
     // `settings.json` lies in `.claude`, which a replacing deploy deletes as a whole: the file is then written again from the restrictions of the project, and the ledger names the entries the engine owns in it.
     override fun mcpPermissions(projectDir: File): McpPermissionsExporter =

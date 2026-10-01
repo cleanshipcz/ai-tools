@@ -28,7 +28,7 @@ class McpServerResolver(
      *
      * A stdio server receives every declared variable in its environment after its fixed `env` entries. An optional plain variable the config does not declare is left out, and so is an `env` entry or header that references it. Where each secret variable is found is logged first - see [McpSecretDelivery.report]. No message names a value.
      *
-     * @throws McpServerResolvingException naming the server and the variable if a required plain variable is not declared by the config; if an optional one that is not is part of an argument or the url, which cannot be left out; if a plain value holds `${`, which a tool would expand; if the resolved `url` does not start with `http://` or `https://` and a host, holds a backslash, carries credentials, or is not https while a header is secret; if a secret variable is referenced anywhere a tool would need its value written, which a server returned by [cz.cleanship.aitools.engine.services.LoaderService.loadMcpServer] never does; or naming the server when the secrets manager of [delivery] cannot start it on this machine
+     * @throws McpServerResolvingException naming the server and the variable if a required plain variable is not declared by the config; if an optional one that is not is part of an argument or the url, which cannot be left out; if a plain value holds `$`, which a tool would expand as `${` or, in Copilot CLI, as `$NAME`; if the resolved `url` does not start with `http://` or `https://` and a host, holds a backslash, carries credentials, or is not https while a header is secret; if a secret variable is referenced anywhere a tool would need its value written, which a server returned by [cz.cleanship.aitools.engine.services.LoaderService.loadMcpServer] never does; or naming the server when the secrets manager of [delivery] cannot start it on this machine
      */
     fun resolve(server: McpServer): ResolvedMcpServer {
         delivery.report(server)
@@ -139,9 +139,10 @@ class McpServerResolver(
          */
         private fun plainValue(variable: McpVariable, place: String, omissible: Boolean): String? {
             val value = variables.configValueOf(variable.name)
+            val expansion = value?.let { McpText.expansionIn(it) }
             val problem = when {
-                value != null && McpText.REFERENCE_OPENER in value ->
-                    "MCP server '${server.id}' reads the variable '${variable.name}' for $place, and its value in 'env_vars:' holds '${McpText.REFERENCE_OPENER}', which a tool would expand from its own environment. Declare a value without it."
+                expansion != null ->
+                    "MCP server '${server.id}' reads the variable '${variable.name}' for $place, and its value in 'env_vars:' holds '$expansion', which a tool would expand from its own environment. Declare a value without it."
                 value != null -> return value
                 variable.required ->
                     "MCP server '${server.id}' needs the variable '${variable.name}' for $place, which 'env_vars:' of config.yml and config.local.yml do not declare. " +

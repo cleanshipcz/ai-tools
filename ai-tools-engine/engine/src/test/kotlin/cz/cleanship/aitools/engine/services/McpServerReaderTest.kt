@@ -190,6 +190,115 @@ class McpServerReaderTest {
                 .hasMessageContaining("'atlassian'")
         }
 
+        /**
+         * Copilot CLI expands `$NAME` as well as `${NAME}` from its own environment, so a `$` the engine did not emit for a declared variable would turn literal text into a reference there.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - a bare reference in a fixed environment variable
+                "env    | env.LOG_FILE | {d}PROBE_SECRET/jira.log",
+                // - a bare reference in an argument, as a regular expression may hold one
+                "args   | args         | --tag=^v{d}PROBE_SECRET",
+                // - a dollar sign that is followed by no name at all
+                "args   | args         | --price=5{d}",
+                // - a dollar sign right before a reference in the form of the engine
+                "args   | args         | --url={d}{d}{JIRA_BASE_URL}",
+                // - a bare reference in the url of an http server
+                "url    | url          | https://x/{d}PROBE_SECRET/mcp",
+                // - a bare reference in a header of an http server
+                "header | X-Key        | {d}PROBE_SECRET",
+            ],
+        )
+        fun `should refuse a dollar sign that does not open a reference in the form NAME, naming the field but not the value`(
+            field: String,
+            place: String,
+            value: String,
+        ) {
+            // given
+            val text = value.replace("{d}", "$")
+            val transport = when (field) {
+                "env" -> McpTransport.Stdio(command = "server", env = mapOf("LOG_FILE" to text))
+                "args" -> McpTransport.Stdio(command = "server", args = listOf(text))
+                "url" -> McpTransport.Http(url = text)
+                else -> McpTransport.Http(url = "https://x", headers = mapOf("X-Key" to text))
+            }
+            // - an http server may declare only the variables it references, so only the stdio server declares the one the reference in the form of the engine names
+            val declared = if (transport is McpTransport.Stdio) listOf(McpVariable("JIRA_BASE_URL", "Base", secret = false)) else emptyList()
+            val manifest = inline(transport, *declared.toTypedArray())
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining("'$place'")
+                .hasMessageContaining("'$'")
+                .hasMessageNotContaining("PROBE_SECRET")
+                .hasMessageNotContaining(text)
+        }
+
+        @Test
+        fun `should refuse a header name holding a dollar sign, naming the server but not the name`() {
+            // given
+            val manifest = inline(McpTransport.Http(url = "https://x", headers = mapOf("X-\$PROBE_SECRET" to "x")))
+
+            // when / then
+            assertThatThrownBy { reader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining("header")
+                .hasMessageContaining("'$'")
+                .hasMessageNotContaining("PROBE_SECRET")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - a dollar sign written into the command
+            "/opt/{d}PROBE_SECRET/server",
+            // - a dollar sign a variable of the run brings into the command
+            "{d}{PRICED_FOLDER}/server",
+        )
+        fun `should refuse a command that holds a dollar sign once the variables of the run are substituted, without repeating it`(
+            command: String,
+        ) {
+            // given
+            val dollarReader = McpServerReader(
+                VariableResolver(variables = mapOf("PRICED_FOLDER" to "/opt/5\$PROBE_SECRET"), environment = { null }),
+                userHome = home,
+            )
+            val manifest = inline(McpTransport.Stdio(command = command.replace("{d}", "$")))
+
+            // when / then
+            assertThatThrownBy { dollarReader.read(manifest, manifestFile) }
+                .isInstanceOf(InvalidMcpServerManifestException::class.java)
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining("'command'")
+                .hasMessageContaining("'$'")
+                .hasMessageNotContaining("PROBE_SECRET")
+        }
+
+        @Test
+        fun `should accept a reference in the form NAME next to literal text, the one place a dollar sign is written`() {
+            // given
+            val manifest = inline(
+                McpTransport.Stdio(command = "server", args = listOf("pre-\${JIRA_BASE_URL}-post"), env = mapOf("JIRA_URL" to "\${JIRA_BASE_URL}")),
+                McpVariable("JIRA_BASE_URL", "Base", secret = false),
+            )
+
+            // when
+            val server = reader.read(manifest, manifestFile)
+
+            // then
+            assertThat(server.transport).isEqualTo(
+                McpServerTransport.Stdio(
+                    command = "server",
+                    args = listOf(McpText(listOf(McpTextPart.Literal("pre-"), McpTextPart.Variable("JIRA_BASE_URL"), McpTextPart.Literal("-post")))),
+                    env = mapOf("JIRA_URL" to McpText(listOf(McpTextPart.Variable("JIRA_BASE_URL")))),
+                ),
+            )
+        }
+
         @Test
         fun `should refuse a declared variable in the command, which resolves like a path`() {
             // given
@@ -562,6 +671,85 @@ class McpServerReaderTest {
                 .isInstanceOf(InvalidMcpServerSourceException::class.java)
                 .hasMessageContaining(serverFile().absolutePath)
                 .hasMessageContaining("'X-Leak'")
+        }
+
+        /**
+         * Copilot CLI expands `$NAME` as well as `${NAME}` from its own environment, so a `$` in text of a server json would send a value of that environment wherever the text goes.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - a header value, which Copilot CLI would send to the remote host
+                "header     | the header 'X-Client'",
+                // - a named package argument, which docker would pass into the container
+                "named      | the package argument '--trace'",
+                // - a positional package argument
+                "positional | a positional package argument",
+                // - the value of an environment variable of a package
+                "env        | the environment variable 'LOG_FILE'",
+                // - the url of a remote
+                "url        | the url of the remote",
+            ],
+        )
+        fun `should refuse a dollar sign in text of a server json, naming the file and the field but not the value`(
+            field: String,
+            place: String,
+        ) {
+            // given
+            val bare = "${'$'}PROBE_SECRET"
+            when (field) {
+                "header" -> writeRemote("""{"name": "X-Client", "value": "$bare"}""")
+                "named" -> writePackage("""{"type": "named", "name": "--trace", "value": "--trace=$bare"}""")
+                "positional" -> writePackage("""{"type": "positional", "value": "$bare"}""")
+                "env" -> writePackageEnvironment("""{"name": "LOG_FILE", "value": "$bare/x.log"}""")
+                else -> writeServerJson(
+                    """{"${'$'}schema": "$SCHEMA", "name": "x", "description": "d", "version": "1", "remotes": [{"type": "streamable-http", "url": "https://example.com/$bare/mcp"}]}""",
+                )
+            }
+
+            // when / then
+            assertThatThrownBy { readServer() }
+                .isInstanceOf(InvalidMcpServerSourceException::class.java)
+                .hasMessageContaining(serverFile().absolutePath)
+                .hasMessageContaining(place)
+                .hasMessageContaining("'$'")
+                .hasMessageNotContaining("PROBE_SECRET")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - the name of a header of a remote
+                "header | a header of the remote",
+                // - the name of an environment variable of an oci package, which docker receives as -e NAME
+                "oci    | an environment variable of the package",
+                // - the name of an environment variable of an npm package
+                "npm    | an environment variable of the package",
+            ],
+        )
+        fun `should refuse a dollar sign in a name of a server json, naming the file and the field but not the name`(
+            field: String,
+            place: String,
+        ) {
+            // given
+            val bare = "${'$'}PROBE_SECRET"
+            when (field) {
+                "header" -> writeRemote("""{"name": "X-$bare", "value": "x"}""")
+                "npm" -> writePackageEnvironment("""{"name": "A$bare", "value": "x"}""")
+                else -> writeServerJson(
+                    """{"${'$'}schema": "$SCHEMA", "name": "x", "description": "d", "version": "1", "packages": [{"registryType": "oci", "identifier": "ghcr.io/acme/harmless:1.0", "transport": {"type": "stdio"}, "environmentVariables": [{"name": "A$bare"}]}]}""",
+                )
+            }
+
+            // when / then
+            assertThatThrownBy { readServer() }
+                .isInstanceOf(InvalidMcpServerSourceException::class.java)
+                .hasMessageContaining(serverFile().absolutePath)
+                .hasMessageContaining(place)
+                .hasMessageContaining("'$'")
+                .hasMessageNotContaining("PROBE_SECRET")
         }
 
         @Test

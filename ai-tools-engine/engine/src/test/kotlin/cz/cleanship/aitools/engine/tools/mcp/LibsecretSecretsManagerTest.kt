@@ -191,6 +191,19 @@ class LibsecretSecretsManagerTest {
         }
 
         @Test
+        fun `should fail when the path of the launcher holds a dollar sign, which Copilot CLI would expand as a bare reference`() {
+            // given
+            val expanding = FakePrograms.executable(tempDir.resolve("\$HOME/scripts/mcp-launch"), "#!/bin/sh\n")
+
+            // when / then
+            assertThatThrownBy { LibsecretSecretsManager(tempDir.resolve("\$HOME").toFile(), environment()).launch("atlassian", transport, managed) }
+                .isInstanceOf(McpServerResolvingException::class.java)
+                .hasMessageContaining("'atlassian'")
+                .hasMessageContaining(expanding.toRealPath().toString())
+                .hasMessageContaining("'$'")
+        }
+
+        @Test
         fun `should refuse a server the loader did not check, whose id or secret name the launcher would refuse`() {
             // given
             // - the loader refuses both; the guard keeps a server built any other way from rendering a launcher that exits at once

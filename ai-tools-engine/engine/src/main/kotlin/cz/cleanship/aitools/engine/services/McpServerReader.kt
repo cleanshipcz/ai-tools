@@ -37,13 +37,13 @@ class McpServerReader(
     /**
      * Returns the server [manifest] describes.
      *
-     * For an inline server, every `${NAME}` in `args`, `env`, `url` and `headers` must name a variable the manifest declares, and becomes a reference to it; any other `${` fails. The `command` is a path: it may reference only variables of the run, and after substitution a `~` or leading `~/` stands for the home directory of this reader; a relative command is kept as written, for the tool to look up.
+     * For an inline server, every `${NAME}` in `args`, `env`, `url` and `headers` must name a variable the manifest declares, and becomes a reference to it; any other `$` fails. The `command` is a path: it may reference only variables of the run, and after substitution a `~` or leading `~/` stands for the home directory of this reader; a relative command is kept as written, for the tool to look up, and it fails when it then holds a `$`.
      *
      * A pointer server is derived from its `server.json`, which is read once: when the manifest declares a `pin`, the SHA-256 hash of the bytes read must equal it, and when it declares none, a warning prints the value to pin. The names of the variables it passes and the environment variables it sets are logged, never their values. Its text is data: a `{name}` placeholder the file defines becomes a variable named after the manifest id and the placeholder, such as `GITHUB_TOKEN`; an environment variable of a package keeps its own name, and so does one whose value is a single placeholder; a header without a value becomes a variable named after the id and the header, such as `GITHUB_AUTHORIZATION`; a positional argument with only a `valueHint` becomes a variable named after the id and the hint. A variable is secret when its input or any input around it is marked `isSecret`. An `npm` package starts with `npx -y`, a `pypi` package with `uvx`, and an `oci` package with `docker run -i --rm`, naming every environment variable with `-e`.
      *
      * @param manifestFile the file [manifest] was read from, whose directory a relative `source` resolves against
      * @throws InvalidMcpServerManifestException if a pointer server declares a `pin` not of the form [McpServerManifest.pin] describes; if an inline server lacks a transport or a description, declares a `select` or a `pin`, or references anything but a declared variable; if its `command` references a declared variable or a variable of the run nothing declares; or if the server, inline or derived, breaks a rule of [requireValid]
-     * @throws InvalidMcpServerSourceException if a pointer server also declares a `description`, `transport` or `variables`; if its `source` cannot be substituted or leads to no readable `server.json`; if the hash of that file is not its `pin`, naming the file, the pinned and the actual hash; if that file is not valid JSON, is not of the schema [SUPPORTED_SCHEMA], has a blank `description`, or declares no package and no remote; if `select` names both, names one the file does not declare, or is missing while the file declares more than one; if the selected remote is not Streamable HTTP, or the selected package is not a stdio package of `npm`, `pypi` or `oci`; if its `runtimeHint` is not the runner of its registry; if its identifier or version does not follow the grammar of its registry - see [PackageRegistry]; if it has a runtime argument other than `-e NAME` of an `oci` package; if it sets or forwards an environment variable, derives a variable, or sends a header, of the names the engine refuses; if a named argument has no value or a positional one has neither a value nor a value hint; if its text holds `${`; or if it derives one variable both as secret and as not secret
+     * @throws InvalidMcpServerSourceException if a pointer server also declares a `description`, `transport` or `variables`; if its `source` cannot be substituted or leads to no readable `server.json`; if the hash of that file is not its `pin`, naming the file, the pinned and the actual hash; if that file is not valid JSON, is not of the schema [SUPPORTED_SCHEMA], has a blank `description`, or declares no package and no remote; if `select` names both, names one the file does not declare, or is missing while the file declares more than one; if the selected remote is not Streamable HTTP, or the selected package is not a stdio package of `npm`, `pypi` or `oci`; if its `runtimeHint` is not the runner of its registry; if its identifier or version does not follow the grammar of its registry - see [PackageRegistry]; if it has a runtime argument other than `-e NAME` of an `oci` package; if it sets or forwards an environment variable, derives a variable, or sends a header, of the names the engine refuses; if a named argument has no value or a positional one has neither a value nor a value hint; if its text holds `$`; or if it derives one variable both as secret and as not secret
      */
     fun read(manifest: McpServerManifest, manifestFile: File): McpServer {
         val server = if (manifest.source == null) readInline(manifest) else readPointer(manifest, manifestFile)
@@ -83,10 +83,19 @@ class McpServerReader(
                 "MCP server '$serverId' references its declared variable '$ownVariable' in 'command'. The command is a path, resolved like the 'source' of a pointer: it may reference only variables of the run, from 'env_vars:' or the environment of the run."
             substituted == null || McpText.REFERENCE_OPENER in substituted ->
                 "MCP server '$serverId' holds a '${McpText.REFERENCE_OPENER}' in 'command' that is not a variable of the run in the form '${McpText.REFERENCE_OPENER}NAME}', which a tool would expand."
-            substituted == HOME || substituted.startsWith("$HOME/") -> return File(".").resolveDeclaredPath(substituted, userHome).absolutePath
-            else -> return substituted
+            else -> return requireNoExpansionSign(serverId, if (substituted == HOME || substituted.startsWith("$HOME/")) File(".").resolveDeclaredPath(substituted, userHome).absolutePath else substituted)
         }
         throw InvalidMcpServerManifestException(problem)
+    }
+
+    // Checked once a leading '~' is resolved too, since the home directory is part of the command as written.
+    private fun requireNoExpansionSign(serverId: String, command: String): String {
+        if (McpText.EXPANSION_SIGN in command) {
+            throw InvalidMcpServerManifestException(
+                "MCP server '$serverId' holds a '${McpText.EXPANSION_SIGN}' in 'command' once the variables of the run and a leading '~' are resolved, which Copilot CLI would expand as it expands '${McpText.EXPANSION_SIGN}NAME'. Use a command whose path holds no '${McpText.EXPANSION_SIGN}'.",
+            )
+        }
+        return command
     }
 
     private fun substituteCommand(serverId: String, command: String): String = try {
@@ -272,6 +281,7 @@ class McpServerReader(
             remote.headers.firstOrNull { header -> DENIED_HEADERS.any { it.matches(header.name) } }?.let {
                 fail("The $label sends the header '${it.name}', which controls the connection or overrides authentication; the engine sends only 'Authorization' and headers of the server itself.")
             }
+            remote.headers.forEach { requireNoExpansionSign(it.name, "a header of the remote") }
             val url = template(remote.url, remote.variables, outerSecret = false, place = "the url of the remote")
             val headers = remote.headers.associate { header ->
                 header.name to if (header.value == null) {
@@ -321,6 +331,7 @@ class McpServerReader(
         }
 
         private fun environmentVariable(input: KeyValueInputJson, env: MutableMap<String, McpText>) {
+            requireNoExpansionSign(input.name, "an environment variable of the package")
             requireAllowedName(input.name, derivedFromId = false)
             val single = input.value
                 ?.let { PLACEHOLDER.matchEntire(it) }
@@ -359,13 +370,22 @@ class McpServerReader(
         }
 
         /**
-         * Returns [text] of the file, refusing text every tool would expand as a reference to a variable of its own environment.
+         * Returns [text] of the file, refusing text a tool would expand as a reference to a variable of its own environment: `${` in every tool, and any `$` in Copilot CLI.
          */
         private fun literal(text: String, place: String): String {
-            if (McpText.REFERENCE_OPENER in text) {
-                fail("It holds '${McpText.REFERENCE_OPENER}' in $place, which every tool would expand as a reference to a variable of its own environment, so the engine refuses to write it.")
+            McpText.expansionIn(text)?.let {
+                fail("It holds '$it' in $place, which a tool would expand as a reference to a variable of its own environment, so the engine refuses to write it.")
             }
             return text
+        }
+
+        /**
+         * Fails when [name], a name the file gives a header or an environment variable, holds a `$`, which Copilot CLI may expand; the name is never repeated.
+         */
+        private fun requireNoExpansionSign(name: String, place: String) {
+            if (McpText.EXPANSION_SIGN in name) {
+                fail("The name of $place holds '${McpText.EXPANSION_SIGN}', which Copilot CLI may expand as a reference to a variable of its own environment, so the engine refuses to write it.")
+            }
         }
 
         private fun add(variable: McpVariable) {

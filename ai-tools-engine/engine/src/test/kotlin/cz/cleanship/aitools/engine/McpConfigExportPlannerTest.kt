@@ -18,6 +18,7 @@ import cz.cleanship.aitools.engine.tools.mcp.JsonMcpConfigFormat
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileException
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigShadow
 import cz.cleanship.aitools.engine.tools.mcp.McpContext
 import cz.cleanship.aitools.engine.tools.mcp.McpPermissionsContext
 import cz.cleanship.aitools.engine.tools.mcp.McpPermissionsExporter
@@ -35,6 +36,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.FileSystems
@@ -166,7 +169,7 @@ class McpConfigExportPlannerTest {
             val allowOnly = mapOf("atlassian" to McpToolRestriction(allow = listOf("search")))
 
             // when
-            val planned = planner.exportsFor(deployment(servers = listOf(atlassian), restrictions = allowOnly), ToolType.CLAUDE, config, permissions, appliesEverything.copy(allowedTools = "no list"))
+            val planned = planner.exportsFor(deployment(servers = listOf(atlassian), restrictions = allowOnly), ToolType.CLAUDE, listOf(config), permissions, appliesEverything.copy(allowedTools = "no list"))
 
             // then
             assertThat(planned.map { it.name }).containsExactly("MCP servers [atlassian]")
@@ -175,7 +178,7 @@ class McpConfigExportPlannerTest {
         @Test
         fun `should report a tool that applies neither list once for the restriction, with its reason`() {
             // when
-            planner.exportsFor(deployment(servers = listOf(atlassian), restrictions = restricted), ToolType.CURSOR, config, null, appliesEverything.copy(allowedTools = "no setting", deniedTools = "no setting"))
+            planner.exportsFor(deployment(servers = listOf(atlassian), restrictions = restricted), ToolType.CURSOR, listOf(config), null, appliesEverything.copy(allowedTools = "no setting", deniedTools = "no setting"))
 
             // then
             assertThat(warnings()).containsExactly("p: cursor does not restrict the tools of the MCP server(s) [atlassian]: no setting.")
@@ -184,7 +187,7 @@ class McpConfigExportPlannerTest {
         @Test
         fun `should plan nothing and read no file for a deployment that selects and restricts nothing and whose ledger records nothing`() {
             // when
-            val planned = planner.exportsFor(deployment(servers = emptyList(), declaresMcps = false), ToolType.CLAUDE, config, permissions, appliesEverything)
+            val planned = planner.exportsFor(deployment(servers = emptyList(), declaresMcps = false), ToolType.CLAUDE, listOf(config), permissions, appliesEverything)
 
             // then
             assertThat(planned).isEmpty()
@@ -323,7 +326,7 @@ class McpConfigExportPlannerTest {
             ledgerFile.writeText("{\"version\": 1, \"files\": {\".mcp.json\": [\"atlassian\"]}}")
 
             // when
-            val planned = planner.exportsFor(deployment(servers = listOf(atlassian), restrictions = restricted), ToolType.CLAUDE, config, permissions, appliesEverything)
+            val planned = planner.exportsFor(deployment(servers = listOf(atlassian), restrictions = restricted), ToolType.CLAUDE, listOf(config), permissions, appliesEverything)
 
             // then
             assertThat(planned.map { it.name }).containsExactly(McpConfigExportPlanner.LEDGER)
@@ -344,7 +347,7 @@ class McpConfigExportPlannerTest {
             val linked = FakeConfigExporter(link.toFile().resolve(".mcp.json")).also { it.entries = null }
 
             // when
-            planner.exportsFor(deployment(servers = emptyList(), declaresMcps = false, root = TargetRoot.Project(link.toFile())), ToolType.CLAUDE, linked, null, appliesEverything).forEach { it.run() }
+            planner.exportsFor(deployment(servers = emptyList(), declaresMcps = false, root = TargetRoot.Project(link.toFile())), ToolType.CLAUDE, listOf(linked), null, appliesEverything).forEach { it.run() }
 
             // then
             assertThat(linked.contexts.single().recorded).isEqualTo(mapOf("atlassian" to setOf(fingerprint('c'))))
@@ -367,8 +370,8 @@ class McpConfigExportPlannerTest {
             planner.claim(listOf(McpFileClaim(config.file, "project 'p'"), McpFileClaim(linked.file, "project 'q'")))
 
             // when
-            val first = planner.exportsFor(deployment(servers = listOf(atlassian)), ToolType.CLAUDE, config, null, appliesEverything)
-            val second = planner.exportsFor(deployment(id = "q", servers = emptyList(), root = TargetRoot.Project(link.toFile())), ToolType.CLAUDE, linked, null, appliesEverything)
+            val first = planner.exportsFor(deployment(servers = listOf(atlassian)), ToolType.CLAUDE, listOf(config), null, appliesEverything)
+            val second = planner.exportsFor(deployment(id = "q", servers = emptyList(), root = TargetRoot.Project(link.toFile())), ToolType.CLAUDE, listOf(linked), null, appliesEverything)
 
             // then
             (first + second).forEach { export ->
@@ -387,7 +390,7 @@ class McpConfigExportPlannerTest {
             planner.claim(listOf(McpFileClaim(config.file, "project 'p'")))
 
             // when
-            val planned = planner.exportsFor(deployment(id = "q", servers = emptyList(), declaresMcps = false), ToolType.CLAUDE, config, null, appliesEverything)
+            val planned = planner.exportsFor(deployment(id = "q", servers = emptyList(), declaresMcps = false), ToolType.CLAUDE, listOf(config), null, appliesEverything)
 
             // then
             assertThat(planned).isEmpty()
@@ -407,11 +410,123 @@ class McpConfigExportPlannerTest {
         }
     }
 
+    /**
+     * A tool that ignores its MCP config file while another file lies beside it, as Copilot CLI ignores `.github/mcp.json` while `.mcp.json` exists in the same directory.
+     */
+    @Nested
+    inner class HiddenFiles {
+
+        private lateinit var hidden: FakeConfigExporter
+        private lateinit var hiding: File
+
+        @BeforeEach
+        fun setUpHiddenFile() {
+            hiding = projectDir.resolve(".mcp.json")
+            hidden = FakeConfigExporter(projectDir.resolve(".github/mcp.json"), McpConfigShadow(hiding, "Copilot CLI"))
+        }
+
+        @Test
+        fun `should warn once, naming both files, when it writes servers into a file that a file this deployment does not write hides`() {
+            // given
+            hiding.writeText("{}")
+
+            // when
+            planner.exportsFor(deployment(servers = listOf(atlassian), mcpConfigFiles = setOf(hidden.file)), ToolType.GITHUB_COPILOT, listOf(hidden), null, appliesEverything).forEach { it.run() }
+
+            // then
+            assertThat(hidden.contexts).hasSize(1)
+            assertThat(warnings()).containsExactly(
+                "p: '${hidden.file.absolutePath}' gets the MCP servers [atlassian] for github_copilot, but '${hiding.absolutePath}' exists and this deployment does not write it: Copilot CLI reads only .mcp.json in that directory and ignores .github/mcp.json there. Let this deployment write .mcp.json too, or remove that file.",
+            )
+        }
+
+        @Test
+        fun `should not warn when the same deployment writes the file that hides it, even through a linked directory`() {
+            // given
+            hiding.writeText("{}")
+            val link = tempDir.resolve("link").toPath()
+            Files.createSymbolicLink(link, projectDir.toPath())
+
+            // when
+            planner.exportsFor(deployment(servers = listOf(atlassian), mcpConfigFiles = setOf(hidden.file, link.toFile().resolve(".mcp.json"))), ToolType.GITHUB_COPILOT, listOf(hidden), null, appliesEverything).forEach { it.run() }
+
+            // then
+            assertThat(hidden.contexts).hasSize(1)
+            assertThat(warnings()).isEmpty()
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - nothing lies beside the file
+            "false, true",
+            // - the deployment selects no server, so it only removes what the ledger records
+            "true, false",
+        )
+        fun `should not warn when no file hides it or it writes no server`(
+            hidingExists: Boolean,
+            selectsServers: Boolean,
+        ) {
+            // given
+            if (hidingExists) hiding.writeText("{}")
+            writeLedger(""""files": {".github/mcp.json": {"atlassian": "${fingerprint('a')}"}}""")
+
+            // when
+            planner.exportsFor(deployment(servers = if (selectsServers) listOf(atlassian) else emptyList()), ToolType.GITHUB_COPILOT, listOf(hidden), null, appliesEverything).forEach { it.run() }
+
+            // then
+            assertThat(hidden.contexts).hasSize(1)
+            assertThat(warnings()).isEmpty()
+        }
+
+        @Test
+        fun `should not warn when the edit of the file fails`() {
+            // given
+            hiding.writeText("{}")
+            hidden.failure = McpConfigFileException("broken")
+
+            // when
+            val export = planner.exportsFor(deployment(servers = listOf(atlassian)), ToolType.GITHUB_COPILOT, listOf(hidden), null, appliesEverything).single()
+
+            // then
+            assertThatThrownBy { export.run() }.isInstanceOf(McpConfigFileException::class.java)
+            assertThat(warnings()).isEmpty()
+        }
+    }
+
+    @Test
+    fun `should plan an export for every MCP config file of a tool, each recorded in the ledger under its own path`() {
+        // given
+        val second = FakeConfigExporter(projectDir.resolve(".github/mcp.json"))
+
+        // when
+        planner.exportsFor(deployment(servers = listOf(atlassian)), ToolType.GITHUB_COPILOT, listOf(config, second), null, appliesEverything).forEach { it.run() }
+
+        // then
+        assertThat(config.contexts).hasSize(1)
+        assertThat(second.contexts).hasSize(1)
+        assertThat(
+            ledger()
+                .jsonObject
+                .getValue("files")
+                .jsonObject.keys,
+        ).containsExactlyInAnyOrder(".mcp.json", ".github/mcp.json")
+    }
+
+    @Test
+    fun `should report a tool without an MCP config file as skipped for the servers of a deployment and plan nothing`() {
+        // when
+        val planned = planner.exportsFor(deployment(servers = listOf(atlassian)), ToolType.WINDSURF, emptyList(), null, appliesEverything)
+
+        // then
+        assertThat(planned).isEmpty()
+        assertThat(warnings()).containsExactly("p: windsurf has no MCP support in this engine, so the MCP server(s) [atlassian] are not deployed for it.")
+    }
+
     private fun runAll(
         deployment: McpDeployment,
         limits: McpLimits = appliesEverything,
         deletedFirst: List<File> = emptyList(),
-    ) = planner.exportsFor(deployment, ToolType.CLAUDE, config, permissions, limits, deletedFirst).forEach { it.run() }
+    ) = planner.exportsFor(deployment, ToolType.CLAUDE, listOf(config), permissions, limits, deletedFirst).forEach { it.run() }
 
     // A test builder: every parameter is one field of the deployment with the default a test rarely needs to change.
     @Suppress("LongParameterList")
@@ -422,12 +537,13 @@ class McpConfigExportPlannerTest {
         restrictions: Map<String, McpToolRestriction> = emptyMap(),
         declaresMcps: Boolean = true,
         root: TargetRoot = TargetRoot.Project(projectDir),
-    ) = McpDeployment(id, root, servers.associateBy { it.id }, ownedMcpIds, restrictions, declaresMcps)
+        mcpConfigFiles: Set<File> = emptySet(),
+    ) = McpDeployment(id, root, servers.associateBy { it.id }, ownedMcpIds, restrictions, declaresMcps, mcpConfigFiles)
 
     // A run of its own: a planner holds the ledgers of one run, so each run gets a new one.
     private fun runWith(exporter: McpConfigExporter, deployment: McpDeployment) =
         McpConfigExportPlanner(McpServerResolver(VariableResolver()), ExportService())
-            .exportsFor(deployment, ToolType.CLAUDE, exporter, null, appliesEverything)
+            .exportsFor(deployment, ToolType.CLAUDE, listOf(exporter), null, appliesEverything)
             .forEach { it.run() }
 
     private fun server(id: String, command: String = "$id-server") = McpServer(
@@ -456,7 +572,10 @@ class McpConfigExportPlannerTest {
     /**
      * A config exporter that records the contexts it is given and prepares an edit writing [entries], or none when it is `null`.
      */
-    private class FakeConfigExporter(override val file: File) : McpConfigExporter {
+    private class FakeConfigExporter(
+        override val file: File,
+        override val hiddenBy: McpConfigShadow? = null,
+    ) : McpConfigExporter {
         val contexts = mutableListOf<McpContext>()
         var entries: Map<String, String>? = mapOf("atlassian" to "sha256:" + "e".repeat(64))
         var failure: McpConfigFileException? = null

@@ -6,7 +6,7 @@ import cz.cleanship.aitools.engine.services.ExportService
 import java.io.File
 
 /**
- * Writes the MCP servers of one deployment into the MCP config file of one tool, obtained from [cz.cleanship.aitools.engine.tools.ToolAdapter.mcpConfig] or [cz.cleanship.aitools.engine.tools.UserScopeExporter.mcpConfig].
+ * Writes the MCP servers of one deployment into the MCP config file of one tool, obtained from [cz.cleanship.aitools.engine.tools.ToolAdapter.mcpConfigs] or [cz.cleanship.aitools.engine.tools.UserScope.mcpConfig].
  *
  * It owns only the server entries [McpContext] names; every other entry and every other part of [file] is left as it is, and the file itself is never deleted.
  */
@@ -14,6 +14,11 @@ interface McpConfigExporter {
 
     /** The MCP config file this exporter writes, such as `<project>/.mcp.json`. */
     val file: File
+
+    /**
+     * The file whose presence makes the tool ignore [file], such as `<project>/.mcp.json` for `<project>/.github/mcp.json` of Copilot CLI, or `null` when the tool reads [file] whatever lies beside it.
+     */
+    val hiddenBy: McpConfigShadow? get() = null
 
     /**
      * Returns the edit that writes the servers of [context] into [file] and removes every entry [context] owns but does not select, prepared from one read of [file]; nothing is written before [PreparedMcpEdit.commit].
@@ -24,6 +29,17 @@ interface McpConfigExporter {
      */
     fun prepare(context: McpContext): PreparedMcpEdit?
 }
+
+/**
+ * A file that, while it exists, makes a tool ignore the MCP config file of an [McpConfigExporter].
+ *
+ * @property file the file that hides the MCP config file
+ * @property reader the program that then reads only [file], as a message names it, such as `Copilot CLI`
+ */
+data class McpConfigShadow(
+    val file: File,
+    val reader: String,
+)
 
 /**
  * The MCP servers one deployment writes into the MCP config file of a tool.
@@ -60,20 +76,26 @@ class PreparedMcpEdit(
 /**
  * The [McpConfigExporter] of a tool whose MCP config file is [file] in [format], written through [exportService], so a dry run writes nothing.
  *
- * @param root the directory [file] belongs to and how far a symbolic link at [file] or above it may lead - see [TargetRoot]
+ * @param root the directory [file] belongs to and how far a symbolic link at [file] or above it may lead - see [TargetRoot]; for a [TargetRoot.UserHome], [prepare] also logs a warning naming [file] and each entry it replaces with other content or removes although the ledger does not record it - see [McpOwnership.reportUnrecordedTakeovers]
  */
 class McpConfigFileExporter(
     override val file: File,
     private val format: McpConfigFormat,
     private val exportService: ExportService,
-    root: TargetRoot,
+    private val root: TargetRoot,
+    override val hiddenBy: McpConfigShadow? = null,
 ) : McpConfigExporter {
 
     /**
      * The exporter of an MCP config file of the project [projectDir]; a symbolic link at [file] is written through only when its real target lies inside it.
      */
-    constructor(file: File, format: McpConfigFormat, exportService: ExportService, projectDir: File) :
-        this(file, format, exportService, TargetRoot.Project(projectDir))
+    constructor(
+        file: File,
+        format: McpConfigFormat,
+        exportService: ExportService,
+        projectDir: File,
+        hiddenBy: McpConfigShadow? = null,
+    ) : this(file, format, exportService, TargetRoot.Project(projectDir), hiddenBy)
 
     private val managed = ManagedConfigFile(file, root)
 
@@ -87,6 +109,8 @@ class McpConfigFileExporter(
         if (context.servers.isEmpty() && removed.isEmpty()) return null
         val content = format.merge(existing, context.servers, owned, file)
         val entries = format.entryFingerprints(content, file).filterKeys { it in selected }
+        // A file of the home is where a server added by hand with its credential most likely lives, and no project checkout keeps a copy of it.
+        if (root is TargetRoot.UserHome) McpOwnership.reportUnrecordedTakeovers(file, present, owned, context.recorded, entries)
         val written = "MCP servers ${context.servers.map { it.id }}"
         val describedBy = if (removed.isEmpty()) written else "$written, removing ${removed.sorted().map { it.escapedForMessage() }}"
         return PreparedMcpEdit(file, entries) {

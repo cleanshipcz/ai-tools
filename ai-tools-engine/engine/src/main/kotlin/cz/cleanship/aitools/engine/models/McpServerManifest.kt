@@ -55,7 +55,7 @@ data class McpServerManifest(
  *
  * The YAML key `type` picks the kind: `stdio` for [Stdio] or `http` for [Http]. Any other value, such as `sse`, fails the load with a [cz.cleanship.aitools.engine.services.ManifestLoadingException] naming the file.
  *
- * Every text field other than a stdio `command` may reference only declared [McpVariable]s, as `${NAME}`; any other `${`, tool syntax such as `${NAME:-default}` or `${env:NAME}` included, fails the load. A stdio `command` is a path and may reference only variables of the run.
+ * Every text field other than a stdio `command` may reference only declared [McpVariable]s, as `${NAME}`; any other `$`, tool syntax such as `${NAME:-default}` or `${env:NAME}` and a bare `$NAME` included, fails the load. A stdio `command` is a path and may reference only variables of the run.
  */
 @Serializable
 sealed class McpTransport {

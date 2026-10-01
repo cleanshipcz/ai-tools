@@ -36,7 +36,7 @@ class AntigravityAdapter(
     /**
      * Returns no exporter: Antigravity expands no environment variable in its MCP config file, so a secret could only reach a server by being written into it, and the engine reports the MCP servers of a project as skipped for this tool instead.
      */
-    override fun mcpConfig(projectDir: File): McpConfigExporter? = null
+    override fun mcpConfigs(projectDir: File): List<McpConfigExporter> = emptyList()
 
     override fun mcpPermissions(projectDir: File): McpPermissionsExporter? = null
 

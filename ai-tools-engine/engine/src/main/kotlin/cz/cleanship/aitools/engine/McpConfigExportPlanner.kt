@@ -5,9 +5,12 @@ import cz.cleanship.aitools.engine.io.resolvedPath
 import cz.cleanship.aitools.engine.models.McpServer
 import cz.cleanship.aitools.engine.models.McpToolRestriction
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.models.UserDeployment
 import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.ExportService
 import cz.cleanship.aitools.engine.tools.McpLimits
+import cz.cleanship.aitools.engine.tools.ToolAdapter
+import cz.cleanship.aitools.engine.tools.UserScope
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileException
 import cz.cleanship.aitools.engine.tools.mcp.McpContext
@@ -58,9 +61,11 @@ internal class McpConfigExportPlanner(
     }
 
     /**
-     * Returns the exports that write the MCP servers and tool restrictions of [deployment] through one tool: into its MCP config file [config] and into its permissions file [permissions], each when the deployment selects or restricts something for that file, or the ledger of the target records entries in it. A tool without [config] is logged as skipped for the servers of the deployment; a tool whose [limits] cannot apply the `allow` or the `deny` list of a restriction, as skipped for that list, which neither of its files then receives.
+     * Returns the exports that write the MCP servers and tool restrictions of [deployment] through one tool: into each of its MCP config files [configs] and into its permissions file [permissions], each when the deployment selects or restricts something for that file, or the ledger of the target records entries in it. A tool without [configs] is logged as skipped for the servers of the deployment; a tool whose [limits] cannot apply the `allow` or the `deny` list of a restriction, as skipped for that list, which none of its files then receives.
      *
      * Nothing is planned, and no file but the ledger of the target is read, for a deployment that selects and restricts nothing and whose ledger records nothing for these files, nor for a file another deployment covers with its `mcps` block while [deployment] declares none - see [claim]. A deployment whose `mcps` block covers a file another deployment covers too gets one export that throws [ContendedMcpFileException].
+     *
+     * An export that writes servers into a config file whose [McpConfigExporter.hiddenBy] file exists, while [McpDeployment.mcpConfigFiles] does not hold that file, logs one warning naming both files once the edit is committed, in a dry run as in a deploy.
      *
      * Running an export prepares the edit of its file, records in the ledger what the edit writes beside what the ledger recorded, commits the edit, and then narrows the record to what the file holds of the engine; an edit that cannot be prepared records nothing, and a file that holds nothing of the engine is dropped from the record. A ledger that cannot be written before the commit leaves the file as it is; a ledger that cannot be written after the commit leaves the file written and the ledger recording both what the file held and what the edit wrote, so the engine still owns every entry the edit changed. Either failure is thrown once as [McpLedgerException], and the other exports of the tool then write nothing. Running an export also throws [McpServerResolvingException] when a selected server cannot be resolved, and [McpConfigFileException] for every failure of the file, and of a ledger that cannot be read.
      *
@@ -71,24 +76,23 @@ internal class McpConfigExportPlanner(
     fun exportsFor(
         deployment: McpDeployment,
         toolType: ToolType,
-        config: McpConfigExporter?,
+        configs: List<McpConfigExporter>,
         permissions: McpPermissionsExporter?,
         limits: McpLimits,
         deletedFirst: Collection<File> = emptyList(),
     ): List<PlannedMcpExport> {
-        if (config == null && deployment.servers.isNotEmpty()) {
+        if (configs.isEmpty() && deployment.servers.isNotEmpty()) {
             LOG.warn("{}: {} has no MCP support in this engine, so the MCP server(s) {} are not deployed for it.", deployment.id, toolType.serialName, deployment.servers.keys)
         }
-        if (config != null) reportSkippedLists(deployment, toolType, limits)
-        if (config == null && permissions == null) return emptyList()
-        contendedExport(deployment, listOfNotNull(config?.file, permissions?.file))?.let { return listOf(it) }
+        if (configs.isNotEmpty()) reportSkippedLists(deployment, toolType, limits)
+        if (configs.isEmpty() && permissions == null) return emptyList()
+        contendedExport(deployment, configs.map { it.file } + listOfNotNull(permissions?.file))?.let { return listOf(it) }
         val ledger = ledgerFor(deployment.root).getOrElse { failure ->
             // A ledger that cannot be read decides nothing: every MCP file of the tool in this target is left as it is, and the failure names the ledger.
             return listOf(PlannedMcpExport(LEDGER, directory = null) { throw failure })
         }
         val restrictions = deployment.restrictions.appliedBy(limits)
-        return listOfNotNull(
-            config?.takeIf { mayWrite(deployment, it.file) }?.let { configExport(deployment, restrictions, it, ledger) },
+        return configs.filter { mayWrite(deployment, it.file) }.mapNotNull { configExport(deployment, toolType, restrictions, it, ledger) } + listOfNotNull(
             permissions?.takeIf { mayWrite(deployment, it.file) }?.let { permissionsExport(deployment, restrictions, it, ledger, presumedAbsent = deletedFirst.any { deleted -> it.file.isBelow(deleted) }) },
         )
     }
@@ -134,6 +138,7 @@ internal class McpConfigExportPlanner(
 
     private fun configExport(
         deployment: McpDeployment,
+        toolType: ToolType,
         restrictions: Map<String, McpToolRestriction>,
         config: McpConfigExporter,
         ledger: McpLedger,
@@ -142,8 +147,34 @@ internal class McpConfigExportPlanner(
         if (deployment.servers.isEmpty() && ledger.recorded(path).isEmpty()) return null
         return PlannedMcpExport("MCP servers ${deployment.servers.keys}", config.file.parentFile) {
             val servers = deployment.servers.values.map { resolve(it).copy(tools = restrictions[it.id] ?: McpToolRestriction()) }
-            recordedAround(deployment.root, path) { recorded -> config.prepare(McpContext(servers, deployment.ownedMcpIds, recorded)) }
+            if (recordedAround(deployment.root, path) { recorded -> config.prepare(McpContext(servers, deployment.ownedMcpIds, recorded)) }) {
+                reportHidden(deployment, toolType, config)
+            }
         }
+    }
+
+    /**
+     * Logs a warning naming the file that hides [config] from its tool when [deployment] selects servers, that file exists, and [McpDeployment.mcpConfigFiles] of [deployment] does not hold it.
+     */
+    // The file that hides it is compared by its real path, so a project reached through a link still counts as writing it. The servers are written anyway, so they take effect as soon as that file is removed.
+    private fun reportHidden(deployment: McpDeployment, toolType: ToolType, config: McpConfigExporter) {
+        val shadow = config.hiddenBy ?: return
+        if (deployment.servers.isEmpty() || !shadow.file.exists()) return
+        if (deployment.mcpConfigFiles.any { it.resolvedPath() == shadow.file.resolvedPath() }) return
+        val shadowName = shadow.file.name
+        val hiddenName = config.file.relativeTo(shadow.file.parentFile).invariantSeparatorsPath
+        LOG.warn(
+            "{}: '{}' gets the MCP servers {} for {}, but '{}' exists and this deployment does not write it: {} reads only {} in that directory and ignores {} there. Let this deployment write {} too, or remove that file.",
+            deployment.id,
+            config.file.absolutePath,
+            deployment.servers.keys,
+            toolType.serialName,
+            shadow.file.absolutePath,
+            shadow.reader,
+            shadowName,
+            hiddenName,
+            shadowName,
+        )
     }
 
     private fun permissionsExport(
@@ -163,25 +194,27 @@ internal class McpConfigExportPlanner(
     /**
      * Prepares the edit of the file at [path] of [root] with what the ledger of [root] records for it, and commits it between two records of that ledger: [McpOwnership.pendingRecord] before, so the ledger owns every entry of the engine the file holds whether the commit runs or not, and [McpOwnership.committedRecord] after it succeeded. Nothing runs when the ledger of [root] could not be written earlier in the run, a failure already reported.
      *
+     * @return whether an edit was committed
      * @throws McpLedgerException if the ledger cannot be written: before the commit, the file is left as it was; after it, the file holds the edit and the ledger the pending record
      */
     private fun recordedAround(
         root: TargetRoot,
         path: String,
         prepare: (recorded: Map<String, Set<String>>) -> PreparedMcpEdit?,
-    ) {
-        val ledger = ledgers[root.directory.resolvedPath()]?.getOrNull() ?: return
+    ): Boolean {
+        val ledger = ledgers[root.directory.resolvedPath()]?.getOrNull() ?: return false
         val recorded = ledger.recorded(path)
         val edit = prepare(recorded)
         if (edit == null) {
             // Nothing of the engine is left in the file: what the ledger still names there was removed by hand or changed since, and is no longer the engine's.
             record(root, path, emptyMap())
-            return
+            return false
         }
         // A record wider than the file is harmless, since an entry is removed only while it holds a fingerprint recorded for it. The pending record keeps what the file holds until the commit and adds what the edit writes, so a failed commit and a ledger that cannot be narrowed after a commit both leave every entry of the engine owned.
-        if (!record(root, path, McpOwnership.pendingRecord(recorded, edit.entries))) return
+        if (!record(root, path, McpOwnership.pendingRecord(recorded, edit.entries))) return false
         edit.commit()
         record(root, path, McpOwnership.committedRecord(edit.entries))
+        return true
     }
 
     /**
@@ -224,6 +257,25 @@ internal class McpConfigExportPlanner(
         // Logged under the engine, which reports every other skip of the run, so one logger holds the whole transcript.
         private val LOG = LoggerFactory.getLogger(ToolsEngine::class.java)
     }
+}
+
+/**
+ * Returns the exports of the MCP files of [deployment] in the user scope [scope] of the tool of [adapter] under [userHome] - see [McpConfigExportPlanner.exportsFor].
+ */
+internal fun McpConfigExportPlanner.userScopeExportsFor(
+    deployment: UserDeployment,
+    adapter: ToolAdapter,
+    scope: UserScope,
+    userHome: File,
+): List<PlannedMcpExport> {
+    val manifest = deployment.manifest
+    return exportsFor(
+        McpDeployment(manifest.id, TargetRoot.UserHome(userHome), deployment.mcps, deployment.ownedMcpIds, manifest.mcps?.tools.orEmpty(), declaresMcps = manifest.mcps != null),
+        adapter.toolType,
+        listOfNotNull(scope.mcpConfig()),
+        scope.mcpPermissions(),
+        adapter.mcpLimits,
+    )
 }
 
 /**
@@ -275,6 +327,7 @@ class McpLedgerException(
  * @property ownedMcpIds the id of every MCP server manifest of the run
  * @property restrictions the allowed and denied tools of each selected server that the deployment restricts, by server id
  * @property declaresMcps whether the deployment declares an `mcps` block, which makes it cover the MCP files of its tools - see [McpConfigExportPlanner.claim]
+ * @property mcpConfigFiles every MCP config file of every tool the deployment deploys through; a [McpConfigExporter.hiddenBy] file among them, compared by real path, is one the deployment writes itself, so it is not reported as hiding anything - see [McpConfigExportPlanner.exportsFor]. Empty by default.
  */
 internal data class McpDeployment(
     val id: String,
@@ -283,6 +336,7 @@ internal data class McpDeployment(
     val ownedMcpIds: Set<String>,
     val restrictions: Map<String, McpToolRestriction>,
     val declaresMcps: Boolean,
+    val mcpConfigFiles: Set<File> = emptySet(),
 )
 
 /**

@@ -46,13 +46,13 @@ internal fun requireVariableNames(serverId: String, variables: List<McpVariable>
  * Returns [value], text of an inline manifest, split into literal parts and references to the variables of [declared].
  *
  * @param place the field [value] was read from, as a message names it
- * @throws InvalidMcpServerManifestException naming [serverId] and [place] if [value] holds a `${` that is not a reference in the form `${NAME}`, or references a name [declared] does not hold; the value itself is never repeated
+ * @throws InvalidMcpServerManifestException naming [serverId] and [place] if [value] holds a `${` that is not a reference in the form `${NAME}`, holds any other `$` that does not open such a reference, or references a name [declared] does not hold; the value itself is never repeated
  */
 internal fun parseText(serverId: String, value: String, place: String, declared: Set<String>): McpText {
     val parts = mutableListOf<McpTextPart>()
     var index = 0
     while (index < value.length) {
-        val opener = value.indexOf(McpText.REFERENCE_OPENER, index)
+        val opener = value.indexOf(McpText.EXPANSION_SIGN, index)
         if (opener < 0) {
             parts += McpTextPart.Literal(value.substring(index))
             break
@@ -61,8 +61,14 @@ internal fun parseText(serverId: String, value: String, place: String, declared:
         val reference = VARIABLE_REFERENCE.find(value, opener)?.takeIf { it.range.first == opener }
             ?: fail(
                 serverId,
-                "holds a '${McpText.REFERENCE_OPENER}' in $place that is not a reference in the form '${McpText.REFERENCE_OPENER}NAME}'. " +
-                    "Tool syntax such as a default, 'env:' or 'input:' is not passed through, because every tool would expand it from its own environment.",
+                if (value.startsWith(McpText.REFERENCE_OPENER, opener)) {
+                    "holds a '${McpText.REFERENCE_OPENER}' in $place that is not a reference in the form '${McpText.REFERENCE_OPENER}NAME}'. " +
+                        "Tool syntax such as a default, 'env:' or 'input:' is not passed through, because every tool would expand it from its own environment."
+                } else {
+                    // Copilot CLI expands '$NAME' at server start, and how it reads a '$' before anything else is not verified, so every '$' outside a reference of the engine is refused rather than escaped.
+                    "holds a '${McpText.EXPANSION_SIGN}' in $place that does not open a reference in the form '${McpText.REFERENCE_OPENER}NAME}'. " +
+                        "Copilot CLI would expand it from its own environment, as it expands '${McpText.EXPANSION_SIGN}NAME'; write the value without it."
+                },
             )
         val name = reference.groupValues[1]
         if (name !in declared) {
@@ -83,7 +89,7 @@ internal fun parseText(serverId: String, value: String, place: String, declared:
  *
  * It also fails when the server breaks a rule of [requireSecretSources]. A failure of a [McpServer.pointer] server offers only what its manifest can change: another package, remote or `server.json`.
  *
- * @throws InvalidMcpServerManifestException naming the server and the offending variable, environment variable or header, or naming the server alone when the launcher would refuse its id
+ * @throws InvalidMcpServerManifestException naming the server and the offending variable, environment variable or header, or naming the server alone when the launcher would refuse its id or a header name holds `$`
  */
 internal fun McpServer.requireValid() {
     requireVariableNames(id, variables, pointer)
@@ -116,6 +122,10 @@ private fun McpServer.requireStdio(transport: McpServerTransport.Stdio, names: S
 }
 
 private fun McpServer.requireHttp(transport: McpServerTransport.Http, names: Set<String>, secrets: Set<String>) {
+    // Whether Copilot CLI expands a header name as it expands a header value is not verified, and no real header name needs a '$', so the name is refused and never repeated.
+    if (transport.headers.keys.any { McpText.EXPANSION_SIGN in it }) {
+        fail(id, "sends a header whose name holds '${McpText.EXPANSION_SIGN}', which Copilot CLI may expand as a reference to a variable of its own environment. Rename the header.")
+    }
     transport.headers.keys.firstOrNull { !HEADER_NAME.matches(it) }?.let {
         fail(id, "sends the header '$it', which is not an HTTP header name.")
     }

@@ -34,6 +34,32 @@ internal object McpOwnership {
     }
 
     /**
+     * Logs a warning naming [file] and each entry of [owned] that [recorded] does not record with what it holds and that an edit writing [written] replaces with other content or removes; what the entry holds is never logged.
+     *
+     * @param present the fingerprint of every entry [file] holds, by entry name
+     * @param owned the names of the entries of [present] the engine owns - see [ownedServerEntries]
+     * @param recorded every fingerprint the ledger records for each entry of [file], by entry name
+     * @param written the fingerprint of every entry of the engine the edit writes, by entry name
+     */
+    fun reportUnrecordedTakeovers(
+        file: File,
+        present: Map<String, String>,
+        owned: Set<String>,
+        recorded: Map<String, Set<String>>,
+        written: Map<String, String>,
+    ) {
+        // Such an entry is owned only by its name, so it may be one the user wrote by hand, credential included, that the edit is about to drop.
+        owned.filter { name -> recorded[name]?.contains(present[name]) != true && written[name] != present[name] }.sorted().forEach { name ->
+            LOG.warn(
+                "'{}' holds the entry '{}', which the MCP ledger does not record: the engine owns it only because it is named after an MCP server manifest, and {}. Whatever the entry holds, such as a credential written by hand, is not kept; rename the entry to keep it.",
+                file.absolutePath,
+                name.escapedForMessage(),
+                if (name in written) "replaces it with the server it deploys" else "removes it, since the deployment does not select it",
+            )
+        }
+    }
+
+    /**
      * Returns the names of the permission entries of [present], such as `deny:mcp__github__push`, the engine owns in [file]: exactly those whose fingerprint now is one [recorded] records for them, so an entry written by hand is never owned. Logs a warning naming [file] and each entry of [present] that [recorded] records with other fingerprints only; such an entry is left in place.
      *
      * @param present the fingerprint of every permission entry [file] holds, by entry name

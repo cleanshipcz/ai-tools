@@ -206,6 +206,7 @@ class McpConfigFormatContractTest {
             Arguments.of("Claude Code user", JsonMcpConfigFormat.CLAUDE_CODE_USER),
             Arguments.of("VS Code", JsonMcpConfigFormat.VS_CODE),
             Arguments.of("Cursor", JsonMcpConfigFormat.CURSOR),
+            Arguments.of("Copilot CLI", JsonMcpConfigFormat.COPILOT_CLI),
             Arguments.of("Codex", CodexTomlMcpConfigFormat),
         )
     }

@@ -51,19 +51,31 @@ sealed interface McpServerTransport {
 /**
  * A text value made of literal text and references to declared variables.
  *
- * No [McpTextPart.Literal] holds `${`, because every tool the engine renders for would expand it.
+ * No [McpTextPart.Literal] holds `$`, because every tool the engine renders for would expand `${`, and Copilot CLI expands a bare `$NAME` as well.
  */
 data class McpText(val parts: List<McpTextPart>) {
     init {
-        require(parts.none { it is McpTextPart.Literal && REFERENCE_OPENER in it.text }) { "A literal part of an MCP text holds '$REFERENCE_OPENER'." }
+        require(parts.none { it is McpTextPart.Literal && EXPANSION_SIGN in it.text }) { "A literal part of an MCP text holds '$EXPANSION_SIGN'." }
     }
 
     /** The name of every variable this text references, in order. */
     val variableNames: List<String> get() = parts.filterIsInstance<McpTextPart.Variable>().map { it.name }
 
     companion object {
-        /** The text that opens a variable reference in every tool the engine renders for, which a literal part may therefore not hold. */
+        /** The text that opens a variable reference in every tool the engine renders for. */
         const val REFERENCE_OPENER = "\${"
+
+        /** The sign that opens a variable reference in Copilot CLI, which expands `$NAME` as well as `${NAME}`; a literal part may therefore not hold it. */
+        const val EXPANSION_SIGN = "$"
+
+        /**
+         * Returns the text in [text] that some tool the engine renders for would expand as the start of a reference to a variable of its own environment: [REFERENCE_OPENER] when [text] holds it, otherwise [EXPANSION_SIGN] when it holds that, otherwise `null`.
+         */
+        fun expansionIn(text: String): String? = when {
+            REFERENCE_OPENER in text -> REFERENCE_OPENER
+            EXPANSION_SIGN in text -> EXPANSION_SIGN
+            else -> null
+        }
 
         /** Returns a text holding only [text]. */
         fun literal(text: String) = McpText(if (text.isEmpty()) emptyList() else listOf(McpTextPart.Literal(text)))

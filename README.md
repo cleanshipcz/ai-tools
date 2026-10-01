@@ -142,7 +142,7 @@ A replacing deploy never deletes an MCP config file; the engine owns only the se
 Claude clears `.claude/` as a whole, so a replacing deploy does delete `.claude/settings.json`, entries written by hand included.
 
 MCP servers are opt-in: a project selects them with a `deploy.mcps` block, and a project without one gets none.
-The selected servers land in `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, and `.codex/config.toml`, and none of these files holds the value of a secret.
+The selected servers land in `.mcp.json`, `.vscode/mcp.json`, `.github/mcp.json`, `.cursor/mcp.json`, and `.codex/config.toml`, and none of these files holds the value of a secret.
 A stdio server with a secret not declared `from: environment` is started through the launcher `scripts/mcp-launch`, on a machine whose `secrets_manager` is `libsecret`, the default. The launcher reads the secret from the libsecret keyring and falls back to the environment of the tool. A remote server reads its secrets from the environment of the tool. See [How a stdio server gets its secrets](07_mcp/README.md#how-a-stdio-server-gets-its-secrets).
 The engine records the entries it wrote, with a fingerprint of each, in `.ai-tools/mcp-ledger.json` of the project, so a later deploy removes the ones the project no longer selects. While the project selects servers, an entry named after a manifest is removed whatever it holds. When it selects none, for example after its `mcps` block was removed, or when the manifest of an entry no longer exists, an entry is removed only while it holds what the engine wrote, and is otherwise kept with a warning. Add `.ai-tools/` to the `.gitignore` of the project.
 Two deployments of one run whose `mcps` blocks write the same MCP file both fail for that file.
@@ -223,12 +223,13 @@ Paths are relative to `--user-home`, which defaults to the home of whoever runs 
 Codex has one shape for everything it can be asked to do, so its agents and prompts are skill-shaped there too, told apart by the prefix of their directory — the same layout it uses inside a project.
 A skill's companion `files` are copied next to the generated `SKILL.md`, exactly as in project scope.
 
-`windsurf`, `antigravity`, `github_copilot`, and `cursor` have no user-scope layout in this engine yet.
-A `user.yml` naming one of them is never silently dropped: the run logs that the manifest is not deployed for that tool, and deploys it for the tools that do have a layout.
+`windsurf`, `antigravity`, and `cursor` have no user-scope layout in this engine yet.
+`github_copilot` gets only the MCP servers of the user scope, described below; its instructions, agents, prompts, and skills are not deployed into the home.
+A `user.yml` naming one of these tools is never silently dropped: the run logs that the manifest is not deployed for that tool, or, for `github_copilot` with servers selected, that only the MCP servers are, and deploys it for the tools that do have a layout.
 
 A `user.yml` may also select MCP servers with a top-level `mcps` block of the same shape as `deploy.mcps` of a project.
 They are opt-in: without the block, no server is selected, and `09_deployments/globals/user.yml` has none.
-The selected servers land in `~/.claude.json` for `claude` and `~/.codex/config.toml` for `codex`, the tool restrictions of Claude Code in `~/.claude/settings.json`, and the record of what was written in `~/.ai-tools/mcp-ledger.json`. Files the engine creates under the home get the mode `0600`.
+The selected servers land in `~/.claude.json` for `claude`, `~/.codex/config.toml` for `codex`, and `~/.copilot/mcp-config.json` for `github_copilot`, which Copilot CLI reads; the tool restrictions of Claude Code land in `~/.claude/settings.json`, and the record of what was written in `~/.ai-tools/mcp-ledger.json`. Files the engine creates under the home get the mode `0600`.
 `~/.claude.json` is Claude Code's own file: the engine changes only its own entries there and refuses the write when the file changes during the deploy, so deploy while no Claude Code session runs.
 See [The user scope](07_mcp/README.md#the-user-scope).
 
@@ -302,7 +303,8 @@ Verified against the adapters in `ai-tools-engine/engine/.../tools/adapters/`. A
 | `antigravity` | `.agent/rules/project.md`, `.agent/rules/agent-<id>.md`, `.agent/rules/prompt-<id>.md`, `.agent/rules/skill-<id>.md`, `.agent/workflows/feature-<id>.md` |
 | `cursor` | `.cursor/rules/project.mdc`, `.cursor/rules/agent-<id>.mdc`, `.cursor/commands/prompt-<id>.md`, `.cursor/commands/skill-<id>.md`, `.cursor/features/feature-<id>.md` |
 
-MCP servers a project selects are merged into one more file per tool: `.mcp.json` for `claude`, `.vscode/mcp.json` for `github_copilot`, `.cursor/mcp.json` for `cursor`, and `.codex/config.toml` for `codex`. `windsurf` and `antigravity` write no MCP config file, and the run warns that the servers are not deployed for them.
+MCP servers a project selects are merged into the MCP config files of each tool: `.mcp.json` for `claude`, `.vscode/mcp.json` and `.github/mcp.json` for `github_copilot`, `.cursor/mcp.json` for `cursor`, and `.codex/config.toml` for `codex`. `windsurf` and `antigravity` write no MCP config file, and the run warns that the servers are not deployed for them.
+Copilot in VS Code reads `.vscode/mcp.json`, and Copilot CLI reads `.github/mcp.json`, but only while no `.mcp.json` lies beside it; see [GitHub Copilot: Copilot in VS Code and Copilot CLI](07_mcp/README.md#github-copilot-copilot-in-vs-code-and-copilot-cli).
 The `deny` restrictions of `claude` land in `.claude/settings.json`, and the record of the MCP entries written in `.ai-tools/mcp-ledger.json`.
 An agent that names MCP servers gets `mcpServers` in its `claude` frontmatter; the other tools attach no server to an agent, and the run warns about it.
 
@@ -387,10 +389,10 @@ The CLI accepts no subcommands, so there is no command to run for any of them:
 - Documentation generation
 - Evaluation suite runner
 - `diff` and `clean` utilities
-- MCP server configuration for `windsurf` and `antigravity`, and in the user scope of `github_copilot` and `cursor`
+- MCP server configuration for `windsurf` and `antigravity`, in the user scope of `cursor`, and in the user scope of Copilot in VS Code (`github_copilot` serves Copilot CLI there)
 - Attaching MCP servers to an agent in `github_copilot`, `codex`, `cursor`, `windsurf`, and `antigravity`, allow and deny lists for the tools of a server in `github_copilot` and `cursor`, and an `allow` list in `claude`
 - Secrets managers other than libsecret for secret MCP variables, and reading the secrets of a remote MCP server from the keyring — a remote server reads its secrets from the environment of the tool
-- User-scope deployment for `windsurf`, `antigravity`, `github_copilot`, and `cursor` — a `user.yml` deploys through `claude` and `codex` only, and names the tools it skipped
+- User-scope deployment for `windsurf`, `antigravity`, and `cursor`, and of anything but MCP servers for `github_copilot` — a `user.yml` deploys every artifact through `claude` and `codex` only, and names the tools it skipped
 - A ledger of the artifacts a deploy wrote, and with it the removal of artifacts a manifest no longer selects — see [User-Scope Deployments](#user-scope-deployments). The MCP ledger covers MCP server entries and the `deny` entries of tool restrictions only
 - Deploy backups and auto-commit
 

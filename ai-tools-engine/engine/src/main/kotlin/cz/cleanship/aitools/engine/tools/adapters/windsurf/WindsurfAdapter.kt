@@ -36,7 +36,7 @@ class WindsurfAdapter(
     /**
      * Returns no exporter: the official Windsurf and Devin documentation disagree on where the MCP config file lives, so the engine reports the MCP servers of a project as skipped for this tool instead of writing a file the installed version may ignore.
      */
-    override fun mcpConfig(projectDir: File): McpConfigExporter? = null
+    override fun mcpConfigs(projectDir: File): List<McpConfigExporter> = emptyList()
 
     override fun mcpPermissions(projectDir: File): McpPermissionsExporter? = null
 

@@ -2,7 +2,7 @@
 
 An MCP server gives an AI coding assistant extra tools, such as reading Jira issues or GitHub pull requests, over the Model Context Protocol (MCP).
 Each YAML file here is an MCP server manifest: it declares one MCP server once, and a deploy writes it into the MCP config file of every supported tool in each project that selects it.
-A user deployment can select servers too, for the MCP config files of Claude Code and Codex in the home directory; see [The user scope](#the-user-scope).
+A user deployment can select servers too, for the MCP config files of Claude Code, Codex and Copilot CLI in the home directory; see [The user scope](#the-user-scope).
 An agent can name the servers it uses, and a deployment can allow and deny single tools of a server; see [Attaching servers to an agent](#attaching-servers-to-an-agent) and [Allowing and denying tools](#allowing-and-denying-tools).
 The engine never reads the value of a variable marked secret, and no MCP config file holds one.
 A stdio server reads each secret from the libsecret keyring at the moment a tool starts it.
@@ -21,8 +21,8 @@ flowchart LR
     pointer["pointer server<br/>07_mcp/github.yml"] --> json["server.json<br/>outside this repository,<br/>checked against its pin"] --> loader
     loader["load and validate<br/>every manifest"] --> filter["deploy.mcps of a project.yml<br/>mcps of a user.yml"]
     filter --> resolve["resolve plain variables,<br/>keep secrets as references,<br/>start a stdio server with keyring<br/>secrets through scripts/mcp-launch"]
-    resolve --> project["project: .mcp.json, .vscode/mcp.json,<br/>.cursor/mcp.json, .codex/config.toml"]
-    resolve --> home["user scope: ~/.claude.json,<br/>~/.codex/config.toml"]
+    resolve --> project["project: .mcp.json, .vscode/mcp.json,<br/>.github/mcp.json, .cursor/mcp.json,<br/>.codex/config.toml"]
+    resolve --> home["user scope: ~/.claude.json,<br/>~/.codex/config.toml,<br/>~/.copilot/mcp-config.json"]
     filter --> tools["mcps.tools: .claude/settings.json<br/>and Codex enabled_tools / disabled_tools"]
     project --> ledger["ledger of the project or home:<br/>.ai-tools/mcp-ledger.json,<br/>the entries written per file,<br/>with fingerprints"]
     home --> ledger
@@ -128,6 +128,7 @@ metadata:
 - A `name` is an environment variable name: letters, digits, and underscores, not starting with a digit.
 - `${NAME}` in `args`, `env`, `url`, and `headers` must name a variable the manifest declares under `variables`.
 - Any other `${` fails loading, naming the file: an undeclared name, and tool syntax such as `${NAME:-default}`, `${env:NAME}`, `${input:id}` or a nested reference. Every tool would expand such text from its own environment.
+- Any other `$` fails loading too, such as `$NAME`, `$$` or a `$` in a password. Copilot CLI expands a bare `$NAME` from its own environment. A header name that holds `$` fails too. A `command` that holds a `$` once the variables of the run and a leading `~` are resolved fails the same way.
 - `command` is a path. `${NAME}` in it is a variable of the run, from `env_vars` of `config.yml` or `config.local.yml` or from the environment of the run, such as `${PROJECTS_FOLDER}`. It may not reference a declared variable.
 - A `command` that is `~` or starts with `~/` is expanded against the home directory of the user running the engine, whatever `--user-home` the run uses. A relative command without `~` is kept as written, for the tool to look up. `url` is never expanded.
 - A name under `env` must be an environment variable name, and a name under `headers` an HTTP header name.
@@ -192,7 +193,7 @@ A pointer server takes its description, transport, and variables from a `server.
   - npm: the identifier follows the rules `validate-npm-package-name` sets for new packages: lower case, URL-safe characters, at most 214 characters, optionally scoped. The version is a SemVer 2.0.0 version, a single-comparator range such as `^1.2.0` or `1.x`, or a dist-tag. An `npm:` alias and a git or URL spec are refused. A name or version ending in `.tgz`, `.tar` or `.tar.gz` is refused too, because npm reads it as a local file. Only specs npm resolves from its registry are accepted.
   - pypi: the identifier is a PEP 508 project name, and the version a PEP 440 version.
   - oci: the identifier is an image reference as `distribution/reference` defines it, optionally with a tag or a digest, and the version is a tag or a digest. An identifier that carries a tag or a digest is used as written, and the version is then ignored.
-- No identifier or version the engine accepts starts with `-` or holds whitespace. So no identifier or version reaches a position where `npx`, `uvx` or `docker` reads its own options. Package arguments come after the identifier. They are checked for `${`, but not against a grammar.
+- No identifier or version the engine accepts starts with `-` or holds whitespace. So no identifier or version reaches a position where `npx`, `uvx` or `docker` reads its own options. Package arguments come after the identifier. They are checked for `$`, but not against a grammar.
 - A `server.json` fails loading when it sets, forwards or derives an environment variable whose name is on the [environment variable denylist](#environment-variable-denylist), compared without regard to case. This holds for a stdio and an http server alike.
 - A derived name is one the engine builds from the manifest id and a key of the file, such as `GIT_SSH_COMMAND` from the id `git` and the `valueHint` `ssh_command`; see [how the variables are named](#how-the-variables-of-a-serverjson-are-named).
 - A header of a remote fails loading when its name is a hop-by-hop header or overrides the host, the client address, the method, or authentication other than `Authorization`: `Host`, `Connection`, `Keep-Alive`, `Proxy-*`, `TE`, `Trailer`, `Transfer-Encoding`, `Upgrade`, `Content-Length`, `Cookie`, `Forwarded`, `X-Forwarded-*`, `X-Real-IP`, `X-HTTP-Method-Override`, `X-Method-Override`, `X-Original-URL`, `X-Rewrite-URL`.
@@ -220,7 +221,7 @@ A class B name, such as `NODE_OPTIONS` or `HTTPS_PROXY`, does not change the lau
 
 - A positional argument with neither `value` nor `valueHint`, and a named argument without a `value`, fail loading, naming the file, and the argument when it has a name. Rendering them would shift the command line.
 - A `{placeholder}` that `variables` does not define is kept as written.
-- Text the engine writes from the file is data. A url, a header value, a package argument, or an environment value that holds `${`, in any form, fails loading, naming the file and the field, because every tool would expand it as a reference to its own environment.
+- Text the engine writes from the file is data. A url, a header value, a package argument, or an environment value that holds `$`, in any form, fails loading, naming the file and the field but not the value: every tool would expand `${` as a reference to its own environment, and Copilot CLI expands a bare `$NAME` as well. A header name or a package environment variable name that holds `$` fails the same way, without repeating the name; whether Copilot CLI expands a header name is not verified.
 - An identifier or version holding `${` fails the grammar check instead.
 - Fields the engine does not render, such as the top-level `version`, are not read.
 - In a generated name, every character other than an ASCII letter, digit or underscore becomes `_`, and a name that would start with a digit gets a leading `_`.
@@ -351,7 +352,7 @@ Other lines this command can show:
 
 - A warning with `the engine cannot tell whether the keyring holds it` means that the check could not ask the keyring. [What the check of secrets reports](#what-the-check-of-secrets-reports) lists each reason and what to do.
 - An error that contains `MCP server '<id>' reads its secrets through the launcher` means that the engine does not trust the file `scripts/mcp-launch` or one of its directories. The usual cause is that their group may write them. When the cause is such a permission, the message names the command that fixes it after `Remove that permission with:`, such as `chmod go-w '<path>'`. Run that command, then run step 2 again; see [The launcher file](#the-launcher-file).
-- Every variant of that error but the one about a path that holds `${` ends with `or set 'secrets_manager: environment' in config.local.yml to read every secret from the environment of the tool.`. That setting turns the keyring off for every server; see [The `secrets_manager` setting](#the-secrets_manager-setting).
+- Every variant of that error but the one about a path that holds `$` ends with `or set 'secrets_manager: environment' in config.local.yml to read every secret from the environment of the tool.`. That setting turns the keyring off for every server; see [The `secrets_manager` setting](#the-secrets_manager-setting).
 - When the command prints nothing, the dry run stopped before it checked the secrets. Run `LOG_FORMAT=TEXT ./deploy.sh --dry-run` without the filter, and read its last lines.
 
 **Step 3: deploy, then restart the tool.**
@@ -729,7 +730,7 @@ The file must:
 - exist, and be a regular file once links are resolved;
 - be executable by the user who runs the engine;
 - lie inside this checkout once links are resolved;
-- have a real path without `${`, which a tool would expand;
+- have a real path without `$`, which a tool would expand as `${` or, in Copilot CLI, as `$NAME`;
 - be owned by the user who runs the engine;
 - be writable by that user only, not by its group or others;
 - lie in directories that are each owned by that user and writable by no one else, from its own directory `scripts/` up to the root of this checkout, once links are resolved.
@@ -841,6 +842,39 @@ This one into `.vscode/mcp.json` (GitHub Copilot).
 }
 ```
 
+This one into `.github/mcp.json` and `~/.copilot/mcp-config.json` (GitHub Copilot, read by Copilot CLI).
+It is the entry of `.mcp.json` with `"tools": ["*"]` as its first key:
+
+```json
+{
+  "mcpServers": {
+    "demo": {
+      "tools": [
+        "*"
+      ],
+      "type": "stdio",
+      "command": "/home/<you>/Documents/Projects/ai-tools/scripts/mcp-launch",
+      "args": [
+        "demo",
+        "--required",
+        "DEMO_TOKEN",
+        "--optional",
+        "DEMO_PROXY_TOKEN",
+        "--",
+        "/opt/demo/bin/demo-mcp",
+        "--read-only"
+      ],
+      "env": {
+        "DEMO_TOKEN": "${DEMO_TOKEN:-}",
+        "DEMO_PROXY_TOKEN": "${DEMO_PROXY_TOKEN:-}",
+        "DEMO_CI_TOKEN": "${DEMO_CI_TOKEN:-}",
+        "DEMO_BASE_URL": "https://demo.example.invalid"
+      }
+    }
+  }
+}
+```
+
 And this table into `.codex/config.toml` (Codex):
 
 ```toml
@@ -858,7 +892,8 @@ DEMO_BASE_URL = "https://demo.example.invalid"
 - Codex clears the environment of a server. It passes only a short default list, plus each name of `env_vars` that its own environment sets.
 - So the Codex table of a server started through the launcher also names `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR`. The launcher needs them to reach the keyring.
 - Only the names are written, never a value.
-- The user scope gets the same entries: `~/.claude.json` like `.mcp.json`, and `~/.codex/config.toml` like `.codex/config.toml`.
+- The Copilot CLI entry names neither variable. Copilot CLI 1.0.89 passes a stdio server its whole environment, the two bus variables included; see [Limits](#limits).
+- The user scope gets the same entries: `~/.claude.json` like `.mcp.json`, `~/.codex/config.toml` like `.codex/config.toml`, and `~/.copilot/mcp-config.json` like `.github/mcp.json`.
 
 Each tool writes a reference in its own form:
 
@@ -866,10 +901,13 @@ Each tool writes a reference in its own form:
 | --- | --- | --- |
 | Claude Code | `.mcp.json` | `${NAME}`; `${NAME:-}` when `required: false`, or when the launcher reads the secret |
 | GitHub Copilot (VS Code) | `.vscode/mcp.json` | `${env:NAME}` |
+| GitHub Copilot (Copilot CLI) | `.github/mcp.json`, `~/.copilot/mcp-config.json` | as for Claude Code: `${NAME}`; `${NAME:-}` when `required: false`, or when the launcher reads the secret |
 | Cursor | `.cursor/mcp.json` | `${env:NAME}` |
 | Codex | `.codex/config.toml` | its name in `env_vars` (stdio), `bearer_token_env_var` (`Authorization: Bearer ${NAME}`), or `env_http_headers` (a header whose whole value is `${NAME}`) |
 
 When a secret the tool reads from its environment is unset, Claude Code passes an optional one as an empty value and a required one as the literal text `${NAME}`.
+Copilot CLI 1.0.89 does the same. It also expands a bare `$NAME`, which is why loading refuses a `$` anywhere else in the text it writes.
+It never expands `${env:NAME}`, which is why its files get the form of Claude Code.
 
 ### Where a secret may appear
 
@@ -961,6 +999,7 @@ Where a tool shows the standard error of a server:
 | --- | --- |
 | Claude Code | Its documentation says to start it with `claude --debug=mcp` and read the standard error of a server in the debug log `~/.claude/debug/<session-id>.txt`, for a server that started and lists no tools. It does not say so for a server that failed to start. `/mcp` shows such a server as failed. |
 | GitHub Copilot (VS Code) | Run **MCP: List Servers** from the Command Palette, select the server, and choose **Show Output**. Its documentation says that this shows the logs of the server. It does not say whether those logs hold the standard error. |
+| GitHub Copilot (Copilot CLI) | Not checked for this page. |
 | Cursor | Open the Output panel, and select **MCP Logs**. Its documentation says that these logs show the error messages of servers. It does not say whether they hold the standard error. |
 | Codex | Its documentation does not say where the standard error of a server is shown. |
 
@@ -1036,6 +1075,7 @@ The engine writes no such start command for you.
 - **Tested versions.** The behaviour of the launcher was verified with dash 0.5.10.2, bash 5.0.17 and glibc 2.31. Other shells, such as mksh, zsh or macOS bash 3.2, newer bash versions, and musl are not tested. The tests of the launcher read the environment of each program from `/proc/<pid>/environ`, so they are skipped where `/proc` is missing, such as on macOS.
 - **Tools on the Windows side.** A tool that runs on Windows, rather than in WSL, cannot start a shell script by its Linux path. This is not tested. For such a tool, set `secrets_manager: environment` in `config.local.yml`.
 - **Claude Code with `CLAUDE_CODE_MCP_ALLOWLIST_ENV`.** With that variable set, Claude Code passes a server only a short list of variables, without `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR`. The code of Claude Code 2.1.283 does the same when `CLAUDE_CODE_ENTRYPOINT` is `local-agent`; this was read in its code, not tried. The launcher then writes `keyring not used` once and reads the environment. The `${NAME:-}` references of the entry still deliver the values you exported. Only the Codex entry forwards the two bus variables.
+- **Copilot CLI passes its whole environment, as observed on 1.0.89.** A stdio server started by Copilot CLI 1.0.89 received the whole environment of the CLI, `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR` included, which is how the launcher reaches the keyring. The GitHub documentation says that only `PATH` is inherited ([Adding MCP servers for Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers), read 2026-09-30). A later version that follows its documentation would cut the launcher off from the keyring; the launcher would then write `keyring not used` and read the environment. This was observed without the sandbox of Copilot CLI; with `sandbox.enabled` it is not verified.
 - **A locked keyring is not tested.** A dismissed unlock prompt is expected to look like "no such item", so the launcher would read the environment without a message. The check counts a locked item as stored.
 - **Two items under the same attributes.** `secret-tool lookup` then returns the first unlocked match in the order the keyring daemon lists them, which you cannot choose. The store command above replaces rather than adds, so this happens only when another program stored an item with these attributes, possibly with more attributes besides. `clear` removes every unlocked match.
 - **A keyring daemon that starts on demand.** The check never starts a keyring daemon, so on such a machine it reports "cannot tell" with `busctl failed with exit code <N>`. The launcher lets the session bus start the daemon, and works.
@@ -1051,7 +1091,7 @@ The environment of the run is never read for it, so a value your shell happens t
 - A required plain variable that `env_vars` does not declare fails the MCP config files of every deployment that selects the server, naming the server and the variable.
 - An optional one that `env_vars` does not declare is left out, and so is an `env` entry or header that references it.
 - An optional one used in `args` or `url` cannot be left out, so it fails the MCP config files of every deployment that selects the server.
-- A value in `env_vars` that holds `${` fails the same way, naming the variable, because a tool would expand it. No message ever repeats a value.
+- A value in `env_vars` that holds `$` fails the same way, naming the variable, because a tool would expand `${`, and Copilot CLI a bare `$NAME` as well. No message ever repeats a value.
 - Such a failure does not stop the run: every other artifact is still written, and the run exits non-zero at the end.
 - Put machine-specific plain values into `env_vars` of `config.local.yml`, which is gitignored.
 
@@ -1076,7 +1116,8 @@ deploy:
 | Tool | MCP config file in the project | Server entry |
 | --- | --- | --- |
 | Claude Code | `.mcp.json` | `mcpServers.<id>`, with `type` |
-| GitHub Copilot | `.vscode/mcp.json` | `servers.<id>`, with `type` |
+| GitHub Copilot | `.vscode/mcp.json`, read by Copilot in VS Code | `servers.<id>`, with `type` |
+| GitHub Copilot | `.github/mcp.json`, read by Copilot CLI | `mcpServers.<id>`, with `tools: ["*"]`, `type`, and `args` on every stdio entry |
 | Cursor | `.cursor/mcp.json` | `mcpServers.<id>`, `type` on stdio servers only |
 | Codex | `.codex/config.toml` | `[mcp_servers.<id>]` and its sub-tables |
 | Windsurf | none | the run warns that the servers are not deployed for it |
@@ -1108,6 +1149,36 @@ url = "https://mcp.example.com/mcp"
 bearer_token_env_var = "EXAMPLE_TOKEN"
 ```
 
+### GitHub Copilot: Copilot in VS Code and Copilot CLI
+
+The tool `github_copilot` serves two programs: Copilot in VS Code, and Copilot CLI, the `copilot` terminal command.
+Each reads its own files, so a deploy writes the selected servers into two files of a project:
+
+| Program | Reads in a project | Reads in the home | The engine writes |
+| --- | --- | --- | --- |
+| Copilot in VS Code | `.vscode/mcp.json`, and `.mcp.json` too | the `mcp.json` of each user profile and of each remote | `.vscode/mcp.json` |
+| Copilot CLI | `.mcp.json` or `.github/mcp.json`, never both; never `.vscode/mcp.json` | `~/.copilot/mcp-config.json` | `.github/mcp.json`, and `~/.copilot/mcp-config.json` for a `user.yml`; see [The user scope](#the-user-scope) |
+
+Before you rely on `.github/mcp.json`:
+
+- Copilot CLI reads `.github/mcp.json` from version 1.0.61 on.
+- In one directory, Copilot CLI reads exactly one project file: `.mcp.json` when it exists, whatever it holds, otherwise `.github/mcp.json`.
+- So in a project that also deploys `claude`, Copilot CLI uses the servers of the `.mcp.json` of Claude Code, which work for it, and ignores `.github/mcp.json`. The engine writes `.github/mcp.json` anyway, so it holds the same servers.
+- Any other `.mcp.json` in the project directory hides `.github/mcp.json` too, even an empty one. Then the run warns, in a dry run as in a deploy:
+
+  ```
+  <id>: '<project>/.github/mcp.json' gets the MCP servers [<ids>] for github_copilot, but '<project>/.mcp.json' exists and this deployment does not write it: Copilot CLI reads only .mcp.json in that directory and ignores .github/mcp.json there. Let this deployment write .mcp.json too, or remove that file.
+  ```
+
+  Add `claude` to the tools of the deployment, or remove that `.mcp.json`. There is no warning when the same deployment writes `.mcp.json` through `claude`.
+- A project server wins over a user server of the same name. `copilot mcp list` shows only the winner.
+- Copilot CLI loads project servers only in a folder you trusted in Copilot CLI; see [What a deploy lets a tool start](#what-a-deploy-lets-a-tool-start).
+
+The entries of `.github/mcp.json` and `~/.copilot/mcp-config.json` have the form Copilot CLI writes itself: `"tools": ["*"]` first, then `type`, then `command`, `args` and `env` of a stdio server, or `url` and `headers` of a remote server.
+`args` is written even when it is empty.
+So `copilot mcp add` and `copilot mcp remove`, which rewrite the whole file of the home, leave the entries of the engine unchanged, and the [ledger](#the-ledger) still recognizes them; this was verified with Copilot CLI 1.0.89.
+`"tools": ["*"]` lets Copilot CLI use every tool of the server.
+
 ### What the engine owns in an MCP config file
 
 In a deployment that selects at least one server, the engine owns the entries named after any MCP server manifest of the run, and the entries the [ledger](#the-ledger) records for the file while they still hold what the engine wrote:
@@ -1136,18 +1207,18 @@ Every edit is checked before it is written, and the file is left untouched, fail
 - The edited file is parsed again: every entry and key the engine does not own must be unchanged, and the owned entries must be exactly the selected servers.
 - The file must read the same just before the write as when it was merged. It does not when a tool writes it during the deploy.
 
-The project files `.mcp.json`, `.vscode/mcp.json`, and `.cursor/mcp.json` are written again as a whole, so their layout is normalized.
+The project files `.mcp.json`, `.vscode/mcp.json`, `.github/mcp.json`, and `.cursor/mcp.json`, and `~/.copilot/mcp-config.json` of the home, are written again as a whole, so their layout is normalized.
 `~/.claude.json` and every `settings.json` are edited in place instead: only the owned entries change, and every other byte is kept, an empty `{}` or `[]` included; see [The user scope](#the-user-scope).
 A `mcpServers` object the engine added to a file that had none stays as `"mcpServers": {}` once its last entry is removed.
 In `.codex/config.toml`, only the tables of owned servers are cut out and written again; every other line, comment and blank line included, is kept byte for byte, and so are its line endings and a missing final newline. Lines the engine adds use the dominant line ending of the file: CRLF when more lines end in CRLF than in LF, otherwise LF. This holds for any mix of line endings, with or without a final newline.
 A rewritten file keeps its permission bits, set on the temporary file before any content is written.
-A file the engine creates under the home, such as `~/.claude.json`, `~/.codex/config.toml`, `~/.claude/settings.json` or the ledger of the home, gets the mode `0600` (`rw-------`) on a POSIX file system, so only you can read it. A file created in a project gets the mode of every other generated file.
+A file the engine creates under the home, such as `~/.claude.json`, `~/.codex/config.toml`, `~/.copilot/mcp-config.json`, `~/.claude/settings.json` or the ledger of the home, gets the mode `0600` (`rw-------`) on a POSIX file system, so only you can read it. A file created in a project gets the mode of every other generated file.
 The engine moves each new file into place atomically where the file system supports it.
 
 In a project, the file is written only inside the project directory, once links are resolved:
 
 - A symbolic link at the path is written through only when its real target lies inside the project.
-- The directory holding the file, such as a linked `.codex`, `.vscode` or `.cursor`, must lie inside the project too.
+- The directory holding the file, such as a linked `.codex`, `.vscode`, `.github` or `.cursor`, must lie inside the project too.
 - A link at the file, or at a directory above it, that leads outside the project, nowhere, or in a loop fails that project and tool. The message names the file and where the link leads. A dry run fails the same way as a deploy.
 
 In the user scope, a link at the file or above it may lead anywhere, as the links of a dotfile repository do, but it must lead to something.
@@ -1162,15 +1233,15 @@ The directory each tool writes into is checked as well, before any file of the t
 
 No failure message quotes the content of a file or the value of a variable; it names the file, the line or offset, the server and the variable, or the duplicated key.
 A name the engine read from a file or a manifest, such as a key, a ledger entry or a server id, is named with every control character, line or paragraph separator, Unicode format character (such as U+202E) and lone surrogate written as `\uXXXX`, and cut to 160 characters ending in `…`, so it cannot start a line of its own or hide text in a log.
-`replace: true` never deletes an MCP config file: Codex and Cursor replace only the directories they generate inside `.codex` and `.cursor`.
+`replace: true` never deletes an MCP config file: Codex and Cursor replace only the directories they generate inside `.codex` and `.cursor`, and GitHub Copilot only `.github/prompts`, `.github/instructions` and `.github/agents`, never `.github/mcp.json`.
 It does delete `.claude/settings.json`, because Claude Code replaces `.claude` as a whole; see [Allowing and denying tools](#allowing-and-denying-tools).
 
 ### Keep the files out of version control
 
-The four MCP config files are gitignored in this repository, and so is `.ai-tools/`, the directory of the [ledger](#the-ledger).
+The five MCP config files of a project are gitignored in this repository, and so is `.ai-tools/`, the directory of the [ledger](#the-ledger).
 The config files hold plain values resolved on one machine, such as base URLs, the absolute path of the Jira server, and the absolute path of the launcher, which differ between machines.
 The ledger records what the engine wrote on one machine.
-The engine does not edit the `.gitignore` of another project. In every project that selects servers, add `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, and `.ai-tools/` to its `.gitignore` yourself, or review each file before you commit it.
+The engine does not edit the `.gitignore` of another project. In every project that selects servers, add `.mcp.json`, `.vscode/mcp.json`, `.github/mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`, and `.ai-tools/` to its `.gitignore` yourself, or review each file before you commit it.
 `.claude/settings.json` is often committed. A deployment with `deny` restrictions changes only the permission entries it wrote there, so the diff shows exactly those entries.
 
 ### What a deploy lets a tool start
@@ -1179,6 +1250,7 @@ An MCP entry makes a tool start a process or send requests to a server, often wi
 
 - Claude Code asks once per server in an interactive session and remembers the answer; `claude mcp reset-project-choices` resets it ([Claude Code MCP documentation](https://code.claude.com/docs/en/mcp)). `claude -p` and the Agent SDK start the servers of `.mcp.json` without asking.
 - VS Code starts the servers of `.vscode/mcp.json` without a prompt in a trusted workspace. It also reads `.mcp.json`, so a Copilot user gets the Claude Code entries too.
+- Copilot CLI loads the servers of `.github/mcp.json`, or of `.mcp.json` when that file exists, only in a folder you trusted in Copilot CLI; a subfolder of a trusted folder counts. In a folder you have not trusted, it skips them, without a message in `copilot -p`. The servers of `~/.copilot/mcp-config.json` always load. See [GitHub Copilot: Copilot in VS Code and Copilot CLI](#github-copilot-copilot-in-vs-code-and-copilot-cli).
 - Cursor documents no prompt before it starts the servers of `.cursor/mcp.json`; a tool call asks for approval.
 - Codex reads the `.codex/config.toml` of a project only when the project is trusted in Codex, and then starts its servers without a further prompt. In a project you have not trusted, Codex ignores the file.
 
@@ -1216,14 +1288,25 @@ Paths are relative to `--user-home`, which defaults to your home directory:
 | --- | --- | --- | --- |
 | Claude Code | `~/.claude.json` | top-level `mcpServers.<id>`, with `type` | `~/.claude/settings.json` |
 | Codex | `~/.codex/config.toml` | `[mcp_servers.<id>]` and its sub-tables | in the server table |
-| GitHub Copilot, Cursor, Windsurf, Antigravity | none | the run warns that the tool gets none of the servers, with the reason | none |
+| GitHub Copilot, read by Copilot CLI | `~/.copilot/mcp-config.json` | top-level `mcpServers.<id>`, with `tools: ["*"]`, `type`, and `args` on every stdio entry | none; a restriction is not applied, and the run warns about it |
+| Cursor, Windsurf, Antigravity | none | the run warns that the tool gets none of the servers, with the reason | none |
 
 - The ledger of the user scope is `~/.ai-tools/mcp-ledger.json`.
-- Secrets are handled exactly as in a project: a stdio server with a keyring secret starts the launcher, and every secret is written as a reference, `${NAME}` or `${NAME:-}` for Claude Code and by name for Codex; see [Secret and plain variables](#secret-and-plain-variables). Claude Code expands `${NAME}` in the server entries of `~/.claude.json` ([Claude Code MCP documentation](https://code.claude.com/docs/en/mcp)).
-- Ownership, verification and the other rules of [What the engine owns in an MCP config file](#what-the-engine-owns-in-an-mcp-config-file) apply unchanged. So a server you added by hand under the id of a manifest, for example with `claude mcp add --scope user github ...`, is changed by the first deploy of a `user.yml` that selects servers. When the `user.yml` selects that id, the entry is replaced without a separate log line. Otherwise it is removed, which the dry run names under `removing [...]`.
+- Secrets are handled exactly as in a project: a stdio server with a keyring secret starts the launcher, and every secret is written as a reference, `${NAME}` or `${NAME:-}` for Claude Code and Copilot CLI and by name for Codex; see [Secret and plain variables](#secret-and-plain-variables). Claude Code expands `${NAME}` in the server entries of `~/.claude.json` ([Claude Code MCP documentation](https://code.claude.com/docs/en/mcp)).
+- For `github_copilot`, a `user.yml` deploys only MCP servers, into `~/.copilot/mcp-config.json`, for Copilot CLI. No instructions, agent, prompt or skill file of GitHub Copilot is written into the home. A `user.yml` that selects servers and names `github_copilot` under `tools` logs this once:
+
+  ```
+  <id>: only the MCP servers are deployed for github_copilot in the user scope; its instructions, agents, prompts and skills are not.
+  ```
+
+  A `user.yml` that names `github_copilot` but selects no server still removes the entries its ledger records in `~/.copilot/mcp-config.json`. When the ledger records none there, it logs the warning `<id>: github_copilot gets only MCP servers in the user scope, and the manifest selects none, so nothing is deployed for it.`
+- `~/.copilot/mcp-config.json` may hold servers and credentials you wrote by hand. The engine keeps every entry it does not own, and an existing file keeps its permission bits. A file the engine creates is readable and writable by you only.
+- The engine writes `~/.copilot/mcp-config.json` under `--user-home` and does not read `COPILOT_HOME`, the variable with which Copilot CLI moves `~/.copilot`.
+- A server of `.github/mcp.json` or `.mcp.json` of a project wins over a server of the same name in `~/.copilot/mcp-config.json`; see [GitHub Copilot: Copilot in VS Code and Copilot CLI](#github-copilot-copilot-in-vs-code-and-copilot-cli).
+- Ownership, verification and the other rules of [What the engine owns in an MCP config file](#what-the-engine-owns-in-an-mcp-config-file) apply unchanged. So a server you added by hand under the id of a manifest, for example with `claude mcp add --scope user github ...`, is changed by the first deploy of a `user.yml` that selects servers. When the `user.yml` selects that id, the entry is replaced; otherwise it is removed, which the dry run names under `removing [...]`. Either way, when the ledger of the home does not record the entry with what it holds, the run first warns, in a dry run as in a deploy, naming the file and the entry but never its content; see the message `... which the MCP ledger does not record ...` under [Troubleshooting](#troubleshooting).
 - A file the engine creates under the home gets the mode `0600`.
-- A link at `~/.claude`, `~/.codex`, or one of the files may lead anywhere, as the links of a dotfile repository do, but it must lead to something; see [Tool directories](#tool-directories).
-- GitHub Copilot and Cursor keep their user servers in files this engine does not write: VS Code in the `mcp.json` of each user profile and of each remote, Cursor in `~/.cursor/mcp.json`. Windsurf and Antigravity are not supported in either scope; see [Not supported yet](#not-supported-yet).
+- A link at `~/.claude`, `~/.codex`, `~/.copilot`, or one of the files may lead anywhere, as the links of a dotfile repository do, but it must lead to something; see [Tool directories](#tool-directories).
+- Copilot in VS Code and Cursor keep their user servers in files this engine does not write: VS Code in the `mcp.json` of each user profile and of each remote, Cursor in `~/.cursor/mcp.json`. Windsurf and Antigravity are not supported in either scope; see [Not supported yet](#not-supported-yet).
 
 ### Deploy while no Claude Code session runs
 
@@ -1332,7 +1415,8 @@ The tools apply the lists differently:
 | --- | --- | --- |
 | Codex | `enabled_tools` and `disabled_tools` in the owned `[mcp_servers.<id>]` table, before its sub-tables | Codex offers only the tools of `enabled_tools`, and hides those of `disabled_tools`, which it applies after `enabled_tools` ([Codex MCP documentation](https://developers.openai.com/codex/mcp)). |
 | Claude Code | `deny` only: `permissions.deny` entries `mcp__<id>__<tool>` in `.claude/settings.json` of the project, or `~/.claude/settings.json` in the user scope | A denied tool is blocked ([Claude Code permissions](https://code.claude.com/docs/en/permissions)). Every other tool of the server stays available and asks before it runs. The `allow` list is not applied, and the run warns about it. |
-| GitHub Copilot, Cursor | nothing | The run warns that the tool does not restrict the tools of the server: the engine knows no setting of their MCP config file that does. |
+| GitHub Copilot | nothing | The run warns that the tool does not restrict the tools of the server. The engine knows no setting of `.vscode/mcp.json` that does. Copilot CLI reads an allow list from the entry field `tools`, but the engine writes every entry of `.github/mcp.json` and `~/.copilot/mcp-config.json` with `"tools": ["*"]`, which allows every tool. |
+| Cursor | nothing | The run warns that the tool does not restrict the tools of the server: the engine knows no setting of its MCP config file that does. |
 | Windsurf, Antigravity | nothing | They get no MCP config file at all. |
 
 Claude Code has no setting that limits which tools a server offers. A `permissions.allow` entry would approve a call without a prompt, which grants where the restriction means to limit, so the engine never writes or changes `permissions.allow`.
@@ -1464,7 +1548,7 @@ Before the engine writes any file of a tool for a deployment, it checks each dir
 | --- | --- | --- |
 | Claude Code | `.claude`, `.claude/agents`, `.claude/commands`, `.claude/skills`, `.claude/workflows` | `~/.claude`, `~/.claude/agents`, `~/.claude/commands`, `~/.claude/skills` |
 | Codex | `.codex`, `.codex/skills`, `.codex/features` | `~/.codex`, `~/.codex/skills` |
-| GitHub Copilot | `.github`, `.github/agents`, `.github/prompts`, `.github/instructions`, and `.vscode` when it writes `.vscode/mcp.json` | no user scope |
+| GitHub Copilot | `.github`, `.github/agents`, `.github/prompts`, `.github/instructions`, and `.vscode` when it writes `.vscode/mcp.json` | `~/.copilot`, when it writes `~/.copilot/mcp-config.json` |
 | Cursor | `.cursor`, `.cursor/rules`, `.cursor/commands`, `.cursor/features` | no user scope |
 | Windsurf | `.windsurf`, `.windsurf/rules`, `.windsurf/workflows` | no user scope |
 | Antigravity | `.agent`, `.agent/rules`, `.agent/workflows` | no user scope |
@@ -1495,9 +1579,10 @@ These are not supported. [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcps) says
 
 - Windsurf, in either scope. The installed Windsurf reads user servers only from `~/.codeium/windsurf/mcp_config.json`, while the documentation of Devin Desktop, as Windsurf is now named, names other paths. The engine writes none of them.
 - Antigravity, in either scope, because it expands no environment variable in its MCP config file, so a secret could reach a server only by being written into the file.
-- The user scope of GitHub Copilot and Cursor.
+- The user scope of Copilot in VS Code and of Cursor.
+- Instructions, agents, prompts and skills of GitHub Copilot in the user scope; a `user.yml` deploys only MCP servers for Copilot CLI.
 - Attaching a server to an agent in GitHub Copilot, Codex, Cursor, Windsurf and Antigravity.
-- Allow and deny lists in GitHub Copilot and Cursor, and an `allow` list in Claude Code, which has no setting for it.
+- Allow and deny lists in GitHub Copilot and Cursor, and an `allow` list in Claude Code, which has no setting for it. For Copilot CLI, an `allow` list could be written into the entry field `tools`; that is open.
 - A ledger that nobody but the user running the engine can plant; see [The ledger](#the-ledger).
 - Secrets managers other than libsecret, such as `pass` or 1Password.
 - Forwarding `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR` for Claude Code when `CLAUDE_CODE_MCP_ALLOWLIST_ENV` is set; open. See [Limits](#limits) for this case and a related one.
@@ -1511,7 +1596,7 @@ These are not supported. [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcps) says
 
 **`MCP server '<id>' uses the optional variable '<NAME>' in ..., which 'env_vars:' of config.yml and config.local.yml do not declare, and ... cannot be left out. Declare it under 'env_vars:'.`**: an optional plain variable is used in `args` or `url`, where leaving it out would change the command line or the address. Declare it under `env_vars:` in `config.local.yml`. Marking it `required: true` does not help: the run then fails with the `needs the variable` message above. The MCP config files of the deployments selecting that server are not written, everything else is, and the run exits non-zero.
 
-**`MCP server '<id>' reads the variable '<NAME>' for ..., and its value in 'env_vars:' holds '${', which a tool would expand from its own environment. Declare a value without it.`**: the value of a plain variable in `config.yml` or `config.local.yml` holds `${`. Change the value there. The MCP config files of the deployments selecting that server are not written, and the run exits non-zero.
+**`MCP server '<id>' reads the variable '<NAME>' for ..., and its value in 'env_vars:' holds '${', which a tool would expand from its own environment. Declare a value without it.`**: the value of a plain variable in `config.yml` or `config.local.yml` holds `${`; the message names `'$'` instead when it holds any other `$`, which Copilot CLI would expand as `$NAME`. Change the value there. The MCP config files of the deployments selecting that server are not written, and the run exits non-zero.
 
 **`MCP server '<id>' has a 'url' that does not start with 'http://' or 'https://' followed by a host.`** / **`MCP server '<id>' has a 'url' that holds a backslash, which some tools read as a slash.`** / **`MCP server '<id>' has a 'url' that carries credentials, which every tool would write into its config file and send. Pass them as a secret header instead.`** / **`MCP server '<id>' sends a secret header, so its 'url' must start with 'https://' as written, never plain http or a variable.`**: the url as written breaks a [URL rule](#url-rules). An empty host, such as `https://?x` or `https://:443/mcp`, gets the first message. Fix the manifest. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written.
 
@@ -1558,9 +1643,9 @@ When the url uses no variable, the message reads `MCP server '<id>' resolves its
 
 Select another package or remote with `select`, point `source` at another `server.json`, or leave the server out. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written.
 
-**`MCP server '<id>' references '<NAME>' in ..., which it does not declare`** / **`... holds a '${' ... that is not a reference in the form '${NAME}'`**: declare the variable under `variables`, or remove the tool syntax. The message names the field, never its text.
+**`MCP server '<id>' references '<NAME>' in ..., which it does not declare`** / **`... holds a '${' ... that is not a reference in the form '${NAME}'`** / **`... holds a '$' ... that does not open a reference in the form '${NAME}'`** / **`... holds a '$' in 'command' ...`**: declare the variable under `variables`, or remove the tool syntax or the `$`. The message names the field, never its text.
 
-**`'...server.json': ... holds '${' in ...`**, **`... declares the runtime argument ...`**, **`... names the runtime ...`**, **`... derives the variable ... twice`**: the `server.json` of a pointer server asks for something the engine does not render. Select another package or remote, or leave the server out.
+**`'...server.json': ... holds '${' in ...`** or **`... holds '$' in ...`**, **`... declares the runtime argument ...`**, **`... names the runtime ...`**, **`... derives the variable ... twice`**: the `server.json` of a pointer server asks for something the engine does not render. Select another package or remote, or leave the server out.
 
 **`'...server.json': The remote <n> sends the header '<name>', which controls the connection or overrides authentication; the engine sends only 'Authorization' and headers of the server itself.`**: the remote sends a header on the [header denylist](#a-pointer-server). Select another remote or a package, or leave the server out. The message starts with `Failed to load <file>:`, and the whole run stops before anything is written.
 
@@ -1638,7 +1723,15 @@ A ledger that is not valid JSON gets the JSON messages above instead. Every MCP 
 
 **`... names a tool of the MCP server '<server>' under 'deploy.mcps.tools' that is not 1 to 128 of the characters A-Z a-z 0-9 _ - . that MCP tool names are made of. Correct the name.`**: an `allow` or `deny` entry holds another character, such as a space or a `*`. The message names the server, never the entry. Correct the name as the server exposes it. The consequences are those of the entries above.
 
-**`<id>: <tool> gets none of the MCP servers [<ids>] in the user scope: <reason>.`**: a warning. A `user.yml` that selects servers also names a tool without a user-scope MCP config file in this engine: GitHub Copilot, Cursor, Windsurf or Antigravity. The reason names where that tool keeps its user servers, or why the engine does not write them. The servers are deployed for Claude Code and Codex.
+**`<id>: <tool> gets none of the MCP servers [<ids>] in the user scope: <reason>.`**: a warning. A `user.yml` that selects servers also names a tool without a user-scope MCP config file in this engine: Cursor, Windsurf or Antigravity. The reason names where that tool keeps its user servers, or why the engine does not write them. The servers are deployed for the tools that have one: Claude Code, Codex and GitHub Copilot.
+
+**`<id>: only the MCP servers are deployed for github_copilot in the user scope; its instructions, agents, prompts and skills are not.`**: an information line, not a warning, logged once for each `user.yml` that selects servers and names `github_copilot`. The servers land in `~/.copilot/mcp-config.json`, for Copilot CLI; nothing else of GitHub Copilot is written into the home. See [The user scope](#the-user-scope).
+
+**`<id>: github_copilot gets only MCP servers in the user scope, and the manifest selects none, so nothing is deployed for it.`**: a warning. A `user.yml` names `github_copilot` but selects no server, and the ledger of the home records none the engine wrote into `~/.copilot/mcp-config.json`, so nothing is written for that tool. Select a server, or remove `github_copilot` from `tools`. See [The user scope](#the-user-scope).
+
+**`'<file>' holds the entry '<name>', which the MCP ledger does not record: the engine owns it only because it is named after an MCP server manifest, and replaces it with the server it deploys. Whatever the entry holds, such as a credential written by hand, is not kept; rename the entry to keep it.`**: a warning, in a dry run as in a deploy, before the engine changes a file of the home: `~/.claude.json`, `~/.codex/config.toml` or `~/.copilot/mcp-config.json`. The deployment selects servers, so it owns every entry named after an MCP server manifest, and this one is not an entry the ledger records with what it holds: typically one you added by hand, such as with `copilot mcp add` or `claude mcp add --scope user`. When the deployment does not select that id, the message ends `and removes it, since the deployment does not select it` instead. The message never shows what the entry holds. To keep the entry, rename it in the file to a name no manifest of `07_mcp/` has, before you deploy. An entry that already holds exactly what the engine writes is not reported.
+
+**`<id>: '<project>/.github/mcp.json' gets the MCP servers [<ids>] for github_copilot, but '<project>/.mcp.json' exists and this deployment does not write it: Copilot CLI reads only .mcp.json in that directory and ignores .github/mcp.json there. Let this deployment write .mcp.json too, or remove that file.`**: a warning, in a dry run as in a deploy. `.github/mcp.json` is written, but Copilot CLI reads the servers of that `.mcp.json` instead, and none of `.github/mcp.json`. Add `claude` to the tools of the deployment, so that `.mcp.json` gets the same servers, or remove `.mcp.json`. See [GitHub Copilot: Copilot in VS Code and Copilot CLI](#github-copilot-copilot-in-vs-code-and-copilot-cli).
 
 **`<id>: <tool> attaches no MCP server to the agent(s) '<agent>': <reason>.`**: a warning. The deployment deploys an agent with `mcps` through GitHub Copilot, Codex, Cursor, Windsurf or Antigravity, which get no server list in the agent file; see [Attaching servers to an agent](#attaching-servers-to-an-agent). The agent is still deployed.
 
@@ -1659,6 +1752,8 @@ A ledger that is not valid JSON gets the JSON messages above instead. Every MCP 
 **A deploy removed a server entry the deployment no longer selects**: that is the [ledger](#the-ledger) at work, also for a deployment without an `mcps` block. An entry is removed only while it holds what the ledger records, or, in a deployment that selects servers, when it is named after a manifest. The dry run shows each removal as `Would write MCP servers [...], removing [<ids>] to <file>`, and each removed deny entry by its full text. To keep an entry of your own, give it a name that is not the id of an MCP server manifest.
 
 **A server does not start in Codex**: check that the project is trusted in Codex, and that every required secret is stored in the keyring or exported in the shell that starts Codex. Codex forwards `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR` to the launcher only when its own environment sets them; without them, the launcher reads the environment only. A remote server reads its secrets from the environment of Codex only; see [Remote servers](#remote-servers).
+
+**A server does not show up in Copilot CLI**: in a project, check that the folder is trusted in Copilot CLI, that Copilot CLI is 1.0.61 or later, and that no `.mcp.json` lies beside `.github/mcp.json`; Copilot CLI then reads `.mcp.json` only. A server of the same name in the project wins over the one in `~/.copilot/mcp-config.json`. See [GitHub Copilot: Copilot in VS Code and Copilot CLI](#github-copilot-copilot-in-vs-code-and-copilot-cli).
 
 **A project got no MCP config file**: MCP servers are opt-in; add an `mcps` block to its `project.yml`.
 
@@ -1703,7 +1798,7 @@ A name that a `server.json` contributes is refused earlier, with the message [`'
 
 #### While exporting: the launcher file
 
-Each message of this group starts with `MCP server '<id>' reads its secrets through the launcher`, and each remedy ends with `or set 'secrets_manager: environment' in config.local.yml to read every secret from the environment of the tool.`, except the `${` message.
+Each message of this group starts with `MCP server '<id>' reads its secrets through the launcher`, and each remedy ends with `or set 'secrets_manager: environment' in config.local.yml to read every secret from the environment of the tool.`, except the message about a path that holds `$`.
 The run logs such a failure as `<deployment>: MCP server '<id>' could not be exported for <TOOL>: ...`.
 It lists it under `Export failed for <n> manifest(s):` as `[<deployment> | <TOOL> | MCP server '<id>'] ...`.
 The line names one of the servers that need the launcher; every other server of that file needs it too.
@@ -1718,7 +1813,7 @@ The rules the file must meet are listed in [The launcher file](#the-launcher-fil
 
 **`... '<path>', whose real path cannot be read (<exception class>). Restore it in the ai-tools repository, ...`**: the file system refuses to resolve the path of the launcher. Check the permissions of the directories above it.
 
-**`... '<real path>', whose path holds '${', which a tool would expand. Move the ai-tools repository to a path without it, or set 'secrets_manager: environment' in config.local.yml.`**: the real path of the checkout holds `${`, which every tool would read as a reference. Move the checkout.
+**`... '<real path>', whose path holds '${', which a tool would expand. Move the ai-tools repository to a path without it, or set 'secrets_manager: environment' in config.local.yml.`**: the real path of the checkout holds `${`, which every tool would read as a reference; the message names `'$'` instead when the path holds any other `$`, which Copilot CLI would read as `$NAME`. Move the checkout.
 
 **`... '<path>', but the real path of the ai-tools repository '<repository>' cannot be read (<exception class>). Make the repository readable, ...`**: the engine cannot resolve the path of the checkout, so it cannot tell whether the launcher lies inside it. Make the checkout and the directories above it readable.
 

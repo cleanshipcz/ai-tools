@@ -667,4 +667,167 @@ class McpConfigFileExporterTest {
         // then
         assertThat(shared.resolve("mcp.json")).content().contains("atlassian")
     }
+
+    /**
+     * An entry of an MCP config file of the home that is named after an MCP server manifest is the engine's while the deployment selects servers, whether or not the ledger records it; the user is warned before the engine replaces or removes one the ledger does not record, since it may hold a credential written by hand.
+     */
+    @Nested
+    inner class UnrecordedEntriesOfTheHome {
+
+        private val home get() = tempDir.resolve("home")
+        private val ledgerLogger = LoggerFactory.getLogger(McpLedger::class.java) as Logger
+        private val ledgerAppender = ListAppender<ILoggingEvent>()
+
+        @BeforeEach
+        fun setUp() {
+            ledgerAppender.start()
+            ledgerLogger.addAppender(ledgerAppender)
+        }
+
+        @AfterEach
+        fun tearDown() {
+            ledgerLogger.detachAppender(ledgerAppender)
+            ledgerAppender.stop()
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            delimiter = '|',
+            value = [
+                // - the file of Claude Code, in a deploy and in a dry run
+                ".claude.json              | claude  | false",
+                ".claude.json              | claude  | true",
+                // - the file of Codex
+                ".codex/config.toml        | codex   | false",
+                // - the file of Copilot CLI, in a deploy and in a dry run
+                ".copilot/mcp-config.json  | copilot | false",
+                ".copilot/mcp-config.json  | copilot | true",
+            ],
+        )
+        fun `should warn naming the file and the entry, but not its content, before it replaces an entry of the home the ledger does not record`(
+            path: String,
+            tool: String,
+            dryRun: Boolean,
+        ) {
+            // given
+            // - an entry written by hand under the name of a manifest, holding a credential
+            val (format, existing) = handWritten(tool, "atlassian")
+            val configFile = home.resolve(path).apply { parentFile.mkdirs() }
+            configFile.writeText(existing)
+            val exporter = McpConfigFileExporter(configFile, format, exportService(dryRun), TargetRoot.UserHome(home))
+
+            // when
+            exporter.export(McpContext(listOf(server), manifestIds = setOf("atlassian")))
+
+            // then
+            assertThat(warnings()).singleElement().satisfies({
+                assertThat(it)
+                    .contains(configFile.absolutePath)
+                    .contains("'atlassian'")
+                    .contains("replaces it")
+                    .doesNotContain(HAND_WRITTEN_TOKEN)
+            })
+            assertThat(configFile.readText().contains(HAND_WRITTEN_TOKEN)).isEqualTo(dryRun)
+        }
+
+        @ParameterizedTest
+        @CsvSource("claude, false", "codex, false", "copilot, false", "copilot, true")
+        fun `should warn naming the file and the entry, but not its content, before it removes an entry of the home the ledger does not record`(
+            tool: String,
+            dryRun: Boolean,
+        ) {
+            // given
+            // - the deployment selects another server, so the entry named after a manifest is the engine's to remove
+            val (format, existing) = handWritten(tool, "retired")
+            val configFile = home.resolve(pathOf(tool)).apply { parentFile.mkdirs() }
+            configFile.writeText(existing)
+            val exporter = McpConfigFileExporter(configFile, format, exportService(dryRun), TargetRoot.UserHome(home))
+
+            // when
+            exporter.export(McpContext(listOf(server), manifestIds = setOf("atlassian", "retired")))
+
+            // then
+            assertThat(warnings()).singleElement().satisfies({
+                assertThat(it)
+                    .contains(configFile.absolutePath)
+                    .contains("'retired'")
+                    .contains("removes it")
+                    .doesNotContain(HAND_WRITTEN_TOKEN)
+            })
+            assertThat(configFile.readText().contains(HAND_WRITTEN_TOKEN)).isEqualTo(dryRun)
+        }
+
+        @Test
+        fun `should not warn about an entry of the home the ledger records with what it holds`() {
+            // given
+            val (format, existing) = handWritten("copilot", "atlassian")
+            val configFile = home.resolve(".copilot/mcp-config.json").apply { parentFile.mkdirs() }
+            configFile.writeText(existing)
+            val recorded = format.entryFingerprints(existing, configFile).asRecorded()
+            val exporter = McpConfigFileExporter(configFile, format, ExportService(), TargetRoot.UserHome(home))
+
+            // when
+            exporter.export(McpContext(listOf(server), manifestIds = setOf("atlassian"), recorded = recorded))
+
+            // then
+            assertThat(warnings()).isEmpty()
+            assertThat(configFile).content().doesNotContain(HAND_WRITTEN_TOKEN)
+        }
+
+        @Test
+        fun `should not warn about an entry of the home that already holds what the engine writes`() {
+            // given
+            // - a file the engine wrote, whose ledger is gone
+            val configFile = home.resolve(".copilot/mcp-config.json")
+            McpConfigFileExporter(configFile, JsonMcpConfigFormat.COPILOT_CLI, ExportService(), TargetRoot.UserHome(home)).export(McpContext(listOf(server), setOf("atlassian")))
+            val written = configFile.readText()
+            ledgerAppender.list.clear()
+            val exporter =
+                McpConfigFileExporter(configFile, JsonMcpConfigFormat.COPILOT_CLI, ExportService(), TargetRoot.UserHome(home))
+
+            // when
+            exporter.export(McpContext(listOf(server), manifestIds = setOf("atlassian")))
+
+            // then
+            assertThat(warnings()).isEmpty()
+            assertThat(configFile).hasContent(written)
+        }
+
+        @Test
+        fun `should not warn about an entry of a project the ledger does not record`() {
+            // given
+            val (format, existing) = handWritten("copilot", "atlassian")
+            val configFile = projectDir.resolve(".github/mcp.json").apply { parentFile.mkdirs() }
+            configFile.writeText(existing)
+            val exporter = McpConfigFileExporter(configFile, format, ExportService(), projectDir)
+
+            // when
+            exporter.export(McpContext(listOf(server), manifestIds = setOf("atlassian")))
+
+            // then
+            assertThat(warnings()).isEmpty()
+            assertThat(configFile).content().doesNotContain(HAND_WRITTEN_TOKEN)
+        }
+
+        private fun warnings() = ledgerAppender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
+
+        private fun exportService(dryRun: Boolean) = if (dryRun) ExportService(DryRunArtifactSink) else ExportService()
+
+        private fun pathOf(tool: String) = when (tool) {
+            "claude" -> ".claude.json"
+            "codex" -> ".codex/config.toml"
+            else -> ".copilot/mcp-config.json"
+        }
+
+        // The format of [tool] and a file of it holding the entry [name] written by hand, with a credential.
+        private fun handWritten(tool: String, name: String): Pair<McpConfigFormat, String> = when (tool) {
+            "claude" -> JsonMcpConfigFormat.CLAUDE_CODE_USER to """{"mcpServers": {"$name": {"type": "http", "url": "https://mine.example.com/mcp", "headers": {"Authorization": "Bearer $HAND_WRITTEN_TOKEN"}}}}"""
+            "codex" -> CodexTomlMcpConfigFormat to "[mcp_servers.$name]\ncommand = \"mine\"\nargs = [\"--token=$HAND_WRITTEN_TOKEN\"]\n"
+            else -> JsonMcpConfigFormat.COPILOT_CLI to """{"mcpServers": {"$name": {"tools": ["*"], "type": "http", "url": "https://mine.example.com/mcp", "headers": {"Authorization": "Bearer $HAND_WRITTEN_TOKEN"}}}}"""
+        }
+    }
+
+    companion object {
+        private const val HAND_WRITTEN_TOKEN = "ghp-written-by-hand"
+    }
 }

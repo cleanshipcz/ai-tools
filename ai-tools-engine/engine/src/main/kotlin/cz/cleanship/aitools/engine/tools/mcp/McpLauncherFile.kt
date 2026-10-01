@@ -23,7 +23,7 @@ class McpLauncherFile(
     private val path: Path = repository.resolve(LAUNCHER_PATH)
 
     /**
-     * Returns the absolute real path of the launcher when a tool may start it: a regular file inside [repository] once every link is resolved, owned by the user running the engine, executable by that user, writable by no one else, in directories that, from its own up to the real root of [repository], are each owned by that user and writable by no one else, and with a real path free of `${`, which a tool would expand; otherwise the problem, naming the launcher, and the directory when one is the cause, and never a value.
+     * Returns the absolute real path of the launcher when a tool may start it: a regular file inside [repository] once every link is resolved, owned by the user running the engine, executable by that user, writable by no one else, in directories that, from its own up to the real root of [repository], are each owned by that user and writable by no one else, and with a real path free of `$`, which a tool would expand as `${` or, in Copilot CLI, as `$NAME`; otherwise the problem, naming the launcher, and the directory when one is the cause, and never a value.
      */
     fun check(): State {
         val problem = when {
@@ -38,9 +38,9 @@ class McpLauncherFile(
         } catch (ex: IOException) {
             return unusable("'$path', whose real path cannot be read (${ex.javaClass.simpleName}). Restore it in the ai-tools repository, $REMEDY")
         }
-        if (McpText.REFERENCE_OPENER in real.toString()) {
+        McpText.expansionIn(real.toString())?.let {
             return unusable(
-                "'$real', whose path holds '${McpText.REFERENCE_OPENER}', which a tool would expand. Move the ai-tools repository to a path without it, or set 'secrets_manager: environment' in config.local.yml.",
+                "'$real', whose path holds '$it', which a tool would expand. Move the ai-tools repository to a path without it, or set 'secrets_manager: environment' in config.local.yml.",
             )
         }
         val realRepository = try {

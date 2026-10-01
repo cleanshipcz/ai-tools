@@ -76,8 +76,8 @@ class CodexAdapter(
     override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter =
         CodexUserScopeExporter(CodexLayout.ofUser(userHome), deployment, userHome)
 
-    override fun mcpConfig(projectDir: File): McpConfigExporter =
-        McpConfigFileExporter(CodexLayout.ofProject(projectDir).mcpConfigFile, CodexTomlMcpConfigFormat, exportService, projectDir)
+    override fun mcpConfigs(projectDir: File): List<McpConfigExporter> =
+        listOf(McpConfigFileExporter(CodexLayout.ofProject(projectDir).mcpConfigFile, CodexTomlMcpConfigFormat, exportService, projectDir))
 
     // Codex reads the allowed and denied tools of a server from its table in config.toml, which the MCP config file already renders.
     override fun mcpPermissions(projectDir: File): McpPermissionsExporter? = null

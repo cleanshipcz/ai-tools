@@ -7,6 +7,7 @@ import cz.cleanship.aitools.engine.models.ProjectDocumentation
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.Version
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigShadow
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -137,21 +138,52 @@ class ToolAdapterTest {
 
     @ParameterizedTest
     @CsvSource(
-        "GITHUB_COPILOT, .vscode/mcp.json",
+        // - Copilot in VS Code reads .vscode/mcp.json, Copilot CLI reads .github/mcp.json
+        "GITHUB_COPILOT, .vscode/mcp.json;.github/mcp.json",
         "CLAUDE, .mcp.json",
         "CODEX, .codex/config.toml",
         "CURSOR, .cursor/mcp.json",
     )
-    fun `should name the MCP config file its tool reads in a project`(toolType: ToolType, expected: String) {
+    fun `should name the MCP config files its tool reads in a project`(toolType: ToolType, expected: String) {
         // given
         val projectDir = tempDir.resolve("project")
         val adapter = ToolFactory.create(toolType)
 
         // when
-        val exporter = adapter.mcpConfig(projectDir)
+        val exporters = adapter.mcpConfigs(projectDir)
 
         // then
-        assertThat(exporter?.file).isEqualTo(projectDir.resolve(expected))
+        assertThat(exporters.map { it.file }).containsExactlyElementsOf(expected.split(";").map { projectDir.resolve(it) })
+    }
+
+    @Test
+    fun `should name the portable MCP config file as the one that hides the file of Copilot CLI in the same directory`() {
+        // given
+        val projectDir = tempDir.resolve("project")
+        val adapter = ToolFactory.create(ToolType.GITHUB_COPILOT)
+
+        // when
+        val hiddenBy = adapter.mcpConfigs(projectDir).associate { it.file to it.hiddenBy }
+
+        // then
+        assertThat(hiddenBy).isEqualTo(
+            mapOf(
+                projectDir.resolve(".vscode/mcp.json") to null,
+                projectDir.resolve(".github/mcp.json") to McpConfigShadow(projectDir.resolve(".mcp.json"), "Copilot CLI"),
+            ),
+        )
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ToolType::class, names = ["CLAUDE", "CODEX", "CURSOR"])
+    fun `should name no file that hides the MCP config file of a tool that reads it whatever lies beside it`(
+        toolType: ToolType,
+    ) {
+        // when
+        val exporters = ToolFactory.create(toolType).mcpConfigs(tempDir.resolve("project"))
+
+        // then
+        assertThat(exporters).isNotEmpty().allSatisfy { assertThat(it.hiddenBy).isNull() }
     }
 
     @ParameterizedTest
@@ -188,7 +220,7 @@ class ToolAdapterTest {
         // - tool, attaches servers to agents, applies allowed tools, applies denied tools, has user-scope MCP
         "CLAUDE, true, false, true, true",
         "CODEX, false, true, true, true",
-        "GITHUB_COPILOT, false, false, false, false",
+        "GITHUB_COPILOT, false, false, false, true",
         "CURSOR, false, false, false, false",
         "WINDSURF, false, true, true, false",
         "ANTIGRAVITY, false, true, true, false",
@@ -231,6 +263,23 @@ class ToolAdapterTest {
 
     @ParameterizedTest
     @CsvSource(
+        ".vscode/mcp.json",
+        ".github/mcp.json",
+        "~/.copilot/mcp-config.json",
+        "[\"*\"]",
+    )
+    fun `should give one reason GitHub Copilot restricts no tool of a server that holds for every MCP file it writes`(
+        fact: String,
+    ) {
+        // when
+        val limits = ToolFactory.create(ToolType.GITHUB_COPILOT).mcpLimits
+
+        // then
+        assertThat(limits.allowedTools).isEqualTo(limits.deniedTools).contains(fact)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
         "WINDSURF, ~/.codeium/windsurf/mcp_config.json",
         "WINDSURF, Devin Desktop",
         "ANTIGRAVITY, environment variable",
@@ -253,10 +302,10 @@ class ToolAdapterTest {
         val adapter = ToolFactory.create(toolType)
 
         // when
-        val exporter = adapter.mcpConfig(tempDir.resolve("project"))
+        val exporters = adapter.mcpConfigs(tempDir.resolve("project"))
 
         // then
-        assertThat(exporter).isNull()
+        assertThat(exporters).isEmpty()
     }
 
     @ParameterizedTest
@@ -265,7 +314,7 @@ class ToolAdapterTest {
         // given
         // - the MCP config file of every tool, each holding servers the user added by hand next to the owned ones
         val projectDir = tempDir.resolve("project")
-        val mcpFiles = listOf(".mcp.json", ".vscode/mcp.json", ".cursor/mcp.json", ".codex/config.toml")
+        val mcpFiles = listOf(".mcp.json", ".vscode/mcp.json", ".github/mcp.json", ".cursor/mcp.json", ".codex/config.toml")
             .map { writeFile(projectDir.resolve(it)) }
         val adapter = ToolFactory.create(toolType)
         val manifest = project(replace = true)

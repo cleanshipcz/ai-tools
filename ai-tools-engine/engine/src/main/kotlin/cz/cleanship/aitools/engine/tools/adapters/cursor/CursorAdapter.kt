@@ -32,8 +32,8 @@ class CursorAdapter(
     override fun replacedPaths(projectDir: File, project: ProjectManifest): List<File> =
         project.replacing(rulesDir(projectDir), commandsDir(projectDir), featuresDir(projectDir))
 
-    override fun mcpConfig(projectDir: File): McpConfigExporter =
-        McpConfigFileExporter(cursorDir(projectDir).resolve("mcp.json"), JsonMcpConfigFormat.CURSOR, exportService, projectDir)
+    override fun mcpConfigs(projectDir: File): List<McpConfigExporter> =
+        listOf(McpConfigFileExporter(cursorDir(projectDir).resolve("mcp.json"), JsonMcpConfigFormat.CURSOR, exportService, projectDir))
 
     override fun mcpPermissions(projectDir: File): McpPermissionsExporter? = null
 

@@ -151,6 +151,114 @@ class JsonMcpConfigFormatTest {
         }
     }
 
+    /**
+     * `.github/mcp.json` and `~/.copilot/mcp-config.json` of GitHub Copilot CLI 1.0.89, whose `copilot mcp add` and `copilot mcp remove` write the user file back with every entry normalized.
+     */
+    @Nested
+    inner class CopilotCli {
+
+        private val format = JsonMcpConfigFormat.COPILOT_CLI
+
+        private val bare =
+            ResolvedMcpServer("bare", ResolvedMcpTransport.Stdio(command = "bare-server", args = emptyList(), env = emptyMap()))
+
+        private val bareRemote =
+            ResolvedMcpServer("remote", ResolvedMcpTransport.Http(url = "https://remote.example.com/mcp", headers = emptyMap()))
+
+        @Test
+        fun `should write every server under mcpServers allowing all its tools, with an explicit type and secrets as shell references`() {
+            // when
+            val content = format.merge(null, listOf(stdioServer, httpServer), setOf("atlassian", "github"), file)
+
+            // then
+            assertThat(content).isEqualTo(
+                """
+                {
+                  "mcpServers": {
+                    "atlassian": {
+                      "tools": [
+                        "*"
+                      ],
+                      "type": "stdio",
+                      "command": "/work/jira-mcp-server",
+                      "args": [
+                        "--verbose"
+                      ],
+                      "env": {
+                        "JIRA_BASE_URL": "https://jira.example.com",
+                        "JIRA_PAT": "${'$'}{JIRA_PAT}",
+                        "CONFLUENCE_PAT": "${'$'}{CONFLUENCE_PAT:-}"
+                      }
+                    },
+                    "github": {
+                      "tools": [
+                        "*"
+                      ],
+                      "type": "http",
+                      "url": "https://api.githubcopilot.com/mcp/",
+                      "headers": {
+                        "Authorization": "Bearer ${'$'}{GITHUB_TOKEN}",
+                        "X-Api-Key": "${'$'}{API_KEY}",
+                        "X-Region": "eu"
+                      }
+                    }
+                  }
+                }
+
+                """.trimIndent(),
+            )
+            assertThat(content).doesNotContain("\${env:")
+        }
+
+        @Test
+        fun `should write the arguments of a stdio server even when it has none, and leave out an environment or headers a server does not have`() {
+            // when
+            val content = format.merge(null, listOf(bare, bareRemote), setOf("bare", "remote"), file)
+
+            // then
+            // - Copilot CLI adds an empty args to a stdio entry that has none when it rewrites the file, which would change the entry
+            val servers = servers(content, "mcpServers")
+            assertThat(servers.getValue("bare")).isEqualTo(Json.parseToJsonElement("""{"tools": ["*"], "type": "stdio", "command": "bare-server", "args": []}"""))
+            assertThat(servers.getValue("remote")).isEqualTo(Json.parseToJsonElement("""{"tools": ["*"], "type": "http", "url": "https://remote.example.com/mcp"}"""))
+        }
+
+        @Test
+        fun `should write nothing for the variables a server reads from the environment of the tool, which Copilot CLI passes on`() {
+            // given
+            val forwarding = stdioServer.copy(transport = (stdioServer.transport as ResolvedMcpTransport.Stdio).copy(forwarded = listOf("DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR")))
+
+            // when
+            val content = format.merge(null, listOf(forwarding), setOf("atlassian"), file)
+
+            // then
+            assertThat(content).isEqualTo(format.merge(null, listOf(stdioServer), setOf("atlassian"), file)).doesNotContain("DBUS_SESSION_BUS_ADDRESS").doesNotContain("XDG_RUNTIME_DIR")
+        }
+
+        /**
+         * The ledger recognises an entry of the engine by its fingerprint, so a rewrite of the file by Copilot CLI must leave every entry the engine wrote the same JSON value.
+         */
+        @Test
+        fun `should keep every entry it wrote and its fingerprint when Copilot CLI rewrites the file to add a server of its own, and change nothing on the next merge`() {
+            // given
+            val owned = setOf("atlassian", "github", "bare", "remote")
+            val servers = listOf(stdioServer, httpServer, bare, bareRemote)
+            val written = format.merge(null, servers, owned, file)
+            // - the file as `copilot mcp add probe -- /bin/true` of Copilot CLI 1.0.89 writes it back: every entry normalized, and the new one appended
+            val rewritten = written.removeSuffix("\n  }\n}\n") +
+                ",\n    \"probe\": {\n      \"tools\": [\n        \"*\"\n      ],\n      \"type\": \"local\",\n      \"command\": \"/bin/true\",\n      \"args\": []\n    }\n  }\n}\n"
+
+            // when
+            val fingerprintsWritten = format.entryFingerprints(written, file)
+            val fingerprintsRewritten = format.entryFingerprints(rewritten, file)
+            val merged = format.merge(rewritten, servers, owned, file)
+
+            // then
+            assertThat(fingerprintsRewritten.filterKeys { it in owned }).isEqualTo(fingerprintsWritten)
+            assertThat(servers(rewritten, "mcpServers").keys).containsExactly("atlassian", "github", "bare", "remote", "probe")
+            assertThat(merged).isEqualTo(rewritten)
+        }
+    }
+
     @Nested
     inner class EntryOwnership {
 
@@ -530,7 +638,8 @@ class JsonMcpConfigFormatTest {
         finalNewline: Boolean,
     ) {
         // given
-        val formats = listOf(JsonMcpConfigFormat.CLAUDE_CODE, JsonMcpConfigFormat.VS_CODE, JsonMcpConfigFormat.CURSOR)
+        val formats =
+            listOf(JsonMcpConfigFormat.CLAUDE_CODE, JsonMcpConfigFormat.VS_CODE, JsonMcpConfigFormat.CURSOR, JsonMcpConfigFormat.COPILOT_CLI)
         val endings = (0 until 5).map { index -> if (style == "crlf" || (style == "mixed" && index % 2 == 0)) "\r\n" else "\n" }
         // - one file per format, holding a foreign entry under the key that format reads
         val existing = formats.associateWith { format ->
@@ -543,7 +652,7 @@ class JsonMcpConfigFormatTest {
         val contents = existing.map { (format, text) -> format.merge(text, listOf(stdioServer), setOf("atlassian"), file) }
 
         // then
-        assertThat(contents).hasSize(3).allSatisfy {
+        assertThat(contents).hasSize(4).allSatisfy {
             assertThat(it)
                 .contains("\"mine\"")
                 .contains("\"atlassian\"")

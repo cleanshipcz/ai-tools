@@ -245,8 +245,8 @@ class McpLaunchRenderingTest {
         private const val START_TIMEOUT_SECONDS = 30L
         private const val SERVER_ARGUMENTS_COMMAND = "/opt/jira server/bin/jira-mcp-server"
 
-        // - arguments with a space, both quotes, a separator of their own and a dollar sign, none of which the launcher or a format may change
-        private val SERVER_ARGUMENTS = listOf("--name=it's \"quoted\"", "a b", "--", "\$HOME")
+        // - arguments with a space, both quotes, a separator of their own, and a command substitution and a glob a shell would expand, none of which the launcher or a format may change; a dollar sign never reaches an argument, since loading refuses it
+        private val SERVER_ARGUMENTS = listOf("--name=it's \"quoted\"", "a b", "--", "`id` *")
 
         private val LAUNCHER_ARGUMENTS =
             listOf("atlassian", "--required", "JIRA_PAT", "--optional", "CONFLUENCE_PAT", "--", SERVER_ARGUMENTS_COMMAND) + SERVER_ARGUMENTS

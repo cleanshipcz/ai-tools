@@ -23,6 +23,8 @@ class JsonMcpConfigFormat private constructor(
     private val secretReference: (variable: String, required: Boolean) -> String,
     private val typesRemoteServers: Boolean,
     private val keepsLayout: Boolean,
+    private val allowsAllTools: Boolean = false,
+    private val writesEmptyArgs: Boolean = false,
 ) : McpConfigFormat {
 
     override fun merge(existing: String?, servers: List<ResolvedMcpServer>, ownedMcpIds: Set<String>, file: File): String {
@@ -96,15 +98,17 @@ class JsonMcpConfigFormat private constructor(
         else -> throw McpConfigFileException("'${file.absolutePath}' holds a '$serversKey' that is not a JSON object, so the engine leaves it untouched. Fix the file or remove it, and deploy again.")
     }
 
-    // The forwarded names of a stdio server are left out: Claude Code, VS Code and Cursor pass their own environment to it (Claude Code a reduced one when CLAUDE_CODE_MCP_ALLOWLIST_ENV is set), and none of them can forward a variable by name without holding a reference to it.
+    // The forwarded names of a stdio server are left out: Claude Code, VS Code, Cursor and Copilot CLI pass their own environment to it (Claude Code a reduced one when CLAUDE_CODE_MCP_ALLOWLIST_ENV is set), and none of them can forward a variable by name without holding a reference to it.
     private fun render(server: ResolvedMcpServer): JsonObject = when (val transport = server.transport) {
         is ResolvedMcpTransport.Stdio -> buildJsonObject {
+            if (allowsAllTools) putJsonArray("tools") { add(JsonPrimitive(ALL_TOOLS)) }
             put("type", "stdio")
             put("command", transport.command)
-            if (transport.args.isNotEmpty()) putJsonArray("args") { transport.args.forEach { add(JsonPrimitive(it)) } }
+            if (transport.args.isNotEmpty() || writesEmptyArgs) putJsonArray("args") { transport.args.forEach { add(JsonPrimitive(it)) } }
             if (transport.env.isNotEmpty()) putJsonObject("env") { transport.env.forEach { (key, value) -> put(key, text(value)) } }
         }
         is ResolvedMcpTransport.Http -> buildJsonObject {
+            if (allowsAllTools) putJsonArray("tools") { add(JsonPrimitive(ALL_TOOLS)) }
             if (typesRemoteServers) put("type", "http")
             put("url", transport.url)
             if (transport.headers.isNotEmpty()) putJsonObject("headers") { transport.headers.forEach { (key, value) -> put(key, text(value)) } }
@@ -123,7 +127,7 @@ class JsonMcpConfigFormat private constructor(
          */
         val CLAUDE_CODE = JsonMcpConfigFormat(
             serversKey = "mcpServers",
-            secretReference = { variable, required -> if (required) "\${$variable}" else "\${$variable:-}" },
+            secretReference = ::shellReference,
             typesRemoteServers = true,
             keepsLayout = false,
         )
@@ -133,7 +137,7 @@ class JsonMcpConfigFormat private constructor(
          */
         val CLAUDE_CODE_USER = JsonMcpConfigFormat(
             serversKey = "mcpServers",
-            secretReference = { variable, required -> if (required) "\${$variable}" else "\${$variable:-}" },
+            secretReference = ::shellReference,
             typesRemoteServers = true,
             // Claude Code keeps its session state in this file and rewrites it while it runs, so no byte of it may be normalized.
             keepsLayout = true,
@@ -159,6 +163,23 @@ class JsonMcpConfigFormat private constructor(
             keepsLayout = false,
         )
 
+        /**
+         * `.github/mcp.json` of a project and `~/.copilot/mcp-config.json` of GitHub Copilot CLI: servers under `mcpServers`, every entry allowing all tools of its server with `"tools": ["*"]`, `type` on every entry, `args` on every stdio entry, a secret as `${NAME}`, and an optional one as `${NAME:-}` so that an unset one is empty rather than the literal reference.
+         */
+        val COPILOT_CLI = JsonMcpConfigFormat(
+            serversKey = "mcpServers",
+            secretReference = ::shellReference,
+            typesRemoteServers = true,
+            keepsLayout = false,
+            // `copilot mcp add` and `copilot mcp remove` of Copilot CLI 1.0.89 write the user file back with every entry normalized: `"tools": ["*"]` added as the first key, keys in the order `tools, type, command, args, env` (`tools, type, url, headers`), an empty `args` added to a stdio entry without one, and unknown fields dropped.
+            // Always writing `tools` and `args` keeps the content of an engine entry, and so its fingerprint in the ledger, through such a rewrite; the fingerprint ignores key order, which render follows only so that the rewrite leaves the bytes of the entry as they were.
+            allowsAllTools = true,
+            writesEmptyArgs = true,
+        )
+
+        /** The value of `tools` that allows every tool of a server. */
+        private const val ALL_TOOLS = "*"
+
         @OptIn(ExperimentalSerializationApi::class)
         private val PRETTY = Json {
             prettyPrint = true
@@ -166,3 +187,9 @@ class JsonMcpConfigFormat private constructor(
         }
     }
 }
+
+/**
+ * Returns the reference to the variable [variable] that a shell and Claude Code and Copilot CLI expand: `${NAME}`, or `${NAME:-}` when it is not [required], so that an unset one is empty rather than the literal reference.
+ */
+private fun shellReference(variable: String, required: Boolean): String =
+    if (required) "\${$variable}" else "\${$variable:-}"

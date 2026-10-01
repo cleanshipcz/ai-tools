@@ -15,7 +15,7 @@ interface ToolAdapter {
     val toolType: ToolType
 
     /**
-     * Returns every path [prepare] deletes in [projectDir] for [project]: the directories this tool generates when the project sets `deploy.replace`, otherwise an empty list. No path is, or holds, the file of [mcpConfig], whose entries the engine owns one by one. A path may hold the file of [mcpPermissions], such as `.claude/settings.json`, which is then deleted with it.
+     * Returns every path [prepare] deletes in [projectDir] for [project]: the directories this tool generates when the project sets `deploy.replace`, otherwise an empty list. No path is, or holds, a file of [mcpConfigs], whose entries the engine owns one by one. A path may hold the file of [mcpPermissions], such as `.claude/settings.json`, which is then deleted with it.
      */
     fun replacedPaths(projectDir: File, project: ProjectManifest): List<File>
 
@@ -35,18 +35,18 @@ interface ToolAdapter {
     fun skillPaths(projectDir: File, skillId: String): List<File>
 
     /**
-     * Returns how this tool writes [deployment] into its per-user configuration under [userHome], or `null` when the per-user layout of this tool is not implemented yet.
+     * Returns how this tool writes [deployment] into its per-user configuration under [userHome]: a [UserScopeExporter] when it gets every artifact of the deployment, a [McpFilesUserScope] when it gets only the MCP servers, or `null` when the per-user layout of this tool is not implemented yet.
      *
-     * Every adapter answers this deliberately rather than inheriting an answer, so that a tool gaining a user scope is a decision someone made about that tool rather than something a default quietly decided. The engine reports a `null` as a manifest skipped for this tool, which is why an unimplemented layout never silently drops a tool a manifest declared - see [cz.cleanship.aitools.engine.ToolsEngine].
+     * Every adapter answers this deliberately rather than inheriting an answer, so that a tool gaining a user scope is a decision someone made about that tool rather than something a default quietly decided. The engine reports a `null` as a manifest skipped for this tool, and a [McpFilesUserScope] as deploying nothing for this tool when the deployment selects no MCP server and the ledger of the home records none it wrote, which is why an unimplemented layout never silently drops a tool a manifest declared - see [cz.cleanship.aitools.engine.ToolsEngine].
      */
-    fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter?
+    fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScope?
 
     /**
-     * Returns how this tool writes the MCP servers of a project into its MCP config file in [projectDir], or `null` when this tool does not support MCP servers in this engine.
+     * Returns how this tool writes the MCP servers of a project into each of its MCP config files in [projectDir], one exporter per file, or an empty list when this tool does not support MCP servers in this engine.
      *
-     * Every adapter answers this deliberately rather than inheriting an answer, like [userScope]. The engine reports a `null` as the MCP servers of the project skipped for this tool.
+     * Every adapter answers this deliberately rather than inheriting an answer, like [userScope]. The engine reports an empty list as the MCP servers of the project skipped for this tool.
      */
-    fun mcpConfig(projectDir: File): McpConfigExporter?
+    fun mcpConfigs(projectDir: File): List<McpConfigExporter>
 
     /**
      * Returns how this tool writes the MCP tool restrictions of a project into a permissions file in [projectDir], or `null` when this tool reads them from its MCP config file or has no way to read them.

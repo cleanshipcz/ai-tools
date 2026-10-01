@@ -37,6 +37,7 @@ import cz.cleanship.aitools.engine.tools.RulesetResolvingException
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserInstructionsContext
+import cz.cleanship.aitools.engine.tools.UserScope
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
 import cz.cleanship.aitools.engine.tools.adapters.antigravity.AntigravityAdapter
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
@@ -44,6 +45,7 @@ import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
 import cz.cleanship.aitools.engine.tools.adapters.github.GitHubCopilotAdapter
 import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
+import cz.cleanship.aitools.engine.tools.artifactExporter
 import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileException
 import cz.cleanship.aitools.engine.tools.mcp.McpSecretDelivery
 import cz.cleanship.aitools.engine.tools.mcp.McpSecretsManager
@@ -219,7 +221,7 @@ class ToolsEngine(
             val projectId = planned.project.manifest.id
             LOG.info("Processing project {}", projectId)
             for (adapter in planned.adapters) {
-                failures += exportAdapter(planned.project, adapter, planned.destination, allData.rulesets, allData.fragments, mcpServers)
+                failures += exportAdapter(planned, adapter, allData.rulesets, allData.fragments, mcpServers)
             }
             LOG.info("Processing project {} completed", projectId)
         }
@@ -310,9 +312,14 @@ class ToolsEngine(
         if (selections.isEmpty()) return UserDeploymentPlan(emptyList(), emptySet())
 
         val targets = selections.flatMap { (manifest, adapters) ->
-            adapters.mapNotNull { adapter -> userScopeTarget(manifest, adapter) }
+            adapters.mapNotNull { adapter ->
+                // A tool without a user-scope layout is reported here rather than passed over, so a manifest naming it is never dropped without a word.
+                val scope = adapter.userScope(userHome, manifest)
+                if (scope == null) reportNoUserScope(manifest, adapter)
+                scope?.let { UserScopeTarget(manifest, adapter, it) }
+            }
         }
-        val instructionsClaims = targets.map { it.instructionsFile to it.manifest.id }
+        val instructionsClaims = targets.mapNotNull { target -> target.instructionsFile?.let { it to target.manifest.id } }
         val contendedInstructions = reportContendedInstructionsFiles(instructionsClaims)
 
         // A manifest every selected tool lacks a user scope for has no targets at all, and is left out here rather than bracketed by a pair of log lines reporting a deploy that never happened - the skip was reported per tool above. Assembling is pure filtering, so it can happen before the home is announced.
@@ -375,8 +382,10 @@ class ToolsEngine(
      */
     private fun announceHome(planned: List<PlannedUserDeployment>, contendedInstructions: Set<File>) {
         val writesSomething = planned.any { plannedDeployment ->
-            plannedDeployment.targets.any { it.instructionsFile !in contendedInstructions } ||
-                plannedDeployment.deployment.hasArtifacts()
+            val deployment = plannedDeployment.deployment
+            plannedDeployment.targets.any { target ->
+                if (target.exporter == null) deployment.mcps.isNotEmpty() else target.instructionsFile !in contendedInstructions || deployment.hasArtifacts()
+            }
         }
         if (!writesSomething) return
         LOG.info("{} the user scope under '{}'", deploying, userHome.absolutePath)
@@ -387,22 +396,6 @@ class ToolsEngine(
                 if (dryRun) "would be created by a deploy" else "is created by this deploy",
             )
         }
-    }
-
-    /**
-     * Returns how [adapter] would deploy [manifest], or `null` when this tool has no user-scope layout - which is reported here rather than passed over, so a manifest naming it is never dropped without a word.
-     */
-    private fun userScopeTarget(manifest: UserDeploymentManifest, adapter: ToolAdapter): UserScopeTarget? {
-        val exporter = adapter.userScope(userHome, manifest)
-        if (exporter == null) {
-            LOG.warn(
-                "{}: {} has no user-scope layout in this engine, so the manifest is not deployed for it.",
-                manifest.id,
-                adapter.toolType.serialName,
-            )
-            return null
-        }
-        return UserScopeTarget(manifest, adapter, exporter)
     }
 
     /**
@@ -436,7 +429,7 @@ class ToolsEngine(
     /**
      * Exports every manifest of [deployment] into the user scope of [target], isolating each of them the way [exportAdapter] isolates the manifests of a project.
      *
-     * The directories of the tool in the home are checked first: when one cannot hold the files of the tool, nothing of the tool is written and that is the one failure. A file other than an MCP file that cannot be written ends the export of the tool with one failure naming that file, and the next tool is exported; a failed delete stops the run with [ReplaceFailedException].
+     * A tool that gets only its MCP files in the home is exported by [exportUserMcpFiles] instead, and [ownsInstructionsFile] is then ignored. The directories of the tool in the home are checked first: when one cannot hold the files of the tool, nothing of the tool is written and that is the one failure. A file other than an MCP file that cannot be written ends the export of the tool with one failure naming that file, and the next tool is exported; a failed delete stops the run with [ReplaceFailedException].
      *
      * @param ownsInstructionsFile whether this manifest may write the instructions file of the tool, which is false when another manifest claims the same file - see [reportContendedInstructionsFiles]. The contention is reported as a failure of this manifest, so the run cannot end successfully having written neither.
      * @return the failures collected while exporting, empty when everything was exported
@@ -452,18 +445,12 @@ class ToolsEngine(
         mcpServers: McpConfigExportPlanner,
     ): List<ExportFailure> {
         val manifest = deployment.manifest
-        val exporter = target.exporter
+        val exporter = target.exporter ?: return exportUserMcpFiles(deployment, target, mcpServers)
         val toolType = target.adapter.toolType
         val subject = "user deployment '${manifest.id}'"
         LOG.info("{}: {} into the user scope of {} under '{}'", manifest.id, deploying, toolType.serialName, userHome.absolutePath)
         val root = TargetRoot.UserHome(userHome)
-        val mcpExports = mcpServers.exportsFor(
-            McpDeployment(manifest.id, root, deployment.mcps, deployment.ownedMcpIds, manifest.mcps?.tools.orEmpty(), declaresMcps = manifest.mcps != null),
-            toolType,
-            exporter.mcpConfig(),
-            exporter.mcpPermissions(),
-            target.adapter.mcpLimits,
-        )
+        val mcpExports = mcpServers.userScopeExportsFor(deployment, target.adapter, target.scope, userHome)
         val directories = exporter.toolDirectories + mcpExports.mapNotNull { it.directory }
         toolDirectoryFailure(manifest.id, subject, root, toolType, directories)?.let { return listOf(it) }
         reportAgentMcpSkip(manifest.id, deployment.agents.values, target.adapter)
@@ -510,6 +497,40 @@ class ToolsEngine(
 
         // The user scope deletes inside the export of each artifact, so a failed delete surfaces here rather than from a step of its own like a project's.
         return exportAll(manifest.id, subject, toolType, exports) { ex -> ex.explained(toolType, "$subject under '${userHome.absolutePath}'") }
+    }
+
+    /**
+     * Exports the MCP files of [deployment] into the user scope of [target], a tool that gets nothing else in the home, the way [exportUserAdapter] exports them beside the other artifacts of a tool.
+     *
+     * When the deployment writes nothing into those files, nothing is checked, and a deployment that selects no server is reported as deploying nothing for the tool. Otherwise the directories of the tool in the home are checked first, and a deployment that selects servers is told, in one line, that the tool gets only them.
+     *
+     * @return the failures collected while exporting, empty when everything was exported
+     */
+    private fun exportUserMcpFiles(
+        deployment: UserDeployment,
+        target: UserScopeTarget,
+        mcpServers: McpConfigExportPlanner,
+    ): List<ExportFailure> {
+        val manifest = deployment.manifest
+        val toolType = target.adapter.toolType
+        val subject = "user deployment '${manifest.id}'"
+        val mcpExports = mcpServers.userScopeExportsFor(deployment, target.adapter, target.scope, userHome)
+        if (mcpExports.isEmpty()) {
+            // Decided here rather than when planning, since only the ledger of the home tells whether a deployment without servers still removes some it wrote earlier.
+            if (deployment.mcps.isEmpty()) {
+                LOG.warn("{}: {} gets only MCP servers in the user scope, and the manifest selects none, so nothing is deployed for it.", manifest.id, toolType.serialName)
+            }
+            return emptyList()
+        }
+        LOG.info("{}: {} into the user scope of {} under '{}'", manifest.id, deploying, toolType.serialName, userHome.absolutePath)
+        // The tool getting only its MCP servers is what the manifest asks for, so it is stated, not warned about.
+        if (deployment.mcps.isNotEmpty()) {
+            LOG.info("{}: only the MCP servers are deployed for {} in the user scope; its instructions, agents, prompts and skills are not.", manifest.id, toolType.serialName)
+        }
+        val root = TargetRoot.UserHome(userHome)
+        val directories = target.scope.toolDirectories + mcpExports.mapNotNull { it.directory }
+        toolDirectoryFailure(manifest.id, subject, root, toolType, directories)?.let { return listOf(it) }
+        return exportAll(manifest.id, subject, toolType, mcpExports.map { it.name to it.run }) { ex -> ex.explained(toolType, "$subject under '${userHome.absolutePath}'") }
     }
 
     /**
@@ -572,20 +593,21 @@ class ToolsEngine(
     }
 
     /**
-     * Exports every manifest of [project] through [adapter], isolating each manifest so that one broken reference cannot skip the manifests behind it.
+     * Exports every manifest of the project of [planned] through [adapter] into its directory, isolating each manifest so that one broken reference cannot skip the manifests behind it.
      *
-     * Every directory the files of the tool land in is checked first, in a dry run as in a deploy - see [requireToolDirectory]: when one is a link that leads nowhere, in a loop or outside the project, or is not a directory, nothing of the tool is written or deleted for the project and that is the one failure. A directory the project replaces, or one below it, is not checked, since the replace removes whatever stands there before anything is written. A file other than an MCP file that cannot be written ends the export of [adapter] for [project] with one failure naming that file, and leaves the files written before it in place; a failed delete stops the run with [ReplaceFailedException]. Any other write failure, such as a read-only directory, only a deploy finds.
+     * Every directory the files of the tool land in is checked first, in a dry run as in a deploy - see [requireToolDirectory]: when one is a link that leads nowhere, in a loop or outside the project, or is not a directory, nothing of the tool is written or deleted for the project and that is the one failure. A directory the project replaces, or one below it, is not checked, since the replace removes whatever stands there before anything is written. A file other than an MCP file that cannot be written ends the export of [adapter] for the project with one failure naming that file, and leaves the files written before it in place; a failed delete stops the run with [ReplaceFailedException]. Any other write failure, such as a read-only directory, only a deploy finds.
      *
      * @return the failures collected while exporting, empty when everything was exported
      */
     private fun exportAdapter(
-        project: Project,
+        planned: PlannedProject,
         adapter: ToolAdapter,
-        destination: File,
         allRulesets: Map<String, RulesetManifest>,
         allFragments: Map<String, FragmentManifest>,
         mcpServers: McpConfigExportPlanner,
     ): List<ExportFailure> {
+        val project = planned.project
+        val destination = planned.destination
         LOG.info("{}: Exporting via adapter {}", project.manifest.id, adapter.toolType)
         val projectId = project.manifest.id
         val root = TargetRoot.Project(destination)
@@ -600,9 +622,10 @@ class ToolsEngine(
                     ?.tools
                     .orEmpty(),
                 declaresMcps = project.manifest.deploy.mcps != null,
+                mcpConfigFiles = planned.mcpConfigFiles(),
             ),
             adapter.toolType,
-            adapter.mcpConfig(destination),
+            adapter.mcpConfigs(destination),
             adapter.mcpPermissions(destination),
             adapter.mcpLimits,
             // The deploy deletes these before any export runs; a dry run deletes nothing, so it plans the files below them as the deploy finds them.
@@ -639,10 +662,12 @@ class ToolsEngine(
         fun mcpClaims(): List<McpFileClaim> = if (project.manifest.deploy.mcps == null) {
             emptyList()
         } else {
-            adapters
-                .flatMap { adapter -> listOfNotNull(adapter.mcpConfig(destination)?.file, adapter.mcpPermissions(destination)?.file) }
+            (mcpConfigFiles() + adapters.mapNotNull { adapter -> adapter.mcpPermissions(destination)?.file })
                 .map { McpFileClaim(it, "project '${project.manifest.id}'") }
         }
+
+        /** Returns every MCP config file of every adapter of this project, whether or not the project declares an `mcps` block. */
+        fun mcpConfigFiles(): Set<File> = adapters.flatMap { adapter -> adapter.mcpConfigs(destination).map { it.file } }.toSet()
     }
 
     /**
@@ -657,7 +682,7 @@ class ToolsEngine(
             emptyList()
         } else {
             targets
-                .flatMap { target -> listOfNotNull(target.exporter.mcpConfig()?.file, target.exporter.mcpPermissions()?.file) }
+                .flatMap { target -> listOfNotNull(target.scope.mcpConfig()?.file, target.scope.mcpPermissions()?.file) }
                 .map { McpFileClaim(it, "user deployment '${deployment.manifest.id}'") }
         }
     }
@@ -671,14 +696,18 @@ class ToolsEngine(
     )
 
     /**
-     * One tool deploying one user deployment: the exporter it will write through, kept beside the manifest and the adapter it came from so that the destinations of a whole run can be compared before any of them is written.
+     * One tool deploying one user deployment: the user scope it will write through, kept beside the manifest and the adapter it came from so that the destinations of a whole run can be compared before any of them is written.
      */
     private data class UserScopeTarget(
         val manifest: UserDeploymentManifest,
         val adapter: ToolAdapter,
-        val exporter: UserScopeExporter,
+        val scope: UserScope,
     ) {
-        val instructionsFile: File get() = exporter.instructionsFile.absoluteFile
+        /** The exporter of every artifact of the deployment, or `null` when the tool gets only its MCP files in the home. */
+        val exporter: UserScopeExporter? get() = scope.artifactExporter
+
+        /** The instructions file of the tool, or `null` when it gets only its MCP files in the home. */
+        val instructionsFile: File? get() = exporter?.instructionsFile?.absoluteFile
     }
 
     companion object {
@@ -702,6 +731,13 @@ private fun reportContendedInstructionsFiles(claims: List<Pair<File, String>>): 
             claimingIds,
         )
     }.keys
+
+/**
+ * Reports [manifest] as not deployed for the tool of [adapter] in the user scope.
+ */
+private fun reportNoUserScope(manifest: UserDeploymentManifest, adapter: ToolAdapter) {
+    ENGINE_LOG.warn("{}: {} has no user-scope layout in this engine, so the manifest is not deployed for it.", manifest.id, adapter.toolType.serialName)
+}
 
 /**
  * Names a run that has nothing to deploy, for the same reason a run configuring no tools is named: a deploy that writes nothing and reports success reads exactly like one that worked.

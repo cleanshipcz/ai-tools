@@ -156,6 +156,36 @@ class McpServerResolverTest {
                 .hasMessageNotContaining("https://proxy")
         }
 
+        /**
+         * Copilot CLI expands `$NAME` as well as `${NAME}` from its own environment, so a `$` in a plain value would send a value of that environment in its place.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - a bare reference
+            "http://proxy/{d}PROBE_SECRET",
+            // - a dollar sign that is followed by no name, as a password may hold one
+            "pa{d}{d}word-$CONFIG_VALUE",
+        )
+        fun `should fail without echoing the value when a plain value of the config holds a dollar sign`(
+            value: String,
+        ) {
+            // given
+            val dollarResolver =
+                McpServerResolver(VariableResolver(variables = mapOf("PROXY" to value.replace("{d}", "$")), environment = { null }))
+            val server = server(
+                McpServerTransport.Stdio(command = "server", args = emptyList(), env = mapOf("HTTPS_PROXY" to McpText(listOf(McpTextPart.Variable("PROXY"))))),
+                McpVariable("PROXY", "Proxy", secret = false),
+            )
+
+            // when / then
+            assertThatThrownBy { dollarResolver.resolve(server) }
+                .isInstanceOf(McpServerResolvingException::class.java)
+                .hasMessageContaining("'PROXY'")
+                .hasMessageContaining("'$'")
+                .hasMessageNotContaining("PROBE_SECRET")
+                .hasMessageNotContaining(CONFIG_VALUE)
+        }
+
         @Test
         fun `should refuse a secret variable referenced in an argument of a server the loader did not build, without reading it`() {
             // given
