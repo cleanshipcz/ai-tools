@@ -1,7 +1,10 @@
 package cz.cleanship.aitools.engine.models
 
+import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
+import com.charleskorn.kaml.YamlConfiguration
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.entry
 import org.junit.jupiter.api.Test
 
 class ProjectManifestTest {
@@ -129,5 +132,65 @@ class ProjectManifestTest {
         val result = yaml.decodeFromString(ProjectManifest.serializer(), input)
 
         assertThat(result.deploy.tools).isEmpty()
+    }
+
+    @Test
+    fun `should deserialize manifest with an mcps filter and select no server without one`() {
+        val input = """
+            |id: test-project
+            |description: Test Project
+            |metadata:
+            |    version: 1.0.0
+            |context:
+            |    documentation:
+            |        readme: README.md
+            |deploy:
+            |    directory: /tmp/test
+            |    mcps:
+            |        filter:
+            |            - type: tags
+            |              tags: [ai-tools]
+        """.trimMargin()
+
+        val result = Yaml(configuration = YamlConfiguration(polymorphismStyle = PolymorphismStyle.Property))
+            .decodeFromString(ProjectManifest.serializer(), input)
+
+        // - MCP servers are opt-in: a project that declares no mcps block selects none of them and never touches an MCP config file
+        assertThat(result.deploy.mcps?.filter).containsExactly(ProjectFilter.ByTags(listOf("ai-tools")))
+        assertThat(ProjectDeploy(directory = "/tmp/test").mcps).isNull()
+    }
+
+    @Test
+    fun `should deserialize the tool restrictions of the mcps block and restrict nothing without them`() {
+        val input = """
+            |id: test-project
+            |description: Test Project
+            |metadata:
+            |    version: 1.0.0
+            |context:
+            |    documentation:
+            |        readme: README.md
+            |deploy:
+            |    directory: /tmp/test
+            |    mcps:
+            |        filter:
+            |            - type: whitelist
+            |              ids: [github, atlassian]
+            |        tools:
+            |            github:
+            |                allow: [get_me]
+            |                deny: [delete_repository]
+            |            atlassian:
+            |                deny: [jira_delete_issue]
+        """.trimMargin()
+
+        val result = Yaml(configuration = YamlConfiguration(polymorphismStyle = PolymorphismStyle.Property))
+            .decodeFromString(ProjectManifest.serializer(), input)
+
+        assertThat(result.deploy.mcps?.tools).containsExactly(
+            entry("github", McpToolRestriction(allow = listOf("get_me"), deny = listOf("delete_repository"))),
+            entry("atlassian", McpToolRestriction(deny = listOf("jira_delete_issue"))),
+        )
+        assertThat(ProjectMcps().tools).isEmpty()
     }
 }

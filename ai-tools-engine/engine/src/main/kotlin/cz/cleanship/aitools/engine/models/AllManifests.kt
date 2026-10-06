@@ -14,6 +14,10 @@ data class AllManifests(
      * The manifest file each skill of [skills] was read from, by skill id.
      */
     val skillManifestFiles: Map<String, java.io.File> = emptyMap(),
+    /**
+     * Every MCP server of the run by id, each with its transport and variables resolved from its `source` when it is a pointer.
+     */
+    val mcps: Map<String, McpServer> = emptyMap(),
     val projects: Map<String, ProjectManifest>,
     val userDeployments: Map<String, UserDeploymentManifest> = emptyMap(),
     val features: Map<ProjectManifest, Map<String, FeatureManifest>>,

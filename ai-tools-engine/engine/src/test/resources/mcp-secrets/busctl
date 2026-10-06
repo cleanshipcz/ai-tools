@@ -1,0 +1,48 @@
+#!/bin/sh
+# Test double of systemd's busctl, answering only the SearchItems call of the secret service with item paths, never a value.
+# Its state directory is written into this file by the test (the placeholder below), because the engine starts it with a cleared environment:
+#   calls.log         every call is appended: a line "call", one line "arg <argument>" per argument, one line "env <name>" per environment variable (names only, never values)
+#   behaviour         optional; "hang" never answers, "fail" fails like an unreachable bus, "garbage" answers in a form busctl never uses
+#   unlocked/<NAME>   the secret NAME is stored and unlocked
+#   locked/<NAME>     the secret NAME is stored and locked
+set -u
+state='@STATE@'
+
+{
+    printf 'call\n'
+    for argument in "$@"; do
+        printf 'arg %s\n' "$argument"
+    done
+    awk 'BEGIN { for (name in ENVIRON) print "env " name }'
+} >>"$state/calls.log"
+
+behaviour=normal
+if [ -f "$state/behaviour" ]; then
+    behaviour=$(cat "$state/behaviour")
+fi
+
+case $behaviour in
+    hang)
+        # exec keeps one process, so the time limit of the engine ends the whole call.
+        exec sleep 30
+        ;;
+    fail)
+        # What busctl 245 writes when the bus address points nowhere.
+        printf 'Failed to connect to bus: No such file or directory\n' >&2
+        exit 1
+        ;;
+    garbage)
+        printf 'aoao 1 "/org/freedesktop/secrets/collection/login/1" 0\n'
+        exit 0
+        ;;
+esac
+
+# The attribute value of the variable is the last argument.
+for name in "$@"; do :; done
+if [ -f "$state/unlocked/$name" ]; then
+    printf '{"type":"aoao","data":[["/org/freedesktop/secrets/collection/login/1"],[]]}\n'
+elif [ -f "$state/locked/$name" ]; then
+    printf '{"type":"aoao","data":[[],["/org/freedesktop/secrets/collection/login/2"]]}\n'
+else
+    printf '{"type":"aoao","data":[[],[]]}\n'
+fi

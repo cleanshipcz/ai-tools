@@ -1,0 +1,22 @@
+id: github-dbg
+description: GitHub Enterprise of Deutsche Boerse (github.deutsche-boerse.de) through the hosted GitHub MCP server of the DBG developer portal - repositories, issues, pull requests, Actions, and code search.
+# A remote server: a tool connects to it itself, so neither the launcher scripts/mcp-launch nor the keyring is used, and every entry keeps the environment reference.
+# The server forwards the Authorization header to GitHub Enterprise, so the token must be a personal access token of github.deutsche-boerse.de, not of github.com.
+# The value of GITHUB_DBG_TOKEN is the token alone, without "Bearer ", and must be in the environment of the tool when it starts. 07_mcp/README.md, "Remote servers", shows how to take it from the keyring for a single start of the tool.
+# The url is written in full: a server that sends a secret header must name its https host in the manifest, never through a variable.
+transport:
+  type: http
+  url: https://mcp-github-dbg.mcp.devportal.test.fra.gcp.dbgcloud.io
+  headers:
+    Authorization: Bearer ${GITHUB_DBG_TOKEN}
+variables:
+  - name: GITHUB_DBG_TOKEN
+    description: Personal access token of github.deutsche-boerse.de, without the "Bearer " prefix.
+    secret: true
+metadata:
+  version: 1.0.0
+  author: cleanshipcz
+  created: 2026-10-05
+  tags:
+    - ai-tools
+    - github

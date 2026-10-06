@@ -16,10 +16,13 @@ import cz.cleanship.aitools.engine.UnreadableReplacedFolderException
 import cz.cleanship.aitools.engine.env.VariableSubstitutionException
 import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.io.resolveDeclaredPath
+import cz.cleanship.aitools.engine.services.ArtifactWriteException
+import cz.cleanship.aitools.engine.services.ConfigFileException
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
-import cz.cleanship.aitools.engine.services.RetiredConfigKeyException
+import cz.cleanship.aitools.engine.services.UnknownMcpServersException
 import java.io.FileNotFoundException
+import java.io.IOException
 import java.nio.file.Paths
 
 class AiToolsCli(
@@ -47,7 +50,7 @@ class AiToolsCli(
         .check("--user-home must name a directory, not an empty path") { it.toString().isNotEmpty() }
 
     /**
-     * Validates the manifests without deploying them: the run loads, filters and renders everything a deploy does and fails on exactly what a deploy fails on, but creates, deletes and modifies nothing on disk. It is the way to check a manifest set before letting a deploy rewrite the projects and the home it reaches.
+     * Validates the manifests without deploying them: the run loads, filters and renders everything a deploy does and fails on what a deploy fails on, but creates, deletes and modifies nothing on disk. The exception is a write the file system refuses, such as one into a read-only directory, which only a deploy finds; a tool directory that is a dangling or looping link, or not a directory, fails the dry run as it fails the deploy. It is the way to check a manifest set before letting a deploy rewrite the projects and the home it reaches.
      */
     private val dryRun by option(
         "--dry-run",
@@ -60,13 +63,15 @@ class AiToolsCli(
     override fun run() {
         try {
             runner.run(workingDir.toFile(), workingDir.toFile().resolveDeclaredPath(userHome.toString()), dryRun)
-        } catch (ex: FileNotFoundException) {
-            throw failure(ex.message ?: "Missing config.yml in ${workingDir.toAbsolutePath()}", ex)
+        } catch (ex: IOException) {
+            throw reported(ex)
         } catch (ex: ExportFailedException) {
             throw failure(ex.message, ex)
         } catch (ex: DuplicateManifestIdException) {
             throw failure(ex.message, ex)
         } catch (ex: ManifestLoadingException) {
+            throw failure(ex.message, ex)
+        } catch (ex: UnknownMcpServersException) {
             throw failure(ex.message, ex)
         } catch (ex: VariableSubstitutionException) {
             throw failure(ex.message, ex)
@@ -76,17 +81,27 @@ class AiToolsCli(
             throw failure(ex.message, ex)
         } catch (ex: ArtifactPathException) {
             throw failure(ex.message, ex)
-        } catch (ex: RetiredConfigKeyException) {
+        } catch (ex: ConfigFileException) {
             throw failure(ex.message, ex)
         } catch (ex: UnreadableReplacedFolderException) {
             throw failure(ex.message, ex)
         } catch (ex: ReplaceFailedException) {
-            // A replacing deploy that cannot delete an entry stops midway; for a project and a user deployment alike, the engine names the deployment, the tool and the entry, which is what the operator needs rather than a stack trace. Any other IOException is left to escape with its stack trace, because its message alone is often only a path.
+            // A replacing deploy that cannot delete an entry stops midway; for a project and a user deployment alike, the engine names the deployment, the tool and the entry, which is what the operator needs rather than a stack trace.
             throw failure(ex.message, ex)
         }
         if (dryRun) {
             echo(DRY_RUN_SUCCEEDED)
         }
+    }
+
+    /**
+     * Returns what the command throws for the failed file operation [ex]: a [CliktError] for a missing config file and for a file the run cannot write, whose messages name the file, and [ex] itself for any other.
+     */
+    // The engine collects a file it cannot write as a failure of its deployment and tool, which reaches this command as an ExportFailedException; an ArtifactWriteException that still escapes it names the file and the reason, which is what the operator needs rather than a stack trace. Any other IOException keeps its stack trace, because its message alone is often only a path.
+    private fun reported(ex: IOException): Exception = when (ex) {
+        is FileNotFoundException -> failure(ex.message ?: "Missing config.yml in ${workingDir.toAbsolutePath()}", ex)
+        is ArtifactWriteException -> failure(ex.message, ex)
+        else -> ex
     }
 
     /**

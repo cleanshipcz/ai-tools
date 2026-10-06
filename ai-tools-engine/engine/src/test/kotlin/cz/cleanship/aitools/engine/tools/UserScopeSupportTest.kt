@@ -3,6 +3,7 @@ package cz.cleanship.aitools.engine.tools
 import cz.cleanship.aitools.engine.data.userDeployment
 import cz.cleanship.aitools.engine.models.ToolType
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -27,11 +28,52 @@ class UserScopeSupportTest {
         val exporter = adapter.userScope(userHome, userDeployment)
 
         // then
-        assertThat(exporter).isNotNull()
+        assertThat(exporter).isInstanceOf(UserScopeExporter::class.java)
+    }
+
+    @Test
+    fun `should offer GitHub Copilot a user scope of the MCP config file of Copilot CLI alone`() {
+        // given
+        val adapter = ToolFactory.create(ToolType.GITHUB_COPILOT)
+
+        // when
+        val scope = adapter.userScope(userHome, userDeployment)
+
+        // then
+        // - no instructions, agent, prompt or skill file is written for it, so it is no exporter of artifacts
+        assertThat(scope).isNotNull().isNotInstanceOf(UserScopeExporter::class.java)
+        assertThat(scope?.toolDirectories).containsExactly(userHome.resolve(".copilot"))
+        assertThat(scope?.mcpConfig()?.file).isEqualTo(userHome.resolve(".copilot/mcp-config.json"))
+        assertThat(scope?.mcpConfig()?.hiddenBy).isNull()
+        assertThat(scope?.mcpPermissions()).isNull()
+        assertThat(userHome.listFiles()).isEmpty()
     }
 
     @ParameterizedTest
-    @CsvSource("WINDSURF", "ANTIGRAVITY", "GITHUB_COPILOT", "CURSOR")
+    @CsvSource(
+        // - the tools that get every artifact of a deployment in the home
+        "CLAUDE, true",
+        "CODEX, true",
+        // - the tool that gets only its MCP files there
+        "GITHUB_COPILOT, false",
+    )
+    fun `should give the exporter of every artifact only for a tool that gets every artifact in the home`(
+        toolType: ToolType,
+        getsArtifacts: Boolean,
+    ) {
+        // given
+        val scope = requireNotNull(ToolFactory.create(toolType).userScope(userHome, userDeployment))
+
+        // when
+        val exporter = scope.artifactExporter
+
+        // then
+        assertThat(exporter).isEqualTo(if (getsArtifacts) scope else null)
+        assertThat(scope is McpFilesUserScope).isEqualTo(!getsArtifacts)
+    }
+
+    @ParameterizedTest
+    @CsvSource("WINDSURF", "ANTIGRAVITY", "CURSOR")
     fun `should offer no user scope for the tools whose per-user layout is not implemented yet`(toolType: ToolType) {
         // given
         val adapter = ToolFactory.create(toolType)

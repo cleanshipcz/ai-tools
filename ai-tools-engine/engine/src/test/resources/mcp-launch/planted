@@ -1,0 +1,4 @@
+#!/bin/sh
+# Test double planted in the working directory or a relative PATH entry, where the launcher must never look for a helper. It only records that it ran, in the file the test installs in place of @MARKER@.
+: >>'@MARKER@'
+exit 0

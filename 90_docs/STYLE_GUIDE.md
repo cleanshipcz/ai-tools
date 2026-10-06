@@ -170,7 +170,11 @@ variables:
 - Follow principle of least privilege
 
 The placeholder above is for manifest and generated content, which the engine emits literally — it never resolves a secret into an artifact.
-Declared paths are the exception: a `${NAME}` in a `locations.*` entry or in a project's `deploy.directory` is expanded from the config `env_vars` or the environment, and fails the run when nothing declares it.
+Declared paths are the exception: a `${NAME}` in a `locations.*` entry, a project's `deploy.directory`, or the `source` of a pointer skill or pointer MCP server is expanded from the config `env_vars` or the environment, and fails the run when nothing declares it.
+An MCP server manifest is another exception.
+Its stdio `command` is expanded like a declared path.
+In the rest of its transport, a variable declared `secret: false` is resolved from `env_vars` only and written as its value.
+A variable declared `secret: true` is only ever written as a reference; see [07_mcp/README.md](../07_mcp/README.md#secret-and-plain-variables).
 
 ## Common Patterns
 

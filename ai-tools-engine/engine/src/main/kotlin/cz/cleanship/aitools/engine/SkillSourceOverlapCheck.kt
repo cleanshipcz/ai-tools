@@ -14,6 +14,7 @@ import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.FilterService
 import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.artifactExporter
 import cz.cleanship.aitools.engine.tools.narrowedTo
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -99,7 +100,8 @@ internal class SkillSourceOverlapCheck(
         val agentIds = filterService.filter(allData.agents.values, manifest.agents.filter).map { it.id }
         val deployedBy = "user deployment '${manifest.id}'"
         tools.narrowedTo(manifest.tools).flatMap { adapter ->
-            val exporter = adapter.userScope(userHome, manifest) ?: return@flatMap emptyList()
+            // A tool without a user scope, or one that gets only its MCP files in the home, writes no skill there and replaces nothing.
+            val exporter = adapter.userScope(userHome, manifest)?.artifactExporter ?: return@flatMap emptyList()
             val skillTargets = skillIds.flatMap { skillId ->
                 exporter.skillPaths(skillId).map { DeployTarget(it, DeployAction.WriteSkill(skillId), adapter.toolType, deployedBy) }
             }

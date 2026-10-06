@@ -175,12 +175,19 @@ class CodexAdapterTest {
     }
 
     @Test
-    fun `prepare should delete codex directory when replace is true`() {
+    fun `prepare should delete the generated codex directories and keep the MCP config file when replace is true`() {
         // given
         val projectDir = tempDir.toFile()
         val codexDir = projectDir.resolve(".codex")
-        codexDir.mkdirs()
-        File(codexDir, "some-file.txt").writeText("content")
+        // - every directory this adapter generates holds a file of an earlier export
+        val generated = listOf("skills", "features").map { codexDir.resolve(it) }
+        generated.forEach {
+            it.mkdirs()
+            File(it, "some-file.txt").writeText("content")
+        }
+        // - the MCP config file, whose entries the engine owns one by one, sits beside them
+        val mcpConfig = codexDir.resolve("config.toml")
+        mcpConfig.writeText("kept")
 
         val manifest = mockk<ProjectManifest>()
         val deploy = mockk<ProjectDeploy>()
@@ -191,7 +198,8 @@ class CodexAdapterTest {
         adapter.prepare(projectDir, manifest)
 
         // then
-        assertThat(codexDir).doesNotExist()
+        assertThat(generated).allSatisfy { assertThat(it).doesNotExist() }
+        assertThat(mcpConfig).hasContent("kept")
     }
 
     @Test
@@ -444,6 +452,23 @@ class CodexAdapterTest {
             file.parentFile.mkdirs()
             file.writeText("Stale.\n")
             return file
+        }
+
+        @Test
+        fun `should name the config file of the home as the file of its MCP servers and write no separate tool permissions`() {
+            // given
+            val exporter = exporterFor(userDeployment)
+
+            // when
+            val mcpConfig = exporter.mcpConfig()
+            val permissions = exporter.mcpPermissions()
+
+            // then
+            // - Codex reads the allowed and denied tools of a server from its table in config.toml
+            assertThat(mcpConfig?.file).isEqualTo(codexDir.resolve("config.toml"))
+            assertThat(permissions).isNull()
+            assertThat(exporter.toolDirectories).containsExactly(codexDir, codexDir.resolve("skills"))
+            assertThat(userHome).doesNotExist()
         }
 
         private fun exporterFor(deployment: UserDeploymentManifest) =

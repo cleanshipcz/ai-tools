@@ -1,14 +1,23 @@
 package cz.cleanship.aitools.engine.services
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import cz.cleanship.aitools.engine.env.EnvironmentSource
 import cz.cleanship.aitools.engine.env.UnresolvedVariableException
+import cz.cleanship.aitools.engine.models.SecretsManagerKind
 import cz.cleanship.aitools.engine.models.ToolType
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileNotFoundException
 
@@ -39,6 +48,51 @@ class ConfigServiceTest {
         assertThat(locations.prompts).isEmpty()
         assertThat(locations.rulesets).isEmpty()
         assertThat(tools).containsExactly(ToolType.WINDSURF)
+    }
+
+    @Test
+    fun `should read the mcps location from config yml when config local yml does not repeat it`(
+        @TempDir tempDir: File,
+    ) {
+        // given
+        File(tempDir, "config.yml").writeText(
+            """
+            locations:
+              mcps:
+                - "07_mcp"
+              agents:
+                - "agents_default"
+            """.trimIndent(),
+        )
+        File(tempDir, "config.local.yml").writeText(
+            """
+            locations:
+              agents:
+                - "agents_local"
+            """.trimIndent(),
+        )
+
+        // when
+        val config = ConfigService().loadConfig(tempDir)
+
+        // then
+        assertThat(config.locations.mcps).containsExactly(File(tempDir, "07_mcp"))
+        assertThat(config.locations.agents).containsExactly(File(tempDir, "agents_local"))
+    }
+
+    @Test
+    fun `should replace the mcps location with the list config local yml declares`(
+        @TempDir tempDir: File,
+    ) {
+        // given
+        File(tempDir, "config.yml").writeText("locations:\n  mcps:\n    - \"07_mcp\"\n")
+        File(tempDir, "config.local.yml").writeText("locations:\n  mcps:\n    - \"private_mcp\"\n")
+
+        // when
+        val config = ConfigService().loadConfig(tempDir)
+
+        // then
+        assertThat(config.locations.mcps).containsExactly(File(tempDir, "private_mcp"))
     }
 
     @Test
@@ -160,6 +214,148 @@ class ConfigServiceTest {
 
         // then
         exception.isInstanceOf(FileNotFoundException::class.java)
+    }
+
+    /**
+     * `secrets_manager` names the secrets manager of the machine, which the secrets of stdio MCP servers are read from when a tool starts them.
+     */
+    @Nested
+    inner class SecretsManagerSwitch {
+
+        @Test
+        fun `should use libsecret when no config file names a secrets manager`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            File(tempDir, "config.yml").writeText("tools:\n  - claude\n")
+
+            // when
+            val config = ConfigService().loadConfig(tempDir)
+
+            // then
+            assertThat(config.secretsManager).isEqualTo(SecretsManagerKind.LIBSECRET)
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - config.yml alone decides when config.local.yml names none
+            "environment, , ENVIRONMENT",
+            "libsecret, , LIBSECRET",
+            // - config.local.yml wins, as it does for every other setting
+            "environment, libsecret, LIBSECRET",
+            "libsecret, environment, ENVIRONMENT",
+            ", environment, ENVIRONMENT",
+        )
+        fun `should take the secrets manager from config local yml over config yml`(
+            base: String?,
+            local: String?,
+            expected: SecretsManagerKind,
+            @TempDir tempDir: File,
+        ) {
+            // given
+            File(tempDir, "config.yml").writeText("tools:\n  - claude\n" + (base?.let { "secrets_manager: $it\n" } ?: ""))
+            local?.let { File(tempDir, "config.local.yml").writeText("secrets_manager: $it\n") }
+
+            // when
+            val config = ConfigService().loadConfig(tempDir)
+
+            // then
+            assertThat(config.secretsManager).isEqualTo(expected)
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            "config.yml, keychain",
+            "config.local.yml, Libsecret",
+            "config.local.yml, ''",
+        )
+        fun `should fail naming the file and the accepted values when a config names a secrets manager this engine does not know`(
+            file: String,
+            value: String,
+            @TempDir tempDir: File,
+        ) {
+            // given
+            File(tempDir, "config.yml").writeText("tools:\n  - claude\n")
+            File(tempDir, file).appendText("secrets_manager: '$value'\n")
+
+            // when
+            val error = runCatching { ConfigService().loadConfig(tempDir) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(InvalidConfigValueException::class.java)
+                .hasMessageContaining("'secrets_manager'")
+                .hasMessageContaining(file)
+                .hasMessageContaining("'libsecret'")
+                .hasMessageContaining("'environment'")
+        }
+    }
+
+    /**
+     * A key this engine does not know is ignored, as a key of a newer engine must be, but never silently: a misspelled `secrets_manager` would otherwise leave the default in force.
+     */
+    @Nested
+    inner class UnknownKeys {
+
+        private val logAppender = ListAppender<ILoggingEvent>()
+        private val serviceLogger = LoggerFactory.getLogger(ConfigService::class.java) as Logger
+
+        @BeforeEach
+        fun setUpLog() {
+            logAppender.start()
+            serviceLogger.addAppender(logAppender)
+        }
+
+        @AfterEach
+        fun tearDownLog() {
+            serviceLogger.detachAppender(logAppender)
+            logAppender.stop()
+            logAppender.list.clear()
+        }
+
+        @Test
+        fun `should warn once naming the file and the key of every key this engine does not know, and go on with the rest`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            // - a misspelled switch, a misspelled location, and an unknown key of config.local.yml
+            File(tempDir, "config.yml").writeText("tools:\n  - claude\nsecrets_managr: environment\nlocations:\n  agents:\n    - agents\n  mcp:\n    - 07_mcp\n")
+            File(tempDir, "config.local.yml").writeText("future_setting:\n  nested: 1\nsecrets_manager: libsecret\n")
+
+            // when
+            val config = ConfigService().loadConfig(tempDir)
+
+            // then
+            assertThat(warnings()).containsExactly(
+                "config.yml declares the key 'secrets_managr', which this engine does not know, so it is ignored. Check its spelling; a key of a newer engine is ignored the same way.",
+                "config.yml declares the key 'locations.mcp', which this engine does not know, so it is ignored. Check its spelling; a key of a newer engine is ignored the same way.",
+                "config.local.yml declares the key 'future_setting', which this engine does not know, so it is ignored. Check its spelling; a key of a newer engine is ignored the same way.",
+            )
+            assertThat(config.tools).containsExactly(ToolType.CLAUDE)
+            assertThat(config.locations.agents).containsExactly(File(tempDir, "agents"))
+            assertThat(config.locations.mcps).isEmpty()
+            assertThat(config.secretsManager).isEqualTo(SecretsManagerKind.LIBSECRET)
+        }
+
+        @Test
+        fun `should not warn about any key the engine knows, the variables of env_vars included`(
+            @TempDir tempDir: File,
+        ) {
+            // given
+            File(tempDir, "config.yml").writeText(
+                "tools:\n  - claude\nsecrets_manager: environment\nenv_vars:\n  ANY_NAME: value\n  other_name: value\nlocations:\n" +
+                    listOf("agents", "deployments", "prompts", "rulesets", "fragments", "skills", "mcps").joinToString("") { "  $it:\n    - $it\n" },
+            )
+            File(tempDir, "config.local.yml").writeText("tools: []\n")
+
+            // when
+            ConfigService().loadConfig(tempDir)
+
+            // then
+            assertThat(warnings()).isEmpty()
+        }
+
+        private fun warnings() = logAppender.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
     }
 
     @Nested

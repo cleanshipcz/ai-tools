@@ -1,0 +1,4 @@
+#!/bin/sh
+# Test double of busctl that reads its standard input to the end before it answers that no item exists, so it answers only when that input is closed.
+cat >/dev/null
+printf '{"type":"aoao","data":[[],[]]}\n'

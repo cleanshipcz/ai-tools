@@ -7,7 +7,9 @@ import cz.cleanship.aitools.engine.models.ProjectDocumentation
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.ToolType
 import cz.cleanship.aitools.engine.models.Version
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigShadow
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -30,8 +32,9 @@ class ToolAdapterTest {
         "ANTIGRAVITY, .agent",
         "GITHUB_COPILOT, .github/prompts;.github/instructions;.github/agents",
         "CLAUDE, .claude",
-        "CODEX, .codex",
-        "CURSOR, .cursor",
+        // - Codex and Cursor keep their MCP config file, .codex/config.toml and .cursor/mcp.json, beside the directories they generate
+        "CODEX, .codex/skills;.codex/features",
+        "CURSOR, .cursor/rules;.cursor/commands;.cursor/features",
     )
     fun `should name the directories of its tool as the paths a replacing project deploy deletes`(
         toolType: ToolType,
@@ -119,6 +122,7 @@ class ToolAdapterTest {
         val replacedPaths = adapter.replacedPaths(projectDir, manifest)
         // - every replaced path is a link to a folder of its own outside the project
         val outsideFiles = replacedPaths.mapIndexed { index, replaced ->
+            replaced.parentFile.mkdirs()
             val outsideFile = writeFile(tempDir.resolve("outside-$index/SKILL.md"))
             Files.createSymbolicLink(replaced.toPath(), outsideFile.parentFile.toPath())
             outsideFile
@@ -130,6 +134,198 @@ class ToolAdapterTest {
         // then
         assertThat(outsideFiles).allSatisfy { assertThat(it).hasContent("Written by hand.\n") }
         assertThat(replacedPaths).allSatisfy { assertThat(Files.exists(it.toPath(), LinkOption.NOFOLLOW_LINKS)).isFalse() }
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        // - Copilot in VS Code reads .vscode/mcp.json, Copilot CLI reads .github/mcp.json
+        "GITHUB_COPILOT, .vscode/mcp.json;.github/mcp.json",
+        "CLAUDE, .mcp.json",
+        "CODEX, .codex/config.toml",
+        "CURSOR, .cursor/mcp.json",
+    )
+    fun `should name the MCP config files its tool reads in a project`(toolType: ToolType, expected: String) {
+        // given
+        val projectDir = tempDir.resolve("project")
+        val adapter = ToolFactory.create(toolType)
+
+        // when
+        val exporters = adapter.mcpConfigs(projectDir)
+
+        // then
+        assertThat(exporters.map { it.file }).containsExactlyElementsOf(expected.split(";").map { projectDir.resolve(it) })
+    }
+
+    @Test
+    fun `should name the portable MCP config file as the one that hides the file of Copilot CLI in the same directory`() {
+        // given
+        val projectDir = tempDir.resolve("project")
+        val adapter = ToolFactory.create(ToolType.GITHUB_COPILOT)
+
+        // when
+        val hiddenBy = adapter.mcpConfigs(projectDir).associate { it.file to it.hiddenBy }
+
+        // then
+        assertThat(hiddenBy).isEqualTo(
+            mapOf(
+                projectDir.resolve(".vscode/mcp.json") to null,
+                projectDir.resolve(".github/mcp.json") to McpConfigShadow(projectDir.resolve(".mcp.json"), "Copilot CLI"),
+            ),
+        )
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ToolType::class, names = ["CLAUDE", "CODEX", "CURSOR"])
+    fun `should name no file that hides the MCP config file of a tool that reads it whatever lies beside it`(
+        toolType: ToolType,
+    ) {
+        // when
+        val exporters = ToolFactory.create(toolType).mcpConfigs(tempDir.resolve("project"))
+
+        // then
+        assertThat(exporters).isNotEmpty().allSatisfy { assertThat(it.hiddenBy).isNull() }
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = '|',
+        value = [
+            "CLAUDE | .claude .claude/agents .claude/commands .claude/skills .claude/workflows",
+            "CODEX | .codex .codex/skills .codex/features",
+            "GITHUB_COPILOT | .github .github/agents .github/prompts .github/instructions",
+            "CURSOR | .cursor .cursor/rules .cursor/commands .cursor/features",
+            "WINDSURF | .windsurf .windsurf/rules .windsurf/workflows",
+            "ANTIGRAVITY | .agent .agent/rules .agent/workflows",
+        ],
+    )
+    fun `should name every directory the files of a tool land in besides the files at the root of the project, each after the directory holding it`(
+        toolType: ToolType,
+        expected: String,
+    ) {
+        // given
+        val projectDir = tempDir.resolve("project")
+
+        // when
+        val directories = ToolFactory.create(toolType).toolDirectories(projectDir)
+
+        // then
+        assertThat(directories).containsExactlyElementsOf(expected.split(" ").map { projectDir.resolve(it) })
+    }
+
+    /**
+     * What of the MCP support of the engine each tool lacks is decided by its adapter, and reported with the reason it gives.
+     */
+    @ParameterizedTest
+    @CsvSource(
+        // - tool, attaches servers to agents, applies allowed tools, applies denied tools, has user-scope MCP
+        "CLAUDE, true, false, true, true",
+        "CODEX, false, true, true, true",
+        "GITHUB_COPILOT, false, false, false, true",
+        "CURSOR, false, false, false, false",
+        "WINDSURF, false, true, true, false",
+        "ANTIGRAVITY, false, true, true, false",
+    )
+    fun `should give a reason for every part of the MCP support a tool lacks`(
+        toolType: ToolType,
+        attachesServers: Boolean,
+        appliesAllowed: Boolean,
+        appliesDenied: Boolean,
+        hasUserScope: Boolean,
+    ) {
+        // when
+        val limits = ToolFactory.create(toolType).mcpLimits
+
+        // then
+        // - Windsurf and Antigravity get no MCP file at all, which is reported on its own, so they give no reason about restrictions
+        assertThat(limits.agentServers == null).isEqualTo(attachesServers)
+        assertThat(limits.allowedTools == null).isEqualTo(appliesAllowed)
+        assertThat(limits.deniedTools == null).isEqualTo(appliesDenied)
+        assertThat(limits.userScope == null).isEqualTo(hasUserScope)
+    }
+
+    @Test
+    fun `should give the reason Claude Code applies no allowed tools of a server`() {
+        // when
+        val reason = ToolFactory.create(ToolType.CLAUDE).mcpLimits.allowedTools
+
+        // then
+        assertThat(reason).isEqualTo("Claude Code has no list of the tools a server may offer; only 'deny' is rendered")
+    }
+
+    @Test
+    fun `should give the reason GitHub Copilot attaches no MCP server to an agent`() {
+        // when
+        val reason = ToolFactory.create(ToolType.GITHUB_COPILOT).mcpLimits.agentServers
+
+        // then
+        assertThat(reason).isEqualTo("a Copilot agent without 'tools' already gets every configured server, and a 'tools' list would remove its built-in tools")
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        ".vscode/mcp.json",
+        ".github/mcp.json",
+        "~/.copilot/mcp-config.json",
+        "[\"*\"]",
+    )
+    fun `should give one reason GitHub Copilot restricts no tool of a server that holds for every MCP file it writes`(
+        fact: String,
+    ) {
+        // when
+        val limits = ToolFactory.create(ToolType.GITHUB_COPILOT).mcpLimits
+
+        // then
+        assertThat(limits.allowedTools).isEqualTo(limits.deniedTools).contains(fact)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "WINDSURF, ~/.codeium/windsurf/mcp_config.json",
+        "WINDSURF, Devin Desktop",
+        "ANTIGRAVITY, environment variable",
+    )
+    fun `should name the facts that keep a tool out of the MCP servers of the user scope`(
+        toolType: ToolType,
+        fact: String,
+    ) {
+        // when
+        val reason = ToolFactory.create(toolType).mcpLimits.userScope
+
+        // then
+        assertThat(reason).contains(fact)
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ToolType::class, names = ["WINDSURF", "ANTIGRAVITY"])
+    fun `should name no MCP config file for a tool whose MCP support is not implemented`(toolType: ToolType) {
+        // given
+        val adapter = ToolFactory.create(toolType)
+
+        // when
+        val exporters = adapter.mcpConfigs(tempDir.resolve("project"))
+
+        // then
+        assertThat(exporters).isEmpty()
+    }
+
+    @ParameterizedTest
+    @EnumSource(ToolType::class)
+    fun `should keep every MCP config file when the project replaces`(toolType: ToolType) {
+        // given
+        // - the MCP config file of every tool, each holding servers the user added by hand next to the owned ones
+        val projectDir = tempDir.resolve("project")
+        val mcpFiles = listOf(".mcp.json", ".vscode/mcp.json", ".github/mcp.json", ".cursor/mcp.json", ".codex/config.toml")
+            .map { writeFile(projectDir.resolve(it)) }
+        val adapter = ToolFactory.create(toolType)
+        val manifest = project(replace = true)
+        // - an earlier export left a file in every replaced path
+        adapter.replacedPaths(projectDir, manifest).forEach { writeFile(it.resolve("stale.md")) }
+
+        // when
+        adapter.prepare(projectDir, manifest)
+
+        // then
+        assertThat(mcpFiles).allSatisfy { assertThat(it).hasContent("Written by hand.\n") }
     }
 
     private fun project(replace: Boolean) = ProjectManifest(

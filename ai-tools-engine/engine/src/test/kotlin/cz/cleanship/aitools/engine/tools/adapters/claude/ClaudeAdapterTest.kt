@@ -110,6 +110,51 @@ class ClaudeAdapterTest {
     }
 
     @Test
+    fun `should list the MCP servers an agent uses under mcpServers of its frontmatter, quoting an id that is not a plain scalar`() {
+        // given
+        val agentWithServers = agent.copy(mcps = listOf("github", "xbid.bobcat", "odd: id"))
+
+        // when
+        claudeAdapter.export(tempDir.toFile(), AgentContext(agentWithServers, rulesets))
+
+        // then
+        val content = targetDir.resolve("agents/${agent.id}.md").readText()
+        assertThat(content).startsWith("---\nname: ${agent.id}\ndescription: ${Frontmatter.value(agent.description)}\nmcpServers: [github, xbid.bobcat, \"odd: id\"]\n---\n")
+    }
+
+    @Test
+    fun `should list an MCP server an agent names twice only once`() {
+        // given
+        val agentWithServers = agent.copy(mcps = listOf("github", "atlassian", "github"))
+
+        // when
+        claudeAdapter.export(tempDir.toFile(), AgentContext(agentWithServers, rulesets))
+
+        // then
+        assertThat(targetDir.resolve("agents/${agent.id}.md")).content().contains("\nmcpServers: [github, atlassian]\n")
+    }
+
+    @Test
+    fun `should write no mcpServers into the frontmatter of an agent that uses no MCP server`() {
+        // when
+        claudeAdapter.export(tempDir.toFile(), AgentContext(agent, rulesets))
+
+        // then
+        assertThat(targetDir.resolve("agents/${agent.id}.md").readText()).doesNotContain("mcpServers")
+    }
+
+    @Test
+    fun `should name the settings file of the project as the file of its MCP tool permissions and the claude directory and the directories below it as its tool directories`() {
+        // when
+        val permissions = claudeAdapter.mcpPermissions(tempDir.toFile())
+        val directories = claudeAdapter.toolDirectories(tempDir.toFile())
+
+        // then
+        assertThat(permissions?.file).isEqualTo(targetDir.resolve("settings.json"))
+        assertThat(directories).containsExactly(targetDir, targetDir.resolve("agents"), targetDir.resolve("commands"), targetDir.resolve("skills"), targetDir.resolve("workflows"))
+    }
+
+    @Test
     fun `should output a feature`() {
         // given
         val featureContext = FeatureContext(feature)
@@ -482,6 +527,22 @@ class ClaudeAdapterTest {
             // then
             val replacedPaths = exporter.replacedPaths(promptIds = listOf(prompt.id), agentIds = listOf(agent.id), skillIds = listOf(textOnlySkill.id))
             assertThat(staleFiles.filterNot { it.exists() }).isNotEmpty.allSatisfy { deleted -> assertThat(replacedPaths).anyMatch { deleted.startsWith(it) } }
+        }
+
+        @Test
+        fun `should name the files of the MCP servers and tool permissions of the home, and its claude directory with the directories below it`() {
+            // given
+            val exporter = exporterFor(userDeployment)
+
+            // when
+            val mcpConfig = exporter.mcpConfig()
+            val permissions = exporter.mcpPermissions()
+
+            // then
+            assertThat(mcpConfig?.file).isEqualTo(userHome.resolve(".claude.json"))
+            assertThat(permissions?.file).isEqualTo(claudeDir.resolve("settings.json"))
+            assertThat(exporter.toolDirectories).containsExactly(claudeDir, claudeDir.resolve("agents"), claudeDir.resolve("commands"), claudeDir.resolve("skills"))
+            assertThat(userHome).doesNotExist()
         }
 
         private fun writeStale(file: File): File {

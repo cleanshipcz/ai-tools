@@ -1,0 +1,512 @@
+#!/bin/sh -p
+# mcp-launch - starts an MCP server with its secrets read from the libsecret keyring at the moment it starts, falling back to the environment.
+#
+# USAGE
+#   mcp-launch <server> [--required <NAME> | --optional <NAME>]... -- <command> [<argument>...]
+#
+#   <server>   the name of the server, used in messages only. It starts with a letter or digit and holds only letters, digits, '.', '_' and '-'.
+#   <NAME>     the name of a secret environment variable, [A-Za-z_][A-Za-z0-9_]*. Each name appears once. A name that matches a pattern of the block mcp_launch_refused_names below, of either class, without regard to case, is refused: a shell, this launcher, a program it starts, a loader or an interpreter gives that variable a meaning of its own.
+#   --         ends the options; everything after it is the real command and its arguments, handed over unchanged, also a command that starts with '-' or is '--'.
+#
+#   The options carry names only, never a value. The command and its arguments are handed over as the tool passed them; the engine never renders a secret among them.
+#   The script makes no value an argument of a program it starts, except the values of DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR and HOME, which env receives as arguments (see HELPERS); none of them is a secret.
+#
+#   Example: mcp-launch atlassian --required JIRA_PAT --optional CONFLUENCE_PAT -- /opt/jira-mcp-server --read-only
+#
+# WHERE A SECRET COMES FROM, per name, in the order of the arguments
+#   1. The keyring: secret-tool lookup service ai-tools-mcp variable <NAME>. A lookup still running after 5 seconds is sent SIGTERM, and one still running 1 second later is killed, so one lookup waits at most 6 seconds. After a lookup that ended in any other way than with a value or with no entry (it did not end in time, was killed, or failed), the keyring is not asked again during the launch.
+#      Store a value through the hidden prompt, so it stays out of the shell history (storing again replaces it):
+#        secret-tool store --label='ai-tools MCP <NAME>' service ai-tools-mcp variable <NAME>
+#      Remove it (secret-tool 0.20.4 crashes with exit code 139 when nothing matches, so do not rely on the exit code):
+#        secret-tool clear service ai-tools-mcp variable <NAME>
+#   2. The environment variable <NAME>, when the keyring has no entry, when its keyring value counts as not set (see below), or when the keyring is not used for one of the reasons listed under MESSAGES.
+#   A value that is empty, or that is literally ${NAME}, ${NAME:-} or ${env:NAME} (a reference the tool left unexpanded), counts as not set.
+#   A keyring value loses exactly one trailing newline, the one `echo value | secret-tool store ...` stores; every other byte is kept. An environment value is kept unchanged.
+#
+# OUTCOME
+#   Every secret found is in the environment of the server; a secret found nowhere is absent (unset, not empty), and when it is required the server is not started.
+#   The server receives every other variable the launcher received, with these exceptions:
+#     - every inherited variable whose name is a valid shell name and starts with mcp_launch_ is removed, also a name the script does not use;
+#     - under dash, an environment entry whose name is not a valid shell name is dropped;
+#     - a variable the shell sets itself or gives a meaning of its own reaches the server with the shell's value, or not at all: dash sets PWD and PPID; bash also sets or drops, among others, OLDPWD, _, SHLVL, LINENO, OPTERR, POSIXLY_CORRECT, SHELLOPTS and BASHOPTS (see SHELL). Each such name is of class A, which the engine refuses in every role of a server started through the launcher.
+#   The script then replaces itself with the command (exec): same process id, same standard input, output and error, same signals.
+#   Standard output is never written by the script: it carries the protocol of the server. The script's messages go to standard error, one line each, and never hold a value.
+#
+# MESSAGES AND EXIT CODES
+#   mcp-launch: <server>: keyring not used, reading secrets from the environment: <reason>     at most once per launch; the launch goes on. <reason> is one of:
+#     the PATH is not set or is empty
+#     secret-tool is not in any absolute directory of the PATH
+#     timeout is not in any absolute directory of the PATH
+#     env is not in any absolute directory of the PATH
+#     no D-Bus session bus is known (DBUS_SESSION_BUS_ADDRESS is not set and XDG_RUNTIME_DIR/bus is not a socket)
+#     secret-tool lookup timed out after 5 seconds
+#     secret-tool lookup did not end within 5 seconds and was killed 1 second later
+#     secret-tool lookup failed with exit code <N>        a lookup that ended in any other way than with a value (exit 0) or with no entry (exit 1 and no message)
+#   mcp-launch: <server>: not started: required secret not found in the keyring or the environment: <NAME>...   exit 1
+#   mcp-launch: usage error: <problem>                                                                       exit 2, nothing started
+#   Otherwise the exit code is that of the command. When the shell cannot start the command, it writes its own message, which names the command and holds no value, and exits with its own code: 127 when the command is not found, 126 when it is not executable, and when the environment is too large for the kernel (a value over 128 KiB) 2 under dash and 126 under bash.
+#
+# HELPERS
+#   When the tool passes no PATH, or an empty one, the script starts no helper: the keyring is not used (see MESSAGES), although without a PATH dash and bash search a default path of their own, /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin. The shell still looks up a command after -- that is not a path: without a PATH in that default path, with an empty PATH in the working directory.
+#   Otherwise secret-tool, timeout and env are started only from absolute directories of the PATH; an empty entry, '.', every other relative entry, and a directory whose name holds '=' are skipped.
+#   env starts in a subshell that has unset every exported variable whose name is a valid shell name, except BASH_XTRACEFD. Its environment then holds exactly: BASH_XTRACEFD, when the launcher received it; and under bash also SHELLOPTS and BASHOPTS with bash's own values when the launcher received them, the SHLVL bash exports itself, and every entry whose name is not a valid shell name, which no shell can unset.
+#   env's arguments are -i, DBUS_SESSION_BUS_ADDRESS=<value>, XDG_RUNTIME_DIR=<value> and HOME=<value>, each only when set and not empty, the path of timeout, -v -k 1 5, the path of secret-tool, and lookup service ai-tools-mcp variable <NAME>.
+#   env starts timeout, and timeout starts secret-tool, each with exactly DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR and HOME, each only when set and not empty, and with standard input from /dev/null. No value of a secret reaches a helper, in its arguments, its environment or its standard input.
+#   Besides these helpers and the command, the script starts no program, and it starts none before env: printf, [, export, unset and command are built into dash and bash, and exec replaces the shell. The environment is read by the shell itself (export -p); no program reads it.
+#
+# GUARANTEES
+#   - secret-tool runs only when DBUS_SESSION_BUS_ADDRESS is set and not empty or XDG_RUNTIME_DIR/bus is a socket, never with DISPLAY, so it never autolaunches a new session bus or a second keyring daemon on one.
+#   - On the existing session bus, D-Bus activation may start the keyring daemon when it is not running.
+#   - The script writes no value to a file and hands none to eval; it uses no eval at all, and no here-document or here-string, for which bash would write a file in TMPDIR.
+#
+# SHELL
+#   The option -p of the #! line makes bash, also when it is /bin/sh, read neither ENV nor BASH_ENV, ignore SHELLOPTS, BASHOPTS, CDPATH and GLOBIGNORE of the environment, and import no function from it; dash accepts -p. BusyBox ash refuses -p, so under it nothing is started and the shell exits 2.
+#   Before the first line of the script runs, the dynamic loader that starts the shell, and the shell itself, read some variables of the environment, and print a message holding the value, or a number derived from it, when the value is not one they accept. No line of a script can prevent that. Tested with dash 0.5.10.2, bash 5.0.17 and glibc 2.31; other versions may print more:
+#     with dash as /bin/sh: LD_AUDIT, LD_DEBUG, LD_PRELOAD, OPTIND.
+#     with bash as /bin/sh: BASH_COMPAT, BASH_XTRACEFD, LC_ALL, LD_AUDIT, LD_DEBUG, LD_PRELOAD, SHLVL.
+#   Each of them is of class A, which the engine refuses in every role of a server started through the launcher, so a manifest that loads never puts a value under such a name; a variable the tool sets on its own still can, and the message goes to standard error, which a tool may keep in a log. With LD_TRACE_LOADED_OBJECTS or LD_SHOW_AUXV set, the loader writes the libraries or the auxiliary vector of the shell to standard output, without a value; with the first, the script does not run at all.
+#   Limit under bash: bash holds SHELLOPTS and BASHOPTS read-only, so no POSIX script can unset them or restore the values the launcher received. When the tool passes them, the server receives bash's own values instead, such as SHELLOPTS=braceexpand:hashall:interactive-comments:noglob:nounset:posix:privileged, and a server that is itself a bash script starts with those options. When the tool passes neither, the server receives neither. Do not export SHELLOPTS or BASHOPTS in the environment of a tool.
+#
+# REQUIRES
+#   A /bin/sh that accepts -p (tested with dash and bash), and for the keyring secret-tool, a timeout that takes -v and -k (GNU coreutils) and env.
+
+set -u
+# No word of this script is a file name pattern; turning pathname expansion off keeps a '*' in a name list from ever matching files.
+set -f
+
+# Every inherited variable is exported, so an inherited mcp_launch_ variable would reach the helpers and the server, and so would every value the script assigns to a variable of that name; unsetting drops the export. Every such name is unset, not only those the script uses, so that none reaches the server.
+# The two variables of the loop are unset first, so that the loop assigns no exported variable. export -p is the only portable list of the exported names; a value holding a newline followed by "export mcp_launch_X=" adds that name to the list, and unsetting it does no harm: no other variable of the script is set yet, and each variable of the loop is assigned again before it is read.
+# A name that is not a valid shell name is skipped: unset would fail on it and end the shell. dash drops such an entry itself; bash passes it on, and no shell can unset it.
+unset mcp_launch_line mcp_launch_exported
+IFS='
+'
+for mcp_launch_line in $(export -p); do
+    case $mcp_launch_line in
+        'export mcp_launch_'*) ;;
+        *) continue ;;
+    esac
+    mcp_launch_exported=${mcp_launch_line#export }
+    mcp_launch_exported=${mcp_launch_exported%%=*}
+    case $mcp_launch_exported in
+        *[!_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789]*) continue ;;
+    esac
+    unset "$mcp_launch_exported"
+done
+IFS=$(printf ' \t\n.')
+IFS=${IFS%.}
+
+mcp_launch_limit=5
+mcp_launch_grace=1
+mcp_launch_lower=abcdefghijklmnopqrstuvwxyz
+mcp_launch_upper_letters=ABCDEFGHIJKLMNOPQRSTUVWXYZ
+mcp_launch_letters=$mcp_launch_lower$mcp_launch_upper_letters
+mcp_launch_digits=0123456789
+mcp_launch_newline='
+'
+
+# Names refused as secret names, whatever their class. One line per pattern: the letter of its class, a colon, and an upper-case name or a name with '*' at its start or its end. mcp_launch_check_name matches each pattern against the secret name converted to upper case, so a name is refused without regard to case, as the engine refuses it; the class matters only to the engine.
+# Class A: the names that the shell running this script, the dynamic loader and the C library of that shell, or a program this script starts reads, or that the shell sets itself (dash(1), bash(1) "Shell Variables", ld.so(8), locale(7), mallopt(3)). The engine refuses a class A name in every role of a server started through the launcher: secret, environment-only secret, plain variable, env key.
+# Class B: the names that change only what the server or a program it starts does: interpreters, runners, name resolution, proxies, temporary files. Neither this shell nor, under env -i, a helper reads them; bash reads TMPDIR only for a here-document, which this script never uses. The engine refuses a class B name as a secret read through the secrets manager and anywhere in a server.json, and lets an inline manifest use it in every other role.
+# McpLauncherContract.REFUSED_NAMES of the engine (package cz.cleanship.aitools.engine.launcher) holds the same lines; the engine's tests read the lines between the opening and the closing quote and fail when the two differ.
+mcp_launch_refused_names='
+A:MCP_LAUNCH_*
+A:PATH
+A:IFS
+A:HOME
+A:DISPLAY
+A:DBUS_*
+A:XDG_*
+A:G_*
+A:GIO_*
+A:POSIXLY_CORRECT
+A:LANG
+A:LANGUAGE
+A:LC_*
+A:NLSPATH
+A:LOCPATH
+A:_
+A:BASH*
+A:ENV
+A:SHELL
+A:SHELLOPTS
+A:SHLVL
+A:CDPATH
+A:PPID
+A:PWD
+A:OLDPWD
+A:OPTIND
+A:OPTARG
+A:OPTERR
+A:PS0
+A:PS1
+A:PS2
+A:PS3
+A:PS4
+A:LINENO
+A:RANDOM
+A:SRANDOM
+A:SECONDS
+A:UID
+A:EUID
+A:GROUPS
+A:HOSTNAME
+A:HOSTTYPE
+A:MACHTYPE
+A:OSTYPE
+A:MAIL
+A:MAILCHECK
+A:MAILPATH
+A:HISTCHARS
+A:HISTCMD
+A:HISTCONTROL
+A:HISTFILE
+A:HISTFILESIZE
+A:HISTIGNORE
+A:HISTSIZE
+A:HISTTIMEFORMAT
+A:FUNCNAME
+A:FUNCNEST
+A:GLOBIGNORE
+A:GLOBSORT
+A:EXECIGNORE
+A:FIGNORE
+A:TIMEFORMAT
+A:TMOUT
+A:PROMPT_COMMAND
+A:PROMPT_DIRTRIM
+A:PIPESTATUS
+A:DIRSTACK
+A:COMP_*
+A:COMPREPLY
+A:COPROC
+A:COLUMNS
+A:LINES
+A:EMACS
+A:INSIDE_EMACS
+A:EPOCHREALTIME
+A:EPOCHSECONDS
+A:FCEDIT
+A:HOSTFILE
+A:IGNOREEOF
+A:INPUTRC
+A:MAPFILE
+A:READLINE_*
+A:REPLY
+A:CHILD_MAX
+A:LD_*
+A:DYLD_*
+A:GLIBC_TUNABLES
+A:GCONV_PATH
+A:MALLOC_*
+B:HOSTALIASES
+B:LOCALDOMAIN
+B:RES_OPTIONS
+B:NODE_*
+B:NPM_*
+B:PYTHON*
+B:UV_*
+B:PIP_*
+B:PERL5LIB
+B:PERL5OPT
+B:PERL5DB
+B:PERLLIB
+B:RUBYOPT
+B:RUBYLIB
+B:JAVA_TOOL_OPTIONS
+B:JDK_JAVA_OPTIONS
+B:_JAVA_OPTIONS
+B:DOCKER_*
+B:CONTAINER_*
+B:CONTAINERS_*
+B:GIT_*
+B:SSL_*
+B:*_PROXY
+B:TMPDIR
+B:TMP
+B:TEMP
+B:REQUESTS_CA_BUNDLE
+B:CURL_CA_BUNDLE
+'
+
+mcp_launch_usage_error() {
+    printf 'mcp-launch: usage error: %s\n' "$1" >&2
+    exit 2
+}
+
+# Sets mcp_launch_upper to $1 with every ASCII lower-case letter replaced by its upper-case letter. The letters are listed rather than taken from the locale, so the result is the same in every locale.
+mcp_launch_uppercase() {
+    mcp_launch_upper=''
+    mcp_launch_rest=$1
+    while [ -n "$mcp_launch_rest" ]; do
+        mcp_launch_char=${mcp_launch_rest%"${mcp_launch_rest#?}"}
+        mcp_launch_rest=${mcp_launch_rest#?}
+        case $mcp_launch_lower in
+            *"$mcp_launch_char"*)
+                # The upper-case letter has the position of the lower-case one in its list: drop one leading letter of the upper-case list per letter that precedes it.
+                mcp_launch_before=${mcp_launch_lower%%"$mcp_launch_char"*}
+                mcp_launch_from=$mcp_launch_upper_letters
+                while [ -n "$mcp_launch_before" ]; do
+                    mcp_launch_before=${mcp_launch_before#?}
+                    mcp_launch_from=${mcp_launch_from#?}
+                done
+                mcp_launch_char=${mcp_launch_from%"${mcp_launch_from#?}"}
+                ;;
+        esac
+        mcp_launch_upper=$mcp_launch_upper$mcp_launch_char
+    done
+}
+
+# Refuses the secret name $1, found at argument position $2, unless it is a valid, free and not yet listed name. An invalid name is never echoed: it may be a value passed by mistake.
+mcp_launch_check_name() {
+    case $1 in
+        '' | [!_$mcp_launch_letters]* | *[!_$mcp_launch_letters$mcp_launch_digits]*)
+            mcp_launch_usage_error "argument $2 is not a valid environment variable name"
+            ;;
+    esac
+    mcp_launch_uppercase "$1"
+    # The only place a name is refused: every name of every role, --required and --optional alike, passes this loop, and the block above is the only list it reads.
+    for mcp_launch_entry in $mcp_launch_refused_names; do
+        # The pattern follows the class letter and the colon; it is unquoted on purpose, so that its '*' matches.
+        case $mcp_launch_upper in
+            ${mcp_launch_entry#?:})
+                mcp_launch_usage_error "secret name $1 is refused: a shell, the launcher, a program it starts, a loader or an interpreter gives that variable a meaning of its own"
+                ;;
+        esac
+    done
+    case $mcp_launch_names in
+        *" $1 "*) mcp_launch_usage_error "secret $1 is listed more than once" ;;
+    esac
+}
+
+# Marks the keyring as not usable for the rest of the launch and says why, once.
+mcp_launch_keyring_unusable() {
+    mcp_launch_keyring=unusable
+    printf 'mcp-launch: %s: keyring not used, reading secrets from the environment: %s\n' "$mcp_launch_server" "$1" >&2
+}
+
+# Sets mcp_launch_found to the program $1 of the first absolute directory of the PATH that holds it as an executable regular file; returns 1 when none does.
+# An empty entry, '.' and every other relative entry name the working directory or a directory below it, where a project may hold a program of the same name, so they are skipped. So is a directory whose name holds '=': env would read a program path holding '=' as an assignment.
+mcp_launch_find_program() {
+    mcp_launch_rest=${PATH-}:
+    while [ -n "$mcp_launch_rest" ]; do
+        mcp_launch_directory=${mcp_launch_rest%%:*}
+        mcp_launch_rest=${mcp_launch_rest#*:}
+        case $mcp_launch_directory in
+            '' | [!/]* | *=*) continue ;;
+        esac
+        if [ -f "$mcp_launch_directory/$1" ] && [ -x "$mcp_launch_directory/$1" ]; then
+            mcp_launch_found=$mcp_launch_directory/$1
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Decides once per launch whether secret-tool may be started, and finds the helpers it is started with.
+mcp_launch_check_keyring() {
+    # Without a PATH from the tool, dash and bash hold a default search path of their own, which is not exported; a helper is never taken from a path the tool did not give.
+    if ! mcp_launch_environment_is_set PATH; then
+        mcp_launch_keyring_unusable 'the PATH is not set or is empty'
+        return
+    fi
+    if mcp_launch_find_program secret-tool; then
+        mcp_launch_secret_tool=$mcp_launch_found
+    else
+        mcp_launch_keyring_unusable 'secret-tool is not in any absolute directory of the PATH'
+        return
+    fi
+    if mcp_launch_find_program timeout; then
+        mcp_launch_timeout=$mcp_launch_found
+    else
+        # Without timeout a lookup of a locked keyring could wait for a prompt forever, so the keyring is not asked at all.
+        mcp_launch_keyring_unusable 'timeout is not in any absolute directory of the PATH'
+        return
+    fi
+    if mcp_launch_find_program env; then
+        mcp_launch_env=$mcp_launch_found
+    else
+        # Without env the shell cannot keep the rest of the environment of the tool away from secret-tool.
+        mcp_launch_keyring_unusable 'env is not in any absolute directory of the PATH'
+        return
+    fi
+    if [ -n "${DBUS_SESSION_BUS_ADDRESS-}" ] || { [ -n "${XDG_RUNTIME_DIR-}" ] && [ -S "$XDG_RUNTIME_DIR/bus" ]; }; then
+        mcp_launch_keyring=usable
+    else
+        # secret-tool would otherwise autolaunch a new session bus and a second keyring daemon when DISPLAY is set.
+        mcp_launch_keyring_unusable 'no D-Bus session bus is known (DBUS_SESSION_BUS_ADDRESS is not set and XDG_RUNTIME_DIR/bus is not a socket)'
+    fi
+}
+
+# Unsets every exported variable whose name is a valid shell name, except $1 and BASH_XTRACEFD. Call it only in a subshell: the server needs the whole environment.
+# export -p is the only portable list of the exported names. A value holding a newline followed by "export X=" adds the name X to that list; unsetting X too does no harm here.
+# The mcp_launch_ names are skipped: the script unset every inherited one at its start and exports none, and a name read from a value must not unset a variable of this loop.
+# BASH_XTRACEFD is kept because bash closes the file descriptor it names when it is unset, and that may be a pipe the launcher reads; env does not pass it on.
+mcp_launch_drop_environment() {
+    IFS=$mcp_launch_newline
+    for mcp_launch_line in $(export -p); do
+        case $mcp_launch_line in
+            'export '*) ;;
+            *) continue ;;
+        esac
+        mcp_launch_exported=${mcp_launch_line#export }
+        mcp_launch_exported=${mcp_launch_exported%%=*}
+        case $mcp_launch_exported in
+            '' | [!_$mcp_launch_letters]* | *[!_$mcp_launch_letters$mcp_launch_digits]* | mcp_launch_* | BASH_XTRACEFD | "$1") continue ;;
+        esac
+        # command keeps a failing unset, such as that of a variable bash holds read-only, from ending the subshell.
+        command unset "$mcp_launch_exported" 2>/dev/null
+    done
+}
+
+# Looks the secret $1 up in the keyring. Returns 0 and sets mcp_launch_value when an entry exists; returns 1 when there is none or the keyring cannot be used.
+mcp_launch_lookup() {
+    [ "$mcp_launch_keyring" = unknown ] && mcp_launch_check_keyring
+    [ "$mcp_launch_keyring" = usable ] || return 1
+    # The value reaches this shell only through the pipe of the outer command substitution (file descriptor 3), and the inner one captures standard error.
+    # The trailer "/<exit code> <none|killed|text>" follows the value, so trailing newlines of the value survive and "no entry" (exit 1, silent) is told apart from a failure (exit 1 with a message).
+    mcp_launch_output=$(
+        # The shell that waits here would report a helper killed by a signal with a line of its own, such as "Killed"; this subshell writes nothing else, so its standard error is discarded.
+        exec 3>&1 2>/dev/null
+        mcp_launch_errors=$(
+            mcp_launch_name=$1
+            set --
+            [ -z "${DBUS_SESSION_BUS_ADDRESS-}" ] || set -- "$@" "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"
+            [ -z "${XDG_RUNTIME_DIR-}" ] || set -- "$@" "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
+            # A bus reached over TCP authenticates with a cookie under the home directory.
+            [ -z "${HOME-}" ] || set -- "$@" "HOME=$HOME"
+            mcp_launch_drop_environment ''
+            # -v makes timeout say which signal it sent, so a lookup it had to kill is told apart from one killed by another process; without DISPLAY and LANG its message is the untranslated English text.
+            exec "$mcp_launch_env" -i "$@" "$mcp_launch_timeout" -v -k "$mcp_launch_grace" "$mcp_launch_limit" "$mcp_launch_secret_tool" lookup service ai-tools-mcp variable "$mcp_launch_name" </dev/null 2>&1 >&3 3>&-
+        )
+        mcp_launch_status=$?
+        case $mcp_launch_errors in
+            '') mcp_launch_stderr=none ;;
+            *'sending signal KILL'*) mcp_launch_stderr=killed ;;
+            *) mcp_launch_stderr=text ;;
+        esac
+        printf '/%s %s' "$mcp_launch_status" "$mcp_launch_stderr"
+    )
+    mcp_launch_result=${mcp_launch_output##*/}
+    mcp_launch_value=${mcp_launch_output%/*}
+    mcp_launch_output=''
+    case $mcp_launch_result in
+        '0 '*)
+            mcp_launch_value=${mcp_launch_value%"$mcp_launch_newline"}
+            return 0
+            ;;
+        '1 none')
+            mcp_launch_value=''
+            return 1
+            ;;
+        '124 '*)
+            mcp_launch_value=''
+            mcp_launch_keyring_unusable "secret-tool lookup timed out after $mcp_launch_limit seconds"
+            return 1
+            ;;
+        '137 killed')
+            mcp_launch_value=''
+            mcp_launch_keyring_unusable "secret-tool lookup did not end within $mcp_launch_limit seconds and was killed $mcp_launch_grace second later"
+            return 1
+            ;;
+        *)
+            mcp_launch_value=''
+            mcp_launch_keyring_unusable "secret-tool lookup failed with exit code ${mcp_launch_result% *}"
+            return 1
+            ;;
+    esac
+}
+
+# Returns 0 when the environment variable $1 is set and its value counts as set (see mcp_launch_is_set).
+# POSIX sh cannot expand a variable whose name is computed without eval, but export -p prints it. In a subshell where no other exported variable is left, export -p prints the same text as after assigning a value v to $1 exactly when $1 holds v, and the same text as after unsetting $1 exactly when $1 is not exported. The value is compared that way, inside this shell, and no program ever sees it.
+mcp_launch_environment_is_set() (
+    mcp_launch_drop_environment "$1"
+    mcp_launch_exports=$(export -p)
+    case $mcp_launch_exports in
+        "$(unset "$1"; export -p)") exit 1 ;;
+    esac
+    for mcp_launch_candidate in '' "\${$1}" "\${$1:-}" "\${env:$1}"; do
+        case $mcp_launch_exports in
+            "$(export "$1=$mcp_launch_candidate"; export -p)") exit 1 ;;
+        esac
+    done
+    exit 0
+)
+
+# Returns 1 when the value $2 of the variable $1 counts as not set: empty, or a reference to the variable that a tool left unexpanded.
+mcp_launch_is_set() {
+    case $2 in
+        '' | "\${$1}" | "\${$1:-}" | "\${env:$1}") return 1 ;;
+    esac
+    return 0
+}
+
+[ "$#" -gt 0 ] || mcp_launch_usage_error 'missing server name'
+mcp_launch_server=$1
+case $mcp_launch_server in
+    '' | [!$mcp_launch_letters$mcp_launch_digits]* | *[!$mcp_launch_letters$mcp_launch_digits._-]*)
+        mcp_launch_usage_error "the server name must start with a letter or digit and hold only letters, digits, '.', '_' and '-'"
+        ;;
+esac
+shift
+
+# Secrets as "<kind>:<NAME>" words, and the names alone between spaces for exact matching.
+mcp_launch_secrets=''
+mcp_launch_names=' '
+mcp_launch_position=1
+mcp_launch_separator=false
+while [ "$#" -gt 0 ]; do
+    mcp_launch_position=$((mcp_launch_position + 1))
+    case $1 in
+        --)
+            shift
+            mcp_launch_separator=true
+            break
+            ;;
+        --required | --optional)
+            [ "$#" -ge 2 ] || mcp_launch_usage_error "$1 at argument $mcp_launch_position is not followed by a secret name"
+            mcp_launch_kind=${1#--}
+            shift
+            mcp_launch_position=$((mcp_launch_position + 1))
+            mcp_launch_check_name "$1" "$mcp_launch_position"
+            mcp_launch_secrets="$mcp_launch_secrets $mcp_launch_kind:$1"
+            mcp_launch_names="$mcp_launch_names$1 "
+            ;;
+        *)
+            mcp_launch_usage_error "argument $mcp_launch_position must be --required, --optional or --"
+            ;;
+    esac
+    shift
+done
+[ "$mcp_launch_separator" = true ] || mcp_launch_usage_error 'missing -- before the command'
+[ "$#" -gt 0 ] || mcp_launch_usage_error 'missing command after --'
+
+mcp_launch_keyring=unknown
+mcp_launch_missing=''
+for mcp_launch_secret in $mcp_launch_secrets; do
+    mcp_launch_kind=${mcp_launch_secret%%:*}
+    mcp_launch_name=${mcp_launch_secret#*:}
+    if mcp_launch_lookup "$mcp_launch_name" && mcp_launch_is_set "$mcp_launch_name" "$mcp_launch_value"; then
+        export "$mcp_launch_name=$mcp_launch_value"
+    elif mcp_launch_environment_is_set "$mcp_launch_name"; then
+        # The inherited variable reaches the server as it is; nothing to do.
+        :
+    else
+        unset "$mcp_launch_name"
+        if [ "$mcp_launch_kind" = required ]; then
+            mcp_launch_missing="$mcp_launch_missing $mcp_launch_name"
+        fi
+    fi
+    mcp_launch_value=''
+done
+
+if [ -n "$mcp_launch_missing" ]; then
+    printf 'mcp-launch: %s: not started: required secret not found in the keyring or the environment:%s\n' "$mcp_launch_server" "$mcp_launch_missing" >&2
+    exit 1
+fi
+
+# bash's exec reads a first word that starts with '-' as an option of its own and ends its options at '--'; dash's exec reads no option, so there '--' would be run as the command. exec with '--' and no command succeeds only in a shell of the first kind.
+# The PATH of that subshell names no existing directory, so a shell of the second kind finds no program named '--' to run.
+if (PATH=/nonexistent/mcp-launch; exec --) </dev/null >/dev/null 2>&1; then
+    exec -- "$@"
+fi
+exec "$@"

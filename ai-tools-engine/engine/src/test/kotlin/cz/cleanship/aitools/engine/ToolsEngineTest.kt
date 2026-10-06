@@ -7,32 +7,63 @@ import ch.qos.logback.core.read.ListAppender
 import cz.cleanship.aitools.engine.env.EnvironmentSource
 import cz.cleanship.aitools.engine.env.UnresolvedVariableException
 import cz.cleanship.aitools.engine.env.VariableResolver
+import cz.cleanship.aitools.engine.io.ArtifactDeleteException
 import cz.cleanship.aitools.engine.io.ArtifactPathException
+import cz.cleanship.aitools.engine.io.ToolDirectoryException
 import cz.cleanship.aitools.engine.models.Locations
+import cz.cleanship.aitools.engine.models.ManifestMetadata
+import cz.cleanship.aitools.engine.models.McpToolRestriction
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.models.UserDeploymentManifest
+import cz.cleanship.aitools.engine.models.Version
 import cz.cleanship.aitools.engine.models.serialName
 import cz.cleanship.aitools.engine.services.DryRunArtifactSink
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
+import cz.cleanship.aitools.engine.services.FileSystemArtifactSink
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
+import cz.cleanship.aitools.engine.services.SkillFileResolvingException
+import cz.cleanship.aitools.engine.tools.AgentContext
+import cz.cleanship.aitools.engine.tools.ToolAdapter
 import cz.cleanship.aitools.engine.tools.ToolFactory
 import cz.cleanship.aitools.engine.tools.adapters.claude.ClaudeAdapter
 import cz.cleanship.aitools.engine.tools.adapters.codex.CodexAdapter
 import cz.cleanship.aitools.engine.tools.adapters.cursor.CursorAdapter
 import cz.cleanship.aitools.engine.tools.adapters.windsurf.WindsurfAdapter
+import cz.cleanship.aitools.engine.tools.mcp.FakePrograms
+import cz.cleanship.aitools.engine.tools.mcp.FakeSecretService
+import cz.cleanship.aitools.engine.tools.mcp.LibsecretSecretsManager
+import cz.cleanship.aitools.engine.tools.mcp.McpLedger
+import cz.cleanship.aitools.engine.tools.mcp.McpSecretsManager
+import cz.cleanship.aitools.engine.tools.mcp.McpServerResolver
+import cz.cleanship.aitools.engine.tools.mcp.SecretServiceProbe
+import cz.cleanship.aitools.engine.tools.mcp.missingProgramsReason
 import cz.cleanship.aitools.engine.utils.contentSnapshot
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assumptions.assumeFalse
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.EnumSource
 import org.slf4j.LoggerFactory
+import org.tomlj.Toml
 import java.io.File
+import java.io.IOException
+import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
+import java.time.Duration
 
 class ToolsEngineTest {
 
@@ -545,6 +576,67 @@ class ToolsEngineTest {
             assertThat((error as ExportFailedException).failures.map { it.manifest })
                 .containsExactlyInAnyOrder("skill 'standalone-skill'", "skill 'directory-skill'")
             assertThat(agentFile("good-agent")).exists()
+        }
+
+        /**
+         * A companion file that cannot be read fails its skill, naming the source rather than the target, in a dry run as in a deploy; the tool goes on with its other files, and the file an earlier deploy copied is kept.
+         */
+        @ParameterizedTest
+        @CsvSource("false", "true")
+        fun `should report a companion file that cannot be read as a failure of its skill naming the source`(
+            dryRun: Boolean,
+        ) {
+            // given
+            val manifest = writeDirectorySkill("directory-skill", "helper.md", companionFileExists = true)
+            val source = manifest.parentFile.resolve("helper.md")
+            writeAgent("good-agent", "base")
+            // - what an earlier deploy copied there
+            val deployed = destination.resolve(".claude/skills/directory-skill/helper.md")
+            deployed.parentFile.mkdirs()
+            deployed.writeText("Deployed before.\n")
+            Files.setPosixFilePermissions(source.toPath(), PosixFilePermissions.fromString("---------"))
+            val runEngine =
+                ToolsEngine(workspace, userHome = userHome, tools = listOf(ToolFactory.create(ToolType.CLAUDE, dryRun)), dryRun = dryRun)
+
+            // when
+            val error = try {
+                // - a user who may read anything, such as root, cannot be refused a read
+                assumeTrue(!Files.isReadable(source.toPath()))
+                runCatching { runEngine.process(locations()) }.exceptionOrNull()
+            } finally {
+                Files.setPosixFilePermissions(source.toPath(), PosixFilePermissions.fromString("rw-r--r--"))
+            }
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("Skill file '${source.absolutePath}' cannot be read.")
+                .hasMessageNotContaining("cannot be written")
+            assertThat((error as ExportFailedException).failures.map { it.manifest to it.cause::class.java })
+                .containsExactly("skill 'directory-skill'" to SkillFileResolvingException::class.java)
+            assertThat(deployed).content().isEqualTo("Deployed before.\n")
+            assertThat(agentFile("good-agent").exists()).isEqualTo(!dryRun)
+        }
+
+        @Test
+        fun `should stop the run rather than collect a failed delete raised while a project is exported`() {
+            // given
+            // - an adapter that deletes inside the export of an agent, as the user-scope adapters do for a skill
+            writeAgent("good-agent", "base")
+            val deleting = object : ToolAdapter by ClaudeAdapter() {
+                override fun export(projectDir: File, agentContext: AgentContext): Unit =
+                    throw ArtifactDeleteException("${projectDir.absolutePath}/.claude/agents/locked", IOException("locked"))
+            }
+            val deletingEngine = ToolsEngine(workspace, userHome = userHome, tools = listOf(deleting))
+
+            // when
+            val error = runCatching { deletingEngine.process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ReplaceFailedException::class.java)
+                .hasMessageContaining("project 'test-project'")
+                .hasMessageContaining("/.claude/agents/locked")
         }
 
         @Test
@@ -1414,11 +1506,12 @@ class ToolsEngineTest {
 
         @ParameterizedTest
         @CsvSource(
-            // - Claude and Codex replace their whole tool directory, which is the link here
+            // - Claude replaces its whole tool directory, which is the link here
             "CLAUDE, .claude, .claude/skills/jira-ticket, CLAUDE.md, true",
             "CLAUDE, .claude, .claude/skills/jira-ticket, CLAUDE.md, false",
-            "CODEX, .codex, .codex/skills/skill-jira-ticket, AGENTS.md, true",
-            "CODEX, .codex, .codex/skills/skill-jira-ticket, AGENTS.md, false",
+            // - Codex replaces the folders it generates below a .codex it keeps for config.toml; the skills folder, which the skill is written into, is the link here
+            "CODEX, .codex/skills, .codex/skills/skill-jira-ticket, AGENTS.md, true",
+            "CODEX, .codex/skills, .codex/skills/skill-jira-ticket, AGENTS.md, false",
             // - GitHub Copilot replaces three folders below a .github it keeps; the prompts folder, which the skill is written into, is the link here
             "GITHUB_COPILOT, .github/prompts, .github/prompts/skill-jira-ticket, .github/copilot-instructions.md, true",
             "GITHUB_COPILOT, .github/prompts, .github/prompts/skill-jira-ticket, .github/copilot-instructions.md, false",
@@ -1766,8 +1859,9 @@ class ToolsEngineTest {
         @CsvSource(
             "CLAUDE, .claude, CLAUDE.md, true",
             "CLAUDE, .claude, CLAUDE.md, false",
-            "CODEX, .codex, AGENTS.md, true",
-            "CODEX, .codex, AGENTS.md, false",
+            // - Codex replaces the folders it generates below a .codex it keeps for config.toml; the skills folder is the link here
+            "CODEX, .codex/skills, AGENTS.md, true",
+            "CODEX, .codex/skills, AGENTS.md, false",
             // - GitHub Copilot replaces three folders below a .github it keeps; the prompts folder is the link here
             "GITHUB_COPILOT, .github/prompts, .github/copilot-instructions.md, true",
             "GITHUB_COPILOT, .github/prompts, .github/copilot-instructions.md, false",
@@ -2211,6 +2305,2407 @@ class ToolsEngineTest {
         private fun sinkInfos() = sinkAppender.list.filter { it.level == Level.INFO }.map { it.formattedMessage }
     }
 
+    @Nested
+    inner class McpServers {
+
+        // - the config of the run declares the base URL, the environment of the run carries the secret; neither is a real value
+        private val mcpVariables = VariableResolver(
+            variables = mapOf("JIRA_BASE_URL" to "https://jira.example.com"),
+            environment = { name -> mapOf("JIRA_PAT" to SECRET_VALUE)[name] },
+        )
+
+        private fun engineFor(vararg toolTypes: ToolType, dryRun: Boolean = false, variables: VariableResolver = mcpVariables) = ToolsEngine(
+            workspace,
+            variables = variables,
+            userHome = userHome,
+            tools = toolTypes.map { ToolFactory.create(it, dryRun) },
+            dryRun = dryRun,
+        )
+
+        @BeforeEach
+        fun selectAtlassian() {
+            // - MCP servers are opt-in, so the project of these tests names the one it deploys
+            writeProject(mcpFilter = listOf("atlassian"))
+        }
+
+        @Test
+        fun `should write the selected servers into the MCP file of every tool that supports them, with secrets only as references`() {
+            // given
+            writeAtlassianServer()
+
+            // when
+            engineFor(*ToolType.entries.toTypedArray()).process(locations())
+
+            // then
+            val claude = destination.resolve(".mcp.json").readText()
+            val vsCode = destination.resolve(".vscode/mcp.json").readText()
+            val copilotCli = destination.resolve(".github/mcp.json").readText()
+            val cursor = destination.resolve(".cursor/mcp.json").readText()
+            val codex = destination.resolve(".codex/config.toml").readText()
+            assertThat(claude).contains("\"JIRA_PAT\": \"\${JIRA_PAT}\"")
+            assertThat(vsCode).contains("\"JIRA_PAT\": \"\${env:JIRA_PAT}\"")
+            assertThat(copilotCli).contains("\"JIRA_PAT\": \"\${JIRA_PAT}\"").doesNotContain("\${env:")
+            assertThat(cursor).contains("\"JIRA_PAT\": \"\${env:JIRA_PAT}\"")
+            assertThat(codex).contains("env_vars = [\"JIRA_PAT\"]")
+            assertThat(listOf(claude, vsCode, copilotCli, cursor, codex)).allSatisfy {
+                assertThat(it).doesNotContain(SECRET_VALUE).contains("https://jira.example.com")
+            }
+        }
+
+        @ParameterizedTest
+        @CsvSource("windsurf", "antigravity")
+        fun `should report a tool without MCP support as skipped for the servers a project selects`(tool: String) {
+            // given
+            writeAtlassianServer()
+
+            // when
+            engineFor(ToolType.entries.single { it.serialName == tool }).process(locations())
+
+            // then
+            assertThat(warnings()).anyMatch { it.contains("test-project") && it.contains(tool) && it.contains("MCP") && it.contains("atlassian") }
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - no mcps block at all
+            "false",
+            // - an mcps block selecting nothing
+            "true",
+        )
+        fun `should not touch any MCP config file of a project that selects no server`(emptyWhitelist: Boolean) {
+            // given
+            writeAtlassianServer()
+            writeProject(mcpFilter = if (emptyWhitelist) emptyList() else null)
+            // - a hand-written entry named like an MCP manifest of the run, in the compact layout a rewrite would change
+            val mcpFile = destination.resolve(".mcp.json")
+            mcpFile.parentFile.mkdirs()
+            val existing = """{"mcpServers":{"atlassian":{"command":"mine"},"playwright":{"command":"npx"}}}"""
+            mcpFile.writeText(existing)
+
+            // when
+            engineFor(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR).process(locations())
+
+            // then
+            assertThat(mcpFile).hasContent(existing)
+            assertThat(destination.resolve(".vscode/mcp.json")).doesNotExist()
+            assertThat(destination.resolve(".github/mcp.json")).doesNotExist()
+            assertThat(destination.resolve(".cursor/mcp.json")).doesNotExist()
+            assertThat(destination.resolve(".codex/config.toml")).doesNotExist()
+            assertThat(warnings()).noneMatch { it.contains("MCP") }
+        }
+
+        @Test
+        fun `should remove an owned server the project does not select and keep a server added by hand`() {
+            // given
+            // - inside a project that selects servers, an entry named after any MCP manifest of the run is the engine's
+            writeAtlassianServer()
+            writeYaml("mcps/other.yml", "id: other\ndescription: Other\ntransport:\n  type: stdio\n  command: other-server\n")
+            writeProject(mcpFilter = listOf("other"))
+            val mcpFile = destination.resolve(".mcp.json")
+            mcpFile.parentFile.mkdirs()
+            mcpFile.writeText("""{ "mcpServers": { "atlassian": { "command": "old" }, "playwright": { "command": "npx" } } }""")
+
+            // when
+            engineFor(ToolType.CLAUDE).process(locations())
+
+            // then
+            assertThat(mcpFile)
+                .content()
+                .doesNotContain("atlassian")
+                .contains("playwright")
+                .contains("other-server")
+        }
+
+        @Test
+        fun `should keep the MCP files and the servers added by hand when a replacing project is deployed`() {
+            // given
+            writeAtlassianServer()
+            writeProject(replace = true, mcpFilter = listOf("atlassian"))
+            val codexConfig = destination.resolve(".codex/config.toml")
+            codexConfig.parentFile.mkdirs()
+            codexConfig.writeText("# mine\n[mcp_servers.playwright]\ncommand = \"npx\"\n")
+            val cursorConfig = destination.resolve(".cursor/mcp.json")
+            cursorConfig.parentFile.mkdirs()
+            cursorConfig.writeText("""{ "mcpServers": { "playwright": { "command": "npx" } } }""")
+            val copilotCliConfig = destination.resolve(".github/mcp.json")
+            copilotCliConfig.parentFile.mkdirs()
+            copilotCliConfig.writeText("""{ "mcpServers": { "playwright": { "command": "npx" } } }""")
+
+            // when
+            engineFor(ToolType.CODEX, ToolType.CURSOR, ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(codexConfig).content().startsWith("# mine\n[mcp_servers.playwright]\ncommand = \"npx\"\n").contains("[mcp_servers.atlassian]")
+            assertThat(cursorConfig).content().contains("playwright").contains("atlassian")
+            assertThat(copilotCliConfig).content().contains("playwright").contains("atlassian")
+        }
+
+        @Test
+        fun `should fail naming the server and the variable when a required plain variable is declared nowhere, and still export the rest`() {
+            // given
+            writeAtlassianServer(extraVariable = "  - name: CONFLUENCE_BASE_URL\n    description: Base URL\n    secret: false\n")
+
+            // when
+            val error = runCatching { engineFor(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'CONFLUENCE_BASE_URL'")
+            // - the failure is labelled with the server that failed, not with the file holding every server of the project
+            assertThat((error as ExportFailedException).failures.map { it.manifest }).containsExactly("MCP server 'atlassian'")
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(destination.resolve(".mcp.json")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail only the project whose MCP config file links outside it, naming the file and the target, and write the rest`() {
+            // given
+            writeAtlassianServer()
+            val outside = tempDir.resolve("home/.claude.json").toFile()
+            outside.parentFile.mkdirs()
+            outside.writeText("""{"mcpServers":{}}""")
+            destination.mkdirs()
+            Files.createSymbolicLink(destination.resolve(".mcp.json").toPath(), outside.toPath())
+
+            // when
+            val error = runCatching { engineFor(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining(destination.resolve(".mcp.json").absolutePath)
+                .hasMessageContaining(outside.canonicalPath)
+            assertThat(outside).hasContent("""{"mcpServers":{}}""")
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+        }
+
+        /**
+         * A linked `.codex` that leads nowhere fails the Codex files of that project only, before any of them is written; the dry run reports exactly the failure the deploy reports, and every other tool and project of the run is still deployed.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - the link leads to a directory that no longer exists
+            "dangling",
+            // - the link leads to a second link that leads back to it
+            "looping",
+        )
+        fun `should fail only the tool and project whose tool directory is a link that cannot be followed, in a dry run as in a deploy`(
+            kind: String,
+        ) {
+            // given
+            writeAtlassianServer()
+            // - a second project of the same run, whose tool directories are plain
+            val laterDestination = tempDir.resolve("later-destination").toFile()
+            writeProject("later-project", "later-project", laterDestination.absolutePath, mcpFilter = listOf("atlassian"))
+            destination.mkdirs()
+            val codexDir = destination.resolve(".codex")
+            val leadsTo = when (kind) {
+                "dangling" -> tempDir.resolve("out/missing").toFile()
+                else -> destination.resolve("loop").also { Files.createSymbolicLink(it.toPath(), codexDir.toPath()) }
+            }
+            Files.createSymbolicLink(codexDir.toPath(), leadsTo.toPath())
+            val configFile = codexDir.resolve("config.toml")
+
+            // when
+            val dryRunError = runCatching { engineFor(ToolType.CODEX, ToolType.CLAUDE, dryRun = true).process(locations()) }.exceptionOrNull()
+            val writtenByDryRun = listOf(laterDestination, destination.resolve(".mcp.json")).filter { it.exists() }
+            val deployError = runCatching { engineFor(ToolType.CODEX, ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deployError)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${codexDir.absolutePath}'")
+                .hasMessageContaining("'${leadsTo.absolutePath}'")
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(deployError?.message)
+            assertThat(writtenByDryRun).isEmpty()
+            listOf(dryRunError, deployError).forEach { error ->
+                assertThat((error as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                    .containsExactly(Triple("test-project", ToolType.CODEX, "tool directory '.codex'"))
+            }
+            // - nothing of Codex is written for that project, the instructions beside .codex included
+            assertThat(configFile.exists()).isFalse()
+            assertThat(destination.resolve("AGENTS.md")).doesNotExist()
+            // - the tool after Codex in the same project, and the other project, are deployed in full
+            assertThat(destination.resolve(".mcp.json")).content().contains("atlassian")
+            assertThat(laterDestination.resolve(".codex/config.toml")).content().contains("[mcp_servers.atlassian]")
+            assertThat(laterDestination.resolve(".mcp.json")).content().contains("atlassian")
+            assertThat(tempDir.resolve("out").toFile()).doesNotExist()
+        }
+
+        /**
+         * A tool directory a deploy cannot write through fails that tool of that project once, before any file of it is written, and every other tool and project is still written. The dry run finds the directory exactly as the deploy does, whether the project selects an MCP server or not.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - a dangling .codex in a project that deploys a Codex agent, which is written into .codex/skills before the MCP config file
+            "codex, true",
+            "codex, false",
+            // - a regular file at .cursor, where every deploy writes the rules of the project first
+            "cursor, true",
+            "cursor, false",
+        )
+        fun `should fail only the tool whose directory cannot be written and still write every other tool and project`(
+            tool: String,
+            selectsServers: Boolean,
+        ) {
+            // given
+            writeAtlassianServer()
+            writeAgent("basic", "base")
+            val mcpFilter = if (selectsServers) listOf("atlassian") else null
+            writeProject(mcpFilter = mcpFilter)
+            // - a second project of the same run, whose tool directories are plain
+            val laterDestination = tempDir.resolve("later-destination").toFile()
+            writeProject("later-project", "later-project", laterDestination.absolutePath, mcpFilter = mcpFilter)
+            val toolType = if (tool == "codex") ToolType.CODEX else ToolType.CURSOR
+            destination.mkdirs()
+            val brokenDir = destination.resolve(".$tool")
+            if (tool == "codex") Files.createSymbolicLink(brokenDir.toPath(), tempDir.resolve("out/missing")) else brokenDir.writeText("not a directory\n")
+
+            // when
+            val dryRunError = runCatching { engineFor(toolType, ToolType.CLAUDE, dryRun = true).process(locations()) }.exceptionOrNull()
+            val writtenByDryRun = listOf(laterDestination, destination.resolve("CLAUDE.md")).filter { it.exists() }
+            val deployError = runCatching { engineFor(toolType, ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deployError)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${brokenDir.absolutePath}'")
+                .hasMessageContaining("writes no ${toolType.serialName} files of project 'test-project'")
+            assertThat((deployError as ExportFailedException).failures.map { it.deploymentId to it.toolType }).containsExactly("test-project" to toolType)
+            // - the failure is named after the directory, and its cause is the check of that directory
+            assertThat(deployError.failures.map { it.manifest to it.cause::class.java }).containsExactly("tool directory '.$tool'" to ToolDirectoryException::class.java)
+            // - the dry run fails the same pair with the same message, whether the project selects a server or not
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(deployError.message)
+            assertThat(writtenByDryRun).isEmpty()
+            // - the other tool of the project, and every tool of the later project, are written in full
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(destination.resolve(".claude/agents/basic.md")).exists()
+            val laterFiles = if (tool == "codex") listOf("AGENTS.md", ".codex/skills/agent-basic/SKILL.md") else listOf(".cursor/rules/project.mdc", ".cursor/rules/agent-basic.mdc")
+            (laterFiles + listOf("CLAUDE.md", ".claude/agents/basic.md")).forEach { assertThat(laterDestination.resolve(it)).exists() }
+            val mcpFiles = listOf(".mcp.json", if (tool == "codex") ".codex/config.toml" else ".cursor/mcp.json")
+            mcpFiles.forEach { assertThat(laterDestination.resolve(it).exists()).isEqualTo(selectsServers) }
+            assertThat(destination.resolve(".mcp.json").exists()).isEqualTo(selectsServers)
+            assertThat(tempDir.resolve("out").toFile()).doesNotExist()
+        }
+
+        @Test
+        fun `should resolve a leading tilde of a stdio command against the real home, whatever the user home of the run`() {
+            // given
+            writeYaml("mcps/atlassian.yml", "id: atlassian\ndescription: Jira\ntransport:\n  type: stdio\n  command: ~/bin/jira-mcp-server\n")
+
+            // when
+            engineFor(ToolType.CLAUDE).process(locations())
+
+            // then
+            val content = destination.resolve(".mcp.json").readText()
+            assertThat(content).contains(File(System.getProperty("user.home"), "bin/jira-mcp-server").absolutePath).doesNotContain(userHome.absolutePath)
+        }
+
+        @Test
+        fun `should name the MCP file of every supporting tool and write nothing in a dry run`() {
+            // given
+            writeAtlassianServer()
+            val sinkAppender = ListAppender<ILoggingEvent>()
+            val sinkLogger = LoggerFactory.getLogger(DryRunArtifactSink::class.java) as Logger
+            sinkAppender.start()
+            sinkLogger.addAppender(sinkAppender)
+
+            // when
+            try {
+                engineFor(*ToolType.entries.toTypedArray(), dryRun = true).process(locations())
+            } finally {
+                sinkLogger.detachAppender(sinkAppender)
+                sinkAppender.stop()
+            }
+
+            // then
+            val sinkInfos = sinkAppender.list.map { it.formattedMessage }
+            listOf(".mcp.json", ".vscode/mcp.json", ".github/mcp.json", ".cursor/mcp.json", ".codex/config.toml").forEach { path ->
+                assertThat(sinkInfos).anyMatch { it.contains("MCP servers [atlassian]") && it.contains(destination.resolve(path).absolutePath) }
+                assertThat(destination.resolve(path)).doesNotExist()
+            }
+        }
+
+        /**
+         * Every way a value of the deploying shell or of the config could reach an MCP config file of a project or of the home, a ledger, a `settings.json`, a log line or an error: each either renders a reference only, or fails, and the value appears nowhere.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - a header marked secret only on the outside, holding a bearer token variable not marked itself: rendered as a reference
+            "outer-secret-bearer, reference, ATLASSIAN_TOKEN",
+            // - an environment variable marked secret on the outside whose value puts the secret into other text
+            "outer-secret-composed-environment, refused-at-load, ATLASSIAN_KEY",
+            // - one variable derived as plain text in the url and as a secret in a header
+            "conflicting-secrecy, refused-at-load, ATLASSIAN_TOKEN",
+            // - a server json holding a reference in the syntax of the engine
+            "literal-reference, refused-at-load, X-Key",
+            // - a server json holding a reference in the syntax of VS Code and Cursor
+            "tool-reference, refused-at-load, X-Env",
+            // - an inline manifest referencing a variable it does not declare
+            "undeclared-reference, refused-at-load, GITHUB_TOKEN",
+            // - a plain variable only the deploying shell exports: left out
+            "environment-plain-value, omitted, EXAMPLE_TOKEN",
+            // - a TLS verification flag only the deploying shell exports: left out
+            "environment-tls-flag, omitted, JIRA_VERIFY_SSL",
+            // - a plain value of the config carrying a reference a tool would expand
+            "nested-config-value, refused-at-export, NESTED_PROXY",
+        )
+        fun `should never write, log or report a value of the environment or the config`(
+            scenario: String,
+            outcome: String,
+            name: String,
+        ) {
+            // given
+            val rootAppender = ListAppender<ILoggingEvent>()
+            val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) as Logger
+            rootAppender.start()
+            rootLogger.addAppender(rootAppender)
+            val variables = VariableResolver(
+                variables = mapOf("NESTED_PROXY" to "http://user:$LEAKED_VALUE@proxy/\${X}"),
+                environment = { name -> if (name in LEAKING_NAMES) LEAKED_VALUE else null },
+            )
+            writeLeakScenario(scenario)
+            // - the project and the user deployment restrict the tools of the server, so both settings.json, both ledgers and the MCP files of the home are written
+            writeProject(mcpFilter = listOf("atlassian"), mcpTools = mapOf("atlassian" to McpToolRestriction(deny = listOf("search"))))
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"), mcpTools = mapOf("atlassian" to McpToolRestriction(deny = listOf("search"))))
+
+            // when
+            val error = try {
+                runCatching { engineFor(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR, variables = variables).process(locations()) }.exceptionOrNull()
+            } finally {
+                rootLogger.detachAppender(rootAppender)
+                rootAppender.stop()
+            }
+
+            // then
+            val written = (destination.walkTopDown() + userHome.walkTopDown())
+                .filter { it.isFile }
+                .map { it.readText() }
+                .toList()
+            val logged = rootAppender.list.flatMap { event ->
+                listOfNotNull(event.formattedMessage) + generateSequence(event.throwableProxy) { it.cause }.mapNotNull { it.message }
+            }
+            val reported = generateSequence(error) { it.cause }.mapNotNull { it.message }.toList()
+            assertThat(written + logged + reported).noneMatch { it.contains(LEAKED_VALUE) }
+            // - and each scenario ends the way it is meant to, so a refusal for an unrelated reason cannot pass for safety
+            val claude = destination.resolve(".mcp.json")
+            val home = userHome.resolve(".claude.json")
+            when (outcome) {
+                "reference" -> {
+                    assertThat(error).isNull()
+                    assertThat(listOf(claude, home)).allSatisfy { assertThat(it).content().contains("\${$name}") }
+                }
+                "omitted" -> {
+                    assertThat(error).isNull()
+                    assertThat(listOf(claude, home)).allSatisfy { assertThat(it).content().contains("\"atlassian\"").doesNotContain(name) }
+                }
+                "refused-at-load" -> {
+                    assertThat(error).isInstanceOf(ManifestLoadingException::class.java).hasMessageContaining(name)
+                    assertThat(listOf(claude, home)).allSatisfy { assertThat(it).doesNotExist() }
+                }
+                else -> {
+                    assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'$name'")
+                    assertThat(listOf(claude, home)).allSatisfy { assertThat(it).doesNotExist() }
+                }
+            }
+            // - wherever the servers were written, the permissions, the ledgers and the files of the home were written too, so the absence above covers them
+            if (outcome == "reference" || outcome == "omitted") {
+                listOf(destination.resolve(".claude/settings.json"), destination.resolve(".ai-tools/mcp-ledger.json"), userHome.resolve(".ai-tools/mcp-ledger.json"), userHome.resolve(".codex/config.toml"), userHome.resolve(".claude/settings.json"))
+                    .forEach { assertThat(it).exists() }
+            }
+        }
+
+        private fun writeLeakScenario(scenario: String) {
+            val schema = "\"\$schema\": \"https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json\", \"name\": \"x\", \"description\": \"d\", \"version\": \"1\""
+
+            fun pointer(serverJson: String) {
+                val folder = tempDir.resolve("servers/$scenario").toFile()
+                folder.mkdirs()
+                folder.resolve("server.json").writeText("{$schema, $serverJson}")
+                writeYaml("mcps/atlassian.yml", "id: atlassian\nsource: \"${folder.absolutePath}\"\n")
+            }
+
+            fun remote(url: String, headers: String) = pointer("\"remotes\": [{\"type\": \"streamable-http\", \"url\": \"$url\", \"variables\": {\"token\": {}}, \"headers\": [$headers]}]")
+
+            fun inline(transport: String, variables: String = "") = writeYaml("mcps/atlassian.yml", "id: atlassian\ndescription: d\ntransport:\n$transport$variables")
+            when (scenario) {
+                "outer-secret-bearer" -> remote("https://x/mcp", "{\"name\": \"Authorization\", \"isSecret\": true, \"value\": \"Bearer {token}\", \"variables\": {\"token\": {\"isRequired\": true}}}")
+                "outer-secret-composed-environment" -> pointer(
+                    "\"packages\": [{\"registryType\": \"npm\", \"identifier\": \"x\", \"transport\": {\"type\": \"stdio\"}, " +
+                        "\"environmentVariables\": [{\"name\": \"API\", \"isSecret\": true, \"value\": \"key={key}\", \"variables\": {\"key\": {\"isRequired\": true}}}]}]",
+                )
+                "conflicting-secrecy" -> remote("https://x/{token}/mcp", "{\"name\": \"Authorization\", \"value\": \"Bearer {token}\", \"variables\": {\"token\": {\"isSecret\": true}}}")
+                "literal-reference" -> remote("https://x/mcp", "{\"name\": \"X-Key\", \"value\": \"\${DEMO_KEY}\"}")
+                "tool-reference" -> remote("https://x/mcp", "{\"name\": \"X-Env\", \"value\": \"\${env:AWS_SECRET_ACCESS_KEY}\"}")
+                "undeclared-reference" -> inline("  type: stdio\n  command: server\n  args: ['--token=\${GITHUB_TOKEN}']\n")
+                "environment-plain-value" -> inline("  type: stdio\n  command: server\n", "variables:\n  - name: EXAMPLE_TOKEN\n    description: t\n    secret: false\n    required: false\n")
+                "environment-tls-flag" -> inline("  type: stdio\n  command: server\n", "variables:\n  - name: JIRA_VERIFY_SSL\n    description: t\n    secret: false\n    required: false\n")
+                "nested-config-value" -> inline("  type: stdio\n  command: server\n", "variables:\n  - name: NESTED_PROXY\n    description: t\n    secret: false\n")
+                else -> error("Unknown scenario $scenario")
+            }
+        }
+
+        private fun writeAtlassianServer(extraVariable: String = "") = writeYaml(
+            "mcps/atlassian.yml",
+            "id: atlassian\ndescription: Jira and Confluence\n" +
+                "transport:\n  type: stdio\n  command: jira-mcp-server\n" +
+                "variables:\n" +
+                "  - name: JIRA_PAT\n    description: Token\n    secret: true\n" +
+                "  - name: JIRA_BASE_URL\n    description: Base URL\n    secret: false\n" +
+                extraVariable,
+        )
+    }
+
+    /**
+     * A stdio server whose secrets the libsecret keyring supplies: rendered as a start of the launcher in every MCP config file of a project and of the home, and checked for in the keyring by the fake `busctl` of [FakeSecretService]. No test here reaches a real keyring, bus or display.
+     */
+    @Nested
+    inner class McpSecretsManagers {
+
+        private lateinit var programs: FakePrograms
+        private lateinit var secretService: FakeSecretService
+        private lateinit var launcher: File
+
+        // - the config of the run declares the base URL, the environment of the run carries the secret; no file may hold it
+        private val secretVariables = VariableResolver(
+            variables = mapOf("JIRA_BASE_URL" to "https://jira.example.com"),
+            environment = { name -> mapOf("JIRA_PAT" to SECRET_VALUE)[name] },
+        )
+
+        @BeforeEach
+        fun setUpKeyring() {
+            assumeTrue(missingProgramsReason() == null) { missingProgramsReason() }
+            programs = FakePrograms(tempDir.resolve("programs"))
+            secretService = FakeSecretService(tempDir.resolve("programs"), programs)
+            launcher = FakePrograms.executable(workspace.toPath().resolve("scripts/mcp-launch"), "#!/bin/sh\nexec \"\$@\"\n").toFile()
+        }
+
+        @Test
+        fun `should start every selected stdio server with a keyring secret through the launcher in every MCP config file of a project and of the home`() {
+            // given
+            writeStdioServer("atlassian", command = "jira-mcp-server", secret = "JIRA_PAT")
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeUserDeployment(tools = listOf("claude", "codex", "github_copilot"), mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR).process(locations())
+
+            // then
+            val launcherPath = launcher.toPath().toRealPath().toString()
+            val arguments = listOf("atlassian", "--required", "JIRA_PAT", "--", "jira-mcp-server")
+            mapOf(
+                destination.resolve(".mcp.json") to "mcpServers",
+                destination.resolve(".vscode/mcp.json") to "servers",
+                destination.resolve(".github/mcp.json") to "mcpServers",
+                destination.resolve(".cursor/mcp.json") to "mcpServers",
+                userHome.resolve(".claude.json") to "mcpServers",
+                userHome.resolve(".copilot/mcp-config.json") to "mcpServers",
+            ).forEach { (file, key) ->
+                val entry = Json
+                    .parseToJsonElement(file.readText())
+                    .jsonObject
+                    .getValue(key)
+                    .jsonObject
+                    .getValue("atlassian")
+                    .jsonObject
+                assertThat(entry.getValue("command").jsonPrimitive.content).describedAs(file.path).isEqualTo(launcherPath)
+                assertThat(entry.getValue("args").jsonArray.map { it.jsonPrimitive.content }).describedAs(file.path).containsExactlyElementsOf(arguments)
+                assertThat(entry.getValue("env").jsonObject.keys).describedAs(file.path).containsExactly("JIRA_PAT")
+            }
+            listOf(destination.resolve(".codex/config.toml"), userHome.resolve(".codex/config.toml")).forEach { file ->
+                val table = Toml.parse(file.readText())
+                assertThat(table.getString("mcp_servers.atlassian.command")).describedAs(file.path).isEqualTo(launcherPath)
+                assertThat(table.getArray("mcp_servers.atlassian.args")?.toList()).describedAs(file.path).containsExactlyElementsOf(arguments)
+                assertThat(table.getArray("mcp_servers.atlassian.env_vars")?.toList()).describedAs(file.path).containsExactly("JIRA_PAT", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR")
+            }
+            assertThat((destination.walkTopDown() + userHome.walkTopDown()).filter { it.isFile }.map { it.readText() }.toList()).noneMatch { it.contains(SECRET_VALUE) }
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - the machine uses no secrets manager
+            "no-manager",
+            // - the manifest reads the secret from the environment only
+            "environment-only",
+        )
+        fun `should render a server without a keyring secret as without a secrets manager and ask the keyring nothing`(
+            case: String,
+        ) {
+            // given
+            writeYaml(
+                "mcps/atlassian.yml",
+                "id: atlassian\ndescription: Jira\ntransport:\n  type: stdio\n  command: jira-mcp-server\n" +
+                    "variables:\n  - name: JIRA_PAT\n    description: Token\n    secret: true\n" + (if (case == "environment-only") "    from: environment\n" else ""),
+            )
+            writeProject(mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.CODEX, manager = if (case == "no-manager") null else manager()).process(locations())
+
+            // then
+            assertThat(destination.resolve(".mcp.json"))
+                .content()
+                .contains("\"command\": \"jira-mcp-server\"")
+                .contains("\"JIRA_PAT\": \"\${JIRA_PAT}\"")
+                .doesNotContain("--required")
+            assertThat(destination.resolve(".codex/config.toml")).content().contains("env_vars = [\"JIRA_PAT\"]\n").doesNotContain("mcp-launch")
+            assertThat(secretService.calls()).isEmpty()
+        }
+
+        @Test
+        fun `should fail the MCP config files of only the deployments that need a missing launcher, naming it, with the same message in a dry run and a deploy`() {
+            // given
+            // - one project selects a server with a keyring secret, another one a server without any secret
+            val otherDestination = tempDir.resolve("other-destination").toFile()
+            writeStdioServer("atlassian", command = "jira-mcp-server", secret = "JIRA_PAT")
+            writeStdioServer("plain")
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeProject(directoryName = "other", id = "other", deployDirectory = otherDestination.absolutePath, mcpFilter = listOf("plain"))
+            val missing = workspace.resolve("moved/scripts/mcp-launch")
+
+            // when
+            val dryRun = runCatching { engineWith(ToolType.CLAUDE, dryRun = true, manager = manager(workspace.resolve("moved"))).process(locations()) }.exceptionOrNull()
+            val deploy = runCatching { engineWith(ToolType.CLAUDE, manager = manager(workspace.resolve("moved"))).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deploy).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'${missing.absolutePath}', which does not exist")
+            assertThat(dryRun).isInstanceOf(ExportFailedException::class.java).hasMessage(deploy?.message)
+            assertThat((deploy as ExportFailedException).failures.map { it.deploymentId to it.manifest }).containsExactly("test-project" to "MCP server 'atlassian'")
+            assertThat(destination.resolve(".mcp.json")).doesNotExist()
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(otherDestination.resolve(".mcp.json")).content().contains("\"command\": \"plain-server\"").doesNotContain("mcp-launch")
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - a launcher its group can write, one that is a link to a file outside the repository, and one in a directory others can write
+            "group-writable, which its group can write",
+            "outside, outside the ai-tools repository",
+            "directory-writable, whose directory",
+        )
+        fun `should fail the MCP config files of only the deployments that need a launcher no tool may be given, naming it and the reason, with the same message in a dry run and a deploy`(
+            case: String,
+            reason: String,
+        ) {
+            // given
+            val otherDestination = tempDir.resolve("other-destination").toFile()
+            writeStdioServer("atlassian", command = "jira-mcp-server", secret = "JIRA_PAT")
+            writeStdioServer("plain")
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeProject(directoryName = "other", id = "other", deployDirectory = otherDestination.absolutePath, mcpFilter = listOf("plain"))
+            when (case) {
+                "group-writable" -> Files.setPosixFilePermissions(launcher.toPath(), PosixFilePermissions.fromString("rwxrwxr-x"))
+                "directory-writable" -> Files.setPosixFilePermissions(launcher.toPath().parent, PosixFilePermissions.fromString("rwxr-xrwx"))
+                else -> {
+                    val outside = FakePrograms.executable(tempDir.resolve("outside/mcp-launch"), "#!/bin/sh\n")
+                    Files.delete(launcher.toPath())
+                    Files.createSymbolicLink(launcher.toPath(), outside)
+                }
+            }
+
+            // when
+            val dryRun = runCatching { engineWith(ToolType.CLAUDE, dryRun = true).process(locations()) }.exceptionOrNull()
+            val deploy = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deploy).isInstanceOf(ExportFailedException::class.java).hasMessageContaining(reason).hasMessageContaining("mcp-launch")
+            assertThat(dryRun).isInstanceOf(ExportFailedException::class.java).hasMessage(deploy?.message)
+            assertThat((deploy as ExportFailedException).failures.map { it.deploymentId to it.manifest }).containsExactly("test-project" to "MCP server 'atlassian'")
+            assertThat(destination.resolve(".mcp.json")).doesNotExist()
+            assertThat(otherDestination.resolve(".mcp.json")).content().contains("\"command\": \"plain-server\"").doesNotContain("mcp-launch")
+        }
+
+        @Test
+        fun `should report where each secret is found once per name, in a dry run as in a deploy, with the same text`() {
+            // given
+            // - two servers read JIRA_PAT, which the keyring holds; a third reads CONFLUENCE_PAT, which is found nowhere
+            secretService.store("JIRA_PAT")
+            writeStdioServer("atlassian", secret = "JIRA_PAT")
+            writeStdioServer("jira", secret = "JIRA_PAT")
+            writeStdioServer("confluence", secret = "CONFLUENCE_PAT")
+            writeProject(mcpFilter = listOf("atlassian", "jira", "confluence"))
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"))
+
+            // when
+            val dryRun = reportsOf { engineWith(ToolType.CLAUDE, ToolType.CODEX, dryRun = true).process(locations()) }
+            val dryRunCalls = secretService.calls().size
+            val deploy = reportsOf { engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations()) }
+
+            // then
+            assertThat(dryRun).isEqualTo(deploy).containsExactlyInAnyOrder(
+                "INFO MCP server 'atlassian' reads the required secret variable 'JIRA_PAT' from the keyring, which holds it.",
+                "INFO MCP server 'jira' reads the required secret variable 'JIRA_PAT' from the keyring, which holds it.",
+                "WARN MCP server 'confluence' reads the required secret variable 'CONFLUENCE_PAT' from the keyring or the environment of the tool that starts it, " +
+                    "but the keyring does not hold it and the environment of this run does not set it. Store it with: secret-tool store --label='ai-tools MCP CONFLUENCE_PAT' service ai-tools-mcp variable CONFLUENCE_PAT",
+            )
+            assertThat(dryRunCalls).isEqualTo(2)
+            assertThat(secretService.calls().map { it.arguments.last() }).containsExactly("JIRA_PAT", "CONFLUENCE_PAT", "JIRA_PAT", "CONFLUENCE_PAT")
+        }
+
+        /**
+         * The launcher rendering and the keyring check extend the leak scenarios of [McpServers]: a secret the environment of the run carries appears in no file, log line, error or argument list, whatever the keyring answers.
+         */
+        @ParameterizedTest
+        @CsvSource("stored", "environment-fallback", "keyring-hangs", "launcher-missing")
+        fun `should never write, log or report a value of the environment when a keyring secret is rendered and checked`(
+            scenario: String,
+        ) {
+            // given
+            val rootAppender = ListAppender<ILoggingEvent>()
+            val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME) as Logger
+            rootAppender.start()
+            rootLogger.addAppender(rootAppender)
+            val variables =
+                VariableResolver(emptyMap(), environment = { name -> if (name == "JIRA_PAT") LEAKED_VALUE else null })
+            when (scenario) {
+                "stored" -> secretService.store("JIRA_PAT")
+                "keyring-hangs" -> secretService.behaves("hang")
+            }
+            writeStdioServer("atlassian", command = "jira-mcp-server", secret = "JIRA_PAT")
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"))
+            // - a keyring that never answers is given a short limit, since the test waits for all of it; every other call answers at once
+            val manager = when (scenario) {
+                "launcher-missing" -> manager(workspace.resolve("moved"))
+                "keyring-hangs" -> manager(timeLimit = Duration.ofSeconds(1))
+                else -> manager()
+            }
+
+            // when
+            val error = try {
+                runCatching { engineWith(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR, manager = manager, variables = variables).process(locations()) }.exceptionOrNull()
+            } finally {
+                rootLogger.detachAppender(rootAppender)
+                rootAppender.stop()
+            }
+
+            // then
+            val written = (destination.walkTopDown() + userHome.walkTopDown()).filter { it.isFile }.map { it.readText() }.toList()
+            val logged = rootAppender.list.flatMap { event -> listOfNotNull(event.formattedMessage) + generateSequence(event.throwableProxy) { it.cause }.mapNotNull { it.message } }
+            val reported = generateSequence(error) { it.cause }.mapNotNull { it.message }.toList()
+            assertThat(written + logged + reported + secretService.recordedText()).noneMatch { it.contains(LEAKED_VALUE) }
+            // - and each scenario ends the way it is meant to, so an unrelated failure cannot pass for safety
+            if (scenario == "launcher-missing") {
+                assertThat(error).isInstanceOf(ExportFailedException::class.java)
+                assertThat(destination.resolve(".mcp.json")).doesNotExist()
+            } else {
+                assertThat(error).isNull()
+                assertThat(listOf(destination.resolve(".mcp.json"), userHome.resolve(".claude.json"))).allSatisfy { assertThat(it).content().contains("mcp-launch").contains("\${JIRA_PAT:-}") }
+            }
+        }
+
+        private fun manager(checkout: File = workspace, timeLimit: Duration = Duration.ofSeconds(30)): McpSecretsManager {
+            val environment =
+                mapOf("PATH" to programs.path, "DBUS_SESSION_BUS_ADDRESS" to "unix:path=/nonexistent/aitools-test-bus")
+            val source = EnvironmentSource { environment[it] }
+            return LibsecretSecretsManager(checkout, source, probe = SecretServiceProbe(source, timeLimit))
+        }
+
+        private fun engineWith(
+            vararg toolTypes: ToolType,
+            dryRun: Boolean = false,
+            manager: McpSecretsManager? = manager(),
+            variables: VariableResolver = secretVariables,
+        ) = ToolsEngine(
+            workspace,
+            variables = variables,
+            userHome = userHome,
+            tools = toolTypes.map { ToolFactory.create(it, dryRun) },
+            dryRun = dryRun,
+            secretsManager = manager,
+        )
+
+        /**
+         * Runs [block] with a list appender on the logger the reports about secrets are written under, returning each report as its level and text.
+         */
+        private fun reportsOf(block: () -> Unit): List<String> {
+            val appender = ListAppender<ILoggingEvent>()
+            val logger = LoggerFactory.getLogger(McpServerResolver::class.java) as Logger
+            appender.start()
+            logger.addAppender(appender)
+            try {
+                block()
+            } finally {
+                logger.detachAppender(appender)
+                appender.stop()
+            }
+            return appender.list.map { "${it.level} ${it.formattedMessage}" }
+        }
+    }
+
+    /**
+     * The MCP servers of a user deployment, written into `<home>/.claude.json` and `<home>/.codex/config.toml`. Every home here is a directory of the test's own temporary tree.
+     */
+    @Nested
+    inner class UserScopeMcpServers {
+
+        private val claudeJson get() = userHome.resolve(".claude.json")
+        private val codexConfig get() = userHome.resolve(".codex/config.toml")
+
+        // - the environment of the run carries the secret; no file may ever hold it
+        private val secretVariables =
+            VariableResolver(emptyMap(), environment = { name -> mapOf("JIRA_PAT" to SECRET_VALUE)[name] })
+
+        @BeforeEach
+        fun writeServers() {
+            writeStdioServer("atlassian", secret = "JIRA_PAT")
+            writeStdioServer("other")
+        }
+
+        @Test
+        fun `should fail only the tool whose config file of the home is nested deeper than the limit, naming the file and the limit, and deploy the rest`() {
+            // given
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"))
+            userHome.mkdirs()
+            val deep = "{\"deep\": " + "[".repeat(10_000) + "]".repeat(10_000) + "}"
+            claudeJson.writeText(deep)
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining(claudeJson.absolutePath).hasMessageContaining("512")
+            assertThat((error as ExportFailedException).failures.map { it.deploymentId to it.toolType }).containsExactly("globals" to ToolType.CLAUDE)
+            assertThat(claudeJson).hasContent(deep)
+            assertThat(codexConfig).content().contains("[mcp_servers.atlassian]")
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+        }
+
+        @Test
+        fun `should create the config files and the ledger of the home readable by their owner only, and those of a project with the mode of every artifact`() {
+            // given
+            assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+            val restriction = mapOf("atlassian" to McpToolRestriction(deny = listOf("delete")))
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"), mcpTools = restriction)
+            writeProject(mcpFilter = listOf("atlassian"), mcpTools = restriction)
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations())
+
+            // then
+            listOf(claudeJson, codexConfig, userHome.resolve(".claude/settings.json"), userHome.resolve(".ai-tools/mcp-ledger.json")).forEach { file ->
+                assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(file.toPath()))).describedAs(file.path).isEqualTo("rw-------")
+            }
+            val artifactMode = Files.getPosixFilePermissions(destination.resolve("CLAUDE.md").toPath())
+            listOf(".mcp.json", ".codex/config.toml", ".claude/settings.json", ".ai-tools/mcp-ledger.json").forEach { path ->
+                assertThat(Files.getPosixFilePermissions(destination.resolve(path).toPath())).describedAs(path).isEqualTo(artifactMode)
+            }
+        }
+
+        @Test
+        fun `should write no MCP file into the home when the user deployment declares no mcps block, in a dry run as in a deploy`() {
+            // given
+            writeUserDeployment(tools = listOf("claude", "codex"))
+            userHome.mkdirs()
+            val existing = "{\"numStartups\":1,\"mcpServers\":{\"atlassian\":{\"command\":\"mine\"}}}"
+            claudeJson.writeText(existing)
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.CODEX, dryRun = true).process(locations())
+            engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations())
+
+            // then
+            assertThat(claudeJson).hasContent(existing)
+            assertThat(codexConfig).doesNotExist()
+            assertThat(userHome.resolve(".ai-tools")).doesNotExist()
+        }
+
+        @Test
+        fun `should name only the MCP files of Claude Code, Codex and Copilot CLI in the home in a dry run, and write nothing`() {
+            // given
+            writeUserDeployment(tools = null, mcpFilter = listOf("atlassian"))
+
+            // when
+            val infos =
+                infosOf(DryRunArtifactSink::class.java) { engineWith(*ToolType.entries.toTypedArray(), dryRun = true).process(locations()) }
+
+            // then
+            assertThat(infos.filter { it.contains("MCP servers") }).containsExactlyInAnyOrder(
+                "Would write MCP servers [atlassian] to ${claudeJson.absolutePath}",
+                "Would write MCP servers [atlassian] to ${codexConfig.absolutePath}",
+                "Would write MCP servers [atlassian] to ${userHome.resolve(".copilot/mcp-config.json").absolutePath}",
+            )
+            assertThat(userHome).doesNotExist()
+        }
+
+        @Test
+        fun `should write the selected servers into the home with secrets only as references, and record them in the ledger of the home`() {
+            // given
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.CODEX, variables = secretVariables).process(locations())
+
+            // then
+            assertThat(claudeJson).content().contains("\"JIRA_PAT\": \"\${JIRA_PAT}\"").doesNotContain(SECRET_VALUE)
+            assertThat(codexConfig)
+                .content()
+                .contains("[mcp_servers.atlassian]")
+                .contains("env_vars = [\"JIRA_PAT\"]")
+                .doesNotContain(SECRET_VALUE)
+            assertThat(recordedEntries(userHome.resolve(".ai-tools/mcp-ledger.json")))
+                .isEqualTo(mapOf(".claude.json" to listOf("atlassian"), ".codex/config.toml" to listOf("atlassian")))
+        }
+
+        @Test
+        fun `should report every tool without MCP servers in the user scope as skipped once, with its reason`() {
+            // given
+            writeUserDeployment(tools = null, mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(*ToolType.entries.toTypedArray()).process(locations())
+
+            // then
+            listOf("cursor", "windsurf", "antigravity").forEach { tool ->
+                assertThat(warnings().filter { it.contains("globals: $tool ") && it.contains("MCP") })
+                    .describedAs(tool)
+                    .singleElement()
+                    .satisfies({ assertThat(it).contains("[atlassian]").contains("user scope") })
+            }
+            assertThat(warnings()).noneMatch { (it.contains("globals: claude ") || it.contains("globals: codex ")) && it.contains("MCP") }
+            assertThat(warnings()).noneMatch { it.contains("globals: github_copilot ") && it.contains("gets none") }
+        }
+
+        @Test
+        fun `should keep every byte of the file of Claude Code outside the entry it owns, the session state and a server added by hand included`() {
+            // given
+            writeUserDeployment(tools = listOf("claude"), mcpFilter = listOf("atlassian"))
+            userHome.mkdirs()
+            val existing = "{\n  \"numStartups\": 12,\n  \"projects\": {\n    \"/work/p\": {\n      \"lastCost\": 0.25,\n      \"allowedTools\": []\n    }\n  },\n" +
+                "  \"mcpServers\": {\n    \"playwright\": {\n      \"command\": \"npx\"\n    }\n  },\n  \"userID\": \"caf\\u00e9\"\n}\n"
+            claudeJson.writeText(existing)
+
+            // when
+            engineWith(ToolType.CLAUDE).process(locations())
+            val deployed = claudeJson.readText()
+            writeUserDeployment(tools = listOf("claude"), mcpFilter = emptyList())
+            engineWith(ToolType.CLAUDE).process(locations())
+
+            // then
+            val prefix = existing.commonPrefixWith(deployed).length
+            val suffix = existing.substring(prefix).commonSuffixWith(deployed.substring(prefix)).length
+            assertThat(prefix + suffix).describedAs("the deploy only inserts the owned entry").isEqualTo(existing.length)
+            assertThat(deployed).contains("\"atlassian\"")
+            // - the ledger names the entry, so the deployment that deselects it removes it and restores the file byte for byte
+            assertThat(claudeJson).hasContent(existing)
+            assertThat(userHome.resolve(".ai-tools")).doesNotExist()
+        }
+    }
+
+    /**
+     * The ledger of a project: the entries the engine wrote into each MCP file, so a later deploy removes what its deployment no longer selects.
+     */
+
+    /**
+     * GitHub Copilot CLI: `.github/mcp.json` of a project beside `.vscode/mcp.json` of Copilot in VS Code, and `~/.copilot/mcp-config.json`, the only file `github_copilot` gets in the user scope.
+     */
+    @Nested
+    inner class CopilotCliMcpServers {
+
+        private val projectFile get() = destination.resolve(".github/mcp.json")
+        private val userFile get() = userHome.resolve(".copilot/mcp-config.json")
+
+        // - the environment of the run carries the secret; no file may ever hold it
+        private val secretVariables =
+            VariableResolver(emptyMap(), environment = { name -> mapOf("JIRA_PAT" to SECRET_VALUE)[name] })
+
+        private val expectedEntry = Json.parseToJsonElement("""{"tools": ["*"], "type": "stdio", "command": "atlassian-server", "args": [], "env": {"JIRA_PAT": "${'$'}{JIRA_PAT}"}}""")
+
+        @BeforeEach
+        fun writeServers() {
+            writeStdioServer("atlassian", secret = "JIRA_PAT")
+            writeStdioServer("other")
+        }
+
+        @Test
+        fun `should write the selected servers into the file of Copilot CLI of a project beside the file of VS Code, and record both in the ledger`() {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT, variables = secretVariables).process(locations())
+
+            // then
+            assertThat(entriesOf(projectFile)).isEqualTo(mapOf("atlassian" to expectedEntry))
+            assertThat(projectFile).content().doesNotContain(SECRET_VALUE).doesNotContain("\${env:")
+            assertThat(destination.resolve(".vscode/mcp.json")).content().contains("\"JIRA_PAT\": \"\${env:JIRA_PAT}\"").doesNotContain(SECRET_VALUE)
+            assertThat(recordedEntries(destination.resolve(".ai-tools/mcp-ledger.json")))
+                .isEqualTo(mapOf(".vscode/mcp.json" to listOf("atlassian"), ".github/mcp.json" to listOf("atlassian")))
+        }
+
+        @Test
+        fun `should keep the entries and keys of the file of Copilot CLI it does not own, and replace the one it owns`() {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            projectFile.parentFile.mkdirs()
+            projectFile.writeText("""{"${'$'}schema": "mine", "mcpServers": {"playwright": {"command": "npx", "tools": ["browser_click"]}, "atlassian": {"command": "old"}}}""")
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            val root = Json.parseToJsonElement(projectFile.readText()).jsonObject
+            assertThat(root.keys).containsExactly("\$schema", "mcpServers")
+            assertThat(entriesOf(projectFile)).isEqualTo(
+                mapOf("playwright" to Json.parseToJsonElement("""{"command": "npx", "tools": ["browser_click"]}"""), "atlassian" to expectedEntry),
+            )
+        }
+
+        @Test
+        fun `should leave a file of Copilot CLI it cannot parse strictly untouched and fail only that file, in a dry run as in a deploy`() {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            projectFile.parentFile.mkdirs()
+            val existing = "{\n  // mine\n  \"mcpServers\": {}\n}\n"
+            projectFile.writeText(existing)
+
+            // when
+            val dryRunError = runCatching { engineWith(ToolType.GITHUB_COPILOT, dryRun = true).process(locations()) }.exceptionOrNull()
+            val error = runCatching { engineWith(ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining(projectFile.absolutePath)
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(error?.message)
+            assertThat((error as ExportFailedException).failures.map { it.toolType to it.manifest }).containsExactly(ToolType.GITHUB_COPILOT to "MCP servers [atlassian]")
+            assertThat(projectFile).hasContent(existing)
+            assertThat(destination.resolve(".vscode/mcp.json")).content().contains("\"atlassian\"")
+            assertThat(recordedEntries(destination.resolve(".ai-tools/mcp-ledger.json"))).isEqualTo(mapOf(".vscode/mcp.json" to listOf("atlassian")))
+        }
+
+        @ParameterizedTest
+        @CsvSource("true", "false")
+        fun `should warn once, naming both files, when a portable MCP file the deployment does not write hides the file of Copilot CLI, and write it anyway`(
+            dryRun: Boolean,
+        ) {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            destination.mkdirs()
+            val portable = destination.resolve(".mcp.json")
+            portable.writeText("{\"mcpServers\": {}}")
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT, dryRun = dryRun).process(locations())
+
+            // then
+            assertThat(warnings().filter { it.contains(portable.absolutePath) }).singleElement().satisfies({
+                assertThat(it)
+                    .startsWith("test-project: '${projectFile.absolutePath}' gets the MCP servers [atlassian] for github_copilot")
+                    .contains("Copilot CLI reads only .mcp.json in that directory")
+            })
+            assertThat(projectFile.exists()).isEqualTo(!dryRun)
+        }
+
+        @Test
+        fun `should not warn about the portable MCP file when the same deployment writes it through Claude Code`() {
+            // given
+            writeProject(tools = listOf("claude", "github_copilot"), mcpFilter = listOf("atlassian"))
+            engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT).process(locations())
+            logAppender.list.clear()
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(destination.resolve(".mcp.json")).exists()
+            assertThat(entriesOf(projectFile)).containsOnlyKeys("atlassian")
+            assertThat(warnings()).noneMatch { it.contains("Copilot CLI") }
+        }
+
+        @Test
+        fun `should fail every project whose mcps block covers the file of Copilot CLI another project covers too, and write none of it`() {
+            // given
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            writeProject("second-project", "second-project", destination.absolutePath, tools = listOf("github_copilot"), mcpFilter = emptyList())
+
+            // when
+            val error = runCatching { engineWith(ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'${projectFile.absolutePath}'")
+            assertThat((error as ExportFailedException).failures.map { it.deploymentId to it.cause::class.java }).containsExactlyInAnyOrder(
+                "test-project" to ContendedMcpFileException::class.java,
+                "second-project" to ContendedMcpFileException::class.java,
+            )
+            assertThat(projectFile).doesNotExist()
+        }
+
+        @Test
+        fun `should write the selected servers into the file of Copilot CLI of the home, readable by its owner only, record them in the ledger of the home and write nothing else`() {
+            // given
+            assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+            writeAgent("basic", "base")
+            writePrompt("review", "base")
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT, variables = secretVariables).process(locations())
+
+            // then
+            assertThat(entriesOf(userFile)).isEqualTo(mapOf("atlassian" to expectedEntry))
+            assertThat(userFile).content().doesNotContain(SECRET_VALUE)
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(userFile.toPath()))).isEqualTo("rw-------")
+            assertThat(recordedEntries(userHome.resolve(".ai-tools/mcp-ledger.json"))).isEqualTo(mapOf(".copilot/mcp-config.json" to listOf("atlassian")))
+            // - no instructions, agent, prompt or skill file of GitHub Copilot lands in the home
+            assertThat(
+                userHome
+                    .walkTopDown()
+                    .filter { it.isFile }
+                    .map { it.relativeTo(userHome).invariantSeparatorsPath }
+                    .toList(),
+            ).containsExactlyInAnyOrder(".copilot/mcp-config.json", ".ai-tools/mcp-ledger.json")
+            // - a deployment that does exactly what it declares is told so, without a warning
+            assertThat(infos()).contains("globals: only the MCP servers are deployed for github_copilot in the user scope; its instructions, agents, prompts and skills are not.")
+            assertThat(warnings().filter { it.contains("globals: ") && it.contains("github_copilot") }).isEmpty()
+        }
+
+        @Test
+        fun `should keep the permission bits and the entries written by hand of an existing file of Copilot CLI of the home`() {
+            // given
+            assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            userFile.parentFile.mkdirs()
+            val mine = """{"tools": ["*"], "type": "http", "url": "https://mine.example.com/mcp", "headers": {"Authorization": "Bearer written-by-hand"}}"""
+            userFile.writeText("""{"mcpServers": {"mine": $mine}, "zz-trailing-key": 1}""")
+            Files.setPosixFilePermissions(userFile.toPath(), PosixFilePermissions.fromString("rw-r-----"))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(userFile.toPath()))).isEqualTo("rw-r-----")
+            assertThat(entriesOf(userFile)).isEqualTo(mapOf("mine" to Json.parseToJsonElement(mine), "atlassian" to expectedEntry))
+            assertThat(Json.parseToJsonElement(userFile.readText()).jsonObject.keys).containsExactly("mcpServers", "zz-trailing-key")
+        }
+
+        @Test
+        fun `should remove the servers it wrote into the file of Copilot CLI of the home once the user deployment selects none, keeping the entries written by hand`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian", "other"))
+            userFile.parentFile.mkdirs()
+            userFile.writeText("""{"mcpServers": {"mine": {"command": "npx"}}}""")
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+            writeUserDeployment(tools = listOf("github_copilot"))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(entriesOf(userFile)).containsOnlyKeys("mine")
+            assertThat(userHome.resolve(".ai-tools")).doesNotExist()
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - no mcps block at all
+            "false",
+            // - an mcps block selecting nothing
+            "true",
+        )
+        fun `should report a user deployment that selects no server as not deployed for GitHub Copilot, and write nothing into the home`(
+            emptyWhitelist: Boolean,
+        ) {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = if (emptyWhitelist) emptyList() else null)
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(warnings().filter { it.startsWith("globals: ") }).containsExactly(
+                "globals: github_copilot gets only MCP servers in the user scope, and the manifest selects none, so nothing is deployed for it.",
+            )
+            assertThat(userHome).doesNotExist()
+        }
+
+        @Test
+        fun `should report a user deployment that selects no server for GitHub Copilot as deploying into the home while it removes the servers it wrote there`() {
+            // given
+            // - a first deploy wrote a server, which the ledger records
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+            writeUserDeployment(tools = listOf("github_copilot"))
+            logAppender.list.clear()
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(warnings()).noneMatch { (it.contains("github_copilot") && it.contains("not deployed")) || it.contains("nothing is deployed") }
+            assertThat(infos()).contains("globals: Deploying into the user scope of github_copilot under '${userHome.absolutePath}'")
+            assertThat(entriesOf(userFile)).isEmpty()
+        }
+
+        @Test
+        fun `should never delete the file of Copilot CLI of the home in a replacing user deployment`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("claude", "github_copilot"), replace = true, mcpFilter = listOf("atlassian"))
+            userFile.parentFile.mkdirs()
+            userFile.writeText("""{"mcpServers": {"mine": {"command": "npx"}}}""")
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(entriesOf(userFile)).containsOnlyKeys("mine", "atlassian")
+        }
+
+        @Test
+        fun `should fail every user deployment whose mcps block covers the file of Copilot CLI of the home another one covers too`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"))
+            writeUserDeployment("second", tools = listOf("github_copilot"), mcpFilter = emptyList())
+
+            // when
+            val error = runCatching { engineWith(ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${userFile.absolutePath}'")
+                .hasMessageContaining("user deployment 'globals', user deployment 'second'")
+            assertThat((error as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.cause::class.java) }).containsExactlyInAnyOrder(
+                Triple("globals", ToolType.GITHUB_COPILOT, ContendedMcpFileException::class.java),
+                Triple("second", ToolType.GITHUB_COPILOT, ContendedMcpFileException::class.java),
+            )
+            assertThat(userFile).doesNotExist()
+        }
+
+        @ParameterizedTest
+        @CsvSource("dangling", "looping", "file")
+        fun `should fail only GitHub Copilot of the user scope when its directory of the home cannot hold its file, and deploy Claude Code, with the same message in a dry run as in a deploy`(
+            kind: String,
+        ) {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("claude", "github_copilot"), mcpFilter = listOf("atlassian"))
+            userHome.mkdirs()
+            val copilotDir = userHome.resolve(".copilot")
+            when (kind) {
+                "dangling" -> Files.createSymbolicLink(copilotDir.toPath(), tempDir.resolve("out/missing"))
+                "looping" -> userHome.resolve(".copilot-loop").also { Files.createSymbolicLink(it.toPath(), copilotDir.toPath()) }.let { Files.createSymbolicLink(copilotDir.toPath(), it.toPath()) }
+                else -> copilotDir.writeText("not a directory\n")
+            }
+
+            // when
+            val dryRunError = runCatching { engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT, dryRun = true).process(locations()) }.exceptionOrNull()
+            val error = runCatching { engineWith(ToolType.CLAUDE, ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'${copilotDir.absolutePath}'")
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(error?.message)
+            assertThat((error as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                .containsExactly(Triple("globals", ToolType.GITHUB_COPILOT, "tool directory '.copilot'"))
+            assertThat(userHome.resolve(".claude.json")).content().contains("\"atlassian\"")
+        }
+
+        @Test
+        fun `should report the tool restrictions of the user scope as not applied for GitHub Copilot, with its reason`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("atlassian"), mcpTools = mapOf("atlassian" to McpToolRestriction(allow = listOf("search"), deny = listOf("delete"))))
+
+            // when
+            engineWith(ToolType.GITHUB_COPILOT).process(locations())
+
+            // then
+            assertThat(warnings().filter { it.contains("restrict") }).singleElement().satisfies({
+                assertThat(it).startsWith("globals: github_copilot does not restrict the tools of the MCP server(s) [atlassian]: ").contains("~/.copilot/mcp-config.json")
+            })
+            assertThat(entriesOf(userFile).getValue("atlassian").jsonObject.getValue("tools")).isEqualTo(Json.parseToJsonElement("[\"*\"]"))
+        }
+
+        /**
+         * Copilot CLI expands `$NAME` as well as `${NAME}` from its own environment in both of its files, so no literal `$` may reach either of them.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            // - a header value of a server json
+            "pointer-header, refused-at-load",
+            // - a package argument of a server json
+            "package-argument, refused-at-load",
+            // - a fixed environment variable of an inline manifest
+            "inline-env, refused-at-load",
+            // - a plain value of the config
+            "config-value, refused-at-export",
+        )
+        fun `should write neither file of Copilot CLI when literal text holds a dollar sign, in a dry run as in a deploy`(
+            scenario: String,
+            outcome: String,
+        ) {
+            // given
+            val bare = "${'$'}PROBE_SECRET"
+            val schema = "\"\$schema\": \"https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json\", \"name\": \"x\", \"description\": \"d\", \"version\": \"1\""
+            val serverJson = tempDir.resolve("servers/probe/server.json").toFile().apply { parentFile.mkdirs() }
+            when (scenario) {
+                "pointer-header" -> serverJson.writeText("{$schema, \"remotes\": [{\"type\": \"streamable-http\", \"url\": \"https://x/mcp\", \"headers\": [{\"name\": \"X-Client\", \"value\": \"$bare\"}]}]}")
+                "package-argument" -> serverJson.writeText(
+                    "{$schema, \"packages\": [{\"registryType\": \"npm\", \"identifier\": \"x\", \"transport\": {\"type\": \"stdio\"}, \"packageArguments\": [{\"type\": \"named\", \"name\": \"--trace\", \"value\": \"--trace=$bare\"}]}]}",
+                )
+                "inline-env" -> writeYaml("mcps/probe.yml", "id: probe\ndescription: d\ntransport:\n  type: stdio\n  command: server\n  env:\n    LOG_FILE: '$bare/x.log'\n")
+                else -> writeYaml("mcps/probe.yml", "id: probe\ndescription: d\ntransport:\n  type: stdio\n  command: server\nvariables:\n  - name: PROXY\n    description: p\n    secret: false\n")
+            }
+            if (serverJson.exists()) writeYaml("mcps/probe.yml", "id: probe\nsource: \"${serverJson.parentFile.absolutePath}\"\n")
+            writeProject(tools = listOf("github_copilot"), mcpFilter = listOf("probe"))
+            writeUserDeployment(tools = listOf("github_copilot"), mcpFilter = listOf("probe"))
+            val variables = VariableResolver(mapOf("PROXY" to "http://proxy/$bare"), emptyEnvironment)
+
+            // when
+            val errors = listOf(true, false).map { dryRun ->
+                runCatching { engineWith(ToolType.GITHUB_COPILOT, dryRun = dryRun, variables = variables).process(locations()) }.exceptionOrNull()
+            }
+
+            // then
+            assertThat(errors).allSatisfy { error ->
+                if (outcome == "refused-at-load") {
+                    assertThat(error).isInstanceOf(ManifestLoadingException::class.java).hasMessageContaining("'$'").hasMessageNotContaining("PROBE_SECRET")
+                } else {
+                    assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("'PROXY'").hasMessageNotContaining("PROBE_SECRET")
+                }
+            }
+            assertThat(listOf(projectFile, userFile)).allSatisfy { assertThat(it).doesNotExist() }
+            assertThat((destination.walkTopDown() + userHome.walkTopDown()).filter { it.isFile }.toList()).noneMatch { it.readText().contains("PROBE_SECRET") }
+        }
+
+        private fun entriesOf(file: File): Map<String, JsonElement> = Json
+            .parseToJsonElement(file.readText())
+            .jsonObject
+            .getValue("mcpServers")
+            .jsonObject
+    }
+
+    @Nested
+    inner class McpLedgers {
+
+        private val mcpFiles =
+            listOf(".mcp.json", ".vscode/mcp.json", ".github/mcp.json", ".cursor/mcp.json", ".codex/config.toml")
+        private val tools = arrayOf(ToolType.CLAUDE, ToolType.CODEX, ToolType.GITHUB_COPILOT, ToolType.CURSOR)
+        private val ledger get() = destination.resolve(".ai-tools/mcp-ledger.json")
+
+        @BeforeEach
+        fun writeServersAndForeignEntries() {
+            writeStdioServer("atlassian")
+            writeStdioServer("other")
+            // - a server added by hand to every MCP file, which no deploy may remove
+            destination.resolve(".vscode").mkdirs()
+            destination.resolve(".github").mkdirs()
+            destination.resolve(".cursor").mkdirs()
+            destination.resolve(".codex").mkdirs()
+            destination.resolve(".mcp.json").writeText("{\"mcpServers\": {\"mine\": {\"command\": \"npx\"}}}")
+            destination.resolve(".vscode/mcp.json").writeText("{\"servers\": {\"mine\": {\"command\": \"npx\"}}}")
+            destination.resolve(".github/mcp.json").writeText("{\"mcpServers\": {\"mine\": {\"command\": \"npx\"}}}")
+            destination.resolve(".cursor/mcp.json").writeText("{\"mcpServers\": {\"mine\": {\"command\": \"npx\"}}}")
+            destination.resolve(".codex/config.toml").writeText("[mcp_servers.mine]\ncommand = \"npx\"\n")
+        }
+
+        @Test
+        fun `should remove a deselected server from every MCP file, then every recorded one once nothing is selected, reporting each removal in a dry run and keeping foreign entries`() {
+            // given
+            writeProject(mcpFilter = listOf("atlassian", "other"))
+            engineWith(*tools).process(locations())
+            val ledgerAfterBoth = recordedEntries(ledger)
+
+            // when
+            writeProject(mcpFilter = listOf("atlassian"))
+            val narrowedInDryRun =
+                infosOf(DryRunArtifactSink::class.java) { engineWith(*tools, dryRun = true).process(locations()) }
+            val beforeNarrowing = mcpFiles.map { destination.resolve(it).readText() }
+            engineWith(*tools).process(locations())
+            val narrowed = mcpFiles.associateWith { destination.resolve(it).readText() }
+            val ledgerAfterNarrowing = recordedEntries(ledger)
+            writeProject(mcpFilter = null)
+            val clearedInDryRun =
+                infosOf(DryRunArtifactSink::class.java) { engineWith(*tools, dryRun = true).process(locations()) }
+            engineWith(*tools).process(locations())
+
+            // then
+            assertThat(ledgerAfterBoth).isEqualTo(mcpFiles.associateWith { listOf("atlassian", "other") })
+            mcpFiles.forEach { path ->
+                val file = destination.resolve(path)
+                assertThat(narrowedInDryRun).describedAs(path).anyMatch { it.contains("MCP servers [atlassian], removing [other]") && it.contains(file.absolutePath) }
+                assertThat(clearedInDryRun).describedAs(path).anyMatch { it.contains("MCP servers [], removing [atlassian]") && it.contains(file.absolutePath) }
+                assertThat(narrowed.getValue(path))
+                    .describedAs(path)
+                    .contains("atlassian")
+                    .doesNotContain("other")
+                    .contains("mine")
+                assertThat(file)
+                    .describedAs(path)
+                    .content()
+                    .doesNotContain("atlassian")
+                    .doesNotContain("other")
+                    .contains("mine")
+            }
+            // - a dry run changed nothing: the files it reported on were still the ones of the first deploy
+            assertThat(beforeNarrowing).allSatisfy { assertThat(it).contains("other") }
+            assertThat(ledgerAfterNarrowing).isEqualTo(mcpFiles.associateWith { listOf("atlassian") })
+            assertThat(ledger).doesNotExist()
+            assertThat(destination.resolve(".ai-tools")).doesNotExist()
+        }
+
+        @Test
+        fun `should remove an entry the ledger records whose manifest the run no longer has`() {
+            // given
+            writeProject(mcpFilter = listOf("atlassian", "other"))
+            engineWith(ToolType.CLAUDE).process(locations())
+            workspace.resolve("mcps/other.yml").delete()
+            writeProject(mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(ToolType.CLAUDE).process(locations())
+
+            // then
+            assertThat(destination.resolve(".mcp.json"))
+                .content()
+                .contains("atlassian")
+                .contains("mine")
+                .doesNotContain("other")
+            assertThat(recordedEntries(ledger)).isEqualTo(mapOf(".mcp.json" to listOf("atlassian")))
+        }
+
+        @Test
+        fun `should keep the record of a tool the run does not deploy`() {
+            // given
+            writeProject(mcpFilter = listOf("atlassian"))
+            engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations())
+            writeProject(mcpFilter = null)
+
+            // when
+            engineWith(ToolType.CLAUDE).process(locations())
+
+            // then
+            assertThat(destination.resolve(".mcp.json")).content().doesNotContain("atlassian")
+            assertThat(destination.resolve(".codex/config.toml")).content().contains("[mcp_servers.atlassian]")
+            assertThat(recordedEntries(ledger)).isEqualTo(mapOf(".codex/config.toml" to listOf("atlassian")))
+        }
+
+        @Test
+        fun `should fail every MCP file of a project whose ledger cannot be read, naming the ledger, and deploy everything else`() {
+            // given
+            writeProject(mcpFilter = listOf("atlassian"))
+            val laterDestination = tempDir.resolve("later-destination").toFile()
+            writeProject("later-project", "later-project", laterDestination.absolutePath, mcpFilter = listOf("atlassian"))
+            ledger.parentFile.mkdirs()
+            ledger.writeText("{\"version\": 7, \"files\": {}}")
+            val before = mcpFiles.map { destination.resolve(it).readText() }
+
+            // when
+            val error = runCatching { engineWith(*tools).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining(ledger.absolutePath)
+            assertThat((error as ExportFailedException).failures.map { it.deploymentId to it.toolType })
+                .containsExactlyInAnyOrder(*tools.map { "test-project" to it }.toTypedArray())
+            assertThat(mcpFiles.map { destination.resolve(it).readText() }).isEqualTo(before)
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+            assertThat(laterDestination.resolve(".mcp.json")).content().contains("atlassian")
+        }
+
+        @Test
+        fun `should leave every MCP file of a tool as it is when the ledger cannot be written, and report the ledger once for that tool`() {
+            // given
+            assumeTrue(FileSystems.getDefault().supportedFileAttributeViews().contains("posix"))
+            writeProject(mcpFilter = listOf("atlassian"))
+            engineWith(ToolType.CLAUDE).process(locations())
+            val deployed = destination.resolve(".mcp.json").readText()
+            // - a second server and a restriction, so the tool has two MCP files whose entries the ledger would have to record
+            writeProject(mcpFilter = listOf("atlassian", "other"), mcpTools = mapOf("atlassian" to McpToolRestriction(deny = listOf("search"))))
+            val ledgerDirectory = ledger.parentFile.toPath()
+            Files.setPosixFilePermissions(ledgerDirectory, PosixFilePermissions.fromString("r-x------"))
+            assumeFalse(Files.isWritable(ledgerDirectory), "the user running the tests writes every directory")
+
+            // when
+            val error = try {
+                runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+            } finally {
+                Files.setPosixFilePermissions(ledgerDirectory, PosixFilePermissions.fromString("rwx------"))
+            }
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining(ledger.absolutePath)
+            assertThat((error as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                .containsExactly(Triple("test-project", ToolType.CLAUDE, "MCP ledger"))
+            assertThat(destination.resolve(".mcp.json")).hasContent(deployed)
+            assertThat(destination.resolve(".claude/settings.json")).doesNotExist()
+            assertThat(recordedEntries(ledger)).isEqualTo(mapOf(".mcp.json" to listOf("atlassian")))
+        }
+
+        @Test
+        fun `should write the permissions of a replacing project afresh, and drop the settings file from the ledger once the restriction goes away`() {
+            // given
+            val restricted = mapOf("atlassian" to McpToolRestriction(deny = listOf("search")))
+            writeProject(replace = true, mcpFilter = listOf("atlassian"), mcpTools = restricted)
+            val settings = destination.resolve(".claude/settings.json")
+
+            // when
+            engineWith(ToolType.CLAUDE).process(locations())
+            val ledgerAfterFirst = recordedEntries(ledger)
+            engineWith(ToolType.CLAUDE).process(locations())
+            val settingsAfterSecond = Json.parseToJsonElement(settings.readText())
+            writeProject(replace = true, mcpFilter = listOf("atlassian"))
+            engineWith(ToolType.CLAUDE).process(locations())
+
+            // then
+            assertThat(ledgerAfterFirst).isEqualTo(mapOf(".claude/settings.json" to listOf("deny:mcp__atlassian__search"), ".mcp.json" to listOf("atlassian")))
+            assertThat(settingsAfterSecond).isEqualTo(Json.parseToJsonElement("""{"permissions": {"deny": ["mcp__atlassian__search"]}}"""))
+            assertThat(settings).doesNotExist()
+            assertThat(recordedEntries(ledger)).isEqualTo(mapOf(".mcp.json" to listOf("atlassian")))
+        }
+
+        /**
+         * A ledger can arrive with a pull: one the engine did not write names entries whose content it does not record, and removes nothing, deny rules of settings.json included.
+         */
+        @Test
+        fun `should remove nothing on the word of a ledger the engine did not write from a project that declares no mcps block, warning for each entry it names`() {
+            // given
+            val settings = destination.resolve(".claude/settings.json")
+            settings.parentFile.mkdirs()
+            settings.writeText("{\"permissions\": {\"allow\": [\"Bash(ls:*)\"], \"deny\": [\"mcp__mine__delete_everything\", \"mcp__keep__x\", \"Read(./.env)\"]}}")
+            val planted = "\"sha256:" + "0".repeat(64) + "\""
+            ledger.parentFile.mkdirs()
+            ledger.writeText(
+                "{\"version\": 2, \"files\": {" + mcpFiles.joinToString { "\"$it\": {\"mine\": $planted}" } +
+                    ", \".claude/settings.json\": {\"deny:mcp__mine__delete_everything\": $planted}}}",
+            )
+            val before = (mcpFiles + ".claude/settings.json").associateWith { destination.resolve(it).readText() }
+            val ledgerWarnings = ListAppender<ILoggingEvent>().also { it.start() }
+            val ledgerLogger = LoggerFactory.getLogger(McpLedger::class.java) as Logger
+            ledgerLogger.addAppender(ledgerWarnings)
+
+            // when
+            val dryRun = try {
+                infosOf(DryRunArtifactSink::class.java) { engineWith(*tools, dryRun = true).process(locations()) }.also { engineWith(*tools).process(locations()) }
+            } finally {
+                ledgerLogger.detachAppender(ledgerWarnings)
+            }
+
+            // then
+            assertThat((mcpFiles + ".claude/settings.json").associateWith { destination.resolve(it).readText() }).isEqualTo(before)
+            assertThat(dryRun).noneMatch { it.contains("MCP") && !it.contains("MCP ledger") }
+            val warned = ledgerWarnings.list.filter { it.level == Level.WARN }.map { it.formattedMessage }
+            (mcpFiles + ".claude/settings.json").forEach { path ->
+                assertThat(warned).describedAs(path).anyMatch { it.contains(destination.resolve(path).absolutePath) && it.contains("changed since the engine wrote it") }
+            }
+            // - the ledger recorded nothing the files hold, so nothing of it is left
+            assertThat(ledger).doesNotExist()
+        }
+
+        @Test
+        fun `should refuse a ledger of version 1, naming it and its version, and leave every MCP file of its target as it is`() {
+            // given
+            writeProject(mcpFilter = listOf("atlassian"))
+            ledger.parentFile.mkdirs()
+            ledger.writeText("{\"version\": 1, \"files\": {\".mcp.json\": [\"mine\"]}}")
+            val before = mcpFiles.map { destination.resolve(it).readText() }
+
+            // when
+            val error = runCatching { engineWith(*tools).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining(ledger.absolutePath)
+                .hasMessageContaining("version 1")
+            assertThat(mcpFiles.map { destination.resolve(it).readText() }).isEqualTo(before)
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+        }
+
+        @Test
+        fun `should never write the ledger in a dry run`() {
+            // given
+            writeProject(mcpFilter = listOf("atlassian"))
+
+            // when
+            engineWith(*tools, dryRun = true).process(locations())
+
+            // then
+            assertThat(destination.resolve(".ai-tools")).doesNotExist()
+        }
+    }
+
+    /**
+     * One MCP file of a target belongs to at most one deployment of a run: the one whose `mcps` block covers it.
+     */
+    @Nested
+    inner class McpOwnership {
+
+        @BeforeEach
+        fun writeServer() {
+            writeStdioServer("atlassian")
+        }
+
+        @Test
+        fun `should fail every deployment whose mcps block covers a file another deployment of the run covers too, naming both, and write everything else`() {
+            // given
+            writeProject(mcpFilter = listOf("atlassian"))
+            // - a second project deploying into the same directory, whose mcps block selects nothing
+            writeProject("second-project", "second-project", destination.absolutePath, mcpFilter = emptyList())
+            val mcpFile = destination.resolve(".mcp.json")
+
+            // when
+            val dryRunError = runCatching { engineWith(ToolType.CLAUDE, dryRun = true).process(locations()) }.exceptionOrNull()
+            val error = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${mcpFile.absolutePath}'")
+                .hasMessageContaining("project 'second-project', project 'test-project'")
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(error?.message)
+            assertThat((error as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.cause::class.java) }).containsExactlyInAnyOrder(
+                Triple("test-project", ToolType.CLAUDE, ContendedMcpFileException::class.java),
+                Triple("second-project", ToolType.CLAUDE, ContendedMcpFileException::class.java),
+            )
+            assertThat(errors().filter { it.contains("Not writing") && it.contains(mcpFile.absolutePath) }).hasSize(2)
+            assertThat(mcpFile).doesNotExist()
+            assertThat(destination.resolve(".ai-tools")).doesNotExist()
+            assertThat(destination.resolve("CLAUDE.md")).exists()
+        }
+
+        @Test
+        fun `should fail both deployments whose mcps blocks cover one file through a linked project directory, and write none of their MCP files`() {
+            // given
+            destination.mkdirs()
+            val linked = tempDir.resolve("linked-destination")
+            Files.createSymbolicLink(linked, destination.toPath())
+            writeStdioServer("beta")
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeProject("second-project", "second-project", linked.toFile().absolutePath, mcpFilter = listOf("beta"))
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error).isInstanceOf(ExportFailedException::class.java).hasMessageContaining("project 'second-project', project 'test-project'")
+            assertThat((error as ExportFailedException).failures.map { it.deploymentId to it.cause::class.java }).containsExactlyInAnyOrder(
+                "test-project" to ContendedMcpFileException::class.java,
+                "second-project" to ContendedMcpFileException::class.java,
+            )
+            assertThat(destination.resolve(".mcp.json")).doesNotExist()
+            assertThat(destination.resolve(".ai-tools")).doesNotExist()
+        }
+
+        @Test
+        fun `should fail every user deployment whose mcps block covers a file of the home another user deployment covers too`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("codex"), mcpFilter = listOf("atlassian"))
+            writeUserDeployment("second", tools = listOf("claude", "codex"), mcpFilter = emptyList())
+            val codexConfig = userHome.resolve(".codex/config.toml")
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${codexConfig.absolutePath}'")
+                .hasMessageContaining("user deployment 'globals', user deployment 'second'")
+            assertThat((error as ExportFailedException).failures.filter { it.cause is ContendedMcpFileException }.map { it.deploymentId to it.toolType })
+                .containsExactlyInAnyOrder("globals" to ToolType.CODEX, "second" to ToolType.CODEX)
+            assertThat(codexConfig).doesNotExist()
+        }
+
+        @Test
+        fun `should never let a deployment without an mcps block remove the entries another deployment of the run writes into the same file`() {
+            // given
+            writeProject(mcpFilter = listOf("atlassian"))
+            writeProject("second-project", "second-project", destination.absolutePath)
+
+            // when
+            val written = infosOf(FileSystemArtifactSink::class.java) {
+                engineWith(ToolType.CLAUDE).process(locations())
+                engineWith(ToolType.CLAUDE).process(locations())
+            }
+
+            // then
+            assertThat(destination.resolve(".mcp.json")).content().contains("\"atlassian\"")
+            assertThat(recordedEntries(destination.resolve(".ai-tools/mcp-ledger.json"))).isEqualTo(mapOf(".mcp.json" to listOf("atlassian")))
+            assertThat(written).noneMatch { it.contains("removing") }
+        }
+    }
+
+    /**
+     * The tools of a selected server a deployment allows and denies: `enabled_tools` and `disabled_tools` for Codex, `permissions` of `settings.json` for Claude Code.
+     */
+    @Nested
+    inner class McpToolRestrictions {
+
+        private val restriction =
+            mapOf("github" to McpToolRestriction(allow = listOf("get_me"), deny = listOf("delete_repository")))
+        private val settings get() = destination.resolve(".claude/settings.json")
+
+        @BeforeEach
+        fun writeServer() {
+            writeYaml(
+                "mcps/github.yml",
+                "id: github\ndescription: GitHub\ntransport:\n  type: http\n  url: https://api.githubcopilot.com/mcp/\n  headers:\n    Authorization: 'Bearer \${GITHUB_TOKEN}'\n" +
+                    "variables:\n  - name: GITHUB_TOKEN\n    description: Token\n    secret: true\n",
+            )
+        }
+
+        @Test
+        fun `should restrict the tools for Codex and as permissions of Claude Code, keeping foreign permissions and every other byte, and remove only its own once the restriction goes away`() {
+            // given
+            writeProject(mcpFilter = listOf("github"), mcpTools = restriction)
+            settings.parentFile.mkdirs()
+            val existing = "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(git status)\"\n    ],\n    \"deny\": [\n      \"mcp__playwright__browser_close\"\n    ]\n  },\n  \"model\": \"opus\"\n}\n"
+            settings.writeText(existing)
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations())
+            val restricted = settings.readText()
+            val codex = destination.resolve(".codex/config.toml").readText()
+            writeProject(mcpFilter = listOf("github"))
+            engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations())
+
+            // then
+            assertThat(codex).contains("enabled_tools = [\"get_me\"]").contains("disabled_tools = [\"delete_repository\"]")
+            // - Claude Code gets the denied tools only: an allow entry would approve calls without a prompt, and is never written
+            assertThat(restricted).isEqualTo(
+                "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(git status)\"\n    ],\n    \"deny\": [\n      \"mcp__playwright__browser_close\",\n      \"mcp__github__delete_repository\"\n    ]\n  },\n  \"model\": \"opus\"\n}\n",
+            )
+            assertThat(settings).hasContent(existing)
+            assertThat(destination.resolve(".codex/config.toml")).content().doesNotContain("enabled_tools").doesNotContain("disabled_tools")
+            assertThat(recordedEntries(destination.resolve(".ai-tools/mcp-ledger.json"))).isEqualTo(mapOf(".codex/config.toml" to listOf("github"), ".mcp.json" to listOf("github")))
+        }
+
+        @Test
+        fun `should never write an allow entry for Claude Code, and report the allowed tools as skipped with the reason, in a dry run as in a deploy`() {
+            // given
+            writeProject(mcpFilter = listOf("github"), mcpTools = mapOf("github" to McpToolRestriction(allow = listOf("get_me"))))
+            writeUserDeployment(tools = listOf("claude"), mcpFilter = listOf("github"), mcpTools = mapOf("github" to McpToolRestriction(allow = listOf("get_me"))))
+
+            // when
+            engineWith(ToolType.CLAUDE, dryRun = true).process(locations())
+            val dryRunWarnings = warnings()
+            logAppender.list.clear()
+            engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations())
+
+            // then
+            val reason = "Claude Code has no list of the tools a server may offer; only 'deny' is rendered."
+            assertThat(dryRunWarnings).containsExactly(
+                "test-project: claude does not apply the 'allow' list of the MCP server(s) [github]: $reason",
+                "globals: claude does not apply the 'allow' list of the MCP server(s) [github]: $reason",
+            )
+            assertThat(warnings()).contains("test-project: claude does not apply the 'allow' list of the MCP server(s) [github]: $reason")
+            assertThat(settings).doesNotExist()
+            assertThat(userHome.resolve(".claude/settings.json")).doesNotExist()
+            assertThat(destination.resolve(".codex/config.toml")).content().contains("enabled_tools = [\"get_me\"]")
+        }
+
+        /**
+         * A deny rule of the user blocks a call in every scope, so the engine never takes one over: it denies what it was asked to beside it, and removes only what it wrote.
+         */
+        @Test
+        fun `should keep the deny rules written by hand for a server it restricts, and name every entry it removes by its full text`() {
+            // given
+            val existing = "{\"permissions\": {\"deny\": [\"mcp__github__drop_database\", \"mcp__github__delete_repository\"]}}"
+            settings.parentFile.mkdirs()
+            settings.writeText(existing)
+            writeProject(mcpFilter = listOf("github"), mcpTools = mapOf("github" to McpToolRestriction(deny = listOf("delete_repository", "push"))))
+
+            // when
+            engineWith(ToolType.CLAUDE).process(locations())
+            val restricted = settings.readText()
+            writeProject(mcpFilter = listOf("github"))
+            val removals = infosOf(DryRunArtifactSink::class.java) { engineWith(ToolType.CLAUDE, dryRun = true).process(locations()) } +
+                infosOf(FileSystemArtifactSink::class.java) { engineWith(ToolType.CLAUDE).process(locations()) }
+
+            // then
+            assertThat(restricted).isEqualTo("{\"permissions\": {\"deny\": [\"mcp__github__drop_database\", \"mcp__github__delete_repository\", \"mcp__github__push\"]}}")
+            assertThat(settings).hasContent(existing)
+            assertThat(removals.filter { it.contains(settings.absolutePath) }).hasSize(2).allSatisfy { assertThat(it).contains("MCP tool permissions [], removing [mcp__github__push]") }
+        }
+
+        @Test
+        fun `should create the settings file holding only the permissions when the project has none`() {
+            // given
+            writeProject(mcpFilter = listOf("github"), mcpTools = restriction)
+
+            // when
+            engineWith(ToolType.CLAUDE).process(locations())
+
+            // then
+            assertThat(Json.parseToJsonElement(settings.readText())).isEqualTo(
+                Json.parseToJsonElement("""{"permissions": {"deny": ["mcp__github__delete_repository"]}}"""),
+            )
+        }
+
+        @Test
+        fun `should write the restrictions of a user deployment into the settings file of the home, and record it in the ledger of the home`() {
+            // given
+            writeUserDeployment(tools = listOf("claude"), mcpFilter = listOf("github"), mcpTools = restriction)
+            val homeSettings = userHome.resolve(".claude/settings.json")
+
+            // when
+            engineWith(ToolType.CLAUDE).process(locations())
+            writeUserDeployment(tools = listOf("claude"), mcpFilter = listOf("github"))
+            val restricted = Json.parseToJsonElement(homeSettings.readText())
+            val ledgerAfterRestriction = recordedEntries(userHome.resolve(".ai-tools/mcp-ledger.json"))
+            engineWith(ToolType.CLAUDE).process(locations())
+
+            // then
+            assertThat(restricted).isEqualTo(
+                Json.parseToJsonElement("""{"permissions": {"deny": ["mcp__github__delete_repository"]}}"""),
+            )
+            assertThat(ledgerAfterRestriction).isEqualTo(mapOf(".claude.json" to listOf("github"), ".claude/settings.json" to listOf("deny:mcp__github__delete_repository")))
+            // - the file held nothing but the restriction, so it goes with it
+            assertThat(homeSettings).doesNotExist()
+            assertThat(recordedEntries(userHome.resolve(".ai-tools/mcp-ledger.json"))).isEqualTo(mapOf(".claude.json" to listOf("github")))
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - a server whose id holds two underscores
+            "a__b, get_me",
+            // - a tool whose name holds two underscores
+            "github, get__me",
+        )
+        fun `should fail a deployment whose restriction names a server or a tool holding two underscores, which separate the two in a permission entry`(
+            server: String,
+            tool: String,
+        ) {
+            // given
+            writeStdioServer("a__b")
+            writeProject(mcpFilter = listOf(server), mcpTools = mapOf(server to McpToolRestriction(allow = listOf(tool))))
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("Project 'test-project'")
+                .hasMessageContaining("MCP server '$server'")
+                .hasMessageContaining("'__'")
+            assertThat(destination).doesNotExist()
+        }
+
+        @Test
+        fun `should never touch the settings file of a project that restricts nothing`() {
+            // given
+            writeProject(mcpFilter = listOf("github"))
+            settings.parentFile.mkdirs()
+            val existing = "{\"permissions\":{\"allow\":[\"mcp__github__get_me\"]}}"
+            settings.writeText(existing)
+
+            // when
+            engineWith(ToolType.CLAUDE).process(locations())
+
+            // then
+            assertThat(settings).hasContent(existing)
+        }
+
+        @Test
+        fun `should fail a deployment that restricts a server it does not select, naming the deployment and the server, and write none of it`() {
+            // given
+            writeStdioServer("atlassian")
+            writeProject(mcpFilter = listOf("atlassian"), mcpTools = restriction)
+            val laterDestination = tempDir.resolve("later-destination").toFile()
+            writeProject("later-project", "later-project", laterDestination.absolutePath)
+            writeUserDeployment(tools = listOf("claude"), mcpFilter = emptyList(), mcpTools = restriction)
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("Project 'test-project' restricts the tools of the MCP server 'github'")
+                .hasMessageContaining("User deployment 'globals' restricts the tools of the MCP server 'github'")
+            assertThat(destination).doesNotExist()
+            assertThat(userHome).doesNotExist()
+            assertThat(laterDestination.resolve("CLAUDE.md")).exists()
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            // - a space
+            "'get me'",
+            // - a character a permission rule would read as syntax
+            "'get_me(x)'",
+        )
+        fun `should fail a deployment that names a tool no MCP server can have`(tool: String) {
+            // given
+            writeProject(mcpFilter = listOf("github"), mcpTools = mapOf("github" to McpToolRestriction(allow = listOf("\"$tool\""))))
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'test-project'")
+                .hasMessageContaining("'github'")
+                .hasMessageContaining("A-Z a-z 0-9 _ - .")
+            assertThat(destination).doesNotExist()
+        }
+
+        @ParameterizedTest
+        @CsvSource("github_copilot", "cursor")
+        fun `should report a tool that cannot restrict the tools of a server as skipped for the restriction, with its reason`(
+            tool: String,
+        ) {
+            // given
+            writeProject(mcpFilter = listOf("github"), mcpTools = restriction)
+
+            // when
+            engineWith(ToolType.entries.single { it.serialName == tool }).process(locations())
+
+            // then
+            assertThat(warnings()).singleElement().satisfies({ assertThat(it).contains("test-project: $tool ").contains("[github]").contains("restrict") })
+        }
+    }
+
+    /**
+     * The MCP servers an agent uses: listed in the frontmatter of Claude Code and GitHub Copilot, and reported as skipped for every other tool.
+     */
+    @Nested
+    inner class AgentMcpServers {
+
+        @BeforeEach
+        fun writeServer() {
+            writeStdioServer("github")
+            writeAgent("reviewer", "base", mcps = listOf("github"))
+        }
+
+        @Test
+        fun `should attach the servers an agent uses in Claude Code, and report every other tool as skipped once, naming the agent`() {
+            // given
+            writeAgent("helper", "base", mcps = listOf("github"))
+            writeProject(mcpFilter = listOf("github"))
+
+            // when
+            engineWith(*ToolType.entries.toTypedArray()).process(locations())
+
+            // then
+            assertThat(destination.resolve(".claude/agents/reviewer.md")).content().contains("\nmcpServers: [github]\n")
+            // - a Copilot agent without tools keeps its built-in tools and gets every server of .vscode/mcp.json
+            assertThat(destination.resolve(".github/agents/reviewer.agent.md")).content().doesNotContain("tools:")
+            assertThat(warnings().filter { it.contains("test-project: github_copilot ") && it.contains("agent") }).singleElement().satisfies({
+                assertThat(it).contains("'helper'").contains("'reviewer'").contains("a 'tools' list would remove its built-in tools")
+            })
+            assertThat(warnings()).noneMatch { it.contains("test-project: claude ") && it.contains("agent") }
+            listOf("codex", "cursor", "windsurf", "antigravity").forEach { tool ->
+                assertThat(warnings().filter { it.contains("test-project: $tool ") && it.contains("agent") })
+                    .describedAs(tool)
+                    .singleElement()
+                    .satisfies({ assertThat(it).contains("'helper'").contains("'reviewer'") })
+            }
+        }
+
+        @Test
+        fun `should fail a project that deploys an agent using a server it does not select, naming the agent, the server and the project, and deploy the others`() {
+            // given
+            val laterDestination = tempDir.resolve("later-destination").toFile()
+            writeProject("later-project", "later-project", laterDestination.absolutePath, mcpFilter = listOf("github"))
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("Project 'test-project' deploys the agent 'reviewer', which uses the MCP server 'github'")
+            assertThat(destination).doesNotExist()
+            assertThat(laterDestination.resolve(".claude/agents/reviewer.md")).content().contains("mcpServers: [github]")
+        }
+
+        @Test
+        fun `should fail a user deployment that deploys an agent using a server it does not select`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("claude"))
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("User deployment 'globals' deploys the agent 'reviewer', which uses the MCP server 'github'")
+            assertThat(userHome).doesNotExist()
+        }
+
+        @Test
+        fun `should attach the servers an agent uses in the user scope of Claude Code, and report Codex as skipped once, naming the agent`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("claude", "codex"), mcpFilter = listOf("github"))
+
+            // when
+            engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations())
+
+            // then
+            assertThat(userHome.resolve(".claude/agents/reviewer.md")).content().contains("\nmcpServers: [github]\n")
+            assertThat(warnings().filter { it.contains("globals: codex ") && it.contains("agent") }).singleElement().satisfies({
+                assertThat(it).contains("'reviewer'").contains("skills")
+            })
+            assertThat(warnings()).noneMatch { it.contains("globals: claude ") && it.contains("agent") }
+        }
+
+        @Test
+        fun `should report none of the MCP skips of a user deployment it refuses because an agent uses a server the deployment does not select`() {
+            // given
+            writeStdioServer("other")
+            writeProject(tools = emptyList())
+            // - Cursor gets no MCP server in the user scope, which a deployment that is exported reports as skipped
+            writeUserDeployment(tools = listOf("claude", "cursor"), mcpFilter = listOf("other"))
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE, ToolType.CURSOR).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("User deployment 'globals' deploys the agent 'reviewer', which uses the MCP server 'github'")
+            assertThat(warnings()).noneMatch { it.contains("globals: ") && it.contains("MCP") }
+        }
+
+        @Test
+        fun `should refuse a user deployment whose agent uses a server it does not select even when none of its tools has a user scope`() {
+            // given
+            writeProject(tools = emptyList())
+            writeUserDeployment(tools = listOf("cursor"))
+
+            // when
+            val error = runCatching { engineWith(ToolType.CURSOR).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("User deployment 'globals' deploys the agent 'reviewer', which uses the MCP server 'github'")
+        }
+    }
+
+    /**
+     * The directory every file of a tool lands in is checked before any of them is written, in a dry run as in a deploy.
+     */
+    @Nested
+    inner class ToolDirectories {
+
+        private val markers = mapOf(
+            ToolType.CLAUDE to ".claude/agents/basic.md",
+            ToolType.CODEX to ".codex/skills/agent-basic/SKILL.md",
+            ToolType.GITHUB_COPILOT to ".github/agents/basic.agent.md",
+            ToolType.CURSOR to ".cursor/rules/project.mdc",
+            ToolType.WINDSURF to ".windsurf/rules/project.md",
+            ToolType.ANTIGRAVITY to ".agent/rules/project.md",
+        )
+
+        @BeforeEach
+        fun writeAgent() {
+            writeAgent("basic", "base")
+        }
+
+        /**
+         * The check of the tool directories keeps a deploy inside the project only if every file a tool writes lies at the top of the target or in a directory the tool lists: an artifact of each kind, with a companion file, MCP servers and a restriction, is written, and every file lands where the list says.
+         */
+        @ParameterizedTest
+        @EnumSource(ToolType::class)
+        fun `should write every file of a tool at the top of the target or in one of the directories it lists, in a project and in the home`(
+            toolType: ToolType,
+        ) {
+            // given
+            writePrompt("review", "base")
+            writeDirectorySkill("jira-ticket", "task.txt", companionFileExists = true)
+            writeFeature("test-project", "login.yml", "login")
+            writeStdioServer("atlassian")
+            val restriction =
+                mapOf("atlassian" to McpToolRestriction(allow = listOf("search"), deny = listOf("delete")))
+            writeProject(mcpFilter = listOf("atlassian"), mcpTools = restriction)
+            writeUserDeployment(tools = listOf(toolType.serialName), mcpFilter = listOf("atlassian"), mcpTools = restriction)
+            val adapter = ToolFactory.create(toolType)
+            val userScope = adapter.userScope(userHome, UserDeploymentManifest(id = "globals", description = "d", metadata = ManifestMetadata(version = Version("1.0.0"))))
+
+            // when
+            engineWith(toolType).process(locations())
+
+            // then
+            val projectDirectories = adapter.toolDirectories(destination) + adapter.mcpConfigs(destination).map { it.file.parentFile } + listOfNotNull(adapter.mcpPermissions(destination)?.file?.parentFile)
+            assertWrittenWithin(destination, projectDirectories)
+            userScope?.let { exporter ->
+                assertWrittenWithin(userHome, exporter.toolDirectories + listOfNotNull(exporter.mcpConfig()?.file?.parentFile, exporter.mcpPermissions()?.file?.parentFile))
+            }
+        }
+
+        /**
+         * Fails unless every file below [root], the MCP ledger aside, lies directly in [root] or in one of [directories], or in the folder of one artifact directly below one of them, named after it, and unless every directory of [directories] was written into.
+         */
+        private fun assertWrittenWithin(root: File, directories: List<File>) {
+            val listed = directories.map { it.absoluteFile.normalize() }.toSet()
+            val ledgerDirectory = root.resolve(".ai-tools").absoluteFile
+            val written = root
+                .walkTopDown()
+                .filter { it.isFile && !it.startsWith(ledgerDirectory) }
+                .map { it.absoluteFile.normalize() }
+                .toList()
+            assertThat(written).isNotEmpty()
+            written.forEach { file ->
+                val parent = file.parentFile
+                // - a skill, and an agent or a prompt rendered as one, is written as a folder of its own, named after it, with its companion files
+                val artifactFolder = generateSequence(parent) { it.parentFile }.takeWhile { it != root.absoluteFile }.any { folder ->
+                    folder.parentFile in listed && listOf("jira-ticket", "basic", "review", "login").any { folder.name.endsWith(it) }
+                }
+                assertThat(parent == root.absoluteFile.normalize() || parent in listed || artifactFolder).describedAs(file.relativeTo(root).path).isTrue()
+            }
+            listed.filter { it != root.absoluteFile.normalize() }.forEach { assertThat(it).describedAs(it.relativeTo(root).path).isDirectory() }
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            ".claude, CLAUDE, dangling",
+            ".claude, CLAUDE, looping",
+            ".claude, CLAUDE, file",
+            ".github, GITHUB_COPILOT, dangling",
+            ".github, GITHUB_COPILOT, looping",
+            ".github, GITHUB_COPILOT, file",
+            ".codex, CODEX, dangling",
+            ".codex, CODEX, looping",
+            ".codex, CODEX, file",
+            ".cursor, CURSOR, dangling",
+            ".cursor, CURSOR, looping",
+            ".cursor, CURSOR, file",
+            ".windsurf, WINDSURF, dangling",
+            ".windsurf, WINDSURF, looping",
+            ".windsurf, WINDSURF, file",
+            ".agent, ANTIGRAVITY, dangling",
+            ".agent, ANTIGRAVITY, looping",
+            ".agent, ANTIGRAVITY, file",
+            // - a link out of the project fails the same way
+            ".codex, CODEX, outside",
+        )
+        fun `should fail only the tool and project whose tool directory cannot hold its files, with the same message in a dry run as in a deploy`(
+            directory: String,
+            toolType: ToolType,
+            kind: String,
+        ) {
+            // given
+            val laterDestination = tempDir.resolve("later-destination").toFile()
+            writeProject("later-project", "later-project", laterDestination.absolutePath)
+            destination.mkdirs()
+            val broken = destination.resolve(directory)
+            val outside = tempDir.resolve("out").toFile()
+            breakDirectory(broken, kind, outside)
+
+            // when
+            val dryRunError = runCatching { engineWith(*ToolType.entries.toTypedArray(), dryRun = true).process(locations()) }.exceptionOrNull()
+            val writtenByDryRun = listOf(laterDestination, destination.resolve("CLAUDE.md")).filter { it.exists() }
+            val deployError = runCatching { engineWith(*ToolType.entries.toTypedArray()).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deployError)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${broken.absolutePath}'")
+                .hasMessageContaining("writes no ${toolType.serialName} files of project 'test-project'")
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(deployError?.message)
+            assertThat(writtenByDryRun).isEmpty()
+            assertThat((deployError as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                .containsExactly(Triple("test-project", toolType, "tool directory '$directory'"))
+            // - every other tool of the project, and every tool of the later project, are written in full
+            markers.filterKeys { it != toolType }.values.forEach { assertThat(destination.resolve(it)).describedAs(it).exists() }
+            markers.values.forEach { assertThat(laterDestination.resolve(it)).describedAs(it).exists() }
+            // - nothing was written through a link out of the project
+            assertThat(outside.walkTopDown().filter { it.isFile }.toList()).isEmpty()
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            ".claude/agents, CLAUDE, outside",
+            ".claude/agents, CLAUDE, file",
+            ".claude/commands, CLAUDE, outside",
+            ".claude/skills, CLAUDE, file",
+            ".claude/workflows, CLAUDE, outside",
+            ".codex/skills, CODEX, outside",
+            ".codex/features, CODEX, file",
+            ".github/agents, GITHUB_COPILOT, outside",
+            ".github/prompts, GITHUB_COPILOT, file",
+            ".github/instructions, GITHUB_COPILOT, outside",
+            ".cursor/rules, CURSOR, outside",
+            ".cursor/commands, CURSOR, file",
+            ".cursor/features, CURSOR, outside",
+            ".windsurf/rules, WINDSURF, outside",
+            ".windsurf/workflows, WINDSURF, file",
+            ".agent/rules, ANTIGRAVITY, outside",
+            ".agent/workflows, ANTIGRAVITY, file",
+        )
+        fun `should fail only the tool and project whose directory below the tool directory leads outside the project or is not a directory, with the same message in a dry run as in a deploy`(
+            directory: String,
+            toolType: ToolType,
+            kind: String,
+        ) {
+            // given
+            val laterDestination = tempDir.resolve("later-destination").toFile()
+            writeProject("later-project", "later-project", laterDestination.absolutePath)
+            val broken = destination.resolve(directory)
+            broken.parentFile.mkdirs()
+            val outside = tempDir.resolve("out").toFile()
+            breakDirectory(broken, kind, outside)
+
+            // when
+            val dryRunError = runCatching { engineWith(*ToolType.entries.toTypedArray(), dryRun = true).process(locations()) }.exceptionOrNull()
+            val writtenByDryRun = listOf(laterDestination, destination.resolve("CLAUDE.md")).filter { it.exists() }
+            val deployError = runCatching { engineWith(*ToolType.entries.toTypedArray()).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deployError)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${broken.absolutePath}'")
+                .hasMessageContaining("writes no ${toolType.serialName} files of project 'test-project'")
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(deployError?.message)
+            assertThat(writtenByDryRun).isEmpty()
+            assertThat((deployError as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                .containsExactly(Triple("test-project", toolType, "tool directory '$directory'"))
+            markers.filterKeys { it != toolType }.values.forEach { assertThat(destination.resolve(it)).describedAs(it).exists() }
+            markers.values.forEach { assertThat(laterDestination.resolve(it)).describedAs(it).exists() }
+            // - nothing was written through a link out of the project
+            assertThat(outside.walkTopDown().filter { it.isFile }.toList()).isEmpty()
+        }
+
+        @Test
+        fun `should not check a directory below a tool directory the project replaces, since the replace removes it before anything is written`() {
+            // given
+            writeProject(replace = true)
+            destination.resolve(".claude").mkdirs()
+            destination.resolve(".claude/agents").writeText("not a directory\n")
+
+            // when
+            val dryRunError = runCatching { engineWith(ToolType.CLAUDE, dryRun = true).process(locations()) }.exceptionOrNull()
+            val deployError = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(dryRunError).isNull()
+            assertThat(deployError).isNull()
+            assertThat(destination.resolve(".claude/agents/basic.md")).exists()
+        }
+
+        /**
+         * A replacing project whose tool directory links outside it fails that tool before the replace deletes anything, so nothing outside the project is ever deleted through the link.
+         */
+        @ParameterizedTest
+        @CsvSource(
+            ".codex, CODEX, skills/keep/SKILL.md",
+            ".github, GITHUB_COPILOT, agents/keep.agent.md",
+            ".cursor, CURSOR, rules/keep.mdc",
+        )
+        fun `should delete nothing outside the project when a replacing project links a tool directory there`(
+            directory: String,
+            toolType: ToolType,
+            kept: String,
+        ) {
+            // given
+            writeProject(replace = true)
+            destination.mkdirs()
+            val outside = tempDir.resolve("out").toFile()
+            val keptFile = outside.resolve(kept).also { it.parentFile.mkdirs() }
+            keptFile.writeText("keep\n")
+            Files.createSymbolicLink(destination.resolve(directory).toPath(), outside.toPath())
+
+            // when
+            val dryRunError = runCatching { engineWith(toolType, dryRun = true).process(locations()) }.exceptionOrNull()
+            val deployError = runCatching { engineWith(toolType).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat((deployError as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                .containsExactly(Triple("test-project", toolType, "tool directory '$directory'"))
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(deployError.message)
+            assertThat(keptFile).hasContent("keep\n")
+            assertThat(outside.walkTopDown().filter { it.isFile }.toList()).containsExactly(keptFile)
+        }
+
+        @Test
+        fun `should pass a dry run of a replacing project whose claude directory links outside it and holds the settings file it restricts, as the deploy passes`() {
+            // given
+            writeStdioServer("github")
+            writeProject(replace = true, mcpFilter = listOf("github"), mcpTools = mapOf("github" to McpToolRestriction(deny = listOf("get_me"))))
+            destination.mkdirs()
+            val outside = tempDir.resolve("out").toFile().also { it.mkdirs() }
+            val outsideSettings = outside.resolve("settings.json").also { it.writeText("{\"permissions\": {\"allow\": [\"mcp__github__mine\"]}}") }
+            Files.createSymbolicLink(destination.resolve(".claude").toPath(), outside.toPath())
+
+            // when
+            val dryRunInfos = infosOf(DryRunArtifactSink::class.java) {
+                val dryRunError = runCatching { engineWith(ToolType.CLAUDE, dryRun = true).process(locations()) }.exceptionOrNull()
+                assertThat(dryRunError).isNull()
+            }
+            val deployError = runCatching { engineWith(ToolType.CLAUDE).process(locations()) }.exceptionOrNull()
+
+            // then
+            val settings = destination.resolve(".claude/settings.json")
+            assertThat(dryRunInfos).contains("Would write MCP tool permissions [github] to ${settings.absolutePath}")
+            assertThat(deployError).isNull()
+            assertThat(outsideSettings).hasContent("{\"permissions\": {\"allow\": [\"mcp__github__mine\"]}}")
+            assertThat(Files.isSymbolicLink(destination.resolve(".claude").toPath())).isFalse()
+            assertThat(Json.parseToJsonElement(settings.readText())).isEqualTo(Json.parseToJsonElement("""{"permissions": {"deny": ["mcp__github__get_me"]}}"""))
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            ".claude/agents, CLAUDE",
+            ".claude/commands, CLAUDE",
+            ".claude/skills, CLAUDE",
+            ".codex/skills, CODEX",
+        )
+        fun `should fail only the tool whose directory below its directory in the home is not a directory, in a dry run as in a deploy`(
+            directory: String,
+            toolType: ToolType,
+        ) {
+            // given
+            writeUserDeployment(tools = listOf("claude", "codex"))
+            val broken = userHome.resolve(directory)
+            broken.parentFile.mkdirs()
+            broken.writeText("not a directory\n")
+
+            // when
+            val dryRunError = runCatching { engineWith(ToolType.CLAUDE, ToolType.CODEX, dryRun = true).process(locations()) }.exceptionOrNull()
+            val deployError = runCatching { engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deployError)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${broken.absolutePath}'")
+                .hasMessageContaining("writes no ${toolType.serialName} files of user deployment 'globals'")
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(deployError?.message)
+            assertThat((deployError as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                .containsExactly(Triple("globals", toolType, "tool directory '$directory'"))
+        }
+
+        @Test
+        fun `should follow a directory below a tool directory of the home that links outside it, as a dotfile repository does`() {
+            // given
+            writeUserDeployment(tools = listOf("claude"))
+            userHome.resolve(".claude").mkdirs()
+            val dotfiles = tempDir.resolve("dotfiles/agents").toFile().also { it.mkdirs() }
+            Files.createSymbolicLink(userHome.resolve(".claude/agents").toPath(), dotfiles.toPath())
+
+            // when
+            engineWith(ToolType.CLAUDE).process(locations())
+
+            // then
+            assertThat(dotfiles.resolve("basic.md")).exists()
+        }
+
+        @ParameterizedTest
+        @CsvSource("true", "false")
+        fun `should check the directory of an MCP config file outside the tool directory only when the project writes that file`(
+            selectsServers: Boolean,
+        ) {
+            // given
+            writeStdioServer("atlassian")
+            writeProject(mcpFilter = if (selectsServers) listOf("atlassian") else null)
+            destination.mkdirs()
+            Files.createSymbolicLink(destination.resolve(".vscode").toPath(), tempDir.resolve("out/missing"))
+
+            // when
+            val error = runCatching { engineWith(ToolType.GITHUB_COPILOT).process(locations()) }.exceptionOrNull()
+
+            // then
+            if (selectsServers) {
+                assertThat((error as ExportFailedException).failures.map { it.manifest }).containsExactly("tool directory '.vscode'")
+                assertThat(destination.resolve(".github")).doesNotExist()
+            } else {
+                assertThat(error).isNull()
+                assertThat(destination.resolve(".github/agents/basic.agent.md")).exists()
+            }
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+            ".claude, CLAUDE, dangling",
+            ".claude, CLAUDE, looping",
+            ".claude, CLAUDE, file",
+            ".codex, CODEX, dangling",
+            ".codex, CODEX, looping",
+            ".codex, CODEX, file",
+        )
+        fun `should fail only the tool whose directory in the home cannot hold its files, and deploy every other tool and project`(
+            directory: String,
+            toolType: ToolType,
+            kind: String,
+        ) {
+            // given
+            writeUserDeployment(tools = listOf("claude", "codex"))
+            userHome.mkdirs()
+            val broken = userHome.resolve(directory)
+            breakDirectory(broken, kind, tempDir.resolve("out").toFile())
+            val other = if (toolType == ToolType.CLAUDE) userHome.resolve(".codex/skills/agent-basic/SKILL.md") else userHome.resolve(".claude/agents/basic.md")
+
+            // when
+            val dryRunError = runCatching { engineWith(ToolType.CLAUDE, ToolType.CODEX, dryRun = true).process(locations()) }.exceptionOrNull()
+            val deployError = runCatching { engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(deployError)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("'${broken.absolutePath}'")
+                .hasMessageContaining("writes no ${toolType.serialName} files of user deployment 'globals'")
+            assertThat(dryRunError).isInstanceOf(ExportFailedException::class.java).hasMessage(deployError?.message)
+            assertThat((deployError as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.manifest) })
+                .containsExactly(Triple("globals", toolType, "tool directory '$directory'"))
+            assertThat(other).exists()
+            assertThat(destination.resolve(".claude/agents/basic.md")).exists()
+        }
+
+        @Test
+        fun `should follow a tool directory of the home that links outside it, as a dotfile repository does`() {
+            // given
+            writeUserDeployment(tools = listOf("codex"))
+            userHome.mkdirs()
+            val dotfiles = tempDir.resolve("dotfiles/codex").toFile().also { it.mkdirs() }
+            Files.createSymbolicLink(userHome.resolve(".codex").toPath(), dotfiles.toPath())
+
+            // when
+            engineWith(ToolType.CODEX).process(locations())
+
+            // then
+            assertThat(dotfiles.resolve("skills/agent-basic/SKILL.md")).exists()
+            assertThat(dotfiles.resolve("AGENTS.md")).exists()
+        }
+
+        private fun breakDirectory(directory: File, kind: String, outside: File) {
+            when (kind) {
+                "dangling" -> Files.createSymbolicLink(directory.toPath(), outside.resolve("missing").toPath())
+                "looping" -> directory.resolveSibling("${directory.name}-loop").also { Files.createSymbolicLink(it.toPath(), directory.toPath()) }.let { Files.createSymbolicLink(directory.toPath(), it.toPath()) }
+                "outside" -> Files.createSymbolicLink(directory.toPath(), outside.also { it.mkdirs() }.toPath())
+                else -> directory.writeText("not a directory\n")
+            }
+        }
+    }
+
+    @Nested
+    inner class UserScopeFailures {
+
+        @Test
+        fun `should collect a file the user scope cannot write as a failure of that tool, and go on with the next tool`() {
+            // given
+            writeAgent("basic", "base")
+            writeUserDeployment(tools = listOf("claude", "codex"))
+            // - a directory holding a file where the agent file of Claude Code belongs, which no write can replace; a regular file where the agents directory belongs is found by the check of the tool directories before anything is written
+            userHome.resolve(".claude/agents/basic.md").mkdirs()
+            userHome.resolve(".claude/agents/basic.md/keep").writeText("mine\n")
+
+            // when
+            val error = runCatching { engineWith(ToolType.CLAUDE, ToolType.CODEX).process(locations()) }.exceptionOrNull()
+
+            // then
+            assertThat(error)
+                .isInstanceOf(ExportFailedException::class.java)
+                .hasMessageContaining("no further claude files of user deployment 'globals'")
+            assertThat((error as ExportFailedException).failures.map { Triple(it.deploymentId, it.toolType, it.cause::class.java) })
+                .containsExactly(Triple("globals", ToolType.CLAUDE, ToolExportStoppedException::class.java))
+            assertThat(userHome.resolve(".codex/skills/agent-basic/SKILL.md")).exists()
+            assertThat(userHome.resolve(".codex/AGENTS.md")).exists()
+        }
+    }
+
     private fun locations() = Locations(
         agents = listOf(workspace.resolve("agents")),
         deployments = listOf(workspace.resolve("deployments")),
@@ -2218,9 +4713,22 @@ class ToolsEngineTest {
         rulesets = listOf(workspace.resolve("rulesets")),
         fragments = emptyList(),
         skills = listOf(workspace.resolve("skills")),
+        mcps = listOf(workspace.resolve("mcps")),
     )
 
     private fun agentFile(id: String) = destination.resolve(".claude/agents/$id.md")
+
+    /**
+     * Returns the entries the MCP ledger [file] records for each file it names, sorted, once it is checked to be a ledger of version 2 whose every entry carries a fingerprint.
+     */
+    private fun recordedEntries(file: File): Map<String, List<String>> {
+        val root = Json.parseToJsonElement(file.readText()).jsonObject
+        assertThat(root["version"]).isEqualTo(JsonPrimitive(2))
+        return root.getValue("files").jsonObject.mapValues { (_, entries) ->
+            entries.jsonObject.values.forEach { assertThat(it.jsonPrimitive.content).matches("sha256:[0-9a-f]{64}") }
+            entries.jsonObject.keys.sorted()
+        }
+    }
 
     private fun promptFile(id: String) = destination.resolve(".claude/commands/$id.md")
 
@@ -2239,11 +4747,53 @@ class ToolsEngineTest {
         "id: $id\ndescription: A ruleset\nrules:\n  - A rule from $id.\n",
     )
 
-    private fun writeAgent(id: String, ruleset: String) = writeYaml(
+    private fun writeAgent(id: String, ruleset: String, mcps: List<String> = emptyList()) = writeYaml(
         "agents/$id.yml",
         "id: $id\ndescription: An agent\nrulesets:\n  - $ruleset\n" +
-            "persona: A persona\nprompt: An agent prompt\n",
+            "persona: A persona\nprompt: An agent prompt\n" +
+            (if (mcps.isEmpty()) "" else "mcps: [${mcps.joinToString()}]\n"),
     )
+
+    /**
+     * Writes an inline stdio MCP server [id] started as [command], which reads the secret variable [secret] when one is named.
+     */
+    private fun writeStdioServer(id: String, command: String = "$id-server", secret: String? = null) = writeYaml(
+        "mcps/$id.yml",
+        "id: $id\ndescription: The $id server\ntransport:\n  type: stdio\n  command: $command\n" +
+            (secret?.let { "variables:\n  - name: $it\n    description: Token\n    secret: true\n" } ?: ""),
+    )
+
+    /**
+     * An engine of this class deploying through [toolTypes], each built for a dry run when [dryRun] is set.
+     */
+    private fun engineWith(
+        vararg toolTypes: ToolType,
+        dryRun: Boolean = false,
+        variables: VariableResolver = VariableResolver(emptyMap(), emptyEnvironment),
+    ) = ToolsEngine(
+        workspace,
+        variables = variables,
+        userHome = userHome,
+        tools = toolTypes.map { ToolFactory.create(it, dryRun) },
+        dryRun = dryRun,
+    )
+
+    /**
+     * Runs [block] with a list appender on the logger of [type], returning the formatted INFO lines it logged.
+     */
+    private fun infosOf(type: Class<*>, block: () -> Unit): List<String> {
+        val appender = ListAppender<ILoggingEvent>()
+        val logger = LoggerFactory.getLogger(type) as Logger
+        appender.start()
+        logger.addAppender(appender)
+        try {
+            block()
+        } finally {
+            logger.detachAppender(appender)
+            appender.stop()
+        }
+        return appender.list.filter { it.level == Level.INFO }.map { it.formattedMessage }
+    }
 
     private fun writePrompt(id: String, ruleset: String) = writeYaml(
         "prompts/$id.yml",
@@ -2271,6 +4821,7 @@ class ToolsEngineTest {
     /**
      * @param root the configured `locations.deployments` directory to write this project under, which decides when the loader reads it relative to the projects of another root
      * @param skillFilter the skill ids the project whitelists, or `null` for every skill there is
+     * @param mcpFilter the MCP server ids the project whitelists, or `null` for every MCP server there is
      */
     // A test builder: every parameter is one field of the manifest with the default a test rarely needs to change.
     @Suppress("LongParameterList")
@@ -2282,13 +4833,28 @@ class ToolsEngineTest {
         root: String = "deployments",
         replace: Boolean = false,
         skillFilter: List<String>? = null,
+        mcpFilter: List<String>? = null,
+        mcpTools: Map<String, McpToolRestriction> = emptyMap(),
     ) = writeYaml(
         "$root/$directoryName/project.yml",
         "id: $id\ndescription: A project\n" +
             "context:\n  documentation:\n    readme: README.md\n" +
             "deploy:\n  directory: \"$deployDirectory\"\n  replace: $replace\n" + toolsDeclaration(tools) +
-            whitelistDeclaration("skills", skillFilter).lineSequence().filter { it.isNotEmpty() }.joinToString("") { "  $it\n" },
+            (whitelistDeclaration("skills", skillFilter) + mcpsDeclaration(mcpFilter, mcpTools)).lineSequence().filter { it.isNotEmpty() }.joinToString("") { "  $it\n" },
     )
+
+    /**
+     * Renders the `mcps` block: absent for `null`, otherwise a whitelist of [ids] followed by the restriction of each server of [tools].
+     */
+    private fun mcpsDeclaration(ids: List<String>?, tools: Map<String, McpToolRestriction>): String {
+        if (ids == null) return ""
+        val restrictions = tools.entries.joinToString("") { (server, restriction) ->
+            "    $server:\n" +
+                (if (restriction.allow.isEmpty()) "" else "      allow: [${restriction.allow.joinToString()}]\n") +
+                (if (restriction.deny.isEmpty()) "" else "      deny: [${restriction.deny.joinToString()}]\n")
+        }
+        return whitelistDeclaration("mcps", ids) + if (restrictions.isEmpty()) "" else "  tools:\n$restrictions"
+    }
 
     /**
      * Renders the optional `deploy.tools` list: absent for `null`, an explicit empty list for an empty one, since the two mean opposite things to the engine.
@@ -2313,10 +4879,12 @@ class ToolsEngineTest {
         agentFilter: List<String>? = null,
         promptFilter: List<String>? = null,
         replace: Boolean = false,
+        mcpFilter: List<String>? = null,
+        mcpTools: Map<String, McpToolRestriction> = emptyMap(),
     ) = writeYaml(
         "deployments/$directoryName/user.yml",
         "id: $id\ndescription: A user deployment\nreplace: $replace\n" + userToolsDeclaration(tools) +
-            whitelistDeclaration("agents", agentFilter) + whitelistDeclaration("prompts", promptFilter),
+            whitelistDeclaration("agents", agentFilter) + whitelistDeclaration("prompts", promptFilter) + mcpsDeclaration(mcpFilter, mcpTools),
     )
 
     /**
@@ -2373,5 +4941,17 @@ class ToolsEngineTest {
         file.parentFile.mkdirs()
         file.writeText(content + "metadata:\n  version: 1.0.0\n")
         return file
+    }
+
+    companion object {
+        /** A value only the environment of a test run carries for a secret variable, which no generated file may ever contain. */
+        private const val SECRET_VALUE = "s3cr3t-value-that-must-never-be-written"
+
+        /** A value the environment or the config of a leak scenario carries, which no file, log line or error may ever contain. */
+        private const val LEAKED_VALUE = "leaked-4f1c9e"
+
+        /** The names the environment of a leak scenario carries [LEAKED_VALUE] under. */
+        private val LEAKING_NAMES =
+            setOf("GITHUB_TOKEN", "ATLASSIAN_TOKEN", "ATLASSIAN_KEY", "DEMO_KEY", "AWS_SECRET_ACCESS_KEY", "EXAMPLE_TOKEN", "JIRA_VERIFY_SSL", "X")
     }
 }

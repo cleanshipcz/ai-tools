@@ -3,6 +3,12 @@ description: My global AI tool setup
 tools:
   - claude
   - codex
+  - github_copilot
+# A replacing deploy deletes the artifact directories it generates before writing them again. In the user scope that
+# means only the folders of the skills this manifest deploys (never ~/.claude or ~/.codex as a whole), and a skill
+# dropped from this manifest is not removed either way: the engine keeps no record of what it deployed earlier.
+# It stays off here so that a deploy never deletes anything under the home directory; stale artifacts are removed by hand.
+replace: false
 # The rules that used to live in a hand-written ~/.claude/CLAUDE.md. The engine owns that file from here on: it is
 # rewritten on every deploy, so these manifests are where the rules are edited.
 rulesets:
@@ -32,9 +38,18 @@ fragments:
         - confluence-search
         - docx-export
         - jira-ticket
+# MCP servers are opt-in: only the ids listed here are written, into ~/.claude.json and ~/.codex/config.toml. While this block selects a server, the engine owns every entry of those two files that is named after a manifest of 07_mcp/, and removes the ones not listed here, hand-written ones included.
+mcps:
+  filter:
+    - type: whitelist
+      ids:
+        - opensearch
+        - github-dbg
+        - dbgAtlassian
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   author: cleanshipcz
   created: "2026-08-10"
+  updated: "2026-09-30"
   tags:
     - global

@@ -1,6 +1,7 @@
 package cz.cleanship.aitools.engine.tools.adapters.github
 
 import cz.cleanship.aitools.engine.io.CountingOutput
+import cz.cleanship.aitools.engine.io.TargetRoot
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.PromptVariable
 import cz.cleanship.aitools.engine.models.ToolType
@@ -10,11 +11,17 @@ import cz.cleanship.aitools.engine.tools.AgentContext
 import cz.cleanship.aitools.engine.tools.FeatureContext
 import cz.cleanship.aitools.engine.tools.Frontmatter
 import cz.cleanship.aitools.engine.tools.GlobalContext
+import cz.cleanship.aitools.engine.tools.McpFilesUserScope
+import cz.cleanship.aitools.engine.tools.McpLimits
 import cz.cleanship.aitools.engine.tools.Printers
 import cz.cleanship.aitools.engine.tools.PromptContext
 import cz.cleanship.aitools.engine.tools.SkillContext
 import cz.cleanship.aitools.engine.tools.ToolAdapter
-import cz.cleanship.aitools.engine.tools.UserScopeExporter
+import cz.cleanship.aitools.engine.tools.mcp.JsonMcpConfigFormat
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigFileExporter
+import cz.cleanship.aitools.engine.tools.mcp.McpConfigShadow
+import cz.cleanship.aitools.engine.tools.mcp.McpPermissionsExporter
 import cz.cleanship.aitools.engine.tools.replacing
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -33,9 +40,39 @@ class GitHubCopilotAdapter(
         project.replacing(promptsDir(projectDir), instructionsDir(projectDir), agentsDir(projectDir))
 
     /**
-     * Returns no exporter: the per-user layout of GitHub Copilot is not implemented yet, so the engine reports a user deployment naming this tool as skipped for it instead of writing anything into the home.
+     * Returns the user scope of Copilot CLI, whose only file in the home is its MCP config file `<home>/.copilot/mcp-config.json`: no instructions, agent, prompt or skill file of GitHub Copilot is written into the home.
      */
-    override fun userScope(userHome: File, deployment: UserDeploymentManifest): UserScopeExporter? = null
+    // Copilot CLI reads COPILOT_HOME in place of ~/.copilot; the engine reads no such variable for any tool, so the file lies where an unset COPILOT_HOME puts it.
+    override fun userScope(userHome: File, deployment: UserDeploymentManifest): McpFilesUserScope =
+        CopilotCliUserScope(userHome, exportService)
+
+    // VS Code also reads a portable `.mcp.json`, but that is the file of Claude Code; `.vscode/mcp.json` is the one only Copilot in VS Code reads, and `.github/mcp.json` the one only Copilot CLI reads, so no two tools contend for an entry.
+    // Copilot CLI reads `.github/mcp.json` only while no `.mcp.json` lies in the same directory, whatever that file holds; the engine writes the file either way, and warns when a `.mcp.json` the deployment does not write hides it.
+    override fun mcpConfigs(projectDir: File): List<McpConfigExporter> = listOf(
+        McpConfigFileExporter(projectDir.resolve(".vscode").resolve(MCP_CONFIG_FILE), JsonMcpConfigFormat.VS_CODE, exportService, projectDir),
+        McpConfigFileExporter(
+            githubDir(projectDir).resolve(MCP_CONFIG_FILE),
+            JsonMcpConfigFormat.COPILOT_CLI,
+            exportService,
+            projectDir,
+            hiddenBy = McpConfigShadow(projectDir.resolve(".mcp.json"), COPILOT_CLI),
+        ),
+    )
+
+    override fun mcpPermissions(projectDir: File): McpPermissionsExporter? = null
+
+    // `.vscode` holds only the MCP config file of VS Code, so the engine checks it only when it writes that file.
+    override fun toolDirectories(projectDir: File): List<File> =
+        listOf(githubDir(projectDir), agentsDir(projectDir), promptsDir(projectDir), instructionsDir(projectDir))
+
+    // VS Code gives an agent that declares no `tools` every tool it has, the servers of `.vscode/mcp.json` included, and one that declares them only those it lists: listing the servers of an agent would take away its editing, search and terminal tools.
+    // The user scope is served through Copilot CLI; VS Code keeps the MCP servers of the user in the mcp.json of each user profile, and of each remote, which this engine does not write.
+    override val mcpLimits = McpLimits(
+        agentServers = "a Copilot agent without 'tools' already gets every configured server, and a 'tools' list would remove its built-in tools",
+        allowedTools = NO_TOOL_RESTRICTION,
+        deniedTools = NO_TOOL_RESTRICTION,
+        userScope = null,
+    )
 
     override fun export(projectDir: File, globalContext: GlobalContext) = exportService.export(
         globalContext.project,
@@ -100,14 +137,6 @@ class GitHubCopilotAdapter(
     override fun skillPaths(projectDir: File, skillId: String): List<File> =
         listOf(skillFile(promptsDir(projectDir), skillId), skillFilesDir(promptsDir(projectDir), skillId))
 
-    private fun githubDir(projectDir: File) = projectDir.resolve(".github")
-
-    private fun promptsDir(projectDir: File) = githubDir(projectDir).resolve("prompts")
-
-    private fun instructionsDir(projectDir: File) = githubDir(projectDir).resolve("instructions")
-
-    private fun agentsDir(projectDir: File) = githubDir(projectDir).resolve("agents")
-
     private fun frontmatter(name: String, description: String, argumentHint: String? = null) = buildString {
         appendLine("---")
         appendLine("name: $name")
@@ -117,13 +146,6 @@ class GitHubCopilotAdapter(
         }
         appendLine("---")
     }
-
-    /**
-     * Renders the declared variables in manifest order as `<required>` and `[optional]` hints, or null when the prompt declares none - `argument-hint` is then omitted from the frontmatter entirely.
-     */
-    private fun argumentHint(variables: List<PromptVariable>) = variables
-        .takeIf { it.isNotEmpty() }
-        ?.joinToString(" ") { if (it.required) "<${it.name}>" else "[${it.name}]" }
 
     companion object {
         private val LOG = LoggerFactory.getLogger(GitHubCopilotAdapter::class.java)
@@ -144,3 +166,46 @@ class GitHubCopilotAdapter(
 private fun skillFile(promptsDir: File, skillId: String) = promptsDir.resolve("skill-$skillId.prompt.md")
 
 private fun skillFilesDir(promptsDir: File, skillId: String) = promptsDir.resolve("skill-$skillId")
+
+/**
+ * Renders the declared variables in manifest order as `<required>` and `[optional]` hints, or null when the prompt declares none - `argument-hint` is then omitted from the frontmatter entirely.
+ */
+private fun argumentHint(variables: List<PromptVariable>) = variables
+    .takeIf { it.isNotEmpty() }
+    ?.joinToString(" ") { if (it.required) "<${it.name}>" else "[${it.name}]" }
+
+private fun githubDir(projectDir: File) = projectDir.resolve(".github")
+
+private fun promptsDir(projectDir: File) = githubDir(projectDir).resolve("prompts")
+
+private fun instructionsDir(projectDir: File) = githubDir(projectDir).resolve("instructions")
+
+private fun agentsDir(projectDir: File) = githubDir(projectDir).resolve("agents")
+
+// Copilot CLI does read an allow list from the entry field `tools`, but the engine does not render one, so the reason holds for all three files alike.
+private const val NO_TOOL_RESTRICTION =
+    "the engine knows no setting of .vscode/mcp.json that restricts the tools of a server, and writes every entry of .github/mcp.json and ~/.copilot/mcp-config.json with the 'tools' list [\"*\"], which allows all of them"
+
+private const val MCP_CONFIG_FILE = "mcp.json"
+
+private const val COPILOT_CLI = "Copilot CLI"
+
+/**
+ * The MCP config file of Copilot CLI in the home [userHome], `<home>/.copilot/mcp-config.json`, written through [exportService].
+ */
+private class CopilotCliUserScope(
+    private val userHome: File,
+    private val exportService: ExportService,
+) : McpFilesUserScope {
+
+    private val toolDir get() = userHome.resolve(".copilot")
+
+    override val toolDirectories: List<File> get() = listOf(toolDir)
+
+    // The file may hold credentials the user wrote by hand: an existing one keeps its permission bits, and a new one is readable and writable by its owner only - see ManagedConfigFile.
+    override fun mcpConfig(): McpConfigExporter =
+        McpConfigFileExporter(toolDir.resolve("mcp-config.json"), JsonMcpConfigFormat.COPILOT_CLI, exportService, TargetRoot.UserHome(userHome))
+
+    // Copilot CLI has no file setting that denies a single tool of a server.
+    override fun mcpPermissions(): McpPermissionsExporter? = null
+}

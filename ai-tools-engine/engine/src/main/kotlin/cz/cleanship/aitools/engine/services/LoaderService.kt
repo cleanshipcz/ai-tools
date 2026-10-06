@@ -9,8 +9,9 @@ import cz.cleanship.aitools.engine.models.AllManifests
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.FeatureManifest
 import cz.cleanship.aitools.engine.models.FragmentManifest
-import cz.cleanship.aitools.engine.models.InvalidVersionException
 import cz.cleanship.aitools.engine.models.Locations
+import cz.cleanship.aitools.engine.models.McpServer
+import cz.cleanship.aitools.engine.models.McpServerManifest
 import cz.cleanship.aitools.engine.models.ProjectManifest
 import cz.cleanship.aitools.engine.models.PromptManifest
 import cz.cleanship.aitools.engine.models.RulesetManifest
@@ -24,9 +25,11 @@ import java.io.File
  * Reads manifest files into their models.
  *
  * @param skillSourceResolver reads the plain skill folder a skill manifest points at with its `source`. The default declares no variables, so a `source` can reference only variables of the process environment.
+ * @param mcpServerReader turns an MCP server manifest into the server it describes, reading the `server.json` a pointer names. The default declares no variables, so a `source` or a stdio `command` can reference only variables of the process environment.
  */
 class LoaderService(
     private val skillSourceResolver: SkillSourceResolver = SkillSourceResolver(),
+    private val mcpServerReader: McpServerReader = McpServerReader(),
 ) {
     private val yaml = Yaml(
         configuration = YamlConfiguration(
@@ -71,6 +74,23 @@ class LoaderService(
         return resolved.skill to resolved.directory
     }
 
+    /**
+     * Loads the MCP server manifest in [file] as the [McpServer] it describes - see [McpServerReader.read].
+     *
+     * @throws YamlException naming [file] if it is not valid YAML or does not match [McpServerManifest]
+     * @throws ManifestLoadingException naming [file] if its `metadata.version`, its transport `type` or its id is invalid, or if [McpServerReader.read] refuses it
+     */
+    fun loadMcpServer(file: File): McpServer {
+        val declared: McpServerManifest = yaml.load(file)
+        return try {
+            mcpServerReader.read(declared, file)
+        } catch (ex: InvalidMcpServerManifestException) {
+            throw ManifestLoadingException(file, ex)
+        } catch (ex: InvalidMcpServerSourceException) {
+            throw ManifestLoadingException(file, ex)
+        }
+    }
+
     fun loadProject(file: File): ProjectManifest = yaml.load(file)
 
     fun loadUserDeployment(file: File): UserDeploymentManifest = yaml.load(file)
@@ -81,8 +101,8 @@ class LoaderService(
             return decodeFromString<T>(content).also { it.requireSingleSegmentId(file) }
         } catch (ex: YamlException) {
             throw YamlException("Failed to load ${file.absolutePath}", ex.path, ex)
-        } catch (ex: InvalidVersionException) {
-            // kaml lets a serializer's own failure through untouched, so a malformed 'metadata.version' would otherwise reach the author as a bare "Invalid version format" naming no file at all.
+        } catch (ex: IllegalArgumentException) {
+            // kaml lets a serializer's own failure through untouched, so a malformed 'metadata.version' (an InvalidVersionException) or a polymorphic 'type' no subclass declares, such as an MCP transport of type 'sse' (a bare SerializationException), would otherwise reach the author naming no file at all. Both are IllegalArgumentExceptions.
             throw ManifestLoadingException(file, ex)
         }
     }
@@ -98,16 +118,20 @@ class LoaderService(
      *
      * How far a collision reaches follows the kind of manifest, mirroring the collect-all-then-fail policy of [cz.cleanship.aitools.engine.ToolsEngine]:
      * - `projects`, `userDeployments` and per-project `features` belong to a single deployment, so a collision there costs only the deployment(s) that carry it. Those are left out of [AllManifests.projects] and [AllManifests.userDeployments] and reported through [AllManifests.duplicates], which lets every unaffected deployment still be exported before the run fails.
-     * - `agents`, `prompts`, `rulesets`, `fragments` and `skills` are shared by every project, and a project that declares no filter for a kind deploys all of it, so dropping a colliding pair would silently ship every project without content it never excluded. These therefore still fail the whole run - but only once every location has been read, so that one run reports every collision instead of one collision per run.
+     * - `agents`, `prompts`, `rulesets`, `fragments`, `skills` and `mcps` are shared by every project, and a project that declares no filter for any of these kinds but `mcps` deploys all of it, so dropping a colliding pair would silently ship every project without content it never excluded. These therefore still fail the whole run - but only once every location has been read, so that one run reports every collision instead of one collision per run.
      *
      * @throws DuplicateManifestIdException if two distinct files of a kind shared by every project declare the same id
+     * @throws ManifestLoadingException naming the agent manifest if one agent names in `mcps` an MCP server that no MCP server manifest declares
+     * @throws UnknownMcpServersException naming every agent manifest if more than one agent does
      */
     fun loadAll(locations: Locations): AllManifests {
-        val agents = loadAllFromDirectories(locations.agents, ::loadAgent)
+        val loadedAgents = locations.agents.flatMap { yamlFilesIn(it) }.loadEach(::loadAgent)
+        val agents = loadedAgents.indexByUniqueId()
         val prompts = loadAllFromDirectories(locations.prompts, ::loadPrompt)
         val rulesets = loadAllFromDirectories(locations.rulesets, ::loadRuleset)
         val fragments = loadAllFromDirectories(locations.fragments, ::loadFragment)
         val (skills, skillSourceDirs, skillManifestFiles) = loadSkills(locations.skills)
+        val mcps = loadAllFromDirectories(locations.mcps, ::loadMcpServer)
 
         val deploymentFiles = locations.deployments.flatMap { directory -> findYamlFiles(directory) }
         val loadedProjects = deploymentFiles.filter { it.name == PROJECT_MANIFEST_FILE }.loadEach(::loadProject)
@@ -124,10 +148,11 @@ class LoaderService(
         val scopedDuplicates = projects.duplicates + userDeployments.duplicates +
             features.values.flatMap { it.duplicates }
         val sharedDuplicates = agents.duplicates + prompts.duplicates + rulesets.duplicates +
-            fragments.duplicates + skills.duplicates
+            fragments.duplicates + skills.duplicates + mcps.duplicates
         if (sharedDuplicates.isNotEmpty()) {
             throw DuplicateManifestIdException(sharedDuplicates + scopedDuplicates)
         }
+        requireKnownMcpServers(loadedAgents, mcps.byId.keys)
 
         // A project whose own features collide cannot be exported either: it deploys every feature it declares unless it filters them, so exporting it would silently leave out the pair that had to be dropped.
         val projectsWithCollidingFeatures = features
@@ -143,6 +168,7 @@ class LoaderService(
             skills = skills.byId,
             skillSourceDirs = skillSourceDirs,
             skillManifestFiles = skillManifestFiles,
+            mcps = mcps.byId,
             projects = projects.byId.filterKeys { it !in projectsWithCollidingFeatures },
             userDeployments = userDeployments.byId,
             features = features.mapValues { (_, featuresOfProject) -> featuresOfProject.byId },
@@ -176,18 +202,7 @@ class LoaderService(
         )
     }
 
-    private fun <T : VersionedManifest> loadAllFromDirectories(
-        directories: List<File>,
-        loader: (File) -> T,
-    ): IndexedManifests<T> = directories
-        .flatMap { directory -> findYamlFiles(directory) }
-        .loadEach(loader)
-        .indexByUniqueId()
-
-    fun findYamlFiles(directory: File): List<File> = directory
-        .walkTopDown()
-        .filter { it.isFile && (it.extension == "yml" || it.extension == "yaml") }
-        .toList()
+    fun findYamlFiles(directory: File): List<File> = yamlFilesIn(directory)
 
     companion object {
         /** The filename that makes a directory under `locations.deployments` a project - see [ProjectManifest]. */
@@ -197,6 +212,25 @@ class LoaderService(
         private const val USER_DEPLOYMENT_MANIFEST_FILE = "user.yml"
     }
 }
+
+/**
+ * Loads every YAML file under [directories] with [loader] and indexes the manifests by id.
+ */
+private fun <T : VersionedManifest> loadAllFromDirectories(
+    directories: List<File>,
+    loader: (File) -> T,
+): IndexedManifests<T> = directories
+    .flatMap { directory -> yamlFilesIn(directory) }
+    .loadEach(loader)
+    .indexByUniqueId()
+
+/**
+ * Returns every YAML file at any depth under [directory], or none when it does not exist.
+ */
+private fun yamlFilesIn(directory: File): List<File> = directory
+    .walkTopDown()
+    .filter { it.isFile && (it.extension == "yml" || it.extension == "yaml") }
+    .toList()
 
 /**
  * Returns the manifest file describing the skill at [entry], or `null` when [entry] is not a skill.
@@ -228,6 +262,33 @@ private fun VersionedManifest.requireSingleSegmentId(file: File) {
         file,
         InvalidManifestIdException("Invalid manifest id '$id': $reason. An id must name a single file or directory."),
     )
+}
+
+/**
+ * Fails when an agent of [agents] names in `mcps` an MCP server that [known], the ids of every MCP server manifest of the run, does not hold.
+ *
+ * @throws ManifestLoadingException naming the agent manifest and every unknown id when one agent does
+ * @throws UnknownMcpServersException naming every such agent manifest and its unknown ids when more than one does
+ */
+private fun requireKnownMcpServers(agents: List<Pair<File, AgentManifest>>, known: Set<String>) {
+    // Every agent is checked before anything is thrown, so one run names every agent to fix, as it names every duplicate id.
+    val failures = agents.mapNotNull { (file, agent) ->
+        val unknown = agent.mcps.filterNot { it in known }.distinct()
+        if (unknown.isEmpty()) {
+            null
+        } else {
+            ManifestLoadingException(
+                file,
+                InvalidAgentManifestException(
+                    "Agent '${agent.id}' uses the MCP server(s) ${unknown.joinToString { "'$it'" }}, which no MCP server manifest of the run declares. Add a manifest under 'locations.mcps', or remove the id from 'mcps'.",
+                ),
+            )
+        }
+    }
+    when {
+        failures.size == 1 -> throw failures.single()
+        failures.size > 1 -> throw UnknownMcpServersException(failures)
+    }
 }
 
 /**
@@ -316,6 +377,11 @@ class InvalidManifestIdException(message: String) : RuntimeException(message)
 class InvalidSkillManifestException(message: String) : RuntimeException(message)
 
 /**
+ * Thrown when an agent manifest names an MCP server no manifest declares. It always travels wrapped in a [ManifestLoadingException], so the author is told which file to fix.
+ */
+class InvalidAgentManifestException(message: String) : RuntimeException(message)
+
+/**
  * Thrown when manifest files of a kind shared by every project declare the same id. Carries every collision found in the run, so that the author is told about all of them at once instead of one per run.
  */
 class DuplicateManifestIdException(
@@ -324,5 +390,17 @@ class DuplicateManifestIdException(
         buildString {
             append("Found ${duplicates.size} duplicate manifest id(s):")
             duplicates.forEach { duplicate -> append("\n  - ${duplicate.message}") }
+        },
+    )
+
+/**
+ * Thrown when more than one agent manifest names an MCP server no MCP server manifest declares, carrying the failure of each of them.
+ */
+class UnknownMcpServersException(
+    val failures: List<ManifestLoadingException>,
+) : RuntimeException(
+        buildString {
+            append("Found ${failures.size} agent manifest(s) naming an MCP server no MCP server manifest declares:")
+            failures.forEach { failure -> append("\n  - ${failure.message}") }
         },
     )

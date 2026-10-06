@@ -16,9 +16,11 @@ import cz.cleanship.aitools.engine.UnreadableReplacedFolderException
 import cz.cleanship.aitools.engine.io.ArtifactPathException
 import cz.cleanship.aitools.engine.models.DuplicateManifestId
 import cz.cleanship.aitools.engine.models.ToolType
+import cz.cleanship.aitools.engine.services.ArtifactWriteException
 import cz.cleanship.aitools.engine.services.DryRunArtifactSink
 import cz.cleanship.aitools.engine.services.DuplicateManifestIdException
 import cz.cleanship.aitools.engine.services.ManifestLoadingException
+import cz.cleanship.aitools.engine.services.UnknownMcpServersException
 import cz.cleanship.aitools.engine.tools.RulesetResolvingException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -30,6 +32,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.NotDirectoryException
 
 class AiToolsCliIntegrationTest {
 
@@ -197,6 +200,22 @@ class AiToolsCliIntegrationTest {
     }
 
     @Test
+    fun `should fail naming the file and the accepted values when a config names a secrets manager the engine does not know`() {
+        // given
+        File(tempDir, "config.yml").writeText("secrets_manager: keychain\n")
+        val cli = AiToolsCli()
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessage("'secrets_manager' of config.yml names a secrets manager this engine does not know. Accepted values: 'libsecret', 'environment'.")
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
     fun `should deploy a user deployment into the home the option names`() {
         // given
         // - the home base is always the one the run was given; the real home of this machine is never involved
@@ -324,6 +343,22 @@ class AiToolsCliIntegrationTest {
         // then
         assertThat(result.statusCode).isNotZero()
         assertThat(result.stderr.trim()).isEqualTo(message)
+    }
+
+    @Test
+    fun `should report a file the run cannot write as a single line without a stack trace`() {
+        // given
+        // - a user-scope export stops the run with the file it could not write, which the engine names in the message
+        val target = tempDir.resolve("home/.claude/skills/jira-ticket/template.txt")
+        val failure = ArtifactWriteException(target, NotDirectoryException(target.parentFile.path))
+        val cli = AiToolsCli(runner = { _, _, _ -> throw failure })
+
+        // when
+        val result = cli.test(arrayOf("--working-dir", tempDir.absolutePath))
+
+        // then
+        assertThat(result.statusCode).isNotZero()
+        assertThat(result.stderr.trim()).isEqualTo("'${target.absolutePath}' cannot be written (NotDirectoryException)")
     }
 
     @Test
@@ -704,6 +739,31 @@ class AiToolsCliIntegrationTest {
             .isInstanceOf(CliktError::class.java)
             .hasMessageContaining("broken.yml")
             .hasMessageContaining("Invalid version format: 1.0")
+        assertThat((error as CliktError).statusCode).isNotZero()
+    }
+
+    @Test
+    fun `should fail with every agent manifest when several agents name an MCP server no manifest declares`() {
+        // given
+        val cli = AiToolsCli(
+            runner = { _, _, _ ->
+                throw UnknownMcpServersException(
+                    listOf(
+                        ManifestLoadingException(File("/manifests/reviewer.yml"), IllegalArgumentException("Agent 'reviewer' uses the MCP server(s) 'github'")),
+                        ManifestLoadingException(File("/manifests/writer.yml"), IllegalArgumentException("Agent 'writer' uses the MCP server(s) 'jira'")),
+                    ),
+                )
+            },
+        )
+
+        // when
+        val error = runCatching { cli.parse(arrayOf("--working-dir", tempDir.absolutePath)) }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(CliktError::class.java)
+            .hasMessageContaining("reviewer.yml")
+            .hasMessageContaining("writer.yml")
         assertThat((error as CliktError).statusCode).isNotZero()
     }
 

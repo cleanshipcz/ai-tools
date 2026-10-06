@@ -6,6 +6,7 @@ import cz.cleanship.aitools.engine.models.SkillFile
 import cz.cleanship.aitools.engine.models.VersionedManifest
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.nio.file.Files
 
 /**
  * Puts the artifacts of a run where they belong, after checking that they belong there.
@@ -30,11 +31,43 @@ class ExportService(
     ) = sink.export(entity, targetFile, outputConsumer)
 
     /**
+     * Writes [content] to the config file [targetFile] through the sink of this service - see [ArtifactSink.writeConfigFile].
+     *
+     * @param describedBy what [content] holds, as the log line names it
+     * @param unchangedFrom what [targetFile] held when the caller read it, which it must still hold to be replaced
+     * @param createdAs who may read and write [targetFile] when it does not exist yet
+     * @throws ConfigFileChangedException naming [targetFile] if it no longer holds what [unchangedFrom] says; never in a dry run
+     * @throws java.io.IOException if [targetFile] or the directory holding it cannot be written, which leaves [targetFile] as it was; never in a dry run
+     */
+    fun writeConfigFile(
+        targetFile: File,
+        content: String,
+        describedBy: String,
+        unchangedFrom: ConfigFileState = ConfigFileState.Unchecked,
+        createdAs: NewConfigFileMode = NewConfigFileMode.DEFAULT,
+    ) = sink.writeConfigFile(targetFile, content, describedBy, unchangedFrom, createdAs)
+
+    /**
+     * Deletes the config file [targetFile] through the sink of this service - see [ArtifactSink.deleteConfigFile].
+     *
+     * @param describedBy what [targetFile] holds, as the log line names it
+     * @param unchangedFrom what [targetFile] held when the caller read it, which it must still hold to be deleted
+     * @throws ConfigFileChangedException naming [targetFile] if it no longer holds what [unchangedFrom] says; never in a dry run
+     * @throws java.io.IOException if [targetFile] cannot be deleted; never in a dry run
+     */
+    fun deleteConfigFile(
+        targetFile: File,
+        describedBy: String,
+        unchangedFrom: ConfigFileState,
+    ) = sink.deleteConfigFile(targetFile, describedBy, unchangedFrom)
+
+    /**
      * Copies every companion file declared by a skill next to its generated manifest.
      *
      * @param sourceDir the folder a relative companion file is copied from: the source folder of a pointer skill, the directory of a directory-based skill, or `null` for a standalone skill file
      * @param pointerSourceDirs the source folder of every pointer skill of the run, none of which a companion file may land in
-     * @throws SkillFileResolvingException if a declared file cannot be resolved, does not exist, would land outside [targetDir] - see [resolveTarget] - or would land, once links are resolved, inside [sourceDir] or inside a folder of [pointerSourceDirs]
+     * @throws SkillFileResolvingException if a declared file cannot be resolved, does not exist, is not a regular file or cannot be read, would land outside [targetDir] - see [resolveTarget] - or would land, once links are resolved, inside [sourceDir] or inside a folder of [pointerSourceDirs]
+     * @throws ArtifactWriteException naming the target if it or the directory holding it cannot be written; never in a dry run
      */
     fun copySkillFiles(
         skillFiles: List<SkillFile>,
@@ -49,7 +82,7 @@ class ExportService(
             val targetFile = resolveTarget(skillFile.target, targetDir)
             requireOutsideSourceDir(targetFile, sourceDir, skillId)
             requireOutsidePointerSourceDirs(targetFile, pointerSourceDirs, skillId)
-            requireSourceExists(sourceFile)
+            requireSourceReadable(sourceFile)
             sink.copySkillFile(sourceFile, targetFile)
         }
     }
@@ -122,16 +155,20 @@ class ExportService(
     }
 
     /**
-     * Checked here rather than left to the copy itself, so that a dry run - which copies nothing - reports a declared file that was never written exactly like a deploy does.
+     * Checked here rather than left to the copy itself, so that a dry run - which copies nothing - reports a declared file that cannot be copied exactly like a deploy does, and a deploy never replaces the file an earlier deploy copied with nothing.
      */
-    private fun requireSourceExists(sourceFile: File) {
-        if (!sourceFile.exists()) {
-            throw SkillFileResolvingException(
+    private fun requireSourceReadable(sourceFile: File) {
+        val path = sourceFile.toPath()
+        val problem = when {
+            !sourceFile.exists() ->
                 "Skill file '${sourceFile.absolutePath}' does not exist. " +
                     "For a skill that declares 'files', add the file or remove it from 'files'. " +
-                    "For a pointer skill, the file was removed from its source folder while the run was going on; run again.",
-            )
+                    "For a pointer skill, the file was removed from its source folder while the run was going on; run again."
+            !Files.isRegularFile(path) -> "Skill file '${sourceFile.absolutePath}' is not a regular file. Declare a file, or remove it from 'files'."
+            !Files.isReadable(path) -> "Skill file '${sourceFile.absolutePath}' cannot be read. Make it readable, or remove it from 'files'."
+            else -> return
         }
+        throw SkillFileResolvingException(problem)
     }
 
     private fun resolveSource(source: String, sourceDir: File?): File {

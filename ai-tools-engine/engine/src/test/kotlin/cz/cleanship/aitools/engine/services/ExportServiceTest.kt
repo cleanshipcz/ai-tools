@@ -10,14 +10,18 @@ import cz.cleanship.aitools.engine.models.SkillFile
 import cz.cleanship.aitools.engine.utils.contentSnapshot
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 
 class ExportServiceTest {
 
@@ -170,6 +174,30 @@ class ExportServiceTest {
             assertThat(targetFile).doesNotExist()
             // - not even the directory that would hold the artifact is created
             assertThat(targetFile.parentFile).doesNotExist()
+        }
+
+        @Test
+        fun `should name a text file it would write without writing it`() {
+            // when
+            dryRunService.writeConfigFile(targetFile, "{ }\n", describedBy = "MCP servers [atlassian]")
+
+            // then
+            assertThat(targetFile.parentFile).doesNotExist()
+            assertThat(infos()).anyMatch { it.contains("Would write") && it.contains("MCP servers [atlassian]") && it.contains(targetFile.absolutePath) }
+        }
+
+        @Test
+        fun `should name a config file it would delete without deleting it`() {
+            // given
+            targetFile.parentFile.mkdirs()
+            targetFile.writeText("{}\n")
+
+            // when
+            dryRunService.deleteConfigFile(targetFile, describedBy = "the MCP ledger", unchangedFrom = ConfigFileState.Exactly("{}\n"))
+
+            // then
+            assertThat(targetFile).hasContent("{}\n")
+            assertThat(infos()).anyMatch { it.contains("Would delete") && it.contains("the MCP ledger") && it.contains(targetFile.absolutePath) }
         }
 
         @Test
@@ -463,6 +491,20 @@ class ExportServiceTest {
     }
 
     @Test
+    fun `should write a text file, replacing what was there, without leaving temporary files behind`() {
+        // given
+        targetFile.parentFile.mkdirs()
+        targetFile.writeText("stale")
+
+        // when
+        exportService.writeConfigFile(targetFile, "{ }\n", describedBy = "MCP servers [atlassian]")
+
+        // then
+        assertThat(targetFile).hasContent("{ }\n")
+        assertThat(targetFile.parentFile.listFiles()).containsExactly(targetFile)
+    }
+
+    @Test
     fun `should write exported content when output consumer succeeds`() {
         // when
         exportService.export(ruleset, targetFile) { output ->
@@ -602,6 +644,71 @@ class ExportServiceTest {
         assertThat(error)
             .isInstanceOf(SkillFileResolvingException::class.java)
             .hasMessageContaining(sourceDir.resolve("missing.md").absolutePath)
+    }
+
+    /**
+     * A companion file that exists but cannot be read fails its skill naming the source, in a dry run as in a deploy, and the file an earlier deploy wrote at the target is kept.
+     */
+    @ParameterizedTest
+    @CsvSource("false", "true")
+    fun `should fail naming the source and keep the target when the declared skill file cannot be read`(
+        dryRun: Boolean,
+    ) {
+        // given
+        val sourceDir = tempDir.resolve("skill").toFile()
+        sourceDir.mkdirs()
+        val source = sourceDir.resolve("locked.md")
+        source.writeText("Locked.\n")
+        val targetDir = tempDir.resolve("exported").toFile()
+        targetDir.mkdirs()
+        // - what an earlier deploy copied there
+        targetDir.resolve("locked.md").writeText("Deployed before.\n")
+        Files.setPosixFilePermissions(source.toPath(), PosixFilePermissions.fromString("---------"))
+        val service = if (dryRun) ExportService(DryRunArtifactSink) else ExportService()
+
+        // when
+        val error = try {
+            // - a user who may read anything, such as root, cannot be refused a read
+            assumeTrue(!Files.isReadable(source.toPath()))
+            runCatching {
+                service.copySkillFiles(listOf(SkillFile("locked.md", "locked.md")), sourceDir, targetDir, pointerSourceDirs = emptyList())
+            }.exceptionOrNull()
+        } finally {
+            Files.setPosixFilePermissions(source.toPath(), PosixFilePermissions.fromString("rw-r--r--"))
+        }
+
+        // then
+        assertThat(error)
+            .isInstanceOf(SkillFileResolvingException::class.java)
+            .hasMessage("Skill file '${source.absolutePath}' cannot be read. Make it readable, or remove it from 'files'.")
+        assertThat(targetDir.resolve("locked.md")).content().isEqualTo("Deployed before.\n")
+    }
+
+    @ParameterizedTest
+    @CsvSource("false", "true")
+    fun `should fail naming the source and keep the target when the declared skill file is a directory`(
+        dryRun: Boolean,
+    ) {
+        // given
+        // - a directory where the manifest declares a file, which opens on Linux and fails only at the first read
+        val sourceDir = tempDir.resolve("skill").toFile()
+        val source = sourceDir.resolve("templates")
+        source.mkdirs()
+        val targetDir = tempDir.resolve("exported").toFile()
+        targetDir.mkdirs()
+        targetDir.resolve("templates").writeText("Deployed before.\n")
+        val service = if (dryRun) ExportService(DryRunArtifactSink) else ExportService()
+
+        // when
+        val error = runCatching {
+            service.copySkillFiles(listOf(SkillFile("templates", "templates")), sourceDir, targetDir, pointerSourceDirs = emptyList())
+        }.exceptionOrNull()
+
+        // then
+        assertThat(error)
+            .isInstanceOf(SkillFileResolvingException::class.java)
+            .hasMessage("Skill file '${source.absolutePath}' is not a regular file. Declare a file, or remove it from 'files'.")
+        assertThat(targetDir.resolve("templates")).content().isEqualTo("Deployed before.\n")
     }
 
     @Test

@@ -22,8 +22,9 @@ fun interface EnvironmentSource {
 }
 
 /**
- * Expands the `${NAME}` references a value declared in a YAML file carries - `locations.*` in `config.yml`,
- * `deploy.directory` in `project.yml` - before that value is resolved into a path.
+ * Holds the variables of a run: it expands the `${NAME}` references a path declared in a YAML file carries - `locations.*` in `config.yml`,
+ * `deploy.directory` in `project.yml`, the `source` of a pointer - before that path is resolved, and answers the value an
+ * MCP server manifest reads for a plain variable from the config files alone - see [configValueOf].
  *
  * A name is looked up in [variables] first - the `env_vars` of `config.yml` merged with those of `config.local.yml`,
  * which win per key - and in [environment] second. A user can therefore keep a base that differs between machines out
@@ -43,10 +44,12 @@ fun interface EnvironmentSource {
  * fails with [UnexpandedReferenceException] rather than being expanded further, which is what keeps the alternative -
  * a path quietly holding a literal `${...}` - from ever being deployed to. One pass also cannot loop, not even when a
  * variable refers to itself.
+ *
+ * @property environment the environment of the run, which every other reader of that environment in the run is given too
  */
 class VariableResolver(
     variables: Map<String, String> = emptyMap(),
-    private val environment: EnvironmentSource = EnvironmentSource.PROCESS,
+    val environment: EnvironmentSource = EnvironmentSource.PROCESS,
 ) {
 
     /**
@@ -64,16 +67,39 @@ class VariableResolver(
      * @throws UnexpandedReferenceException if a reference survives the one pass this resolver makes
      */
     fun substitute(value: String, origin: String? = null): String {
-        val substituted = REFERENCE.replace(value) { reference ->
+        val substituted = VARIABLE_REFERENCE.replace(value) { reference ->
             val name = reference.groupValues[1]
-            declared[name] ?: environment.read(name) ?: throw UnresolvedVariableException(name, value, origin)
+            valueOf(name) ?: throw UnresolvedVariableException(name, value, origin)
         }
         // The result is checked as a whole rather than each expansion on its own, because an expansion can also
         // assemble a reference together with the text around it: a variable holding a bare dollar turns the `{NAME}`
         // written after it into a reference that no expansion ever looked at.
-        val leftover = REFERENCE.find(substituted) ?: return substituted
+        val leftover = VARIABLE_REFERENCE.find(substituted) ?: return substituted
         throw UnexpandedReferenceException(leftover.groupValues[1], substituted, value, origin)
     }
+
+    /**
+     * Returns the value of the variable [name]: the one the config files declare, otherwise the one the environment carries, or `null` when neither carries it.
+     */
+    fun valueOf(name: String): String? = declared[name] ?: environment.read(name)
+
+    /**
+     * Returns the value the `env_vars` of the config files declare for [name], or `null` when they declare none; the environment of the run is never read.
+     */
+    fun configValueOf(name: String): String? = declared[name]
+
+    /**
+     * Returns whether the environment of the run carries the variable [name]; a variable only the config files declare does not count.
+     */
+    fun isSetInEnvironment(name: String): Boolean = environment.read(name) != null
+
+    /**
+     * Returns whether the environment of the run carries the variable [name] with a value [accepts] accepts; the value is handed to [accepts] only, never returned.
+     */
+    fun environmentHolds(
+        name: String,
+        accepts: (String) -> Boolean,
+    ): Boolean = environment.read(name)?.let(accepts) == true
 
     /**
      * Two resolvers are equal when they were built from the same variables and read the same environment - that is,
@@ -97,10 +123,6 @@ class VariableResolver(
      * manifests, and whatever a user puts in one has no business being repeated into a log line.
      */
     override fun toString(): String = "VariableResolver(variables=${declared.keys}, environment=$environment)"
-
-    companion object {
-        private val REFERENCE = Regex("""\$\{([A-Za-z_][A-Za-z0-9_]*)}""")
-    }
 }
 
 /**
@@ -139,3 +161,13 @@ class UnexpandedReferenceException(
     )
 
 private fun String?.readFrom() = this?.let { ", read from $it" } ?: ""
+
+/**
+ * An environment variable name the engine accepts, `[A-Za-z_][A-Za-z0-9_]*`: the name of a variable of the run, of a variable of an MCP server, and of a secret the launcher reads.
+ */
+internal val ENVIRONMENT_VARIABLE_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
+
+/**
+ * A `${NAME}` reference, where NAME matches [ENVIRONMENT_VARIABLE_NAME]; group 1 is the name. Every place that expands or checks such a reference reads it from here, so they agree on what a reference is.
+ */
+internal val VARIABLE_REFERENCE = Regex("""\$\{(${ENVIRONMENT_VARIABLE_NAME.pattern})}""")

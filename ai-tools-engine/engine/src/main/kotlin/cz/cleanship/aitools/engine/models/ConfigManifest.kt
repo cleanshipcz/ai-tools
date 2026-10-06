@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
  * [cz.cleanship.aitools.engine.env.VariableResolver]. Unlike `locations` and `tools`, which `config.local.yml`
  * replaces as a whole, these merge per key, so a local config can redeclare the one base that differs on its machine
  * without repeating the variables it agrees with.
+ * @param secretsManager the `configValue` of the [SecretsManagerKind] of the machine, written `secrets_manager` in YAML, or `null` when this file names none; a value this engine does not know fails the run, naming the file and the accepted values.
  */
 @Serializable
 data class ConfigManifest(
@@ -15,6 +16,9 @@ data class ConfigManifest(
     val tools: List<ToolType>? = null,
     @SerialName("env_vars")
     val envVars: Map<String, String>? = null,
+    // Decoded as text rather than as SecretsManagerKind, so that a value this engine does not know fails naming the file and the accepted values instead of failing inside the decoder.
+    @SerialName("secrets_manager")
+    val secretsManager: String? = null,
 )
 
 /**
@@ -22,6 +26,7 @@ data class ConfigManifest(
  * rejected by [cz.cleanship.aitools.engine.services.ConfigService] instead of being dropped as an unknown key -
  * `config.local.yml` is gitignored, so no rename in the repository can reach the one on another machine, and a
  * silently dropped list means a run that deploys nothing and reports success.
+ * @param mcps the directories holding the MCP server manifests of the run - see [McpServerManifest]. Omitting it loads no MCP server, so no deployment writes an MCP config file.
  */
 @Serializable
 data class LocationsConfig(
@@ -32,4 +37,5 @@ data class LocationsConfig(
     val rulesets: List<String>? = null,
     val fragments: List<String>? = null,
     val skills: List<String>? = null,
+    val mcps: List<String>? = null,
 )
