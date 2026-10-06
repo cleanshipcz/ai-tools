@@ -254,7 +254,7 @@ The full reference is [07_mcp/README.md](07_mcp/README.md).
 An inline server declares how to start or reach it, and the variables it needs. This is an excerpt of the example in [07_mcp/README.md](07_mcp/README.md#an-inline-server), which shows the optional `args` and `env` too:
 
 ```yaml
-id: atlassian
+id: dbgAtlassian
 description: Jira and Confluence through the local jira-confluence-mcp-server.
 transport:
   type: stdio
@@ -384,7 +384,7 @@ A stdio server with a keyring secret starts the launcher, which receives the nam
 - A server is started through the launcher when it is a stdio server with at least one keyring secret, that is, a secret without `from` or with `from: manager`. Loading fails, whatever `secrets_manager` the machine uses, when such an inline server:
   - has a keyring secret whose name is of either class;
   - has a class A name in any other role: a secret with `from: environment`, a plain variable, or a key under `env`.
-- An inline manifest may use a class B name as a secret with `from: environment`, a plain variable or an `env` key, such as `HTTPS_PROXY` with `from: environment` in `07_mcp/atlassian.yml`, or `NODE_OPTIONS` under `env`. A class A name, such as a secret `LC_ALL` with `from: environment` beside a keyring secret, fails loading. A pointer's `server.json` may use no name of either class, and an inline server not started through the launcher is not checked. See [Names the launcher refuses](07_mcp/README.md#names-the-launcher-refuses).
+- An inline manifest may use a class B name as a secret with `from: environment`, a plain variable or an `env` key, such as `DBG_ATLASSIAN_HTTPS_PROXY` as a plain variable and `HTTPS_PROXY` under `env` in `07_mcp/dbgAtlassian.yml`, or `NODE_OPTIONS` under `env`. A class A name, such as a secret `LC_ALL` with `from: environment` beside a keyring secret, fails loading. A pointer's `server.json` may use no name of either class, and an inline server not started through the launcher is not checked. See [Names the launcher refuses](07_mcp/README.md#names-the-launcher-refuses).
 - The engine gives a tool `scripts/mcp-launch` only while it is a regular, executable file inside this checkout, owned by the user running the engine and writable by no one else, and while each directory from `scripts/` up to the root of the checkout is owned by that user and writable by no one else. After a checkout with the umask `002`, run `chmod go-w scripts/mcp-launch scripts .` from the root of the checkout. The engine checks this at every deploy and dry run only. See [The launcher file](07_mcp/README.md#the-launcher-file).
 - The keyring keeps a secret out of every file this repository, the engine or a tool writes, and out of the environment of the tool. The keyring daemon stores the items of a keyring in one file of its own under the home directory. That file is encrypted with the password of the keyring. When that password is empty, which is usual with automatic login, the items are stored without encryption, protected only by the permissions of that file. The keyring does not keep one server's secret from another: every program of your user can ask an unlocked keyring, and every server that declares a name receives the value stored under it. See [What the keyring protects](07_mcp/README.md#what-the-keyring-protects-and-what-it-does-not).
 - The launcher is referenced by the absolute path of this checkout, so moving the checkout breaks those servers until the next deploy.

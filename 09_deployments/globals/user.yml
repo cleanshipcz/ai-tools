@@ -3,6 +3,7 @@ description: My global AI tool setup
 tools:
   - claude
   - codex
+  - github_copilot
 # A replacing deploy deletes the artifact directories it generates before writing them again. In the user scope that
 # means only the folders of the skills this manifest deploys (never ~/.claude or ~/.codex as a whole), and a skill
 # dropped from this manifest is not removed either way: the engine keeps no record of what it deployed earlier.
@@ -43,6 +44,8 @@ mcps:
     - type: whitelist
       ids:
         - opensearch
+        - github-dbg
+        - dbgAtlassian
 metadata:
   version: 1.1.0
   author: cleanshipcz

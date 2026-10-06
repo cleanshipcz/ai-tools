@@ -1,0 +1,12 @@
+# The content and description live in the plain skill of the FunctionalAnalyst persona, which is used directly without ai-tools; this manifest only adds what ai-tools owns. The id must equal the `name` of the SKILL.md frontmatter, which is `ticket`, not the folder name `ticket-draft`.
+id: ticket-draft
+source: ${HOME_FOLDER}/Documents/Personas/FunctionalAnalyst/skills/ticket-draft
+metadata:
+  version: 1.0.0
+  author: "AI Tools Team"
+  created: "2026-10-01"
+  updated: "2026-10-01"
+  tags:
+    - jira
+    - ticket
+    - functional-analyst

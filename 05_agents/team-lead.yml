@@ -47,6 +47,11 @@ prompt: |
   BRIEFS
   Every spawned agent receives a self-contained brief: the specification excerpt, the acceptance criteria, the relevant plan section, and the scope it must work on.
   Briefs MUST be complete on their own; never assume an agent can see another agent's context or yours.
+  Complete does not mean large: an agent processes its brief and everything the brief tells it to read again on every turn, so a brief carries only what its agent needs to act.
+  Quote the relevant excerpt of the specification, the plan, or an earlier report; never tell an agent to read a whole report or the whole plan as background.
+  Name longer source material by path and section, each with the question it answers, for the agent to open only when it needs that detail.
+  Every brief MUST ask its agent to end its report with a section "Context for the next step": what the next agent needs to know, with file paths, in at most 300 words.
+  Build each later brief from these sections first, and open the body of a report only for the detail they do not hold.
   Run every agent one at a time; never spawn two agents concurrently.
 
   PROCESS (DO THIS IN ORDER)
@@ -124,10 +129,10 @@ constraints:
   - "Briefs and plans MUST describe outcomes and constraints, not implementations."
   - "When a gate is unsatisfiable within the iteration budget, ALWAYS stop and write a handoff report — never degrade scope silently."
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   author: "AI Tools Team"
   created: "2026-07-12"
-  updated: "2026-09-30"
+  updated: "2026-10-05"
   tags:
     - orchestration
     - delivery

@@ -17,7 +17,7 @@ When this page and the model disagree, the model wins.
 
 ```mermaid
 flowchart LR
-    inline["inline server<br/>07_mcp/atlassian.yml"] --> loader
+    inline["inline server<br/>07_mcp/dbgAtlassian.yml"] --> loader
     pointer["pointer server<br/>07_mcp/github.yml"] --> json["server.json<br/>outside this repository,<br/>checked against its pin"] --> loader
     loader["load and validate<br/>every manifest"] --> filter["deploy.mcps of a project.yml<br/>mcps of a user.yml"]
     filter --> resolve["resolve plain variables,<br/>keep secrets as references,<br/>start a stdio server with keyring<br/>secrets through scripts/mcp-launch"]
@@ -35,14 +35,14 @@ The ledger is read at the start of the next deploy, which removes the entries it
 
 | File | Server | Form |
 | --- | --- | --- |
-| `atlassian.yml` | Jira and Confluence through the local `jira-confluence-mcp-server` checkout | inline stdio server |
+| `dbgAtlassian.yml` | Jira and Confluence through the local `jira-confluence-mcp-server` checkout | inline stdio server |
 | `github.yml` | GitHub through the `server.json` of the `github-mcp-server` checkout | pointer to the remote endpoint, [pinned](#pinning-a-pointer-server) |
 
 Both carry the tag `ai-tools`, which the `mcps` filter of `09_deployments/ai-tools/project.yml` selects.
 
 Every run needs two checkouts outside this repository, `./deploy.sh --dry-run` included:
 
-- `atlassian.yml` starts `${PROJECTS_FOLDER}/jira-confluence-mcp-server/.venv/bin/jira-mcp-server`. The engine does not check that this file exists; a missing one only shows when a tool starts the server.
+- `dbgAtlassian.yml` starts `${PROJECTS_FOLDER}/jira-confluence-mcp-server/.venv/bin/jira-mcp-server`. The engine does not check that this file exists; a missing one only shows when a tool starts the server.
 - `github.yml` reads the `server.json` of `${PROJECTS_FOLDER}/github-mcp-server`, a checkout of `github/github-mcp-server`. With the default `config.yml` that is `~/Documents/Projects/github-mcp-server`. Every run reads that file, so a machine without the checkout fails every run until you check it out or remove `github.yml`.
 - `github.yml` pins the hash of that `server.json`. A checkout whose `server.json` holds other bytes fails every run until you review the change and update the pin; see [Pinning a pointer server](#pinning-a-pointer-server).
 
@@ -75,10 +75,10 @@ The full step list is in [QUICKREF.md](../QUICKREF.md#add-an-mcp-server).
 ## An inline server
 
 An inline server declares how a tool starts or reaches it, and the variables it needs.
-This is a shortened `07_mcp/atlassian.yml`:
+This is a shortened `07_mcp/dbgAtlassian.yml`:
 
 ```yaml
-id: atlassian
+id: dbgAtlassian
 description: Jira and Confluence through the local jira-confluence-mcp-server.
 transport:
   type: stdio
@@ -286,7 +286,7 @@ Before you start:
 
 - Install `secret-tool`, the command-line program of the keyring. On Ubuntu and Debian it is the package `libsecret-tools`.
 - Open a terminal of your desktop session, where the keyring runs. [Storing a secret in the keyring](#storing-a-secret-in-the-keyring) lists exactly what that terminal needs.
-- Look up the name of the secret: it is the `name` of a variable marked `secret: true` in the manifest of the server, such as `JIRA_PAT` in `07_mcp/atlassian.yml`.
+- Look up the name of the secret: it is the `name` of a variable marked `secret: true` in the manifest of the server, such as `JIRA_PAT` in `07_mcp/dbgAtlassian.yml`.
 - Make sure that `./deploy.sh --dry-run` can run. It needs what [Requirements](../README.md#requirements) of `README.md` lists, among them a JDK and two checkouts of other repositories.
 
 **Step 1: store the secret.**
@@ -326,25 +326,24 @@ Each line starts with the time of day.
 When the secret is stored, its line reads:
 
 ```
-09:28:19.688 INFO  c.c.a.e.tools.mcp.McpServerResolver - MCP server 'atlassian' reads the optional secret variable 'JIRA_PAT' from the keyring, which holds it.
+09:28:19.688 INFO  c.c.a.e.tools.mcp.McpServerResolver - MCP server 'dbgAtlassian' reads the optional secret variable 'JIRA_PAT' from the keyring, which holds it.
 ```
 
 When it is not stored, but the variable is set in the environment of the run, for example by your shell profile, the line is an INFO line that ends with `the keyring does not hold it, and the environment of this run sets it.`.
 When it is found in neither, the line is a warning that ends with the command of step 1:
 
 ```
-09:28:19.688 WARN  c.c.a.e.tools.mcp.McpServerResolver - MCP server 'atlassian' reads the optional secret variable 'JIRA_PAT' from the keyring or the environment of the tool that starts it, but the keyring does not hold it and the environment of this run does not set it. Store it with: secret-tool store --label='ai-tools MCP JIRA_PAT' service ai-tools-mcp variable JIRA_PAT
+09:28:19.688 WARN  c.c.a.e.tools.mcp.McpServerResolver - MCP server 'dbgAtlassian' reads the optional secret variable 'JIRA_PAT' from the keyring or the environment of the tool that starts it, but the keyring does not hold it and the environment of this run does not set it. Store it with: secret-tool store --label='ai-tools MCP JIRA_PAT' service ai-tools-mcp variable JIRA_PAT
 ```
 
 `optional` in a line means that the server can start without that secret.
 A `required` secret is one the server cannot start without.
 
 The other secrets of the same server that the keyring supplies keep their own lines until you store them too.
-In this repository, those of `atlassian` are `CONFLUENCE_PAT`, `JIRA_CLIENT_CERT` and `JIRA_CLIENT_KEY`.
+In this repository, those of `dbgAtlassian` are `CONFLUENCE_PAT`, `JIRA_CLIENT_CERT` and `JIRA_CLIENT_KEY`.
 You need not store a secret you do not use: a warning about an optional secret you do not use needs no action.
 Two more lines end with `Export it before starting the tool.`.
-One is about `HTTPS_PROXY` of `atlassian`, which its manifest declares `from: environment`.
-The other is about `GITHUB_AUTHORIZATION` of `github`, which is a remote server; see [Remote servers](#remote-servers).
+They are about `GITHUB_AUTHORIZATION` of `github` and `GITHUB_DBG_TOKEN` of `github-dbg`, which are remote servers; see [Remote servers](#remote-servers).
 The keyring never supplies these two secrets, so storing them does not remove their lines.
 Export such a secret instead, and only when you use it.
 
@@ -662,7 +661,7 @@ Why the rule differs by class:
 
 Examples:
 
-- Allowed: `07_mcp/atlassian.yml` declares `HTTPS_PROXY` with `secret: true` and `from: environment`, beside four keyring secrets. `HTTPS_PROXY` matches `*_PROXY`, which is of class B.
+- Allowed: `07_mcp/dbgAtlassian.yml` declares the plain variable `DBG_ATLASSIAN_HTTPS_PROXY` (`secret: false`) and passes it to the server as `HTTPS_PROXY` under `env`, beside four keyring secrets. Both names match `*_PROXY`, which is of class B.
 - Allowed: an inline stdio server with a keyring secret sets `NODE_OPTIONS` under `env`. `NODE_OPTIONS` matches `NODE_*`, which is of class B.
 - Refused: the same server declares a secret `LC_ALL` with `from: environment`. `LC_ALL` matches `LC_*`, which is of class A, and bash as `/bin/sh` prints an invalid value of `LC_ALL` before the launcher runs.
 
@@ -1005,7 +1004,7 @@ Where a tool shows the standard error of a server:
 
 The check that works for every tool is to start the launcher by hand in a terminal:
 
-1. Open the MCP config file the tool reads, such as `.mcp.json` in the root of the project, and find the entry of the server, such as `"atlassian"`. For Codex, it is the table `[mcp_servers.atlassian]` of `.codex/config.toml`.
+1. Open the MCP config file the tool reads, such as `.mcp.json` in the root of the project, and find the entry of the server, such as `"dbgAtlassian"`. For Codex, it is the table `[mcp_servers.dbgAtlassian]` of `.codex/config.toml`.
 2. Copy the value of `command`, which is the path of the launcher, and the items of `args` up to and including `--`. They hold names only, never the value of a secret.
 3. In a terminal of your desktop session, run them with `/bin/true` in place of the real command, each item in single quotes. For the `demo` entry of [What each tool's entry looks like](#what-each-tools-entry-looks-like), that is:
 
@@ -1474,7 +1473,7 @@ A ledger lists, for every MCP config file and `settings.json` of its target that
       "deny:mcp__github__delete_repository": "sha256:<64 hexadecimal digits>"
     },
     ".mcp.json": {
-      "atlassian": "sha256:<64 hexadecimal digits>",
+      "dbgAtlassian": "sha256:<64 hexadecimal digits>",
       "github": ["sha256:<64 hexadecimal digits>", "sha256:<64 hexadecimal digits>"]
     }
   }
@@ -1773,7 +1772,7 @@ Each message of this group names the manifest, and the whole run stops before an
 
 **`Exception in thread "main" YamlException at variables[<n>].from on line <l>, column <c>: Failed to load <manifest>`**, followed by **`Caused by: InvalidPropertyValueException at variables[<n>].from on line <l>, column <c>: Value for 'from' is invalid: Value '<value>' is not a valid option, permitted choices are: environment, manager`** and a stack trace: `from` holds a value other than `manager` or `environment`. Correct it. A one-line message instead of the stack trace is listed as not scheduled in [PLANNED_FEATURES.md](../PLANNED_FEATURES.md#mcps).
 
-**`Failed to load <manifest>: MCP server '<id>' declares the secret variable '<NAME>' without 'from: environment', so on a machine with a secrets manager the launcher reads it, and the launcher refuses every secret name matching '<PATTERN>' without regard to case: <reason>. This is checked on every machine, whatever secrets manager it uses. Rename the variable, or declare it 'from: environment'.`**: a keyring secret of an inline stdio server has a name of either class. For a class B name, such as `HTTPS_PROXY`, declare it `from: environment` and export it before starting the tool, as `07_mcp/atlassian.yml` does, or rename it, if the server accepts another name. For a class A name that is the only keyring secret of the server, the same two remedies work. See [Names the launcher refuses](#names-the-launcher-refuses).
+**`Failed to load <manifest>: MCP server '<id>' declares the secret variable '<NAME>' without 'from: environment', so on a machine with a secrets manager the launcher reads it, and the launcher refuses every secret name matching '<PATTERN>' without regard to case: <reason>. This is checked on every machine, whatever secrets manager it uses. Rename the variable, or declare it 'from: environment'.`**: a keyring secret of an inline stdio server has a name of either class. For a class B name, such as `HTTPS_PROXY`, declare it `from: environment` and export it before starting the tool, as `07_mcp/dbgAtlassian.yml` does, or rename it, if the server accepts another name. For a class A name that is the only keyring secret of the server, the same two remedies work. See [Names the launcher refuses](#names-the-launcher-refuses).
 
 **`Failed to load <manifest>: MCP server '<id>' declares the secret variable '<NAME>' without 'from: environment', ... Rename the variable, or declare every secret variable 'from: environment'.`**: the same message, for a keyring secret whose name is of class A while the server has another keyring secret. Declaring only that secret `from: environment` would leave a class A name in the entry of a server still started through the launcher, which the next message refuses. Rename the variable. Or declare every secret of the server `from: environment`, so that no launcher is used, and export those secrets before starting the tool.
 

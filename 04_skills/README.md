@@ -20,8 +20,9 @@ When this page and the model disagree, the model wins.
 | `jira-ticket` | pointer | Create and update Jira tickets |
 | `confluence-doc` | pointer | Create and update Confluence pages |
 | `confluence-search` | pointer | Search and read Confluence |
+| `ticket` | pointer | Draft the content of a Jira ticket for a developer with low domain knowledge, from the FunctionalAnalyst persona |
 
-The three pointer skills point at `${PROJECTS_FOLDER}/jira-confluence-mcp-server/skills/`, a separate repository. Every run, `./deploy.sh --dry-run` included, needs that repository checked out there; see [Pointer skill](#pointer-skill).
+The three Jira and Confluence pointer skills point at `${PROJECTS_FOLDER}/jira-confluence-mcp-server/skills/`, a separate repository, and `ticket` at `${HOME_FOLDER}/Documents/Personas/FunctionalAnalyst/skills/ticket-draft`. Every run, `./deploy.sh --dry-run` included, needs those folders present; see [Pointer skill](#pointer-skill).
 
 ## Three Ways to Write a Skill
 

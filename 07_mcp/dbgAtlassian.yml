@@ -1,11 +1,14 @@
-id: atlassian
+id: dbgAtlassian
 description: Jira and Confluence (self-managed Data Center / Server) through the local jira-confluence-mcp-server - search, read, create, and update issues and pages, and transfer attachments.
 # The server runs from its own checkout; ${PROJECTS_FOLDER} comes from env_vars of config.yml or config.local.yml.
 transport:
   type: stdio
   command: ${PROJECTS_FOLDER}/jira-confluence-mcp-server/.venv/bin/jira-mcp-server
+  # The server reads its proxy from HTTPS_PROXY; the value comes from the variable DBG_ATLASSIAN_HTTPS_PROXY, so that the env_vars key names this server and no other manifest picks the proxy up. When env_vars does not declare it, this entry is left out and the server connects directly.
+  env:
+    HTTPS_PROXY: ${DBG_ATLASSIAN_HTTPS_PROXY}
 # Every variable is optional: the server enables Jira and Confluence each only when its base URL is set.
-# Every secret variable but HTTPS_PROXY is read from the secrets manager of the machine when a tool starts the server: the entry starts the launcher scripts/mcp-launch of this repository, which looks each secret up in the libsecret keyring and falls back to the environment of the tool. On a machine whose config sets 'secrets_manager: environment', each tool passes every secret from its own environment by name. The engine never reads the value of a secret.
+# Every secret variable is read from the secrets manager of the machine when a tool starts the server: the entry starts the launcher scripts/mcp-launch of this repository, which looks each secret up in the libsecret keyring and falls back to the environment of the tool. On a machine whose config sets 'secrets_manager: environment', each tool passes every secret from its own environment by name. The engine never reads the value of a secret.
 # Plain variables are resolved at deploy time from env_vars of config.yml or config.local.yml only, and written as values; one declared nowhere is left out.
 variables:
   - name: JIRA_PAT
@@ -40,17 +43,16 @@ variables:
     description: TLS verification for Confluence - true, false, or the path to a CA bundle.
     secret: false
     required: false
-  - name: HTTPS_PROXY
-    # Secret, because a proxy URL may carry credentials. Read from the environment of the tool only, which passes it to the server with or without the launcher. HTTPS_PROXY matches *_PROXY, a class B name of the launcher's list of refused names: it changes where the server connects, never how the launcher runs. So it cannot be a keyring secret, and without 'from: environment' loading would fail; an inline manifest may declare it 'from: environment'.
-    description: HTTPS proxy the server connects through.
-    secret: true
+  - name: DBG_ATLASSIAN_HTTPS_PROXY
+    # Plain, so that the proxy applies to this server alone: the value comes from env_vars and is written into the entry as HTTPS_PROXY. Never put a proxy URL that carries credentials into env_vars, because a plain value is written into every MCP config file. Both names match *_PROXY, a class B name of the launcher's list of refused names, which an inline manifest may use as a plain variable or an env key but never as a keyring secret.
+    description: HTTPS proxy the server connects through, without credentials in the URL; passed to the server as HTTPS_PROXY.
+    secret: false
     required: false
-    from: environment
 metadata:
-  version: 1.2.0
+  version: 1.3.0
   author: cleanshipcz
   created: 2026-09-24
-  updated: 2026-09-29
+  updated: 2026-10-05
   tags:
     - ai-tools
     - atlassian
